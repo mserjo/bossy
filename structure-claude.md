@@ -712,3 +712,218 @@ kudos/
 │   │   │   ├── Runner.rc            # Файл ресурсів
 │   │   │   ├── runner.ico           # Іконка додатку
 │   │   │   └── win32_window.cpp     # Вікно Win32
+│   │
+│   ├── linux/                       # Linux (Ubuntu) specific files
+│   │   ├── runner/                  # Linux application runner
+│   │   │   ├── main.cc              # Main C++ file for Linux
+│   │   │   ├── CMakeLists.txt       # CMake configuration for Linux
+│   │   │   └── resources/           # Resources for Linux (e.g., icons)
+│   │   ├── my_application.cc        # Main application class
+│   │   ├── my_application.h
+│   │   └── CMakeLists.txt           # Root CMake for Linux part
+│   │
+│   ├── macos/                       # macOS specific files
+│   │   ├── Runner/                  # macOS application
+│   │   │   ├── AppDelegate.swift    # Application delegate
+│   │   │   ├── MainMenu.xib         # Main menu interface file
+│   │   │   └── Info.plist           # macOS configuration
+│   │   ├── Runner.xcworkspace/      # Xcode workspace
+│   │   └── Podfile                  # CocoaPods dependencies
+│   │
+│   ├── assets/                      # Static assets for frontend
+│   │   ├── images/                  # General images
+│   │   │   ├── logo.png             # Application logo
+│   │   │   ├── placeholders/        # Placeholder images
+│   │   ├── icons/                   # Icons (besides avatars, group icons etc. from backend)
+│   │   │   ├── feature_icon.svg
+│   │   ├── fonts/                   # Custom fonts
+│   │   │   ├── CustomFont-Regular.ttf
+│   │   │   └── CustomFont-Bold.ttf
+│   │   └── translations/            # JSON translation files (if not solely using Flutter l10n for .arb)
+│   │       ├── en.json
+│   │       └── uk.json
+│   │
+│   ├── lib/                         # Main Flutter application code (Dart)
+│   │   ├── main.dart                # Entry point of the application
+│   │   ├──
+│   │   ├── app.dart                 # Root widget of the application (e.g., MaterialApp/CupertinoApp)
+│   │   ├──
+│   │   ├── src/                     # Source code
+│   │   │   ├── config/              # Configuration files
+│   │   │   │   ├── __init.dart      # (if needed, or just files)
+│   │   │   │   ├── app_config.dart  # Application-level configuration
+│   │   │   │   ├── theme_config.dart # Theme definitions (light, dark, custom)
+│   │   │   │   ├── flavor_config.dart # Build flavor configurations (dev, prod)
+│   │   │   │   └── navigation_config.dart # Routes and navigation setup
+│   │   │   │
+│   │   │   ├── core/                # Core utilities and base classes
+│   │   │   │   ├── constants/       # Application constants (strings, numbers)
+│   │   │   │   │   └── app_constants.dart
+│   │   │   │   ├── enums/           # Enumerations used across the app
+│   │   │   │   │   └── ui_enums.dart
+│   │   │   │   ├── errors/          # Error handling (failures, exceptions)
+│   │   │   │   │   ├── exceptions.dart
+│   │   │   │   │   └── failures.dart
+│   │   │   │   ├── usecases/        # Business logic use cases (Clean Architecture)
+│   │   │   │   │   └── usecase.dart # Base use case class
+│   │   │   │   ├── mixins/          # Dart mixins
+│   │   │   │   ├── extensions/      # Dart extensions
+│   │   │   │   │   └── string_extensions.dart
+│   │   │   │   ├── navigation/      # Navigation helpers/router
+│   │   │   │   │   ├── app_router.dart
+│   │   │   │   │   └── route_names.dart
+│   │   │   │   ├── di/              # Dependency injection setup (e.g., get_it)
+│   │   │   │   │   └── service_locator.dart
+│   │   │   │   └── network/         # Network utility (e.g. Dio setup)
+│   │   │   │       └── api_client.dart
+│   │   │   │
+│   │   │   ├── data/                # Data layer (models, repositories, data sources)
+│   │   │   │   ├── models/          # Data models (from API, local)
+│   │   │   │   │   ├── request/     # Request models
+│   │   │   │   │   └── response/    # Response models
+│   │   │   │   │   ├── user_model.dart
+│   │   │   │   │   ├── group_model.dart
+│   │   │   │   │   ├── task_model.dart
+│   │   │   │   │   ├── bonus_model.dart
+│   │   │   │   │   └── auth_model.dart
+│   │   │   │   ├── repositories/    # Abstract repository interfaces
+│   │   │   │   │   ├── auth_repository.dart
+│   │   │   │   │   └── group_repository.dart
+│   │   │   │   └── sources/         # Data sources (remote, local)
+│   │   │   │       ├── remote/      # Remote API data sources
+│   │   │   │       │   ├── auth_remote_data_source.dart
+│   │   │   │       │   └── group_remote_data_source.dart
+│   │   │   │       └── local/       # Local data sources (SQLite, SharedPreferences)
+│   │   │   │           ├── user_local_data_source.dart
+│   │   │   │           └── app_preferences.dart
+│   │   │   │
+│   │   │   ├── domain/              # Domain layer (entities, usecases interfaces, repository interfaces) - if following Clean Arch strictly
+│   │   │   │   ├── entities/        # Business objects (plain Dart objects)
+│   │   │   │   │   ├── user.dart
+│   │   │   │   │   └── task.dart
+│   │   │   │   ├── repositories/    # Abstract repository interfaces (could be here or in data/)
+│   │   │   │   └── usecases/        # Abstract usecase definitions
+│   │   │   │       ├── login_user_usecase.dart
+│   │   │   │       └── get_group_details_usecase.dart
+│   │   │   │
+│   │   │   ├── presentation/        # UI Layer (screens, widgets, state management)
+│   │   │   │   ├── state_management/ # State management (Bloc, Provider, Riverpod, GetX)
+│   │   │   │   │   ├── auth_bloc/
+│   │   │   │   │   │   ├── auth_bloc.dart
+│   │   │   │   │   │   ├── auth_event.dart
+│   │   │   │   │   │   └── auth_state.dart
+│   │   │   │   │   └── group_provider.dart
+│   │   │   │   ├── screens/         # Application screens or pages
+│   │   │   │   │   ├── auth/        # Authentication screens
+│   │   │   │   │   │   ├── login_screen.dart
+│   │   │   │   │   │   ├── register_screen.dart
+│   │   │   │   │   │   └── forgot_password_screen.dart
+│   │   │   │   │   ├── home/        # Home screen
+│   │   │   │   │   │   └── home_screen.dart
+│   │   │   │   │   ├── groups/      # Group related screens
+│   │   │   │   │   │   ├── group_list_screen.dart
+│   │   │   │   │   │   ├── group_details_screen.dart
+│   │   │   │   │   │   └── create_group_screen.dart
+│   │   │   │   │   ├── tasks/       # Task related screens
+│   │   │   │   │   │   ├── task_list_screen.dart
+│   │   │   │   │   │   └── task_details_screen.dart
+│   │   │   │   │   ├── profile/     # User profile screen
+│   │   │   │   │   │   └── profile_screen.dart
+│   │   │   │   │   ├── settings/    # Settings screen
+│   │   │   │   │   │   └── settings_screen.dart
+│   │   │   │   │   └── notifications/ # Notifications screen
+│   │   │   │   │       └── notifications_screen.dart
+│   │   │   │   ├── widgets/         # Reusable UI widgets
+│   │   │   │   │   ├── common/      # Common widgets (buttons, text fields)
+│   │   │   │   │   │   ├── custom_button.dart
+│   │   │   │   │   │   └── loading_indicator.dart
+│   │   │   │   │   ├── auth/        # Auth specific widgets
+│   │   │   │   │   │   └── login_form.dart
+│   │   │   │   │   ├── tasks/       # Task specific widgets
+│   │   │   │   │   │   └── task_card.dart
+│   │   │   │   │   └── layout/      # Layout widgets (e.g. main_app_bar.dart)
+│   │   │   │   │       └── main_drawer.dart
+│   │   │   │   └── themes/          # Theme data and styles
+│   │   │   │       ├── app_theme.dart # Main theme setup
+│   │   │   │       ├── color_schemes.dart
+│   │   │   │       └── text_styles.dart
+│   │   │   │
+│   │   │   ├── utils/               # Utility functions and helpers
+│   │   │   │   ├── validators.dart    # Input validators
+│   │   │   │   ├── formatters.dart    # Data formatters
+│   │   │   │   ├── logger.dart        # Logging utility
+│   │   │   │   ├── device_info.dart   # Device information
+│   │   │   │   └── connectivity.dart  # Connectivity checker
+│   │   │   │
+│   │   │   └── services/            # External services integration (Firebase, etc.) - distinct from data/sources
+│   │   │       ├── notification_service.dart # Push notifications, local notifications
+│   │   │       ├── analytics_service.dart    # Analytics
+│   │   │       └── offline_sync_service.dart # For offline mode support
+│   │   │
+│   │   ├── generated/               # Generated code (e.g., by build_runner)
+│   │   │   ├── l10n.dart            # Generated localization files
+│   │   │   └── ...                  # Other generated files (e.g., for DI, routing)
+│   │   │
+│   │   └── l10n/                    # Localization files (.arb)
+│   │       ├── app_en.arb
+│   │       └── app_uk.arb
+│   │
+│   ├── test/                        # Frontend tests
+│   │   ├── flutter_test_config.dart # Configuration for flutter test command
+│   │   ├──
+│   │   ├── fixtures/                # Test fixtures and mock data
+│   │   │   ├── user_fixtures.json
+│   │   │   └── task_fixtures.dart
+│   │   ├──
+│   │   ├── mocks/                   # Mock classes for dependencies
+│   │   │   ├── mock_auth_repository.dart
+│   │   │   └── mock_navigator.dart
+│   │   ├──
+│   │   ├── core/                    # Tests for core utilities
+│   │   │   └── extensions/
+│   │   │       └── string_extensions_test.dart
+│   │   ├──
+│   │   ├── data/                    # Tests for data layer
+│   │   │   ├── models/              # Tests for data models
+│   │   │   │   └── user_model_test.dart
+│   │   │   ├── repositories/        # Tests for repository implementations
+│   │   │   │   └── auth_repository_impl_test.dart
+│   │   │   └── sources/             # Tests for data sources
+│   │   │       └── auth_remote_data_source_test.dart
+│   │   ├──
+│   │   ├── domain/                  # Tests for domain layer
+│   │   │   └── usecases/            # Tests for use cases
+│   │   │       └── login_user_usecase_test.dart
+│   │   ├──
+│   │   ├── presentation/            # Tests for presentation layer
+│   │   │   ├── state_management/    # Tests for Blocs/Providers/Cubits
+│   │   │   │   └── auth_bloc_test.dart
+│   │   │   ├── screens/             # Widget tests for screens
+│   │   │   │   └── login_screen_test.dart
+│   │   │   └── widgets/             # Widget tests for individual widgets
+│   │   │       └── custom_button_test.dart
+│   │   ├──
+│   │   ├── unit/                    # General unit tests (can be merged with above specific paths)
+│   │   │   └── example_unit_test.dart
+│   │   ├──
+│   │   ├── widget/                  # General widget tests (can be merged with above specific paths)
+│   │   │   └── example_widget_test.dart
+│   │   ├──
+│   │   ├── integration_test/        # Integration tests (run on device/emulator)
+│   │   │   ├── app_test.dart        # Full app flow tests
+│   │   │   └── login_flow_test.dart
+│   │   ├──
+│   │   └── e2e/                     # End-to-end tests (using flutter_driver or patrol)
+│   │       ├── patrol/              # Example if using Patrol
+│   │       │   └── login_e2e_test.dart
+│   │       └── test_driver/         # Example if using flutter_driver
+│   │           ├── app.dart
+│   │           └── app_test.dart
+│
+# TODO: Add scripts and other top-level directories if needed for frontend or general project management.
+# e.g.
+# ├── scripts/                         # General utility scripts
+# │   ├── setup_dev_env.sh             # Script to set up development environment
+# │   ├── build_all.sh                 # Script to build all components (backend, frontend platforms)
+# │   └── deploy.sh                    # Script for deployment
+# └── ... (other shared directories)

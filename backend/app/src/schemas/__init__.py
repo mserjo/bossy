@@ -30,6 +30,19 @@ from .gamification import (
     UserGroupRatingResponse,
     GroupLeaderboardResponse,
 )
+from .notifications import (
+    NotificationBase,
+    NotificationCreateInternal,
+    NotificationUpdate,
+    NotificationResponse,
+    NotificationTemplateBase,
+    NotificationTemplateCreate,
+    NotificationTemplateUpdate,
+    NotificationTemplateResponse,
+    NotificationDeliveryAttemptBase,
+    NotificationDeliveryAttemptCreate,
+    NotificationDeliveryAttemptResponse,
+)
 
 __all__ = [
     # Base schemas (example, uncomment if you have them in .base)
@@ -53,6 +66,19 @@ __all__ = [
     "UserGroupRatingBase",
     "UserGroupRatingResponse",
     "GroupLeaderboardResponse",
+
+    # Notification Schemas
+    "NotificationBase",
+    "NotificationCreateInternal",
+    "NotificationUpdate",
+    "NotificationResponse",
+    "NotificationTemplateBase",
+    "NotificationTemplateCreate",
+    "NotificationTemplateUpdate",
+    "NotificationTemplateResponse",
+    "NotificationDeliveryAttemptBase",
+    "NotificationDeliveryAttemptCreate",
+    "NotificationDeliveryAttemptResponse",
 ]
 
 logger.info(f"Successfully exported schemas: {__all__}")

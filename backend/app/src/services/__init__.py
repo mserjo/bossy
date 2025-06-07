@@ -227,6 +227,46 @@ for name, service in _imported_task_event_services.items():
     else: globals()[name] = None # Ensure name exists as None if not imported
 
 
+# --- Bonus Services ---
+BONUS_RULE_SERVICE = "BonusRuleService"
+USER_ACCOUNT_SERVICE = "UserAccountService"
+ACCOUNT_TRANSACTION_SERVICE = "AccountTransactionService"
+REWARD_SERVICE = "RewardService"
+BONUS_CALCULATION_SERVICE = "BonusCalculationService"
+
+_bonus_service_names = [
+    BONUS_RULE_SERVICE, USER_ACCOUNT_SERVICE, ACCOUNT_TRANSACTION_SERVICE,
+    REWARD_SERVICE, BONUS_CALCULATION_SERVICE
+]
+_imported_bonus_services = {}
+
+try:
+    from .bonuses import (
+        BonusRuleService, UserAccountService, AccountTransactionService,
+        RewardService, BonusCalculationService
+    )
+    _imported_bonus_services[BONUS_RULE_SERVICE] = BonusRuleService
+    _imported_bonus_services[USER_ACCOUNT_SERVICE] = UserAccountService
+    _imported_bonus_services[ACCOUNT_TRANSACTION_SERVICE] = AccountTransactionService
+    _imported_bonus_services[REWARD_SERVICE] = RewardService
+    _imported_bonus_services[BONUS_CALCULATION_SERVICE] = BonusCalculationService
+    logger.info("Successfully imported all specified bonus services.")
+except ImportError as e:
+    logger.warning(f"Could not import one or more bonus services from .bonuses: {e}. Attempting individual imports.")
+    for service_name_const in _bonus_service_names:
+        try:
+            module = __import__("app.src.services.bonuses", globals(), locals(), [service_name_const], 0)
+            _imported_bonus_services[service_name_const] = getattr(module, service_name_const)
+            logger.info(f"Successfully imported {service_name_const} individually.")
+        except (ImportError, AttributeError) as ie:
+            logger.warning(f"Could not import {service_name_const} from .bonuses: {ie}")
+            _imported_bonus_services[service_name_const] = None
+
+for name, service in _imported_bonus_services.items():
+    if service: globals()[name] = service
+    else: globals()[name] = None # Ensure name exists as None if not imported
+
+
 # Construct __all__ dynamically
 __all__ = []
 if BaseService:
@@ -237,6 +277,7 @@ __all__.extend([name for name, service in _imported_dictionary_services.items() 
 __all__.extend([name for name, service in _imported_auth_services.items() if service is not None])
 __all__.extend([name for name, service in _imported_group_services.items() if service is not None])
 __all__.extend([name for name, service in _imported_task_event_services.items() if service is not None])
+__all__.extend([name for name, service in _imported_bonus_services.items() if service is not None])
 
 # Ensure __all__ has unique entries
 # and sort for consistency.

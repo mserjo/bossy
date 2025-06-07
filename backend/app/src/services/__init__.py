@@ -147,6 +147,44 @@ for name, service in _imported_auth_services.items():
     else: globals()[name] = None # Ensure name exists as None if not imported
 
 
+# --- Group Services ---
+GROUP_SERVICE = "GroupService"
+GROUP_SETTING_SERVICE = "GroupSettingService"
+GROUP_MEMBERSHIP_SERVICE = "GroupMembershipService"
+GROUP_INVITATION_SERVICE = "GroupInvitationService"
+
+_group_service_names = [
+    GROUP_SERVICE, GROUP_SETTING_SERVICE,
+    GROUP_MEMBERSHIP_SERVICE, GROUP_INVITATION_SERVICE
+]
+_imported_group_services = {}
+
+try:
+    from .groups import (
+        GroupService, GroupSettingService,
+        GroupMembershipService, GroupInvitationService
+    )
+    _imported_group_services[GROUP_SERVICE] = GroupService
+    _imported_group_services[GROUP_SETTING_SERVICE] = GroupSettingService
+    _imported_group_services[GROUP_MEMBERSHIP_SERVICE] = GroupMembershipService
+    _imported_group_services[GROUP_INVITATION_SERVICE] = GroupInvitationService
+    logger.info("Successfully imported all specified group services.")
+except ImportError as e:
+    logger.warning(f"Could not import one or more group services from .groups: {e}. Attempting individual imports.")
+    for service_name_const in _group_service_names:
+        try:
+            module = __import__("app.src.services.groups", globals(), locals(), [service_name_const], 0)
+            _imported_group_services[service_name_const] = getattr(module, service_name_const)
+            logger.info(f"Successfully imported {service_name_const} individually.")
+        except (ImportError, AttributeError) as ie:
+            logger.warning(f"Could not import {service_name_const} from .groups: {ie}")
+            _imported_group_services[service_name_const] = None
+
+for name, service in _imported_group_services.items():
+    if service: globals()[name] = service
+    else: globals()[name] = None # Ensure name exists as None if not imported
+
+
 # Construct __all__ dynamically
 __all__ = []
 if BaseService:
@@ -155,6 +193,7 @@ if BaseService:
 __all__.extend([name for name, service in _imported_system_services.items() if service is not None])
 __all__.extend([name for name, service in _imported_dictionary_services.items() if service is not None])
 __all__.extend([name for name, service in _imported_auth_services.items() if service is not None])
+__all__.extend([name for name, service in _imported_group_services.items() if service is not None])
 
 # Ensure __all__ has unique entries
 # and sort for consistency.

@@ -111,6 +111,42 @@ for name, service in _imported_dictionary_services.items():
     else: globals()[name] = None # Ensure name exists as None if not imported
 
 
+# --- Auth Services ---
+USER_SERVICE = "UserService"
+TOKEN_SERVICE = "TokenService"
+PASSWORD_SERVICE = "PasswordService"
+USER_SESSION_SERVICE = "UserSessionService"
+
+_auth_service_names = [
+    USER_SERVICE, TOKEN_SERVICE, PASSWORD_SERVICE, USER_SESSION_SERVICE
+]
+_imported_auth_services = {}
+
+try:
+    from .auth import (
+        UserService, TokenService, PasswordService, UserSessionService
+    )
+    _imported_auth_services[USER_SERVICE] = UserService
+    _imported_auth_services[TOKEN_SERVICE] = TokenService
+    _imported_auth_services[PASSWORD_SERVICE] = PasswordService
+    _imported_auth_services[USER_SESSION_SERVICE] = UserSessionService
+    logger.info("Successfully imported all specified authentication services.")
+except ImportError as e:
+    logger.warning(f"Could not import one or more authentication services from .auth: {e}. Attempting individual imports.")
+    for service_name_const in _auth_service_names:
+        try:
+            module = __import__("app.src.services.auth", globals(), locals(), [service_name_const], 0)
+            _imported_auth_services[service_name_const] = getattr(module, service_name_const)
+            logger.info(f"Successfully imported {service_name_const} individually.")
+        except (ImportError, AttributeError) as ie:
+            logger.warning(f"Could not import {service_name_const} from .auth: {ie}")
+            _imported_auth_services[service_name_const] = None
+
+for name, service in _imported_auth_services.items():
+    if service: globals()[name] = service
+    else: globals()[name] = None # Ensure name exists as None if not imported
+
+
 # Construct __all__ dynamically
 __all__ = []
 if BaseService:
@@ -118,8 +154,9 @@ if BaseService:
 
 __all__.extend([name for name, service in _imported_system_services.items() if service is not None])
 __all__.extend([name for name, service in _imported_dictionary_services.items() if service is not None])
+__all__.extend([name for name, service in _imported_auth_services.items() if service is not None])
 
-# Ensure __all__ has unique entries (though direct construction above should be fine)
+# Ensure __all__ has unique entries
 # and sort for consistency.
 __all__ = sorted(list(set(__all__)))
 

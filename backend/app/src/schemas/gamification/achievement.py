@@ -1,106 +1,101 @@
-import uuid
-import datetime
+# backend/app/src/schemas/gamification/achievement.py
 import logging
-from pydantic import BaseModel, Field
-from .badge import BadgeResponse # Assuming BadgeResponse is in badge.py
+from uuid import UUID
+from datetime import datetime
+from typing import Optional, Dict, Any
 
-# Configure logging
+from pydantic import BaseModel, Field
+
+from app.src.schemas.base import BaseDBRead  # Common DB fields
+from app.src.schemas.gamification.badge import BadgeResponse # To nest badge details
+# from app.src.schemas.auth.user import UserResponse # Assuming user schema for nesting
+
+# Initialize logger for this module
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.INFO) # Basic config for demonstration
+
+# --- UserAchievement Schemas ---
 
 class UserAchievementBase(BaseModel):
     """
-    Base schema for a User's Achievement (earning a badge).
-    Identifies the user and the badge they earned.
+    Base schema for user achievements, linking a user to a badge they've earned.
     """
-    user_id: uuid.UUID = Field(..., description="The unique identifier of the user who earned the achievement.")
-    badge_id: uuid.UUID = Field(..., description="The unique identifier of the badge that was earned.")
+    user_id: UUID = Field(..., description="The unique identifier of the user who earned the achievement.")
+    badge_id: UUID = Field(..., description="The unique identifier of the badge that was awarded.")
+    achieved_at: datetime = Field(
+        default_factory=datetime.utcnow,
+        description="Timestamp when the user was awarded this badge/achievement."
+    )
+    context: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Optional dictionary to store additional context about the achievement, e.g., related task ID, event details."
+    )
 
     class Config:
         orm_mode = True
-        # For Pydantic V2:
-        # model_config = { "from_attributes": True }
-
-class UserAchievementCreate(UserAchievementBase):
-    """
-    Schema for creating a new UserAchievement.
-    This typically happens when a user meets the criteria for a badge.
-    The 'achieved_at' timestamp can be set automatically by the server.
-    """
-    achieved_at: datetime.datetime | None = Field(default_factory=datetime.datetime.now, description="Timestamp when the badge was earned. Defaults to current time.")
-
-
-class UserAchievementResponse(UserAchievementBase):
-    """
-    Schema for representing a User's Achievement in API responses.
-    Includes details from UserAchievementBase plus database-generated fields and potentially the badge details.
-    """
-    id: uuid.UUID = Field(..., description="The unique identifier of this achievement record.")
-    achieved_at: datetime.datetime = Field(..., description="Timestamp when the badge was earned.")
-    badge: BadgeResponse | None = Field(None, description="Detailed information about the badge earned. Included if requested.") # Nested schema
-
-    # For Pydantic V2, the Config class would be nested here too if needed.
-    # class Config:
-    #     from_attributes = True
-    #
-    #     model_config = {
-    #         "from_attributes": True,
-    #         "json_schema_extra": {
-    #             "examples": [
-    #                 {
-    #                     "id": "ua1b2c3d4-e5f6-7890-1234-567890abcdef",
-    #                     "user_id": "u1a2b3c4-d5e6-f789-0123-456789abcdef",
-    #                     "badge_id": "b1a2b3c4-d5e6-f789-0123-456789abcdef",
-    #                     "achieved_at": "2023-03-20T14:30:00Z",
-    #                     "badge": { # Example of nested BadgeResponse
-    #                         "id": "b1a2b3c4-d5e6-f789-0123-456789abcdef",
-    #                         "name": "Early Adopter",
-    #                         "description": "Joined within the first month of launch.",
-    #                         "icon_url": "https://example.com/icons/early_adopter.png",
-    #                         "created_at": "2023-01-01T00:00:00Z",
-    #                         "updated_at": "2023-01-01T00:00:00Z"
-    #                     }
-    #                 }
-    #             ]
-    #         }
-    #     }
-
-# Example usage
-if __name__ == "__main__":
-    logger.info("Logging example from achievement.py")
-
-    # Example of creating a UserAchievementCreate instance
-    try:
-        user_achievement_data = {
-            "user_id": uuid.uuid4(),
-            "badge_id": uuid.uuid4()
-            # achieved_at will use default_factory
-        }
-        new_achievement = UserAchievementCreate(**user_achievement_data)
-        logger.info(f"Successfully created UserAchievementCreate instance: {new_achievement.model_dump_json(indent=2)}")
-    except Exception as e:
-        logger.error(f"Error creating UserAchievementCreate instance: {e}")
-
-    # Example of a UserAchievementResponse instance
-    try:
-        # Dummy BadgeResponse data for the nested schema
-        badge_resp_data = {
-            "id": uuid.uuid4(),
-            "name": "Bug Squasher",
-            "description": "Reported a critical bug.",
-            "icon_url": "https://example.com/icons/bug_squasher.png",
-            "created_at": datetime.datetime.now() - datetime.timedelta(days=5),
-            "updated_at": datetime.datetime.now() - datetime.timedelta(days=2)
+        # from_attributes = True # For Pydantic V2
+        anystr_strip_whitespace = True
+        title = "UserAchievement"
+        json_schema_extra = {
+            "example": {
+                "user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+                "badge_id": "d4e5f6a7-b8c9-0123-4567-890abcdef0123",
+                "achieved_at": "2023-04-01T09:30:00Z",
+                "context": {"task_id": "f0e1d2c3-b4a5-6789-0123-456789abcdef01"}
+            }
         }
 
-        achievement_response_data = {
-            "id": uuid.uuid4(),
-            "user_id": uuid.uuid4(),
-            "badge_id": badge_resp_data["id"], # Link to the badge's ID
-            "achieved_at": datetime.datetime.now(),
-            "badge": badge_resp_data # Embed the full BadgeResponse object
+    def __init__(self, **data):
+        super().__init__(**data)
+        logger.debug(f"UserAchievementBase instance created with data: {data}")
+
+# UserAchievementCreate is typically handled by business logic when a badge is awarded.
+# If direct API creation is needed, it would look like:
+# class UserAchievementCreate(UserAchievementBase):
+#     pass
+
+# UserAchievementUpdate is usually not applicable as achievements are milestones.
+# If updates were needed (e.g., to context), it would be defined here.
+
+class UserAchievementResponse(UserAchievementBase, BaseDBRead):
+    """
+    Schema for representing a user's achievement in API responses.
+    Includes all fields from UserAchievementBase, common DB read fields,
+    and can nest badge and user details.
+    """
+    # id: UUID # From BaseDBRead
+    # created_at: datetime # From BaseDBRead
+    # updated_at: datetime # From BaseDBRead
+
+    badge: Optional[BadgeResponse] = Field(None, description="Detailed information about the awarded badge.")
+    # user: Optional[UserResponse] = Field(None, description="Detailed information about the user. Consider privacy implications.")
+
+    class Config:
+        orm_mode = True
+        # from_attributes = True # For Pydantic V2
+        title = "UserAchievementResponse"
+        json_schema_extra = {
+            "example": {
+                "id": "e5f6a7b8-c9d0-1234-5678-90abcdef01234",
+                "user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
+                "badge_id": "d4e5f6a7-b8c9-0123-4567-890abcdef0123",
+                "achieved_at": "2023-04-01T09:30:00Z",
+                "context": {"task_id": "f0e1d2c3-b4a5-6789-0123-456789abcdef01", "comment": "Completed with bonus"},
+                "created_at": "2023-04-01T09:30:05Z",
+                "updated_at": "2023-04-01T09:30:05Z",
+                "badge": {
+                    "id": "d4e5f6a7-b8c9-0123-4567-890abcdef0123",
+                    "name": "Early Bird",
+                    "description": "Awarded for completing a task before 8 AM.",
+                    "icon_url": "https://example.com/icons/early_bird.png",
+                    "created_at": "2023-01-05T10:00:00Z",
+                    "updated_at": "2023-01-05T10:00:00Z"
+                }
+                # "user": { ... user details ... }
+            }
         }
-        achievement_resp = UserAchievementResponse(**achievement_response_data)
-        logger.info(f"Successfully created UserAchievementResponse instance: {achievement_resp.model_dump_json(indent=2)}")
-    except Exception as e:
-        logger.error(f"Error creating UserAchievementResponse instance: {e}")
+
+    def __init__(self, **data):
+        super().__init__(**data)
+        logger.debug(f"UserAchievementResponse instance created for UserAchievement ID '{self.id}'.")
+
+logger.info("UserAchievement schemas (UserAchievementBase, UserAchievementResponse) defined successfully.")

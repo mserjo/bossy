@@ -185,6 +185,48 @@ for name, service in _imported_group_services.items():
     else: globals()[name] = None # Ensure name exists as None if not imported
 
 
+# --- Task and Event Services ---
+TASK_SERVICE = "TaskService"
+EVENT_SERVICE = "EventService"
+TASK_ASSIGNMENT_SERVICE = "TaskAssignmentService"
+TASK_COMPLETION_SERVICE = "TaskCompletionService"
+TASK_REVIEW_SERVICE = "TaskReviewService"
+TASK_SCHEDULING_SERVICE = "TaskSchedulingService"
+
+_task_event_service_names = [
+    TASK_SERVICE, EVENT_SERVICE, TASK_ASSIGNMENT_SERVICE,
+    TASK_COMPLETION_SERVICE, TASK_REVIEW_SERVICE, TASK_SCHEDULING_SERVICE
+]
+_imported_task_event_services = {}
+
+try:
+    from .tasks import (
+        TaskService, EventService, TaskAssignmentService,
+        TaskCompletionService, TaskReviewService, TaskSchedulingService
+    )
+    _imported_task_event_services[TASK_SERVICE] = TaskService
+    _imported_task_event_services[EVENT_SERVICE] = EventService
+    _imported_task_event_services[TASK_ASSIGNMENT_SERVICE] = TaskAssignmentService
+    _imported_task_event_services[TASK_COMPLETION_SERVICE] = TaskCompletionService
+    _imported_task_event_services[TASK_REVIEW_SERVICE] = TaskReviewService
+    _imported_task_event_services[TASK_SCHEDULING_SERVICE] = TaskSchedulingService
+    logger.info("Successfully imported all specified task and event services.")
+except ImportError as e:
+    logger.warning(f"Could not import one or more task/event services from .tasks: {e}. Attempting individual imports.")
+    for service_name_const in _task_event_service_names:
+        try:
+            module = __import__("app.src.services.tasks", globals(), locals(), [service_name_const], 0)
+            _imported_task_event_services[service_name_const] = getattr(module, service_name_const)
+            logger.info(f"Successfully imported {service_name_const} individually.")
+        except (ImportError, AttributeError) as ie:
+            logger.warning(f"Could not import {service_name_const} from .tasks: {ie}")
+            _imported_task_event_services[service_name_const] = None
+
+for name, service in _imported_task_event_services.items():
+    if service: globals()[name] = service
+    else: globals()[name] = None # Ensure name exists as None if not imported
+
+
 # Construct __all__ dynamically
 __all__ = []
 if BaseService:
@@ -194,6 +236,7 @@ __all__.extend([name for name, service in _imported_system_services.items() if s
 __all__.extend([name for name, service in _imported_dictionary_services.items() if service is not None])
 __all__.extend([name for name, service in _imported_auth_services.items() if service is not None])
 __all__.extend([name for name, service in _imported_group_services.items() if service is not None])
+__all__.extend([name for name, service in _imported_task_event_services.items() if service is not None])
 
 # Ensure __all__ has unique entries
 # and sort for consistency.

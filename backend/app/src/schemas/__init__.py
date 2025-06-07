@@ -43,6 +43,21 @@ from .notifications import (
     NotificationDeliveryAttemptCreate,
     NotificationDeliveryAttemptResponse,
 )
+from .files import (
+    FileRecordBase,
+    FileRecordCreate,
+    FileRecordResponse,
+    PresignedUrlRequest,
+    PresignedUrlResponse,
+    FileUploadInitiateRequest,
+    FileUploadInitiateResponse,
+    FileUploadCompleteRequest,
+    FileUploadResponse,
+    UserAvatarBase,
+    UserAvatarCreate,
+    UserAvatarUpdate,
+    UserAvatarResponse,
+)
 
 __all__ = [
     # Base schemas (example, uncomment if you have them in .base)
@@ -79,6 +94,21 @@ __all__ = [
     "NotificationDeliveryAttemptBase",
     "NotificationDeliveryAttemptCreate",
     "NotificationDeliveryAttemptResponse",
+
+    # File Schemas
+    "FileRecordBase",
+    "FileRecordCreate",
+    "FileRecordResponse",
+    "PresignedUrlRequest",
+    "PresignedUrlResponse",
+    "FileUploadInitiateRequest",
+    "FileUploadInitiateResponse",
+    "FileUploadCompleteRequest",
+    "FileUploadResponse",
+    "UserAvatarBase",
+    "UserAvatarCreate",
+    "UserAvatarUpdate",
+    "UserAvatarResponse",
 ]
 
 logger.info(f"Successfully exported schemas: {__all__}")

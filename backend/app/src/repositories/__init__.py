@@ -29,6 +29,9 @@ from .tasks import TaskRepository, EventRepository, TaskAssignmentRepository, Ta
 # Import bonus repositories
 from .bonuses import BonusRuleRepository, UserAccountRepository, AccountTransactionRepository, RewardRepository
 
+# Import gamification repositories
+from .gamification import LevelRepository, UserLevelRepository, BadgeRepository
+
 # This line exports the BaseRepository class when the package is imported,
 # making it available as `from app.src.repositories import BaseRepository`.
 
@@ -77,6 +80,10 @@ __all__ = [
     "UserAccountRepository",
     "AccountTransactionRepository",
     "RewardRepository",
+    # Gamification Repositories
+    "LevelRepository",
+    "UserLevelRepository",
+    "BadgeRepository",
     # Add other main repository class names here as they are created
 ]
 

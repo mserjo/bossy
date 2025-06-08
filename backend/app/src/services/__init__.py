@@ -307,6 +307,48 @@ for name, service in _imported_gamification_services.items():
     else: globals()[name] = None # Ensure name exists as None if not imported
 
 
+# --- Notification Services ---
+NOTIFICATION_TEMPLATE_SERVICE = "NotificationTemplateService"
+NOTIFICATION_SERVICE = "NotificationService" # Or InternalNotificationService
+NOTIFICATION_DELIVERY_SERVICE = "NotificationDeliveryService"
+EMAIL_NOTIFICATION_SERVICE = "EmailNotificationService" # Channel sender
+SMS_NOTIFICATION_SERVICE = "SmsNotificationService"     # Channel sender
+PUSH_NOTIFICATION_SERVICE = "PushNotificationService"   # Channel sender
+
+_notification_service_names = [
+    NOTIFICATION_TEMPLATE_SERVICE, NOTIFICATION_SERVICE, NOTIFICATION_DELIVERY_SERVICE,
+    EMAIL_NOTIFICATION_SERVICE, SMS_NOTIFICATION_SERVICE, PUSH_NOTIFICATION_SERVICE
+]
+_imported_notification_services = {}
+
+try:
+    from .notifications import (
+        NotificationTemplateService, NotificationService, NotificationDeliveryService,
+        EmailNotificationService, SmsNotificationService, PushNotificationService
+    )
+    _imported_notification_services[NOTIFICATION_TEMPLATE_SERVICE] = NotificationTemplateService
+    _imported_notification_services[NOTIFICATION_SERVICE] = NotificationService
+    _imported_notification_services[NOTIFICATION_DELIVERY_SERVICE] = NotificationDeliveryService
+    _imported_notification_services[EMAIL_NOTIFICATION_SERVICE] = EmailNotificationService
+    _imported_notification_services[SMS_NOTIFICATION_SERVICE] = SmsNotificationService
+    _imported_notification_services[PUSH_NOTIFICATION_SERVICE] = PushNotificationService
+    logger.info("Successfully imported all specified notification services.")
+except ImportError as e:
+    logger.warning(f"Could not import one or more notification services from .notifications: {e}. Attempting individual imports.")
+    for service_name_const in _notification_service_names:
+        try:
+            module = __import__("app.src.services.notifications", globals(), locals(), [service_name_const], 0)
+            _imported_notification_services[service_name_const] = getattr(module, service_name_const)
+            logger.info(f"Successfully imported {service_name_const} individually.")
+        except (ImportError, AttributeError) as ie:
+            logger.warning(f"Could not import {service_name_const} from .notifications: {ie}")
+            _imported_notification_services[service_name_const] = None
+
+for name, service in _imported_notification_services.items():
+    if service: globals()[name] = service
+    else: globals()[name] = None # Ensure name exists as None if not imported
+
+
 # Construct __all__ dynamically
 __all__ = []
 if BaseService:
@@ -319,6 +361,7 @@ __all__.extend([name for name, service in _imported_group_services.items() if se
 __all__.extend([name for name, service in _imported_task_event_services.items() if service is not None])
 __all__.extend([name for name, service in _imported_bonus_services.items() if service is not None])
 __all__.extend([name for name, service in _imported_gamification_services.items() if service is not None])
+__all__.extend([name for name, service in _imported_notification_services.items() if service is not None])
 
 # Ensure __all__ has unique entries
 # and sort for consistency.

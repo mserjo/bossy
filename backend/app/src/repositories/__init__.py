@@ -1,84 +1,102 @@
 # backend/app/src/repositories/__init__.py
 from .base import BaseRepository
 
+# Import system repositories
+from .system.settings_repository import SystemSettingRepository
+from .system.monitoring_repository import SystemLogRepository, PerformanceMetricRepository
+from .system.health_repository import ServiceHealthRepository
+
+# Import dictionary repositories
+from .dictionaries.base_dict_repository import BaseDictionaryRepository
+from .dictionaries.status_repository import StatusRepository
+from .dictionaries.user_role_repository import UserRoleRepository
+from .dictionaries.user_type_repository import UserTypeRepository
+from .dictionaries.group_type_repository import GroupTypeRepository
+from .dictionaries.task_type_repository import TaskTypeRepository
+from .dictionaries.bonus_type_repository import BonusTypeRepository
+from .dictionaries.calendar_provider_repository import CalendarProviderRepository
+from .dictionaries.messenger_platform_repository import MessengerPlatformRepository
+
 # This line exports the BaseRepository class when the package is imported,
 # making it available as `from app.src.repositories import BaseRepository`.
 
 # When you create specific repositories, you will import and export them here
 # to make them easily accessible from the repositories package.
 # For example:
-# from .user_repository import UserRepository
-# from .item_repository import ItemRepository
-#
-# __all__ = [
-#     "BaseRepository",
-#     "UserRepository",
-#     "ItemRepository",
-#     # Add other repository class names here
-# ]
+# from .user_repository import UserRepository # Will be in auth folder
+# from .item_repository import ItemRepository # Example, if not categorized
 
-# For now, only BaseRepository is defined.
+# __all__ defines the public API of this package.
+# When a client uses `from app.src.repositories import *`, only names listed
+# in `__all__` will be imported.
 __all__ = [
     "BaseRepository",
+    # System Repositories
+    "SystemSettingRepository",
+    "SystemLogRepository",
+    "PerformanceMetricRepository",
+    "ServiceHealthRepository",
+    # Dictionary Repositories
+    "BaseDictionaryRepository",
+    "StatusRepository",
+    "UserRoleRepository",
+    "UserTypeRepository",
+    "GroupTypeRepository",
+    "TaskTypeRepository",
+    "BonusTypeRepository",
+    "CalendarProviderRepository",
+    "MessengerPlatformRepository",
+    # Add other main repository class names here as they are created
+    # e.g., "UserRepository", "GroupRepository", "TaskRepository"
 ]
 
 # Detailed comments:
-# This __init__.py file serves two main purposes within the 'repositories' package:
+# This __init__.py file serves as the main entry point for the 'repositories' package.
 #
+# Key Functions:
 # 1. Package Initialization:
-#    It signals to Python that the 'repositories' directory should be treated as a
-#    package (or sub-package). This allows you to organize your repository-related
-#    modules within this directory and import them using dot notation.
+#    Allows Python to treat the 'repositories' directory as a package, enabling
+#    organized imports of repository modules.
 #
-# 2. Convenient Imports:
-#    By importing and re-exporting classes like `BaseRepository` (and later,
-#    specific repositories like `UserRepository`), this file provides a cleaner
-#    and more convenient API for other parts of your application to access these
-#    classes. Instead of needing to know the exact module file where a class is
-#    defined (e.g., `from app.src.repositories.base import BaseRepository`),
-#    other modules can simply use:
-#    `from app.src.repositories import BaseRepository`.
+# 2. Centralized Access to Repositories:
+#    It imports and re-exports repository classes from its sub-packages (like
+#    `system` and `dictionaries`) and also any repositories defined directly
+#    under `repositories` (like `BaseRepository`). This provides a single,
+#    consistent point of access for other parts of the application. For example,
+#    services can import any repository using:
+#    `from app.src.repositories import SystemSettingRepository`
+#    `from app.src.repositories import StatusRepository`
+#    `from app.src.repositories import UserRepository` (once created)
 #
-# 3. Controlling `import *`:
-#    The `__all__` list defines the public API of this package when a client uses
-#    `from app.src.repositories import *`. Only names listed in `__all__` will be
-#    imported with a wildcard import. This helps to prevent namespace pollution
-#    and makes it clear which components are intended for external use.
-#    As you add more repositories (e.g., UserRepository, GroupRepository),
-#    you should add their class names to the `__all__` list.
+# 3. Public API Control (`__all__`):
+#    The `__all__` list explicitly defines which symbols are part of this package's
+#    public interface. This is crucial for:
+#    - Clarity: Makes it clear which repositories are intended for external use.
+#    - Namespace Management: Prevents accidental import of internal variables or
+#      modules when `from app.src.repositories import *` is used (though wildcard
+#      imports are generally discouraged in production code).
+#    - Tooling: Helps linters, IDEs, and documentation generators understand the
+#      package structure and public API.
 #
-# Future Expansion:
-# As the application grows, you will create more specific repository classes
-# (e.g., `user_repository.py`, `task_repository.py`). Each of those new
-# repository classes should be imported into this `__init__.py` file and
-# added to the `__all__` list. This keeps the import structure consistent
-# and manageable.
+# How to Extend:
+# - Base Repositories: If new base repository types are created (e.g., `BaseServiceAccessRepository`),
+#   define them in a `.py` file in this directory and add them here.
+# - Specific Entity Repositories (e.g., User, Task, Group):
+#   - Categorize them into sub-packages if logical (e.g., `auth`, `tasks`, `groups`).
+#   - Create an `__init__.py` in each sub-package to export its repositories.
+#   - Import the specific repositories from their sub-packages into this top-level
+#     `__init__.py` file and add their names to the `__all__` list.
+#   - Example (for a future UserRepository in `repositories/auth/user_repository.py`):
+#     ```python
+#     # In repositories/auth/__init__.py:
+#     # from .user_repository import UserRepository
+#     # __all__ = ["UserRepository"]
 #
-# Example of adding a new repository:
+#     # In this file (repositories/__init__.py):
+#     # from .auth import UserRepository # Assuming auth/__init__.py exports it
+#     # ...
+#     # __all__.append("UserRepository")
+#     ```
 #
-# 1. Create `user_repository.py` in the `repositories` directory:
-#    ```python
-#    # backend/app/src/repositories/user_repository.py
-#    from .base import BaseRepository
-#    from app.src.models.auth.user import User  # Assuming User model path
-#    from app.src.schemas.auth.user import UserCreate, UserUpdate # Assuming User schemas
-#
-#    class UserRepository(BaseRepository[User, UserCreate, UserUpdate]):
-#        def __init__(self):
-#            super().__init__(User)
-#        # ... user-specific methods
-#    ```
-#
-# 2. Update `__init__.py` in the `repositories` directory:
-#    ```python
-#    # backend/app/src/repositories/__init__.py
-#    from .base import BaseRepository
-#    from .user_repository import UserRepository # Import the new repository
-#
-#    __all__ = [
-#        "BaseRepository",
-#        "UserRepository", # Add to __all__
-#    ]
-#    ```
-#
-# This setup promotes a clean and organized structure for your data access layer.
+# This centralized approach promotes a clean, maintainable, and easily navigable
+# data access layer.

@@ -26,6 +26,9 @@ from .groups import GroupRepository, GroupMembershipRepository, GroupInvitationR
 # Import task repositories
 from .tasks import TaskRepository, EventRepository, TaskAssignmentRepository, TaskCompletionRepository
 
+# Import bonus repositories
+from .bonuses import BonusRuleRepository, UserAccountRepository, AccountTransactionRepository, RewardRepository
+
 # This line exports the BaseRepository class when the package is imported,
 # making it available as `from app.src.repositories import BaseRepository`.
 
@@ -69,6 +72,11 @@ __all__ = [
     "EventRepository",
     "TaskAssignmentRepository",
     "TaskCompletionRepository",
+    # Bonus Repositories
+    "BonusRuleRepository",
+    "UserAccountRepository",
+    "AccountTransactionRepository",
+    "RewardRepository",
     # Add other main repository class names here as they are created
 ]
 

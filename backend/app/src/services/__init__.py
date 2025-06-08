@@ -349,6 +349,54 @@ for name, service in _imported_notification_services.items():
     else: globals()[name] = None # Ensure name exists as None if not imported
 
 
+# --- Integration Services ---
+BASE_CALENDAR_INTEGRATION_SERVICE = "BaseCalendarIntegrationService"
+GOOGLE_CALENDAR_SERVICE = "GoogleCalendarService"
+OUTLOOK_CALENDAR_SERVICE = "OutlookCalendarService"
+BASE_MESSENGER_INTEGRATION_SERVICE = "BaseMessengerIntegrationService"
+TELEGRAM_INTEGRATION_SERVICE = "TelegramIntegrationService"
+VIBER_INTEGRATION_SERVICE = "ViberIntegrationService"
+SLACK_INTEGRATION_SERVICE = "SlackIntegrationService"
+TEAMS_INTEGRATION_SERVICE = "TeamsIntegrationService"
+
+_integration_service_names = [
+    BASE_CALENDAR_INTEGRATION_SERVICE, GOOGLE_CALENDAR_SERVICE, OUTLOOK_CALENDAR_SERVICE,
+    BASE_MESSENGER_INTEGRATION_SERVICE, TELEGRAM_INTEGRATION_SERVICE, VIBER_INTEGRATION_SERVICE,
+    SLACK_INTEGRATION_SERVICE, TEAMS_INTEGRATION_SERVICE
+]
+_imported_integration_services = {}
+
+try:
+    from .integrations import (
+        BaseCalendarIntegrationService, GoogleCalendarService, OutlookCalendarService,
+        BaseMessengerIntegrationService, TelegramIntegrationService, ViberIntegrationService,
+        SlackIntegrationService, TeamsIntegrationService
+    )
+    _imported_integration_services[BASE_CALENDAR_INTEGRATION_SERVICE] = BaseCalendarIntegrationService
+    _imported_integration_services[GOOGLE_CALENDAR_SERVICE] = GoogleCalendarService
+    _imported_integration_services[OUTLOOK_CALENDAR_SERVICE] = OutlookCalendarService
+    _imported_integration_services[BASE_MESSENGER_INTEGRATION_SERVICE] = BaseMessengerIntegrationService
+    _imported_integration_services[TELEGRAM_INTEGRATION_SERVICE] = TelegramIntegrationService
+    _imported_integration_services[VIBER_INTEGRATION_SERVICE] = ViberIntegrationService
+    _imported_integration_services[SLACK_INTEGRATION_SERVICE] = SlackIntegrationService
+    _imported_integration_services[TEAMS_INTEGRATION_SERVICE] = TeamsIntegrationService
+    logger.info("Successfully imported all specified integration services.")
+except ImportError as e:
+    logger.warning(f"Could not import one or more integration services from .integrations: {e}. Attempting individual imports.")
+    for service_name_const in _integration_service_names:
+        try:
+            module = __import__("app.src.services.integrations", globals(), locals(), [service_name_const], 0)
+            _imported_integration_services[service_name_const] = getattr(module, service_name_const)
+            logger.info(f"Successfully imported {service_name_const} individually.")
+        except (ImportError, AttributeError) as ie:
+            logger.warning(f"Could not import {service_name_const} from .integrations: {ie}")
+            _imported_integration_services[service_name_const] = None
+
+for name, service in _imported_integration_services.items():
+    if service: globals()[name] = service
+    else: globals()[name] = None # Ensure name exists as None if not imported
+
+
 # Construct __all__ dynamically
 __all__ = []
 if BaseService:
@@ -362,6 +410,7 @@ __all__.extend([name for name, service in _imported_task_event_services.items() 
 __all__.extend([name for name, service in _imported_bonus_services.items() if service is not None])
 __all__.extend([name for name, service in _imported_gamification_services.items() if service is not None])
 __all__.extend([name for name, service in _imported_notification_services.items() if service is not None])
+__all__.extend([name for name, service in _imported_integration_services.items() if service is not None])
 
 # Ensure __all__ has unique entries
 # and sort for consistency.

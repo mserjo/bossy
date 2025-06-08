@@ -23,6 +23,9 @@ from .auth import UserRepository, RefreshTokenRepository, UserSessionRepository
 # Import group repositories
 from .groups import GroupRepository, GroupMembershipRepository, GroupInvitationRepository, GroupSettingRepository
 
+# Import task repositories
+from .tasks import TaskRepository, EventRepository, TaskAssignmentRepository, TaskCompletionRepository
+
 # This line exports the BaseRepository class when the package is imported,
 # making it available as `from app.src.repositories import BaseRepository`.
 
@@ -61,8 +64,12 @@ __all__ = [
     "GroupMembershipRepository",
     "GroupInvitationRepository",
     "GroupSettingRepository",
+    # Task Repositories
+    "TaskRepository",
+    "EventRepository",
+    "TaskAssignmentRepository",
+    "TaskCompletionRepository",
     # Add other main repository class names here as they are created
-    # e.g., "TaskRepository"
 ]
 
 # Detailed comments:

@@ -17,6 +17,9 @@ from .dictionaries.bonus_type_repository import BonusTypeRepository
 from .dictionaries.calendar_provider_repository import CalendarProviderRepository
 from .dictionaries.messenger_platform_repository import MessengerPlatformRepository
 
+# Import auth repositories
+from .auth import UserRepository, RefreshTokenRepository, UserSessionRepository
+
 # This line exports the BaseRepository class when the package is imported,
 # making it available as `from app.src.repositories import BaseRepository`.
 
@@ -46,8 +49,12 @@ __all__ = [
     "BonusTypeRepository",
     "CalendarProviderRepository",
     "MessengerPlatformRepository",
+    # Auth Repositories
+    "UserRepository", # This was already added in the previous incorrect diff, so it's fine.
+    "RefreshTokenRepository",
+    "UserSessionRepository",
     # Add other main repository class names here as they are created
-    # e.g., "UserRepository", "GroupRepository", "TaskRepository"
+    # e.g., "GroupRepository", "TaskRepository"
 ]
 
 # Detailed comments:
@@ -66,7 +73,7 @@ __all__ = [
 #    services can import any repository using:
 #    `from app.src.repositories import SystemSettingRepository`
 #    `from app.src.repositories import StatusRepository`
-#    `from app.src.repositories import UserRepository` (once created)
+#     `from app.src.repositories import UserRepository`
 #
 # 3. Public API Control (`__all__`):
 #    The `__all__` list explicitly defines which symbols are part of this package's
@@ -86,16 +93,16 @@ __all__ = [
 #   - Create an `__init__.py` in each sub-package to export its repositories.
 #   - Import the specific repositories from their sub-packages into this top-level
 #     `__init__.py` file and add their names to the `__all__` list.
-#   - Example (for a future UserRepository in `repositories/auth/user_repository.py`):
+#   - Example (for UserRepository in `repositories/auth/user_repository.py`):
 #     ```python
 #     # In repositories/auth/__init__.py:
-#     # from .user_repository import UserRepository
-#     # __all__ = ["UserRepository"]
+#     from .user_repository import UserRepository
+#     __all__ = ["UserRepository"]
 #
 #     # In this file (repositories/__init__.py):
-#     # from .auth import UserRepository # Assuming auth/__init__.py exports it
+#     from .auth import UserRepository # Assuming auth/__init__.py exports it
 #     # ...
-#     # __all__.append("UserRepository")
+#     __all__.append("UserRepository") # Or directly include as done above
 #     ```
 #
 # This centralized approach promotes a clean, maintainable, and easily navigable

@@ -32,6 +32,9 @@ from .bonuses import BonusRuleRepository, UserAccountRepository, AccountTransact
 # Import gamification repositories
 from .gamification import LevelRepository, UserLevelRepository, BadgeRepository
 
+# Import notification repositories
+from .notifications import NotificationTemplateRepository, NotificationRepository, NotificationDeliveryAttemptRepository
+
 # This line exports the BaseRepository class when the package is imported,
 # making it available as `from app.src.repositories import BaseRepository`.
 
@@ -84,6 +87,10 @@ __all__ = [
     "LevelRepository",
     "UserLevelRepository",
     "BadgeRepository",
+    # Notification Repositories
+    "NotificationTemplateRepository",
+    "NotificationRepository",
+    "NotificationDeliveryAttemptRepository",
     # Add other main repository class names here as they are created
 ]
 

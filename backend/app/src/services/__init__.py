@@ -267,6 +267,46 @@ for name, service in _imported_bonus_services.items():
     else: globals()[name] = None # Ensure name exists as None if not imported
 
 
+# --- Gamification Services ---
+LEVEL_SERVICE = "LevelService"
+USER_LEVEL_SERVICE = "UserLevelService"
+BADGE_SERVICE = "BadgeService"
+USER_ACHIEVEMENT_SERVICE = "UserAchievementService"
+USER_RATING_SERVICE = "UserRatingService"
+
+_gamification_service_names = [
+    LEVEL_SERVICE, USER_LEVEL_SERVICE, BADGE_SERVICE,
+    USER_ACHIEVEMENT_SERVICE, USER_RATING_SERVICE
+]
+_imported_gamification_services = {}
+
+try:
+    from .gamification import (
+        LevelService, UserLevelService, BadgeService,
+        UserAchievementService, UserRatingService
+    )
+    _imported_gamification_services[LEVEL_SERVICE] = LevelService
+    _imported_gamification_services[USER_LEVEL_SERVICE] = UserLevelService
+    _imported_gamification_services[BADGE_SERVICE] = BadgeService
+    _imported_gamification_services[USER_ACHIEVEMENT_SERVICE] = UserAchievementService
+    _imported_gamification_services[USER_RATING_SERVICE] = UserRatingService
+    logger.info("Successfully imported all specified gamification services.")
+except ImportError as e:
+    logger.warning(f"Could not import one or more gamification services from .gamification: {e}. Attempting individual imports.")
+    for service_name_const in _gamification_service_names:
+        try:
+            module = __import__("app.src.services.gamification", globals(), locals(), [service_name_const], 0)
+            _imported_gamification_services[service_name_const] = getattr(module, service_name_const)
+            logger.info(f"Successfully imported {service_name_const} individually.")
+        except (ImportError, AttributeError) as ie:
+            logger.warning(f"Could not import {service_name_const} from .gamification: {ie}")
+            _imported_gamification_services[service_name_const] = None
+
+for name, service in _imported_gamification_services.items():
+    if service: globals()[name] = service
+    else: globals()[name] = None # Ensure name exists as None if not imported
+
+
 # Construct __all__ dynamically
 __all__ = []
 if BaseService:
@@ -278,6 +318,7 @@ __all__.extend([name for name, service in _imported_auth_services.items() if ser
 __all__.extend([name for name, service in _imported_group_services.items() if service is not None])
 __all__.extend([name for name, service in _imported_task_event_services.items() if service is not None])
 __all__.extend([name for name, service in _imported_bonus_services.items() if service is not None])
+__all__.extend([name for name, service in _imported_gamification_services.items() if service is not None])
 
 # Ensure __all__ has unique entries
 # and sort for consistency.

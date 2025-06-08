@@ -20,6 +20,9 @@ from .dictionaries.messenger_platform_repository import MessengerPlatformReposit
 # Import auth repositories
 from .auth import UserRepository, RefreshTokenRepository, UserSessionRepository
 
+# Import group repositories
+from .groups import GroupRepository, GroupMembershipRepository, GroupInvitationRepository, GroupSettingRepository
+
 # This line exports the BaseRepository class when the package is imported,
 # making it available as `from app.src.repositories import BaseRepository`.
 
@@ -53,8 +56,13 @@ __all__ = [
     "UserRepository", # This was already added in the previous incorrect diff, so it's fine.
     "RefreshTokenRepository",
     "UserSessionRepository",
+    # Group Repositories
+    "GroupRepository",
+    "GroupMembershipRepository",
+    "GroupInvitationRepository",
+    "GroupSettingRepository",
     # Add other main repository class names here as they are created
-    # e.g., "GroupRepository", "TaskRepository"
+    # e.g., "TaskRepository"
 ]
 
 # Detailed comments:

@@ -23,7 +23,7 @@ from fastapi import APIRouter
 # Наприклад:
 from .system import system_router # Очікуємо, що system_router експортується з api/v1/system/__init__.py
 from .auth import auth_router # Імпортуємо агрегований auth_router з auth/__init__.py
-# from .users.router import router as users_router
+from .users import users_router # Імпортуємо агрегований users_router з users/__init__.py
 # from .groups.router import router as groups_router
 # from .tasks.router import router as tasks_router
 # from .bonuses.router import router as bonuses_router
@@ -67,11 +67,21 @@ except ImportError:
 except Exception as e:
     logger.error(f"Помилка підключення auth_router: {e}", exc_info=True)
 
+# Підключення роутера для управління користувачами
+try:
+    # users_router вже імпортовано вище
+    v1_router.include_router(users_router, prefix="/users", tags=["V1 User Management"])
+    logger.info("Роутер v1.users (керування користувачами) підключено з префіксом /users.")
+except ImportError: # Цей ImportError тут малоймовірний, якщо імпорт вгорі успішний
+    logger.warning("Не вдалося імпортувати users_router з api.v1.users (мало б спрацювати з верхнього імпорту). Ендпоінти керування користувачами v1 не будуть доступні.")
+except Exception as e:
+    logger.error(f"Помилка підключення users_router: {e}", exc_info=True)
+
 # try:
-#     from .users.router import router as users_router
-#     v1_router.include_router(users_router, prefix="/users", tags=["V1 Users"])
-#     logger.info("Роутер v1.users підключено.")
-# except ImportError: logger.warning("Роутер v1.users не знайдено.")
+#     from .dictionaries.router import router as dictionaries_router
+#     v1_router.include_router(dictionaries_router, prefix="/dictionaries", tags=["V1 Dictionaries"])
+#     logger.info("Роутер v1.dictionaries підключено.")
+# except ImportError: logger.warning("Роутер v1.dictionaries не знайдено.")
 
 # try:
 #     from .dictionaries.router import router as dictionaries_router

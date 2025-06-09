@@ -24,7 +24,7 @@ from fastapi import APIRouter
 from .system import system_router # Очікуємо, що system_router експортується з api/v1/system/__init__.py
 from .auth import auth_router # Імпортуємо агрегований auth_router з auth/__init__.py
 from .users import users_router # Імпортуємо агрегований users_router з users/__init__.py
-# from .groups.router import router as groups_router
+from .groups import groups_router # Імпортуємо агрегований groups_router з groups/__init__.py
 # from .tasks.router import router as tasks_router
 # from .bonuses.router import router as bonuses_router
 # from .gamification.router import router as gamification_router

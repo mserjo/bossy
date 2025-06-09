@@ -1,10 +1,10 @@
 # backend/app/src/models/base.py
 
 """
-This module defines the base model classes for the application.
-- `Base` is imported from `config.database` and is the declarative base for all models.
-- `BaseModel` provides common fields like `id` and timestamps.
-- `BaseMainModel` extends `BaseModel` with additional common fields for main business entities.
+Цей модуль визначає базові класи моделей для програми.
+- `Base` імпортується з `config.database` і є декларативною базою для всіх моделей.
+- `BaseModel` надає загальні поля, такі як `id` та часові мітки.
+- `BaseMainModel` розширює `BaseModel` додатковими загальними полями для основних бізнес-сутностей.
 """
 
 import logging
@@ -13,7 +13,7 @@ from typing import Optional, TypeVar
 from sqlalchemy.orm import Mapped, mapped_column, declared_attr
 from sqlalchemy import Integer
 
-from backend.app.src.config.database import Base # Declarative base from SQLAlchemy setup
+from backend.app.src.config.database import Base # Декларативна база з налаштувань SQLAlchemy
 from backend.app.src.models.mixins import (
     TimestampedMixin,
     SoftDeleteMixin,
@@ -23,113 +23,113 @@ from backend.app.src.models.mixins import (
     NotesMixin
 )
 
-# Configure logger for this module
+# Налаштувати логер для цього модуля
 logger = logging.getLogger(__name__)
 
-# Generic TypeVariable that can be used for ORM models in services/repositories
+# Загальний TypeVariable, який можна використовувати для моделей ORM у сервісах/репозиторіях
 ModelT = TypeVar("ModelT", bound="BaseModel")
 
 class BaseModel(Base, TimestampedMixin):
     """
-    Base class for all SQLAlchemy models in the application.
-    Inherits from the global `Base` (declarative_base()) and `TimestampedMixin`.
+    Базовий клас для всіх моделей SQLAlchemy у програмі.
+    Успадковує від глобального `Base` (declarative_base()) та `TimestampedMixin`.
 
-    Includes:
-        - id: Primary key integer column.
-        - created_at: Timestamp of creation (from TimestampedMixin).
-        - updated_at: Timestamp of last update (from TimestampedMixin).
+    Включає:
+        - id: Первинний ключ, цілочисельний стовпець.
+        - created_at: Часова мітка створення (з TimestampedMixin).
+        - updated_at: Часова мітка останнього оновлення (з TimestampedMixin).
     """
-    __abstract__ = True  # Indicates that this class should not be mapped to a database table itself
+    __abstract__ = True  # Вказує, що цей клас не повинен зіставлятися з таблицею бази даних сам по собі
 
     @declared_attr
     def __tablename__(cls) -> str:
-        # Automatically generate table name from class name (e.g., UserProfile -> user_profiles)
-        # This is a common convention but can be overridden in subclasses if needed.
+        # Автоматично генерувати назву таблиці з назви класу (наприклад, UserProfile -> user_profiles)
+        # Це поширена конвенція, але її можна перевизначити в підкласах, якщо потрібно.
         import re
         name_parts = re.findall(r'[A-Z][^A-Z]*', cls.__name__)
-        # Handle case where a class name might be all caps like "URLShortener" -> "url_shorteners"
-        if not name_parts: # If class name is all uppercase or single word
+        # Обробка випадку, коли назва класу може бути повністю у верхньому регістрі, наприклад "URLShortener" -> "url_shorteners"
+        if not name_parts: # Якщо назва класу повністю у верхньому регістрі або одне слово
             return cls.__name__.lower() + "s"
-        return "_".join(part.lower() for part in name_parts) + "s" # Simple pluralization by adding 's'
+        return "_".join(part.lower() for part in name_parts) + "s" # Просте утворення множини додаванням 's'
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True, autoincrement=True, comment="Unique identifier for the record")
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True, autoincrement=True, comment="Унікальний ідентифікатор запису")
 
 class BaseMainModel(BaseModel, NameDescriptionMixin, StateMixin, SoftDeleteMixin, NotesMixin):
     """
-    Base class for main business entities in the application.
-    Inherits from `BaseModel` and includes other common mixins.
+    Базовий клас для основних бізнес-сутностей у програмі.
+    Успадковує від `BaseModel` та включає інші загальні міксини.
 
-    Includes (in addition to BaseModel fields):
-        - name: Name of the entity (from NameDescriptionMixin).
-        - description: Optional detailed description (from NameDescriptionMixin).
-        - state: Current state or status (from StateMixin).
-        - deleted_at: Timestamp for soft deletion (from SoftDeleteMixin).
-        - is_deleted: Hybrid property for soft deletion status (from SoftDeleteMixin).
-        - notes: Internal notes or general remarks (from NotesMixin).
+    Включає (на додаток до полів BaseModel):
+        - name: Назва сутності (з NameDescriptionMixin).
+        - description: Опціональний детальний опис (з NameDescriptionMixin).
+        - state: Поточний стан або статус (зі StateMixin).
+        - deleted_at: Часова мітка для м'якого видалення (з SoftDeleteMixin).
+        - is_deleted: Гібридна властивість для статусу м'якого видалення (з SoftDeleteMixin).
+        - notes: Внутрішні нотатки або загальні зауваження (з NotesMixin).
 
-    The `GroupAffiliationMixin` is intentionally omitted here to make this base model
-    more generally applicable. Models that are group-affiliated can include
-    `GroupAffiliationMixin` explicitly.
-    Alternatively, another base class like `BaseGroupAffiliatedMainModel` could be created.
+    `GroupAffiliationMixin` тут навмисно пропущено, щоб зробити цю базову модель
+    більш загальнозастосовною. Моделі, які пов'язані з групами, можуть включати
+    `GroupAffiliationMixin` явно.
+    Альтернативно, можна створити інший базовий клас, наприклад `BaseGroupAffiliatedMainModel`.
     """
     __abstract__ = True
 
-    # No additional fields are defined here directly, they come from the inherited mixins.
-    # Specific models inheriting from this will add their own unique fields and relationships.
+    # Тут безпосередньо не визначено додаткових полів, вони надходять з успадкованих міксинів.
+    # Специфічні моделі, що успадковують від цього, додаватимуть власні унікальні поля та зв'язки.
 
-# Example of a more specific base model that includes group affiliation
+# Приклад більш специфічної базової моделі, яка включає приналежність до групи
 class BaseGroupAffiliatedMainModel(BaseMainModel, GroupAffiliationMixin):
     """
-    Base class for main business entities that are directly affiliated with a group.
-    Inherits from `BaseMainModel` and adds `GroupAffiliationMixin`.
+    Базовий клас для основних бізнес-сутностей, які безпосередньо пов'язані з групою.
+    Успадковує від `BaseMainModel` та додає `GroupAffiliationMixin`.
     """
     __abstract__ = True
 
 
 if __name__ == "__main__":
-    # This block is for demonstration of the base model structure.
-    # It does not interact with the database directly here.
+    # Цей блок призначений для демонстрації структури базової моделі.
+    # Він не взаємодіє з базою даних безпосередньо тут.
 
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    logger.info("--- SQLAlchemy Base Models --- demonstrating structure")
+    logger.info("--- Базові моделі SQLAlchemy --- демонстрація структури")
 
-    logger.info(f"BaseModel inherits from: {BaseModel.__mro__}")
-    logger.info(f"BaseMainModel inherits from: {BaseMainModel.__mro__}")
-    logger.info(f"BaseGroupAffiliatedMainModel inherits from: {BaseGroupAffiliatedMainModel.__mro__}")
+    logger.info(f"BaseModel успадковує від: {BaseModel.__mro__}")
+    logger.info(f"BaseMainModel успадковує від: {BaseMainModel.__mro__}")
+    logger.info(f"BaseGroupAffiliatedMainModel успадковує від: {BaseGroupAffiliatedMainModel.__mro__}")
 
-    # Show generated tablenames (conceptual)
+    # Показати згенеровані назви таблиць (концептуально)
     class User(BaseModel):
-        __tablename__ = "users" # Explicitly set for this common case
+        __tablename__ = "users" # Явно встановлено для цього поширеного випадку
         username: Mapped[str]
 
     class ProductOffering(BaseModel):
-        # Tablename will be 'product_offerings' by default
+        # Назва таблиці буде 'product_offerings' за замовчуванням
         pass
 
     class URLShortener(BaseModel):
-        # Tablename will be 'url_shorteners' by default
+        # Назва таблиці буде 'url_shorteners' за замовчуванням
         pass
 
     class SomeGroupedItem(BaseGroupAffiliatedMainModel):
-        # Tablename will be 'some_grouped_items' by default
-        # Will have id, created_at, updated_at, name, description, state, deleted_at, notes, group_id
+        # Назва таблиці буде 'some_grouped_items' за замовчуванням
+        # Матиме id, created_at, updated_at, name, description, state, deleted_at, notes, group_id
         specific_field: Mapped[Optional[str]]
 
-    logger.debug(f"Example User tablename (explicit): {User.__tablename__}")
-    logger.debug(f"Example ProductOffering tablename (generated): {ProductOffering.__tablename__}")
-    logger.debug(f"Example URLShortener tablename (generated): {URLShortener.__tablename__}")
-    logger.debug(f"Example SomeGroupedItem tablename (generated): {SomeGroupedItem.__tablename__}")
+    logger.debug(f"Приклад назви таблиці User (явно): {User.__tablename__}")
+    logger.debug(f"Приклад назви таблиці ProductOffering (згенеровано): {ProductOffering.__tablename__}")
+    logger.debug(f"Приклад назви таблиці URLShortener (згенеровано): {URLShortener.__tablename__}")
+    logger.debug(f"Приклад назви таблиці SomeGroupedItem (згенеровано): {SomeGroupedItem.__tablename__}")
 
-    # To inspect actual columns, you would need to initialize Base.metadata with an engine
-    # and then access SomeGroupedItem.__table__.columns
-    # For example:
+    # Щоб перевірити фактичні стовпці, вам потрібно було б ініціалізувати Base.metadata за допомогою engine
+    # а потім отримати доступ до SomeGroupedItem.__table__.columns
+    # Наприклад:
     # from sqlalchemy import create_engine
     # engine = create_engine("sqlite:///:memory:")
-    # Base.metadata.create_all(engine) # This would require all referenced tables (like 'groups' for SomeGroupedItem) to be defined.
-    # logger.info(f"Columns in SomeGroupedItem: {[c.name for c in SomeGroupedItem.__table__.columns]}")
+    # Base.metadata.create_all(engine) # Це вимагало б визначення всіх таблиць, на які є посилання (наприклад, 'groups' для SomeGroupedItem).
+    # logger.info(f"Стовпці в SomeGroupedItem: {[c.name for c in SomeGroupedItem.__table__.columns]}")
 
-    logger.info("BaseModel provides 'id', 'created_at', 'updated_at'.")
-    logger.info("BaseMainModel adds 'name', 'description', 'state', 'deleted_at', 'is_deleted' (hybrid), 'notes'.")
-    logger.info("BaseGroupAffiliatedMainModel further adds 'group_id'.")
+    logger.info("BaseModel надає 'id', 'created_at', 'updated_at'.")
+    logger.info("BaseMainModel додає 'name', 'description', 'state', 'deleted_at', 'is_deleted' (гібрид), 'notes'.")
+    logger.info("BaseGroupAffiliatedMainModel далі додає 'group_id'.")

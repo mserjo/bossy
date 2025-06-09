@@ -1,71 +1,72 @@
 # backend/app/src/core/base.py
 
 """
-This module can contain base classes or core utilities that are fundamental
-to the application's structure but don't fit into more specific `base.py` files
-(e.g., `models.base`, `repositories.base`).
+Цей модуль може містити базові класи або основні утиліти, які є фундаментальними
+для структури програми, але не вписуються у більш специфічні файли `base.py`
+(наприклад, `models.base`, `repositories.base`).
 
-For now, this might be minimal. It can be expanded if truly generic, non-domain-specific
-base functionalities are identified for components like services or other core utilities.
+Наразі цей модуль може бути мінімальним. Його можна розширити, якщо будуть виявлені
+справді загальні, не пов'язані з доменом базові функціональності для компонентів,
+таких як сервіси або інші основні утиліти.
 """
 
 from typing import TypeVar, Generic, Any, Dict
 from pydantic import BaseModel
 
-# Generic TypeVariable for Pydantic models, useful for base service/repository patterns
+# Загальні TypeVariable для моделей Pydantic, корисні для базових шаблонів сервісів/репозиторіїв
 ModelType = TypeVar("ModelType", bound=BaseModel)
 CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
 UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 
-# Example of a very generic base class that might be used by other components.
-# However, specific base classes for services or repositories are often better placed
-# in their respective modules (e.g., `services/base.py`, `repositories/base.py`)
-# to keep concerns separated and allow for domain-specific base functionalities.
+# Приклад дуже загального базового класу, який може використовуватися іншими компонентами.
+# Однак, специфічні базові класи для сервісів або репозиторіїв часто краще розміщувати
+# у відповідних модулях (наприклад, `services/base.py`, `repositories/base.py`),
+# щоб розділити відповідальності та дозволити доменно-специфічні базові функціональності.
 
 class BaseCoreComponent:
     """
-    An example of a very generic base component.
-    Its utility would depend on common, non-domain-specific methods needed across
-    various core parts of the application.
+    Приклад дуже загального базового компонента.
+    Його корисність залежатиме від загальних, не пов'язаних з доменом методів,
+    необхідних у різних основних частинах програми.
     """
     def __init__(self, *args: Any, **kwargs: Any) -> None:
-        # Placeholder for common initialization logic if any
+        # Заповнювач для загальної логіки ініціалізації, якщо така є
         pass
 
     def get_component_name(self) -> str:
-        """Returns the name of the component class."""
+        """Повертає назву класу компонента."""
         return self.__class__.__name__
 
-# Example of a simple utility class that could reside here if it's fundamental
-# and used by many core components.
+# Приклад простого класу-утиліти, який міг би знаходитися тут, якби він був фундаментальним
+# і використовувався багатьма основними компонентами.
 
 class ObjectConfigurator:
     """
-    A utility class to help configure objects from dictionaries.
-    This is a conceptual example; Pydantic models usually handle this for data objects.
+    Клас-утиліта для допомоги в налаштуванні об'єктів зі словників.
+    Це концептуальний приклад; моделі Pydantic зазвичай обробляють це для об'єктів даних.
     """
     @staticmethod
     def configure_from_dict(obj: Any, config_dict: Dict[str, Any]) -> None:
         """
-        Configures an object's attributes from a dictionary.
+        Налаштовує атрибути об'єкта зі словника.
 
         Args:
-            obj: The object to configure.
-            config_dict: A dictionary where keys correspond to attribute names.
+            obj: Об'єкт для налаштування.
+            config_dict: Словник, де ключі відповідають назвам атрибутів.
         """
         for key, value in config_dict.items():
             if hasattr(obj, key):
                 setattr(obj, key, value)
             else:
-                # Optionally log a warning or raise an error for unknown keys
-                # print(f"Warning: Attribute '{key}' not found on object {obj.__class__.__name__}")
+                # Опціонально логувати попередження або викликати помилку для невідомих ключів
+                # print(f"Попередження: Атрибут '{key}' не знайдено в об'єкті {obj.__class__.__name__}")
                 pass
 
 if __name__ == "__main__":
-    print("--- Core Base Components/Utilities ---")
+    print("--- Основні базові компоненти/утиліти ---")
 
     core_comp = BaseCoreComponent()
-    print(f"Component Name: {core_comp.get_component_name()}")
+    print(f"Назва компонента: {core_comp.get_component_name()}")
 
     class MyTestObject:
         def __init__(self):
@@ -73,14 +74,14 @@ if __name__ == "__main__":
             self.value: int = 0
 
     test_obj = MyTestObject()
-    print(f"Before configuration: Name='{test_obj.name}', Value={test_obj.value}")
+    print(f"До налаштування: Ім'я='{test_obj.name}', Значення={test_obj.value}")
 
     config_data = {"name": "ConfiguredName", "value": 100, "non_existent_attr": "test"}
     ObjectConfigurator.configure_from_dict(test_obj, config_data)
-    print(f"After configuration: Name='{test_obj.name}', Value={test_obj.value}")
-    # Note: 'non_existent_attr' would be ignored or warned based on implementation
+    print(f"Після налаштування: Ім'я='{test_obj.name}', Значення={test_obj.value}")
+    # Примітка: 'non_existent_attr' буде проігноровано або видасть попередження залежно від реалізації
 
-    print("\nTypeVars defined for Pydantic models (for use in generic base classes):")
+    print("\nTypeVars, визначені для моделей Pydantic (для використання в загальних базових класах):")
     print(f"ModelType: {ModelType}")
     print(f"CreateSchemaType: {CreateSchemaType}")
     print(f"UpdateSchemaType: {UpdateSchemaType}")

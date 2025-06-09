@@ -1,78 +1,78 @@
 # backend/app/src/core/dependencies.py
 
 """
-This module defines common FastAPI dependencies, particularly for authentication
-and authorization, such as retrieving the current user from a token.
+Цей модуль визначає загальні залежності FastAPI, зокрема для автентифікації
+та авторизації, наприклад, отримання поточного користувача з токена.
 """
 
 from typing import Optional, AsyncGenerator
 from fastapi import Depends, HTTPException, status, Path
 from fastapi.security import OAuth2PasswordBearer
 from jose import JWTError
-from pydantic import BaseModel, ValidationError # Added BaseModel for TokenPayload
-from datetime import datetime, timezone, timedelta # Added for __main__ example
+from pydantic import BaseModel, ValidationError # Додано BaseModel для TokenPayload
+from datetime import datetime, timezone, timedelta # Додано для прикладу в __main__
 
 from backend.app.src.config.settings import settings
 from backend.app.src.config.security import decode_token
 from backend.app.src.config.database import get_db, AsyncSession
-# It's common to import user models and service/repository for fetching user data
-# For now, we'll use a placeholder. These should be replaced with actual imports
-# from backend.app.src.models.auth import User as UserModel # Placeholder
-# from backend.app.src.services.auth.user import UserService # Placeholder
-# from backend.app.src.schemas.auth.token import TokenPayload # Placeholder for token payload schema
+# Зазвичай імпортують моделі користувачів та сервіс/репозиторій для отримання даних користувача
+# Наразі ми будемо використовувати заповнювач. Їх слід замінити на фактичні імпорти
+# from backend.app.src.models.auth import User as UserModel # Заповнювач
+# from backend.app.src.services.auth.user import UserService # Заповнювач
+# from backend.app.src.schemas.auth.token import TokenPayload # Заповнювач для схеми корисного навантаження токена
 
-# This is a placeholder for the actual User model. Replace with your User model import.
+# Це заповнювач для фактичної моделі User. Замініть на імпорт вашої моделі User.
 class UserModel:
     id: int
     email: str
     is_active: bool
     is_superuser: bool
-    # Add other relevant fields like roles, group memberships etc.
+    # Додайте інші відповідні поля, такі як ролі, членство в групах тощо.
     def __init__(self, id: int, email: str, is_active: bool = True, is_superuser: bool = False):
         self.id = id
         self.email = email
         self.is_active = is_active
         self.is_superuser = is_superuser
 
-# This is a placeholder for the actual TokenPayload schema. Replace with your Pydantic schema.
-class TokenPayload(BaseModel): # Inheriting from BaseModel
-    sub: Optional[str] = None # 'sub' usually stores the user identifier (e.g., email or user_id)
-    user_id: Optional[int] = None # Or use user_id directly if that's your 'sub'
-    type: Optional[str] = None # To distinguish between access and refresh tokens
+# Це заповнювач для фактичної схеми TokenPayload. Замініть на вашу схему Pydantic.
+class TokenPayload(BaseModel): # Успадкування від BaseModel
+    sub: Optional[str] = None # 'sub' зазвичай зберігає ідентифікатор користувача (наприклад, email або user_id)
+    user_id: Optional[int] = None # Або використовуйте user_id безпосередньо, якщо це ваш 'sub'
+    type: Optional[str] = None # Для розрізнення токенів доступу та оновлення
 
-# OAuth2PasswordBearer is a FastAPI utility class that handles extracting the token
-# from the Authorization header (Bearer token).
-# The `tokenUrl` should point to your login endpoint where tokens are issued.
+# OAuth2PasswordBearer - це утилітарний клас FastAPI, який обробляє вилучення токена
+# з заголовка Authorization (токен Bearer).
+# `tokenUrl` повинен вказувати на ваш ендпоінт входу, де видаються токени.
 reusable_oauth2 = OAuth2PasswordBearer(
-    tokenUrl=f"{settings.API_V1_STR}/auth/login" # Example login endpoint
+    tokenUrl=f"{settings.API_V1_STR}/auth/login" # Приклад ендпоінту входу
 )
 
 async def get_current_user(
     db: AsyncSession = Depends(get_db),
     token: str = Depends(reusable_oauth2)
-) -> UserModel: # Should return your actual User model type
+) -> UserModel: # Повинен повертати ваш фактичний тип моделі User
     """
-    FastAPI dependency to get the current user from a JWT token.
+    Залежність FastAPI для отримання поточного користувача з JWT токена.
 
     Args:
-        db (AsyncSession): Database session dependency.
-        token (str): The JWT token extracted from the Authorization header.
+        db (AsyncSession): Залежність сесії бази даних.
+        token (str): JWT токен, вилучений з заголовка Authorization.
 
     Returns:
-        UserModel: The authenticated user object from the database.
+        UserModel: Об'єкт автентифікованого користувача з бази даних.
 
     Raises:
-        HTTPException (401): If the token is invalid, expired, or the user is not found.
-        HTTPException (400): If the token payload is malformed.
+        HTTPException (401): Якщо токен недійсний, прострочений або користувача не знайдено.
+        HTTPException (400): Якщо корисне навантаження токена пошкоджено.
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Could not validate credentials",
+        detail="Не вдалося перевірити облікові дані",
         headers={"WWW-Authenticate": "Bearer"},
     )
     malformed_payload_exception = HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail="Malformed token payload"
+        detail="Пошкоджене корисне навантаження токена"
     )
 
     payload = decode_token(token)
@@ -87,7 +87,7 @@ async def get_current_user(
     if token_data.type != "access":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid token type, expected 'access' token.",
+            detail="Недійсний тип токена, очікується токен 'access'.",
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -95,28 +95,28 @@ async def get_current_user(
     if user_identifier is None:
         raise malformed_payload_exception
 
-    # --- Fetch user from database ---
-    # This part needs to be adapted to your actual user service/repository logic.
-    # user_service = UserService(db) # Example instantiation
-    # current_user = await user_service.get_user_by_email(email=user_identifier) # If 'sub' is email
-    # Or: current_user = await user_service.get_user_by_id(id=int(user_identifier)) # If 'sub' is user_id
+    # --- Отримання користувача з бази даних ---
+    # Цю частину потрібно адаптувати до вашої фактичної логіки сервісу/репозиторію користувачів.
+    # user_service = UserService(db) # Приклад створення екземпляра
+    # current_user = await user_service.get_user_by_email(email=user_identifier) # Якщо 'sub' - це email
+    # Або: current_user = await user_service.get_user_by_id(id=int(user_identifier)) # Якщо 'sub' - це user_id
 
-    # Placeholder user fetching logic:
-    # In a real app, you would query the database using the user_identifier from the token.
-    # For demonstration, we'll create a dummy user if the identifier matches a pattern.
-    # Replace this with actual database lookup.
+    # Логіка-заповнювач для отримання користувача:
+    # У реальній програмі ви б запитували базу даних, використовуючи user_identifier з токена.
+    # Для демонстрації ми створимо фіктивного користувача, якщо ідентифікатор відповідає шаблону.
+    # Замініть це на фактичний пошук у базі даних.
     if user_identifier == "testuser@example.com" or user_identifier == "123":
-        # This is a dummy user. Replace with actual DB lookup.
-        # Ensure the UserModel structure matches your actual User model.
+        # Це фіктивний користувач. Замініть на фактичний пошук у БД.
+        # Переконайтеся, що структура UserModel відповідає вашій фактичній моделі User.
         current_user = UserModel(id=123, email="testuser@example.com", is_active=True)
     elif user_identifier == settings.FIRST_SUPERUSER_EMAIL:
         current_user = UserModel(id=1, email=settings.FIRST_SUPERUSER_EMAIL, is_active=True, is_superuser=True)
     else:
-        current_user = None # User not found
-    # --- End of placeholder user fetching logic ---
+        current_user = None # Користувача не знайдено
+    # --- Кінець логіки-заповнювача для отримання користувача ---
 
     if current_user is None:
-        raise credentials_exception # User not found in DB
+        raise credentials_exception # Користувача не знайдено в БД
 
     return current_user
 
@@ -124,98 +124,98 @@ async def get_current_active_user(
     current_user: UserModel = Depends(get_current_user)
 ) -> UserModel:
     """
-    FastAPI dependency to get the current active user.
-    Builds on `get_current_user` and checks if the user is active.
+    Залежність FastAPI для отримання поточного активного користувача.
+    Базується на `get_current_user` і перевіряє, чи активний користувач.
 
     Args:
-        current_user (UserModel): The user object obtained from `get_current_user`.
+        current_user (UserModel): Об'єкт користувача, отриманий з `get_current_user`.
 
     Returns:
-        UserModel: The authenticated and active user object.
+        UserModel: Об'єкт автентифікованого та активного користувача.
 
     Raises:
-        HTTPException (403): If the user is inactive.
+        HTTPException (403): Якщо користувач неактивний.
     """
     if not current_user.is_active:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Inactive user")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Неактивний користувач")
     return current_user
 
 async def get_current_superuser(
     current_active_user: UserModel = Depends(get_current_active_user)
 ) -> UserModel:
     """
-    FastAPI dependency to get the current active superuser.
-    Builds on `get_current_active_user` and checks if the user is a superuser.
+    Залежність FastAPI для отримання поточного активного суперкористувача.
+    Базується на `get_current_active_user` і перевіряє, чи є користувач суперкористувачем.
 
     Args:
-        current_active_user (UserModel): The user object from `get_current_active_user`.
+        current_active_user (UserModel): Об'єкт користувача з `get_current_active_user`.
 
     Returns:
-        UserModel: The authenticated, active, and superuser object.
+        UserModel: Об'єкт автентифікованого, активного та суперкористувача.
 
     Raises:
-        HTTPException (403): If the user is not a superuser.
+        HTTPException (403): Якщо користувач не є суперкористувачем.
     """
     if not hasattr(current_active_user, 'is_superuser') or not current_active_user.is_superuser:
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="The user does not have superuser privileges."
+            status_code=status.HTTP_403_FORBIDDEN, detail="Користувач не має прав суперкористувача."
         )
     return current_active_user
 
-# Placeholder for Group Admin dependency - this will need more context
-# from backend.app.src.models.groups import GroupMembershipModel # Placeholder
-# from backend.app.src.core.dicts import GroupRole # Placeholder
+# Заповнювач для залежності адміністратора групи - це потребуватиме більше контексту
+# from backend.app.src.models.groups import GroupMembershipModel # Заповнювач
+# from backend.app.src.core.dicts import GroupRole # Заповнювач
 
 # async def get_current_group_admin(
 #     current_active_user: UserModel = Depends(get_current_active_user),
-#     group_id: int = Path(..., title="The ID of the group"), # Assuming group_id is a path parameter
+#     group_id: int = Path(..., title="ID групи"), # Припускаючи, що group_id є параметром шляху
 #     db: AsyncSession = Depends(get_db)
 # ) -> UserModel:
 #     """
-#     FastAPI dependency to check if the current user is an admin of a specific group.
-#     This is a more complex dependency and needs your actual GroupMembership model and logic.
+#     Залежність FastAPI для перевірки, чи є поточний користувач адміністратором конкретної групи.
+#     Це складніша залежність, яка потребує вашої фактичної моделі GroupMembership та логіки.
 #     """
-#     # Example logic (needs your actual models and repository/service):
+#     # Приклад логіки (потребує ваших фактичних моделей та репозиторію/сервісу):
 #     # membership = await GroupMembershipRepository(db).get_by_user_and_group(
 #     # user_id=current_active_user.id, group_id=group_id
 #     # )
 #     # if not membership or membership.role != GroupRole.ADMIN:
 #     #     raise HTTPException(
 #     # status_code=status.HTTP_403_FORBIDDEN,
-#     # detail="User is not an admin of this group."
+#     # detail="Користувач не є адміністратором цієї групи."
 #     #     )
 #     # return current_active_user
-#     # For now, let's make it pass if the user is a superuser for testing purposes
+#     # Наразі, для тестування, дозволимо, якщо користувач є суперкористувачем
 #     if hasattr(current_active_user, 'is_superuser') and current_active_user.is_superuser:
 #         return current_active_user
-#     raise HTTPException(status_code=403, detail="Not a group admin (placeholder logic)")
+#     raise HTTPException(status_code=403, detail="Не є адміністратором групи (логіка-заповнювач)")
 
 
 if __name__ == "__main__":
-    # This module defines dependencies for FastAPI and is not typically run directly.
-    # Testing these dependencies usually involves integration tests with a FastAPI test client.
-    print("--- Core Dependencies (for FastAPI) ---")
-    print("OAuth2PasswordBearer instance created for token URL:")
+    # Цей модуль визначає залежності для FastAPI і зазвичай не запускається безпосередньо.
+    # Тестування цих залежностей зазвичай включає інтеграційні тести з тестовим клієнтом FastAPI.
+    print("--- Основні залежності (для FastAPI) ---")
+    print("Створено екземпляр OAuth2PasswordBearer для URL токена:")
     print(f"  reusable_oauth2.scheme.tokenUrl = {reusable_oauth2.scheme.tokenUrl}")
 
-    print("\nDefined dependencies:")
-    print("- get_current_user: Decodes token, fetches user from DB (placeholder).")
-    print("- get_current_active_user: Ensures user from get_current_user is active.")
-    print("- get_current_superuser: Ensures user from get_current_active_user is a superuser.")
-    # print("- get_current_group_admin: Placeholder for group admin check.")
+    print("\nВизначені залежності:")
+    print("- get_current_user: Декодує токен, отримує користувача з БД (заповнювач).")
+    print("- get_current_active_user: Гарантує, що користувач з get_current_user активний.")
+    print("- get_current_superuser: Гарантує, що користувач з get_current_active_user є суперкористувачем.")
+    # print("- get_current_group_admin: Заповнювач для перевірки адміністратора групи.")
 
-    print("\nNote: To test these, you'd typically use FastAPI's TestClient and mock database/token interactions.")
+    print("\nПримітка: Для тестування цих залежностей зазвичай використовується TestClient FastAPI та макети взаємодії з базою даних/токенами.")
 
-    # Example of how TokenPayload might be used (though it's usually internal to get_current_user)
+    # Приклад використання TokenPayload (хоча зазвичай він внутрішній для get_current_user)
     try:
         payload_data = {"sub": "user@example.com", "user_id": 1, "type": "access", "exp": datetime.now(timezone.utc) + timedelta(minutes=15)}
         token_payload_instance = TokenPayload(**payload_data)
-        print(f"\nExample TokenPayload instance: {token_payload_instance.model_dump_json(indent=2)}")
+        print(f"\nПриклад екземпляра TokenPayload: {token_payload_instance.model_dump_json(indent=2)}")
     except ValidationError as e:
-        print(f"\nError creating TokenPayload instance: {e}")
+        print(f"\nПомилка створення екземпляра TokenPayload: {e}")
 
-    # The actual UserModel would come from your models.auth.user module
-    # This is just to show the placeholder class structure
-    print(f"\nPlaceholder UserModel structure: id, email, is_active, is_superuser")
+    # Фактична UserModel надходила б з вашого модуля models.auth.user
+    # Це лише для демонстрації структури класу-заповнювача
+    print(f"\nСтруктура UserModel-заповнювача: id, email, is_active, is_superuser")
     dummy_user = UserModel(id=1, email="dummy@example.com", is_active=True, is_superuser=False)
-    print(f"  Dummy user: id={dummy_user.id}, email='{dummy_user.email}', active={dummy_user.is_active}")
+    print(f"  Фіктивний користувач: id={dummy_user.id}, email='{dummy_user.email}', active={dummy_user.is_active}")

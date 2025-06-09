@@ -1,48 +1,48 @@
 # backend/app/src/core/permissions.py
 
 """
-This module defines more granular permission checking logic, possibly as FastAPI
-dependencies or callable classes/functions. It builds upon the user authentication
-provided by `core.dependencies`.
+Цей модуль визначає більш гранульовану логіку перевірки дозволів, можливо,
+як залежності FastAPI або викликані класи/функції. Він базується на автентифікації
+користувача, що надається `core.dependencies`.
 """
 
 from functools import wraps
-from typing import Callable, List, Optional, Any, Coroutine, Type # Added Type for Enum hint
-from enum import Enum # Added for require_roles example
+from typing import Callable, List, Optional, Any, Coroutine, Type # Додано Type для підказки Enum
+from enum import Enum # Додано для прикладу require_roles
 
 from fastapi import Depends, HTTPException, status, Request
 
-# Using placeholder UserModel from core.dependencies for now.
-# Replace with actual import: from backend.app.src.models.auth import User as UserModel
-from backend.app.src.core.dependencies import get_current_active_user, UserModel # get_current_user_optional would be needed for AllowAll with optional auth
+# Поки що використовуємо UserModel-заповнювач з core.dependencies.
+# Замініть на фактичний імпорт: from backend.app.src.models.auth import User as UserModel
+from backend.app.src.core.dependencies import get_current_active_user, UserModel # get_current_user_optional знадобився б для AllowAll з опціональною автентифікацією
 
-# Using placeholder GroupRole from core.dicts for now.
-# Replace with actual import if different: from backend.app.src.core.dicts import GroupRole
+# Поки що використовуємо GroupRole-заповнювач з core.dicts.
+# Замініть на фактичний імпорт, якщо відрізняється: from backend.app.src.core.dicts import GroupRole
 from backend.app.src.core.dicts import GroupRole
 
-# Placeholder for actual database session and group membership repository/service
+# Заповнювач для фактичної сесії бази даних та репозиторію/сервісу членства в групах
 # from backend.app.src.config.database import AsyncSession, get_db
-# from backend.app.src.repositories.groups import GroupMembershipRepository # Example
+# from backend.app.src.repositories.groups import GroupMembershipRepository # Приклад
 
 class Permission:
-    """Base class for defining a permission."""
+    """Базовий клас для визначення дозволу."""
     async def has_permission(self, request: Request, user: UserModel, **kwargs: Any) -> bool:
-        raise NotImplementedError("Permission check not implemented.")
+        raise NotImplementedError("Перевірка дозволу не реалізована.")
 
 class IsAuthenticated(Permission):
-    """Allows access only to authenticated users."""
+    """Дозволяє доступ лише автентифікованим користувачам."""
     async def has_permission(self, request: Request, user: UserModel, **kwargs: Any) -> bool:
         return user is not None and user.is_active
 
 class IsSuperuser(Permission):
-    """Allows access only to superusers."""
+    """Дозволяє доступ лише суперкористувачам."""
     async def has_permission(self, request: Request, user: UserModel, **kwargs: Any) -> bool:
         return user is not None and user.is_active and hasattr(user, 'is_superuser') and user.is_superuser
 
 class IsGroupAdmin(Permission):
     """
-    Allows access only to users who are admins of a specific group.
-    This permission requires `group_id` to be passed to the `PermissionDependency`.
+    Дозволяє доступ лише користувачам, які є адміністраторами конкретної групи.
+    Цей дозвіл вимагає передачі `group_id` до `PermissionDependency`.
     """
     async def has_permission(self, request: Request, user: UserModel, **kwargs: Any) -> bool:
         if not (user and user.is_active):
@@ -50,39 +50,39 @@ class IsGroupAdmin(Permission):
 
         group_id = kwargs.get("group_id")
         if group_id is None:
-            # This indicates a configuration error in how the permission is used.
-            # Log this error appropriately in a real application.
-            # print("Error: group_id not provided for IsGroupAdmin permission check.")
+            # Це вказує на помилку конфігурації у використанні дозволу.
+            # У реальній програмі цю помилку слід належним чином залогувати.
+            # print("Помилка: group_id не надано для перевірки дозволу IsGroupAdmin.")
             return False
 
-        # Placeholder logic for checking group admin status.
-        # In a real application, this would involve a database query:
+        # Логіка-заповнювач для перевірки статусу адміністратора групи.
+        # У реальній програмі це включало б запит до бази даних:
         # async with get_db() as db_session:
         #     membership_repo = GroupMembershipRepository(db_session)
         #     membership = await membership_repo.get_by_user_and_group(user_id=user.id, group_id=group_id)
         #     return membership is not None and membership.role == GroupRole.ADMIN
 
-        # For placeholder purposes:
-        # If user is a superuser, grant admin access to any group for testing.
+        # Для цілей заповнювача:
+        # Якщо користувач є суперкористувачем, надати адміністративний доступ до будь-якої групи для тестування.
         if hasattr(user, 'is_superuser') and user.is_superuser:
             return True
-        # Simulate user 1 being admin of group 1, user 2 admin of group 2 etc.
-        # This is highly simplified and for demonstration only.
+        # Імітація: користувач 1 є адміністратором групи 1, користувач 2 - групи 2 і т.д.
+        # Це дуже спрощено і лише для демонстрації.
         if hasattr(user, 'id') and user.id == group_id:
-            # print(f"User {user.id} is considered admin of group {group_id} (placeholder logic)")
+            # print(f"Користувач {user.id} вважається адміністратором групи {group_id} (логіка-заповнювач)")
             return True
 
-        # print(f"User {user.id} is NOT admin of group {group_id} (placeholder logic)")
+        # print(f"Користувач {user.id} НЕ є адміністратором групи {group_id} (логіка-заповнювач)")
         return False
 
 class AllowAll(Permission):
-    """Allows access to any user, including anonymous ones (if no auth is enforced prior)."""
+    """Дозволяє доступ будь-якому користувачеві, включаючи анонімних (якщо попередня автентифікація не застосовується)."""
     async def has_permission(self, request: Request, user: Optional[UserModel], **kwargs: Any) -> bool:
-        # If using get_current_active_user, user will not be None unless that dependency is changed.
-        # If an optional authentication (get_current_user_optional) was used, then user could be None.
+        # Якщо використовується get_current_active_user, user не буде None, якщо ця залежність не змінена.
+        # Якщо використовується опціональна автентифікація (get_current_user_optional), то user може бути None.
         return True
 
-# --- Permission Dependency Factory ---
+# --- Фабрика залежностей дозволів ---
 
 def PermissionDependency(
     permissions: List[Permission],
@@ -90,98 +90,98 @@ def PermissionDependency(
     allow_superuser_override: bool = True
 ) -> Callable[..., Coroutine[Any, Any, UserModel]]:
     """
-    FastAPI dependency that checks if the current user has the required permissions.
+    Залежність FastAPI, яка перевіряє, чи має поточний користувач необхідні дозволи.
 
     Args:
-        permissions (List[Permission]): A list of permission instances to check.
-        require_all (bool): If True, all permissions in the list must be met.
-                            If False, at least one permission must be met.
-        allow_superuser_override (bool): If True, a superuser bypasses all other permission checks.
+        permissions (List[Permission]): Список екземплярів дозволів для перевірки.
+        require_all (bool): Якщо True, всі дозволи зі списку повинні бути виконані.
+                            Якщо False, повинен бути виконаний принаймні один дозвіл.
+        allow_superuser_override (bool): Якщо True, суперкористувач обходить усі інші перевірки дозволів.
 
     Returns:
-        A FastAPI dependency callable.
+        Викликана залежність FastAPI.
     """
     async def _permission_checker(
         request: Request,
-        user: UserModel = Depends(get_current_active_user) # Ensures user is active
-        # If you need to support optional authentication for some permissions (e.g. AllowAll with specific checks):
-        # user: Optional[UserModel] = Depends(get_current_user_optional) # Needs get_current_user_optional
+        user: UserModel = Depends(get_current_active_user) # Гарантує, що користувач активний
+        # Якщо вам потрібно підтримувати опціональну автентифікацію для деяких дозволів (наприклад, AllowAll з конкретними перевірками):
+        # user: Optional[UserModel] = Depends(get_current_user_optional) # Потребує get_current_user_optional
     ) -> UserModel:
-        # get_current_active_user already raises 401 if not authenticated or inactive
-        # So, user object here should always be an active UserModel instance.
+        # get_current_active_user вже викликає 401, якщо не автентифіковано або неактивно
+        # Отже, об'єкт user тут завжди повинен бути активним екземпляром UserModel.
 
-        # Superuser override
+        # Обхід для суперкористувача
         if allow_superuser_override and hasattr(user, 'is_superuser') and user.is_superuser:
             return user
 
-        # Extract path parameters for permissions that might need them (e.g., group_id)
+        # Витягти параметри шляху для дозволів, яким вони можуть знадобитися (наприклад, group_id)
         path_params = request.path_params
 
         results = []
         for perm_instance in permissions:
-            # Pass path_params or specific relevant parts to has_permission
-            # For IsGroupAdmin, it expects 'group_id' in kwargs
+            # Передати path_params або відповідні частини до has_permission
+            # Для IsGroupAdmin очікується 'group_id' у kwargs
             kwargs_for_perm = {}
             if isinstance(perm_instance, IsGroupAdmin) and 'group_id' in path_params:
                 try:
                     kwargs_for_perm['group_id'] = int(path_params['group_id'])
                 except ValueError:
-                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid group_id format in path.")
+                    raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Недійсний формат group_id у шляху.")
 
-            # For AllowAll, user might be None if an optional auth dependency was used.
-            # However, with get_current_active_user, user is guaranteed.
-            # If AllowAll is the only permission, this check is somewhat redundant here
-            # but kept for logical completeness of the Permission class structure.
+            # Для AllowAll, user може бути None, якщо використовувалася опціональна залежність автентифікації.
+            # Однак, з get_current_active_user, user гарантовано існує.
+            # Якщо AllowAll є єдиним дозволом, ця перевірка тут дещо зайва,
+            # але збережена для логічної повноти структури класу Permission.
             has_perm = await perm_instance.has_permission(request, user, **kwargs_for_perm)
             results.append(has_perm)
 
-        if not results: # Should not happen if permissions list is not empty
+        if not results: # Не повинно статися, якщо список дозволів не порожній
              raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="No permissions were checked."
+                detail="Не було перевірено жодних дозволів."
             )
 
         if require_all and not all(results):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have sufficient permissions to perform this action."
+                detail="У вас недостатньо дозволів для виконання цієї дії."
             )
         if not require_all and not any(results):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have any of the required permissions for this action."
+                detail="У вас немає жодного з необхідних дозволів для цієї дії."
             )
         return user
     return _permission_checker
 
-# Example of a simpler role-based permission decorator (not a class-based Permission)
-# This is an alternative or complementary approach.
+# Приклад простішого декоратора дозволів на основі ролей (не класовий дозвіл)
+# Це альтернативний або доповнюючий підхід.
 
-def require_roles(allowed_roles: List[Union[str, Enum]]): # Allow Enum members too
+def require_roles(allowed_roles: List[Union[str, Enum]]): # Дозволити також члени Enum
     """
-    Decorator to restrict access to users with specific roles.
-    Assumes user object has a `roles` attribute (e.g., List[str] or List[UserRoleEnum]).
-    This is a conceptual example; for FastAPI, it's better to make this a dependency.
+    Декоратор для обмеження доступу користувачам з певними ролями.
+    Припускає, що об'єкт user має атрибут `roles` (наприклад, List[str] або List[UserRoleEnum]).
+    Це концептуальний приклад; для FastAPI краще зробити це залежністю.
     """
     def decorator(func: Callable[..., Any]):
         @wraps(func)
         async def wrapper(*args: Any, **kwargs: Any):
-            # This is a simplified example. In FastAPI, 'user' would come from a Depends()
-            user: Optional[UserModel] = kwargs.get('user') # Or 'current_user' depending on arg name
+            # Це спрощений приклад. У FastAPI 'user' надходив би з Depends()
+            user: Optional[UserModel] = kwargs.get('user') # Або 'current_user' залежно від назви аргументу
 
-            if not user or not hasattr(user, 'roles'): # Check if user has 'roles' attribute
-                # print("User object or user.roles not found for @require_roles check.")
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="User roles not available or user not provided.")
+            if not user or not hasattr(user, 'roles'): # Перевірити, чи має користувач атрибут 'roles'
+                # print("Об'єкт user або user.roles не знайдено для перевірки @require_roles.")
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ролі користувача недоступні або користувача не надано.")
 
             user_roles = getattr(user, 'roles')
             if not isinstance(user_roles, list):
-                # print(f"user.roles is not a list: {user_roles}")
-                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="User roles attribute is misconfigured.")
+                # print(f"user.roles не є списком: {user_roles}")
+                raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Атрибут ролей користувача неправильно налаштований.")
 
-            # Convert allowed_roles to their values if they are Enums
+            # Перетворити allowed_roles на їхні значення, якщо вони є Enum
             allowed_role_values = [role.value if isinstance(role, Enum) else role for role in allowed_roles]
 
-            # Check if any of the user's roles (also converting if they are Enums) match allowed roles
+            # Перевірити, чи будь-яка з ролей користувача (також конвертуючи, якщо вони є Enum) відповідає дозволеним ролям
             user_has_role = False
             for user_role in user_roles:
                 user_role_value = user_role.value if isinstance(user_role, Enum) else user_role
@@ -190,18 +190,18 @@ def require_roles(allowed_roles: List[Union[str, Enum]]): # Allow Enum members t
                     break
 
             if not user_has_role:
-                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Requires one of roles: {allowed_role_values}")
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=f"Потрібна одна з ролей: {allowed_role_values}")
             return await func(*args, **kwargs)
         return wrapper
     return decorator
 
 if __name__ == "__main__":
-    print("--- Core Permissions ---")
-    print("This module defines permission classes and a dependency factory for FastAPI.")
+    print("--- Основні дозволи ---")
+    print("Цей модуль визначає класи дозволів та фабрику залежностей для FastAPI.")
 
-    # Mock user objects for demonstration
+    # Макети об'єктів користувачів для демонстрації
     active_user = UserModel(id=1, email="user@example.com", is_active=True)
-    setattr(active_user, 'roles', ["user"]) # Add roles for require_roles demo
+    setattr(active_user, 'roles', ["user"]) # Додати ролі для демонстрації require_roles
 
     inactive_user = UserModel(id=2, email="inactive@example.com", is_active=False)
     setattr(inactive_user, 'roles', ["user"])
@@ -211,12 +211,12 @@ if __name__ == "__main__":
     setattr(superuser_model, 'roles', ["superuser", "user", "admin"])
 
 
-    # User for group admin testing; placeholder: user ID 4 is admin of group 4
+    # Користувач для тестування адміністратора групи; заповнювач: користувач ID 4 є адміністратором групи 4
     admin_group1_user = UserModel(id=4, email="admin_g1@example.com", is_active=True)
     setattr(admin_group1_user, 'roles', ["group_admin", "user"])
 
 
-    # Mock request object
+    # Макет об'єкта запиту
     mock_request_group1 = Request(scope={"type": "http", "method": "GET", "path": "/groups/1/items", "path_params": {"group_id": "1"}})
     mock_request_group4 = Request(scope={"type": "http", "method": "GET", "path": "/groups/4/items", "path_params": {"group_id": "4"}})
 
@@ -224,74 +224,74 @@ if __name__ == "__main__":
     async def run_permission_check(perm_class, user, request_obj, **perm_kwargs):
         perm = perm_class()
         try:
-            # Simulate how PermissionDependency would pass kwargs from path_params
-            # For IsGroupAdmin, group_id comes from request.path_params if not in perm_kwargs
+            # Імітація того, як PermissionDependency передаватиме kwargs з path_params
+            # Для IsGroupAdmin, group_id надходить з request.path_params, якщо не в perm_kwargs
             final_kwargs = perm_kwargs.copy()
             if isinstance(perm, IsGroupAdmin) and 'group_id' not in final_kwargs and 'group_id' in request_obj.path_params:
                  final_kwargs['group_id'] = int(request_obj.path_params['group_id'])
 
             has_perm = await perm.has_permission(request_obj, user, **final_kwargs)
-            print(f"User '{user.email if user else 'Anonymous'}' check for {perm.__class__.__name__} (path: {request_obj.url.path}, kwargs: {final_kwargs}): {'GRANTED' if has_perm else 'DENIED'}")
+            print(f"Перевірка користувача '{user.email if user else 'Anonymous'}' для {perm.__class__.__name__} (шлях: {request_obj.url.path}, kwargs: {final_kwargs}): {'НАДАНО' if has_perm else 'ВІДМОВЛЕНО'}")
         except Exception as e:
-            print(f"Error checking {perm.__class__.__name__} for '{user.email if user else 'Anonymous'}': {e}")
+            print(f"Помилка перевірки {perm.__class__.__name__} для '{user.email if user else 'Anonymous'}': {e}")
 
-    # For require_roles decorator test
-    @require_roles(["admin", GroupRole.ADMIN]) # GroupRole.ADMIN is "admin"
-    async def decorated_func_for_admin(user: UserModel): # Changed arg name to 'user'
-        print(f"User '{user.email}' accessed admin-only decorated function.")
+    # Для тесту декоратора require_roles
+    @require_roles(["admin", GroupRole.ADMIN]) # GroupRole.ADMIN це "admin"
+    async def decorated_func_for_admin(user: UserModel): # Змінено назву аргументу на 'user'
+        print(f"Користувач '{user.email}' отримав доступ до функції, призначеної лише для адміністраторів.")
 
     @require_roles(["user"])
     async def decorated_func_for_user(user: UserModel):
-        print(f"User '{user.email}' accessed user-only decorated function.")
+        print(f"Користувач '{user.email}' отримав доступ до функції, призначеної лише для користувачів.")
 
     import asyncio
 
     async def main():
-        print("\n--- Testing Permission Classes ---")
-        print("\nTesting IsAuthenticated:")
+        print("\n--- Тестування класів дозволів ---")
+        print("\nТестування IsAuthenticated:")
         await run_permission_check(IsAuthenticated, active_user, mock_request_group1)
-        await run_permission_check(IsAuthenticated, inactive_user, mock_request_group1) # Denied (inactive)
-        # await run_permission_check(IsAuthenticated, None, mock_request_group1) # Would fail in PermissionDependency due to get_current_active_user
+        await run_permission_check(IsAuthenticated, inactive_user, mock_request_group1) # Відмовлено (неактивний)
+        # await run_permission_check(IsAuthenticated, None, mock_request_group1) # Завершиться невдачею в PermissionDependency через get_current_active_user
 
-        print("\nTesting IsSuperuser:")
-        await run_permission_check(IsSuperuser, active_user, mock_request_group1) # Denied
-        await run_permission_check(IsSuperuser, superuser_model, mock_request_group1) # Granted
+        print("\nТестування IsSuperuser:")
+        await run_permission_check(IsSuperuser, active_user, mock_request_group1) # Відмовлено
+        await run_permission_check(IsSuperuser, superuser_model, mock_request_group1) # Надано
 
-        print("\nTesting IsGroupAdmin (placeholder logic):")
-        # User ID 4 is admin of group 4 by placeholder logic
-        await run_permission_check(IsGroupAdmin, admin_group1_user, mock_request_group4) # Granted (user 4, group 4)
-        await run_permission_check(IsGroupAdmin, admin_group1_user, mock_request_group1) # Denied (user 4, group 1)
-        await run_permission_check(IsGroupAdmin, superuser_model, mock_request_group1, group_id=99) # Superuser granted for group 99
+        print("\nТестування IsGroupAdmin (логіка-заповнювач):")
+        # Користувач ID 4 є адміністратором групи 4 за логікою-заповнювачем
+        await run_permission_check(IsGroupAdmin, admin_group1_user, mock_request_group4) # Надано (користувач 4, група 4)
+        await run_permission_check(IsGroupAdmin, admin_group1_user, mock_request_group1) # Відмовлено (користувач 4, група 1)
+        await run_permission_check(IsGroupAdmin, superuser_model, mock_request_group1, group_id=99) # Суперкористувачу надано для групи 99
 
-        print("\nTesting AllowAll:")
+        print("\nТестування AllowAll:")
         await run_permission_check(AllowAll, active_user, mock_request_group1)
-        # await run_permission_check(AllowAll, None, mock_request_group1) # If using optional auth
+        # await run_permission_check(AllowAll, None, mock_request_group1) # Якщо використовується опціональна автентифікація
 
-        print("\n--- Testing @require_roles decorator (conceptual) ---")
-        print("Note: This decorator is a simplified example for direct calls.")
+        print("\n--- Тестування декоратора @require_roles (концептуальне) ---")
+        print("Примітка: Цей декоратор є спрощеним прикладом для прямих викликів.")
         try:
-            await decorated_func_for_admin(user=superuser_model) # Superuser has 'admin' role
+            await decorated_func_for_admin(user=superuser_model) # Суперкористувач має роль 'admin'
         except HTTPException as e:
-            print(f"Admin func access for superuser: {e.detail}")
-
-        try:
-            await decorated_func_for_admin(user=active_user) # Active_user does not have 'admin' role
-        except HTTPException as e:
-            print(f"Admin func access for active_user: {e.detail}")
+            print(f"Доступ до адмін-функції для суперкористувача: {e.detail}")
 
         try:
-            await decorated_func_for_user(user=active_user) # Active_user has 'user' role
+            await decorated_func_for_admin(user=active_user) # active_user не має ролі 'admin'
         except HTTPException as e:
-            print(f"User func access for active_user: {e.detail}")
+            print(f"Доступ до адмін-функції для active_user: {e.detail}")
+
+        try:
+            await decorated_func_for_user(user=active_user) # active_user має роль 'user'
+        except HTTPException as e:
+            print(f"Доступ до користувацької функції для active_user: {e.detail}")
 
         user_without_roles = UserModel(id=5, email="noroles@example.com", is_active=True)
         try:
             await decorated_func_for_user(user=user_without_roles)
         except HTTPException as e:
-            print(f"User func access for user_without_roles: {e.detail}")
+            print(f"Доступ до користувацької функції для user_without_roles: {e.detail}")
 
 
-        print("\nNote: PermissionDependency factory would be used in FastAPI endpoint dependencies.")
-        print("Example: `Depends(PermissionDependency([IsAuthenticated(), IsGroupAdmin()]))`")
+        print("\nПримітка: Фабрика PermissionDependency використовувалася б у залежностях ендпоінтів FastAPI.")
+        print("Приклад: `Depends(PermissionDependency([IsAuthenticated(), IsGroupAdmin()]))`")
 
     asyncio.run(main())

@@ -1,87 +1,87 @@
 # backend/app/src/models/dictionaries/calendars.py
 
 """
-SQLAlchemy model for a 'CalendarProvider' dictionary table.
-This table stores different calendar services that the system might integrate with (e.g., Google Calendar, Outlook Calendar).
+Модель SQLAlchemy для таблиці-довідника 'CalendarProvider'.
+Ця таблиця зберігає різні календарні сервіси, з якими система може інтегруватися (наприклад, Google Calendar, Outlook Calendar).
 """
 
 import logging
-from typing import Optional # If adding specific optional fields
-from datetime import datetime, timezone # For __main__ example
+from typing import Optional # Якщо додаються специфічні опціональні поля
+from datetime import datetime, timezone # Для прикладу в __main__
 
-from sqlalchemy.orm import Mapped, mapped_column # If adding specific fields
-from sqlalchemy import String # If adding specific fields
+from sqlalchemy.orm import Mapped, mapped_column # Якщо додаються специфічні поля
+from sqlalchemy import String # Якщо додаються специфічні поля
 
 from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
 
-# Configure logger for this module
+# Налаштувати логер для цього модуля
 logger = logging.getLogger(__name__)
 
 class CalendarProvider(BaseDictionaryModel):
     """
-    Represents a calendar provider service in a dictionary table (e.g., Google Calendar, Outlook Calendar, Apple Calendar).
-    Inherits common fields from BaseDictionaryModel.
+    Представляє постачальника календарних сервісів у таблиці-довіднику (наприклад, Google Calendar, Outlook Calendar, Apple Calendar).
+    Успадковує загальні поля від BaseDictionaryModel.
 
-    The 'code' field will be important (e.g., 'GOOGLE_CALENDAR', 'OUTLOOK_CALENDAR').
-    The 'name' would be 'Google Calendar', 'Outlook Calendar'.
+    Поле 'code' буде важливим (наприклад, 'GOOGLE_CALENDAR', 'OUTLOOK_CALENDAR').
+    Поле 'name' буде 'Google Calendar', 'Outlook Calendar'.
     """
     __tablename__ = "dict_calendar_providers"
 
-    # Add any fields specific to 'CalendarProvider' that are not in BaseDictionaryModel.
-    # For example, an icon URL for the provider or specific API endpoint hints (though actual endpoints are better in config).
+    # Додайте будь-які поля, специфічні для 'CalendarProvider', яких немає в BaseDictionaryModel.
+    # Наприклад, URL-адреса іконки для постачальника або підказки щодо конкретних кінцевих точок API (хоча фактичні кінцеві точки краще зберігати в конфігурації).
     # icon_url: Mapped[Optional[str]] = mapped_column(
     #     String(512),
     #     nullable=True,
-    #     comment="URL to an icon representing this calendar provider."
+    #     comment="URL-адреса іконки, що представляє цього постачальника календарів."
     # )
     # integration_docs_url: Mapped[Optional[str]] = mapped_column(
     #     String(512),
     #     nullable=True,
-    #     comment="Link to documentation for integrating with this provider."
+    #     comment="Посилання на документацію для інтеграції з цим постачальником."
     # )
 
     def __repr__(self) -> str:
-        return super().__repr__() # BaseDictionaryModel provides a good default
+        return super().__repr__() # BaseDictionaryModel надає хороший стандартний __repr__
 
 if __name__ == "__main__":
-    # This block is for demonstration of the CalendarProvider model structure.
+    # Цей блок призначений для демонстрації структури моделі CalendarProvider.
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    logger.info("--- CalendarProvider Dictionary Model --- Demonstration")
+    logger.info("--- Модель довідника CalendarProvider --- Демонстрація")
 
-    # Example instances of CalendarProvider
+    # Приклади екземплярів CalendarProvider
     google_calendar = CalendarProvider(
         code="GOOGLE_CALENDAR",
         name="Google Calendar",
-        description="Integration with Google Calendar for task and event synchronization.",
+        description="Інтеграція з Google Calendar для синхронізації завдань та подій.",
         state="active",
         display_order=1
-        # icon_url="https://example.com/icons/google_calendar.png" # If field was added
+        # icon_url="https://example.com/icons/google_calendar.png" # Якби поле було додано
     )
-    google_calendar.id = 1 # Simulate ORM-set ID
-    google_calendar.created_at = datetime.now(timezone.utc) # Simulate timestamp
-    google_calendar.updated_at = datetime.now(timezone.utc) # Simulate timestamp
-    logger.info(f"Example CalendarProvider: {google_calendar!r}, Description: {google_calendar.description}")
+    google_calendar.id = 1 # Імітація ID, встановленого ORM
+    google_calendar.created_at = datetime.now(timezone.utc) # Імітація часової мітки
+    google_calendar.updated_at = datetime.now(timezone.utc) # Імітація часової мітки
+    logger.info(f"Приклад CalendarProvider: {google_calendar!r}, Опис: {google_calendar.description}")
     # if hasattr(google_calendar, 'icon_url'):
-    #     logger.info(f"  Icon URL: {google_calendar.icon_url}")
+    #     logger.info(f"  URL іконки: {google_calendar.icon_url}")
 
     outlook_calendar = CalendarProvider(
         code="OUTLOOK_CALENDAR",
         name="Outlook Calendar",
-        description="Integration with Outlook Calendar.",
+        description="Інтеграція з Outlook Calendar.",
         state="active",
         display_order=2
     )
     outlook_calendar.id = 2
     outlook_calendar.created_at = datetime.now(timezone.utc)
     outlook_calendar.updated_at = datetime.now(timezone.utc)
-    logger.info(f"Example CalendarProvider: {outlook_calendar!r}, Name: {outlook_calendar.name}")
+    logger.info(f"Приклад CalendarProvider: {outlook_calendar!r}, Назва: {outlook_calendar.name}")
 
-    # Show inherited and specific attributes (if any were added)
+    # Показати успадковані та специфічні атрибути (якщо такі були додані)
     # from sqlalchemy import create_engine
-    # from backend.app.src.config.database import Base # Ensure Base is correctly imported
+    # from backend.app.src.config.database import Base # Переконайтеся, що Base правильно імпортовано
     # engine = create_engine("sqlite:///:memory:")
-    # Base.metadata.create_all(engine) # This would create all tables defined using this Base
-    # logger.info(f"Columns in CalendarProvider ({CalendarProvider.__tablename__}): {[c.name for c in CalendarProvider.__table__.columns]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    # Base.metadata.create_all(engine) # Це створить усі таблиці, визначені за допомогою цього Base
+    # logger.info(f"Стовпці в CalendarProvider ({CalendarProvider.__tablename__}): {[c.name for c in CalendarProvider.__table__.columns]}")
+    logger.info("Щоб побачити фактичні стовпці таблиці, метадані SQLAlchemy потрібно ініціалізувати за допомогою engine (наприклад, Base.metadata.create_all(engine)).")

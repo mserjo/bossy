@@ -1,104 +1,104 @@
 # backend/app/src/models/dictionaries/bonus_types.py
 
 """
-SQLAlchemy model for a 'BonusType' dictionary table.
-This table stores different types or categories of bonuses or penalties
-(e.g., TaskCompletionBonus, EarlyCompletionBonus, LateSubmissionPenalty).
+Модель SQLAlchemy для таблиці-довідника 'BonusType'.
+Ця таблиця зберігає різні типи або категорії бонусів чи штрафів
+(наприклад, БонусЗаВиконанняЗавдання, БонусЗаЗавчаснеВиконання, ШтрафЗаПізнєПодання).
 """
 
 import logging
-from typing import Optional # If adding specific optional fields
-from datetime import datetime, timezone # For __main__ example
+from typing import Optional # Якщо додаються специфічні опціональні поля
+from datetime import datetime, timezone # Для прикладу в __main__
 
-from sqlalchemy.orm import Mapped, mapped_column # If adding specific fields
-from sqlalchemy import Boolean, Integer # If adding specific fields
+from sqlalchemy.orm import Mapped, mapped_column # Якщо додаються специфічні поля
+from sqlalchemy import Boolean, Integer # Якщо додаються специфічні поля
 
 from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
 
-# Configure logger for this module
+# Налаштувати логер для цього модуля
 logger = logging.getLogger(__name__)
 
 class BonusType(BaseDictionaryModel):
     """
-    Represents a type of bonus or penalty in a dictionary table.
-    Examples: Task Completion, Streak Bonus, Late Penalty, Referral Bonus.
-    Inherits common fields from BaseDictionaryModel.
+    Представляє тип бонусу або штрафу в таблиці-довіднику.
+    Приклади: Завершення завдання, Бонус за серію, Штраф за запізнення, Реферальний бонус.
+    Успадковує загальні поля від BaseDictionaryModel.
 
-    The 'code' field will be important (e.g., 'TASK_COMPLETION', 'STREAK_7_DAYS', 'LATE_PENALTY').
+    Поле 'code' буде важливим (наприклад, 'TASK_COMPLETION', 'STREAK_7_DAYS', 'LATE_PENALTY').
     """
     __tablename__ = "dict_bonus_types"
 
-    # Add any fields specific to 'BonusType' that are not in BaseDictionaryModel.
-    # For example, whether this type is typically a bonus (positive points) or penalty (negative points).
+    # Додайте будь-які поля, специфічні для 'BonusType', яких немає в BaseDictionaryModel.
+    # Наприклад, чи є цей тип зазвичай бонусом (позитивні бали) чи штрафом (негативні бали).
     # is_penalty_type: Mapped[bool] = mapped_column(
     #     Boolean,
     #     default=False,
     #     nullable=False,
-    #     comment="True if this type typically results in negative points (a penalty)."
+    #     comment="True, якщо цей тип зазвичай призводить до негативних балів (штраф)."
     # )
     # default_point_impact: Mapped[Optional[int]] = mapped_column(
     #     Integer,
     #     nullable=True,
-    #     comment="Default points awarded or deducted for this bonus type. Can be overridden by specific BonusRule."
+    #     comment="Кількість балів за замовчуванням, що нараховуються або знімаються для цього типу бонусу. Може бути перевизначено конкретним BonusRule."
     # )
 
     def __repr__(self) -> str:
-        return super().__repr__() # BaseDictionaryModel provides a good default
+        return super().__repr__() # BaseDictionaryModel надає хороший стандартний __repr__
 
 if __name__ == "__main__":
-    # This block is for demonstration of the BonusType model structure.
+    # Цей блок призначений для демонстрації структури моделі BonusType.
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    logger.info("--- BonusType Dictionary Model --- Demonstration")
+    logger.info("--- Модель довідника BonusType --- Демонстрація")
 
-    # Example instances of BonusType
+    # Приклади екземплярів BonusType
     task_completion_bonus = BonusType(
         code="TASK_COMPLETION",
-        name="Task Completion Bonus",
-        description="Standard bonus awarded for successfully completing a task.",
+        name="Бонус за виконання завдання",
+        description="Стандартний бонус, що нараховується за успішне виконання завдання.",
         state="active",
         display_order=1
-        # is_penalty_type=False, # If field was added
-        # default_point_impact=20 # If field was added
+        # is_penalty_type=False, # Якби поле було додано
+        # default_point_impact=20 # Якби поле було додано
     )
-    task_completion_bonus.id = 1 # Simulate ORM-set ID
-    task_completion_bonus.created_at = datetime.now(timezone.utc) # Simulate timestamp
-    task_completion_bonus.updated_at = datetime.now(timezone.utc) # Simulate timestamp
-    logger.info(f"Example BonusType: {task_completion_bonus!r}, Description: {task_completion_bonus.description}")
+    task_completion_bonus.id = 1 # Імітація ID, встановленого ORM
+    task_completion_bonus.created_at = datetime.now(timezone.utc) # Імітація часової мітки
+    task_completion_bonus.updated_at = datetime.now(timezone.utc) # Імітація часової мітки
+    logger.info(f"Приклад BonusType: {task_completion_bonus!r}, Опис: {task_completion_bonus.description}")
     # if hasattr(task_completion_bonus, 'is_penalty_type'):
-    #     logger.info(f"  Is Penalty Type: {task_completion_bonus.is_penalty_type}")
+    #     logger.info(f"  Чи є типом штрафу: {task_completion_bonus.is_penalty_type}")
 
     late_penalty = BonusType(
         code="LATE_SUBMISSION_PENALTY",
-        name="Late Submission Penalty",
-        description="Penalty applied for submitting a task after its due date.",
+        name="Штраф за пізнє подання",
+        description="Штраф, що застосовується за подання завдання після встановленого терміну.",
         state="active",
         display_order=10
-        # is_penalty_type=True, # If field was added
-        # default_point_impact=-5 # If field was added
+        # is_penalty_type=True, # Якби поле було додано
+        # default_point_impact=-5 # Якби поле було додано
     )
     late_penalty.id = 2
     late_penalty.created_at = datetime.now(timezone.utc)
     late_penalty.updated_at = datetime.now(timezone.utc)
-    logger.info(f"Example BonusType: {late_penalty!r}, Name: {late_penalty.name}")
+    logger.info(f"Приклад BonusType: {late_penalty!r}, Назва: {late_penalty.name}")
 
     streak_bonus = BonusType(
         code="STREAK_BONUS_7_DAY",
-        name="7-Day Streak Bonus",
-        description="Bonus for completing tasks consecutively for 7 days.",
+        name="Бонус за 7-денну серію",
+        description="Бонус за послідовне виконання завдань протягом 7 днів.",
         state="active",
         display_order=3
     )
     streak_bonus.id = 3
     streak_bonus.created_at = datetime.now(timezone.utc)
     streak_bonus.updated_at = datetime.now(timezone.utc)
-    logger.info(f"Example BonusType: {streak_bonus!r}, Is Default: {streak_bonus.is_default}") # is_default is False by default
+    logger.info(f"Приклад BonusType: {streak_bonus!r}, За замовчуванням: {streak_bonus.is_default}") # is_default за замовчуванням False
 
-    # Show inherited and specific attributes (if any were added)
+    # Показати успадковані та специфічні атрибути (якщо такі були додані)
     # from sqlalchemy import create_engine
-    # from backend.app.src.config.database import Base # Ensure Base is correctly imported
+    # from backend.app.src.config.database import Base # Переконайтеся, що Base правильно імпортовано
     # engine = create_engine("sqlite:///:memory:")
-    # Base.metadata.create_all(engine) # This would create all tables defined using this Base
-    # logger.info(f"Columns in BonusType ({BonusType.__tablename__}): {[c.name for c in BonusType.__table__.columns]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    # Base.metadata.create_all(engine) # Це створить усі таблиці, визначені за допомогою цього Base
+    # logger.info(f"Стовпці в BonusType ({BonusType.__tablename__}): {[c.name for c in BonusType.__table__.columns]}")
+    logger.info("Щоб побачити фактичні стовпці таблиці, метадані SQLAlchemy потрібно ініціалізувати за допомогою engine (наприклад, Base.metadata.create_all(engine)).")

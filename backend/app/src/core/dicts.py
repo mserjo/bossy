@@ -1,62 +1,63 @@
 # backend/app/src/core/dicts.py
 
 """
-This module defines system-level enumerations (Enums) that represent fixed sets of choices
-used within the application's business logic. These are distinct from dictionary models
-that might be stored in the database and managed dynamically.
+Цей модуль визначає переліки (Enums) системного рівня, які представляють
+фіксовані набори варіантів, що використовуються в бізнес-логіці програми.
+Вони відрізняються від моделей-довідників, які можуть зберігатися в базі даних
+та керуватися динамічно.
 """
 
 from enum import Enum
 
 class SortOrder(str, Enum):
-    """Defines the sort order for query results."""
-    ASC = "asc"         # Ascending order
-    DESC = "desc"       # Descending order
+    """Визначає порядок сортування для результатів запитів."""
+    ASC = "asc"         # За зростанням
+    DESC = "desc"       # За спаданням
 
 class UserState(str, Enum):
-    """Represents the possible states of a user account."""
-    PENDING_VERIFICATION = "pending_verification" # User registered, email/phone not yet verified
-    ACTIVE = "active"                     # User account is active and can be used
-    INACTIVE = "inactive"                   # User account has been deactivated by an admin or user
-    SUSPENDED = "suspended"                 # User account has been temporarily suspended by an admin
-    BANNED = "banned"                     # User account has been permanently banned
-    DELETED = "deleted"                   # User account is marked for deletion (soft delete)
+    """Представляє можливі стани облікового запису користувача."""
+    PENDING_VERIFICATION = "pending_verification" # Користувач зареєстрований, email/телефон ще не підтверджено
+    ACTIVE = "active"                     # Обліковий запис користувача активний і може використовуватися
+    INACTIVE = "inactive"                   # Обліковий запис користувача деактивовано адміністратором або користувачем
+    SUSPENDED = "suspended"                 # Обліковий запис користувача тимчасово призупинено адміністратором
+    BANNED = "banned"                     # Обліковий запис користувача остаточно заблоковано
+    DELETED = "deleted"                   # Обліковий запис користувача позначено для видалення (м'яке видалення)
 
 class GroupRole(str, Enum):
-    """Defines roles within a group."""
-    ADMIN = "admin"       # Administrator of the group
-    MEMBER = "member"     # Regular member of the group
-    # GUEST = "guest"     # Optional: A guest role with limited permissions
+    """Визначає ролі всередині групи."""
+    ADMIN = "admin"       # Адміністратор групи
+    MEMBER = "member"     # Звичайний учасник групи
+    # GUEST = "guest"     # Опціонально: гостьова роль з обмеженими правами
 
 class TaskStatus(str, Enum):
     """
-    Represents the lifecycle status of a task.
-    These are general statuses; specific applications might extend or specialize them.
+    Представляє статус життєвого циклу завдання.
+    Це загальні статуси; конкретні програми можуть розширювати або спеціалізувати їх.
     """
-    OPEN = "open"                          # Task is available to be worked on
-    IN_PROGRESS = "in_progress"            # Task is currently being worked on by a user
-    PENDING_REVIEW = "pending_review"      # Task completion is submitted and awaits admin approval
-    COMPLETED = "completed"                # Task has been successfully completed and verified
-    REJECTED = "rejected"                  # Task completion was reviewed and rejected
-    CANCELLED = "cancelled"                # Task has been cancelled before completion
-    ON_HOLD = "on_hold"                    # Task is temporarily paused
-    EXPIRED = "expired"                    # Task was not completed within its due date
+    OPEN = "open"                          # Завдання доступне для виконання
+    IN_PROGRESS = "in_progress"            # Завдання зараз виконується користувачем
+    PENDING_REVIEW = "pending_review"      # Виконання завдання надіслано та очікує на затвердження адміністратором
+    COMPLETED = "completed"                # Завдання успішно виконано та перевірено
+    REJECTED = "rejected"                  # Виконання завдання було переглянуто та відхилено
+    CANCELLED = "cancelled"                # Завдання було скасовано до завершення
+    ON_HOLD = "on_hold"                    # Завдання тимчасово призупинено
+    EXPIRED = "expired"                    # Завдання не було виконано до встановленого терміну
 
 class EventFrequency(str, Enum):
-    """Defines how often a recurring task or event occurs."""
+    """Визначає, як часто відбувається повторюване завдання або подія."""
     ONCE = "once"
     DAILY = "daily"
     WEEKLY = "weekly"
     MONTHLY = "monthly"
     YEARLY = "yearly"
-    # CUSTOM = "custom" # For more complex recurrence patterns, usually needs more fields
+    # CUSTOM = "custom" # Для складніших шаблонів повторення, зазвичай потребує більше полів
 
 class NotificationType(str, Enum):
-    """Defines different types of notifications within the system."""
+    """Визначає різні типи сповіщень у системі."""
     GENERAL_INFO = "general_info"
     TASK_ASSIGNED = "task_assigned"
-    TASK_COMPLETED_USER = "task_completed_by_user" # User marked task as complete
-    TASK_VERIFIED_ADMIN = "task_verified_by_admin" # Admin approved/rejected completion
+    TASK_COMPLETED_USER = "task_completed_by_user" # Користувач позначив завдання як виконане
+    TASK_VERIFIED_ADMIN = "task_verified_by_admin" # Адміністратор затвердив/відхилив виконання
     TASK_REMINDER = "task_reminder"
     BONUS_AWARDED = "bonus_awarded"
     REWARD_REDEEMED = "reward_redeemed"
@@ -66,7 +67,7 @@ class NotificationType(str, Enum):
     SYSTEM_ANNOUNCEMENT = "system_announcement"
 
 class FileType(str, Enum):
-    """Categorizes uploaded files."""
+    """Категоризує завантажені файли."""
     AVATAR = "avatar"
     GROUP_ICON = "group_icon"
     REWARD_ICON = "reward_icon"
@@ -79,7 +80,7 @@ class FileType(str, Enum):
     OTHER = "other"
 
 class TimePeriod(str, Enum):
-    """Represents common time periods for reporting or filtering."""
+    """Представляє загальні періоди часу для звітності або фільтрації."""
     TODAY = "today"
     YESTERDAY = "yesterday"
     LAST_7_DAYS = "last_7_days"
@@ -89,8 +90,8 @@ class TimePeriod(str, Enum):
     CURRENT_YEAR = "current_year"
     ALL_TIME = "all_time"
 
-# Add more Enums as needed for your application's core logic.
-# Examples:
+# Додавайте більше Enum за потребою для основної логіки вашої програми.
+# Приклади:
 # class TransactionType(str, Enum):
 #     CREDIT = "credit"
 #     DEBIT = "debit"
@@ -104,26 +105,26 @@ class TimePeriod(str, Enum):
 #     CRITICAL = "critical"
 
 if __name__ == "__main__":
-    print("--- Core Enums (Dictionaries) ---")
+    print("--- Основні переліки (Довідники) ---")
 
-    print("\nUser States:")
+    print("\nСтани користувача:")
     for state in UserState:
         print(f"- {state.name}: {state.value}")
 
-    print("\nGroup Roles:")
+    print("\nРолі в групі:")
     for role in GroupRole:
         print(f"- {role.name}: {role.value}")
 
-    print("\nTask Statuses:")
+    print("\nСтатуси завдань:")
     for status in TaskStatus:
         print(f"- {status.name}: {status.value}")
 
-    print("\nSort Orders:")
+    print("\nПорядки сортування:")
     for order in SortOrder:
         print(f"- {order.name}: {order.value}")
 
-    print("\nNotification Types:")
+    print("\nТипи сповіщень:")
     for n_type in NotificationType:
         print(f"- {n_type.name}: {n_type.value}")
 
-    print(f"\nAccessing a specific enum value: UserState.ACTIVE is '{UserState.ACTIVE.value}'")
+    print(f"\nДоступ до конкретного значення enum: UserState.ACTIVE це '{UserState.ACTIVE.value}'")

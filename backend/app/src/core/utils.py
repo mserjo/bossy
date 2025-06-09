@@ -1,9 +1,9 @@
 # backend/app/src/core/utils.py
 
 """
-This module provides miscellaneous utility functions that are reusable
-across different parts of the application and don't fit into more
-specific utility modules (like validators.py or security.py from config).
+Цей модуль надає різноманітні допоміжні функції, які можна повторно
+використовувати в різних частинах програми і які не вписуються
+в більш специфічні модулі утиліт (наприклад, validators.py або security.py з config).
 """
 
 import random
@@ -13,19 +13,19 @@ from datetime import datetime, timezone, timedelta
 from typing import Any, Optional, List, Dict, Union
 from decimal import Decimal, ROUND_HALF_UP
 
-# --- String Utilities ---
+# --- Утиліти для рядків ---
 
 def generate_random_string(length: int, chars: str = string.ascii_letters + string.digits) -> str:
     """
-    Generates a random string of a specified length from a given set of characters.
+    Генерує випадковий рядок заданої довжини із заданого набору символів.
 
     Args:
-        length (int): The desired length of the random string.
-        chars (str): A string containing characters to choose from.
-                     Defaults to alphanumeric characters (letters + digits).
+        length (int): Бажана довжина випадкового рядка.
+        chars (str): Рядок, що містить символи для вибору.
+                     За замовчуванням використовуються буквено-цифрові символи (літери + цифри).
 
     Returns:
-        str: The generated random string.
+        str: Згенерований випадковий рядок.
     """
     if length <= 0:
         return ""
@@ -33,43 +33,43 @@ def generate_random_string(length: int, chars: str = string.ascii_letters + stri
 
 def generate_random_numeric_string(length: int) -> str:
     """
-    Generates a random string consisting only of digits.
+    Генерує випадковий рядок, що складається лише з цифр.
     """
     return generate_random_string(length, string.digits)
 
 def slugify(text: str, separator: str = "-") -> str:
     """
-    Generates a URL-friendly slug from a given text.
-    Converts to lowercase, removes non-alphanumeric characters (except spaces and hyphens),
-    replaces spaces and repeated hyphens with a single specified separator.
+    Генерує URL-дружній "слаг" із заданого тексту.
+    Перетворює на нижній регістр, видаляє небуквено-цифрові символи (крім пробілів та дефісів),
+    замінює пробіли та повторювані дефіси одним вказаним роздільником.
     """
     if not text:
         return ""
     text = text.lower()
-    # Remove special characters, keeping spaces and hyphens for now
+    # Видалити спеціальні символи, поки що зберігаючи пробіли та дефіси
     text = re.sub(r"[^a-z0-9\s-]", "", text, flags=re.UNICODE)
-    # Replace spaces and multiple hyphens with a single separator
+    # Замінити пробіли та кілька дефісів одним роздільником
     text = re.sub(r"[\s-]+|-", separator, text).strip(separator)
     return text
 
 def truncate_string(text: str, max_length: int, suffix: str = "...") -> str:
     """
-    Truncates a string to a maximum length, adding a suffix if truncated.
+    Обрізає рядок до максимальної довжини, додаючи суфікс, якщо обрізано.
     """
     if len(text) <= max_length:
         return text
     return text[:max_length - len(suffix)] + suffix
 
-# --- Datetime Utilities ---
+# --- Утиліти для дати та часу ---
 
 def get_current_utc_timestamp() -> datetime:
-    """Returns the current datetime in UTC with timezone information."""
+    """Повертає поточну дату та час у UTC з інформацією про часовий пояс."""
     return datetime.now(timezone.utc)
 
 def format_datetime_for_display(dt: datetime, fmt: str = "%Y-%m-%d %H:%M:%S %Z%z") -> str:
     """
-    Formats a datetime object into a string for display purposes.
-    Defaults to a common ISO-like format with timezone.
+    Форматує об'єкт datetime у рядок для відображення.
+    За замовчуванням використовується поширений ISO-подібний формат з часовим поясом.
     """
     if not dt:
         return ""
@@ -77,13 +77,13 @@ def format_datetime_for_display(dt: datetime, fmt: str = "%Y-%m-%d %H:%M:%S %Z%z
 
 def human_readable_timedelta(delta: timedelta) -> str:
     """
-    Converts a timedelta object into a human-readable string (e.g., "2 days, 3 hours").
+    Перетворює об'єкт timedelta на людиночитаний рядок (наприклад, "2 дні, 3 години").
     """
     seconds = int(delta.total_seconds())
     if seconds < 0:
-        return "(negative duration)"
+        return "(від'ємна тривалість)"
     if seconds == 0:
-        return "0 seconds"
+        return "0 секунд"
 
     days, remainder = divmod(seconds, 86400)
     hours, remainder = divmod(remainder, 3600)
@@ -91,106 +91,106 @@ def human_readable_timedelta(delta: timedelta) -> str:
 
     parts = []
     if days > 0:
-        parts.append(f"{days} day{'s' if days != 1 else ''}")
+        parts.append(f"{days} день{'i' if days != 1 else ''}") # Адаптація для української мови
     if hours > 0:
-        parts.append(f"{hours} hour{'s' if hours != 1 else ''}")
+        parts.append(f"{hours} годин{'а' if hours == 1 else ('и' if 1 < hours < 5 else '')}") # Адаптація для української мови
     if minutes > 0:
-        parts.append(f"{minutes} minute{'s' if minutes != 1 else ''}")
-    if seconds > 0 or not parts: # Show seconds if it's the only unit or if non-zero
-        parts.append(f"{seconds} second{'s' if seconds != 1 else ''}")
+        parts.append(f"{minutes} хвилин{'а' if minutes == 1 else ('и' if 1 < minutes < 5 else '')}") # Адаптація для української мови
+    if seconds > 0 or not parts: # Показати секунди, якщо це єдина одиниця або якщо не нуль
+        parts.append(f"{seconds} секунд{'а' if seconds == 1 else ('и' if 1 < seconds < 5 else '')}") # Адаптація для української мови
 
     return ", ".join(parts)
 
-# --- Numeric Utilities ---
+# --- Числові утиліти ---
 
 def round_decimal(number: Union[float, Decimal, str], decimal_places: int = 2) -> Decimal:
     """
-    Rounds a number to a specified number of decimal places using Decimal for precision.
-    Uses ROUND_HALF_UP rounding method.
+    Округлює число до вказаної кількості десяткових знаків, використовуючи Decimal для точності.
+    Використовує метод округлення ROUND_HALF_UP.
     """
     if not isinstance(number, Decimal):
         number = Decimal(str(number))
-    quantizer = Decimal("1e-" + str(decimal_places)) # e.g., Decimal('0.01') for 2 places
+    quantizer = Decimal("1e-" + str(decimal_places)) # наприклад, Decimal('0.01') для 2 знаків
     return number.quantize(quantizer, rounding=ROUND_HALF_UP)
 
-# --- Collection Utilities ---
+# --- Утиліти для колекцій ---
 
 def chunk_list(data: List[Any], chunk_size: int) -> List[List[Any]]:
     """
-    Splits a list into smaller chunks of a specified size.
-    Example: chunk_list([1,2,3,4,5], 2) -> [[1,2], [3,4], [5]]
+    Розбиває список на менші частини заданого розміру.
+    Приклад: chunk_list([1,2,3,4,5], 2) -> [[1,2], [3,4], [5]]
     """
     if chunk_size <= 0:
-        raise ValueError("Chunk size must be a positive integer.")
+        raise ValueError("Розмір частини повинен бути додатним цілим числом.")
     return [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
 
 def get_from_dict_or_object(data: Union[Dict[str, Any], object], key: str, default: Optional[Any] = None) -> Any:
     """
-    Safely retrieves a value from a dictionary or an attribute from an object.
+    Безпечно отримує значення зі словника або атрибут з об'єкта.
 
     Args:
-        data: The dictionary or object to retrieve from.
-        key: The key or attribute name.
-        default: The default value to return if the key/attribute is not found.
+        data: Словник або об'єкт, з якого потрібно отримати значення.
+        key: Ключ або назва атрибута.
+        default: Значення за замовчуванням, яке повертається, якщо ключ/атрибут не знайдено.
 
     Returns:
-        The value if found, otherwise the default.
+        Значення, якщо знайдено, інакше значення за замовчуванням.
     """
     if isinstance(data, dict):
         return data.get(key, default)
     else:
         return getattr(data, key, default)
 
-# --- Other Utilities ---
+# --- Інші утиліти ---
 
 def generate_unique_code(length: int = 6, prefix: str = "") -> str:
     """
-    Generates a unique code, typically for things like invitation codes or short IDs.
-    Combines a prefix with a random string. For true uniqueness in a distributed system,
-    more robust mechanisms (e.g., UUIDs, database sequences) are needed.
-    This is more for human-readable, relatively short codes.
+    Генерує унікальний код, зазвичай для таких речей, як коди запрошень або короткі ID.
+    Поєднує префікс із випадковим рядком. Для справжньої унікальності в розподіленій системі
+    потрібні більш надійні механізми (наприклад, UUID, послідовності бази даних).
+    Це більше для людиночитаних, відносно коротких кодів.
     """
     random_part = generate_random_string(length, string.ascii_uppercase + string.digits)
     return f"{prefix}{random_part}".upper()
 
 
 if __name__ == "__main__":
-    print("--- Core Utilities Demonstration ---")
+    print("--- Демонстрація основних утиліт ---")
 
-    # String utils
-    print(f"\nRandom string (10 chars): {generate_random_string(10)}")
-    print(f"Random numeric string (8 chars): {generate_random_numeric_string(8)}")
-    print(f"Slugify 'Hello World! 123': {slugify('Hello World! 123')}")
-    print(f"Slugify '  --Extra--Hyphens--  ': {slugify('  --Extra--Hyphens--  ')}")
-    print(f"Truncate 'This is a long string' (max 10): {truncate_string('This is a long string', 10)}")
-    print(f"Truncate 'Short' (max 10): {truncate_string('Short', 10)}")
+    # Рядкові утиліти
+    print(f"\nВипадковий рядок (10 символів): {generate_random_string(10)}")
+    print(f"Випадковий числовий рядок (8 символів): {generate_random_numeric_string(8)}")
+    print(f"Slugify 'Привіт Світ! 123': {slugify('Привіт Світ! 123')}")
+    print(f"Slugify '  --Зайві--Дефіси--  ': {slugify('  --Зайві--Дефіси--  ')}")
+    print(f"Обрізати 'Це довгий рядок' (макс 10): {truncate_string('Це довгий рядок', 10)}")
+    print(f"Обрізати 'Короткий' (макс 10): {truncate_string('Короткий', 10)}")
 
-    # Datetime utils
+    # Утиліти для дати та часу
     utc_now = get_current_utc_timestamp()
-    print(f"\nCurrent UTC Timestamp: {utc_now}")
-    print(f"Formatted UTC Timestamp: {format_datetime_for_display(utc_now)}")
+    print(f"\nПоточна мітка часу UTC: {utc_now}")
+    print(f"Відформатована мітка часу UTC: {format_datetime_for_display(utc_now)}")
     delta_example = timedelta(days=2, hours=3, minutes=30, seconds=5)
-    print(f"Human readable timedelta ({delta_example}): {human_readable_timedelta(delta_example)}")
-    print(f"Human readable timedelta (0 seconds): {human_readable_timedelta(timedelta(seconds=0))}")
+    print(f"Людиночитаний timedelta ({delta_example}): {human_readable_timedelta(delta_example)}")
+    print(f"Людиночитаний timedelta (0 секунд): {human_readable_timedelta(timedelta(seconds=0))}")
 
-    # Numeric utils
-    print(f"\nRound 123.456 (2 places): {round_decimal(123.456, 2)}")
-    print(f"Round 123.454 (2 places): {round_decimal(123.454, 2)}")
-    print(f"Round 123.45 (0 places): {round_decimal(123.45, 0)}")
+    # Числові утиліти
+    print(f"\nОкруглити 123.456 (2 знаки): {round_decimal(123.456, 2)}")
+    print(f"Округлити 123.454 (2 знаки): {round_decimal(123.454, 2)}")
+    print(f"Округлити 123.45 (0 знаків): {round_decimal(123.45, 0)}")
 
-    # Collection utils
+    # Утиліти для колекцій
     my_list = list(range(10))
-    print(f"\nChunk list {my_list} (size 3): {chunk_list(my_list, 3)}")
-    my_dict = {"name": "Alice", "age": 30}
-    print(f"Get 'name' from dict: {get_from_dict_or_object(my_dict, 'name')}")
-    print(f"Get 'city' from dict (default 'N/A'): {get_from_dict_or_object(my_dict, 'city', 'N/A')}")
+    print(f"\nРозбити список {my_list} (розмір 3): {chunk_list(my_list, 3)}")
+    my_dict = {"name": "Аліса", "age": 30}
+    print(f"Отримати 'name' зі словника: {get_from_dict_or_object(my_dict, 'name')}")
+    print(f"Отримати 'city' зі словника (за замовчуванням 'N/A'): {get_from_dict_or_object(my_dict, 'city', 'N/A')}")
 
     class MyObj:
         def __init__(self):
-            self.title = "Test Object"
+            self.title = "Тестовий об'єкт"
     my_obj_instance = MyObj()
-    print(f"Get 'title' from object: {get_from_dict_or_object(my_obj_instance, 'title')}")
+    print(f"Отримати 'title' з об'єкта: {get_from_dict_or_object(my_obj_instance, 'title')}")
 
-    # Other utils
-    print(f"\nUnique code (prefix 'INV-'): {generate_unique_code(6, 'INV-')}")
-    print(f"Unique code (default): {generate_unique_code()}")
+    # Інші утиліти
+    print(f"\nУнікальний код (префікс 'INV-'): {generate_unique_code(6, 'INV-')}")
+    print(f"Унікальний код (за замовчуванням): {generate_unique_code()}")

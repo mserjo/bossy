@@ -12,18 +12,18 @@ from app.src.services.dictionaries import CalendarProviderService
 from app.src.repositories.dictionaries import CalendarProviderRepository
 from app.src.core.pagination import PagedResponse, PageParams
 from app.src.core.dependencies import paginator
-# from app.src.models.auth import User as UserModel # For role-based access
+# from app.src.models.auth import User as UserModel # Для доступу на основі ролей
 
 router = APIRouter(
     prefix="/calendar-providers",
     tags=["Dictionary - Calendar Providers"],
-    dependencies=[Depends(get_current_active_superuser)] # TODO: Adjust permissions - Superuser only as per task
+    dependencies=[Depends(get_current_active_superuser)] # TODO: Налаштувати дозволи - Тільки суперкористувач згідно із завданням
 )
 
-# Dependency to get CalendarProviderService
+# Залежність для отримання CalendarProviderService
 async def get_calendar_provider_service(session: AsyncSession = Depends(get_db_session)) -> CalendarProviderService:
     """
-    Dependency to get an instance of CalendarProviderService.
+    Залежність для отримання екземпляра CalendarProviderService.
     """
     return CalendarProviderService(CalendarProviderRepository(session))
 
@@ -31,15 +31,15 @@ async def get_calendar_provider_service(session: AsyncSession = Depends(get_db_s
     "/",
     response_model=CalendarProviderResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a new calendar provider",
-    description="Allows a superuser to create a new calendar provider.",
+    summary="Створити нового постачальника календарів",
+    description="Дозволяє суперкористувачу створювати нового постачальника календарів.",
 )
 async def create_calendar_provider(
     calendar_provider_in: CalendarProviderCreate,
     service: CalendarProviderService = Depends(get_calendar_provider_service),
 ) -> CalendarProviderModel:
     """
-    Create a new calendar provider.
+    Створити нового постачальника календарів.
     """
     return await service.create(obj_in=calendar_provider_in)
 
@@ -47,36 +47,36 @@ async def create_calendar_provider(
     "/{calendar_provider_id}",
     response_model=CalendarProviderResponse,
     status_code=status.HTTP_200_OK,
-    summary="Get a calendar provider by ID",
-    description="Allows a superuser to retrieve a specific calendar provider.", # As per task, only superuser configures this
+    summary="Отримати постачальника календарів за ID",
+    description="Дозволяє суперкористувачу отримувати конкретного постачальника календарів.", # Згідно із завданням, налаштовує тільки суперкористувач
 )
 async def get_calendar_provider(
     calendar_provider_id: UUID,
     service: CalendarProviderService = Depends(get_calendar_provider_service),
-    # current_user: UserModel = Depends(get_current_active_superuser) # Ensure superuser
+    # current_user: UserModel = Depends(get_current_active_superuser) # Переконатися, що це суперкористувач
 ) -> CalendarProviderModel:
     """
-    Get a calendar provider by its ID.
+    Отримати постачальника календарів за його ID.
     """
     db_calendar_provider = await service.get_by_id(obj_id=calendar_provider_id)
     if not db_calendar_provider:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calendar provider not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Постачальника календарів не знайдено")
     return db_calendar_provider
 
 @router.get(
     "/",
     response_model=PagedResponse[CalendarProviderResponse],
     status_code=status.HTTP_200_OK,
-    summary="Get all calendar providers",
-    description="Allows a superuser to retrieve a paginated list of calendar providers.", # As per task, only superuser configures this
+    summary="Отримати всіх постачальників календарів",
+    description="Дозволяє суперкористувачу отримувати сторінковий список постачальників календарів.", # Згідно із завданням, налаштовує тільки суперкористувач
 )
 async def get_all_calendar_providers(
     page_params: PageParams = Depends(paginator),
     service: CalendarProviderService = Depends(get_calendar_provider_service),
-    # current_user: UserModel = Depends(get_current_active_superuser) # Ensure superuser
+    # current_user: UserModel = Depends(get_current_active_superuser) # Переконатися, що це суперкористувач
 ) -> PagedResponse[CalendarProviderModel]:
     """
-    Get all calendar providers with pagination.
+    Отримати всіх постачальників календарів з пагінацією.
     """
     calendar_providers = await service.get_multi(
         skip=page_params.skip,
@@ -91,8 +91,8 @@ async def get_all_calendar_providers(
     "/{calendar_provider_id}",
     response_model=CalendarProviderResponse,
     status_code=status.HTTP_200_OK,
-    summary="Update a calendar provider",
-    description="Allows a superuser to update an existing calendar provider.",
+    summary="Оновити постачальника календарів",
+    description="Дозволяє суперкористувачу оновлювати існуючого постачальника календарів.",
 )
 async def update_calendar_provider(
     calendar_provider_id: UUID,
@@ -100,30 +100,30 @@ async def update_calendar_provider(
     service: CalendarProviderService = Depends(get_calendar_provider_service),
 ) -> CalendarProviderModel:
     """
-    Update an existing calendar provider.
+    Оновити існуючого постачальника календарів.
     """
     db_calendar_provider = await service.get_by_id(obj_id=calendar_provider_id)
     if not db_calendar_provider:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calendar provider not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Постачальника календарів не знайдено")
     return await service.update(obj_db=db_calendar_provider, obj_in=calendar_provider_in)
 
 @router.delete(
     "/{calendar_provider_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a calendar provider",
-    description="Allows a superuser to delete a calendar provider. (Hard delete)", # TODO: Confirm soft delete
+    summary="Видалити постачальника календарів",
+    description="Дозволяє суперкористувачу видалити постачальника календарів. (Жорстке видалення)", # TODO: Підтвердити м'яке видалення
 )
 async def delete_calendar_provider(
     calendar_provider_id: UUID,
     service: CalendarProviderService = Depends(get_calendar_provider_service),
 ) -> None:
     """
-    Delete a calendar provider by its ID.
+    Видалити постачальника календарів за його ID.
     """
     db_calendar_provider = await service.get_by_id(obj_id=calendar_provider_id)
     if not db_calendar_provider:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Calendar provider not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Постачальника календарів не знайдено")
     await service.delete(obj_id=calendar_provider_id)
     return None
 
-# TODO: Consider get_calendar_provider_by_code endpoint if needed.
+# TODO: Розглянути можливість додавання ендпоінта get_calendar_provider_by_code, якщо потрібно.

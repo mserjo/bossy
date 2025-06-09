@@ -5,100 +5,100 @@ from passlib.context import CryptContext
 
 from backend.app.src.config.settings import settings
 
-# --- Password Hashing Setup ---
-# CryptContext is used for hashing and verifying passwords.
-# "bcrypt" is a strong and widely recommended hashing algorithm.
-# `deprecated="auto"` means that any deprecated schemes will still be usable for verification
-# but new hashes will use the default scheme.
+# --- Налаштування хешування паролів ---
+# CryptContext використовується для хешування та перевірки паролів.
+# "bcrypt" - це надійний і широко рекомендований алгоритм хешування.
+# `deprecated="auto"` означає, що будь-які застарілі схеми все ще будуть використовуватися для перевірки,
+# але нові хеші використовуватимуть схему за замовчуванням.
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
-    Verifies a plain password against a hashed password.
+    Перевіряє звичайний пароль на відповідність хешованому паролю.
 
     Args:
-        plain_password (str): The password in plain text.
-        hashed_password (str): The hashed password stored in the database.
+        plain_password (str): Пароль у відкритому вигляді.
+        hashed_password (str): Хешований пароль, що зберігається в базі даних.
 
     Returns:
-        bool: True if the password matches, False otherwise.
+        bool: True, якщо пароль збігається, False в іншому випадку.
     """
     try:
         return pwd_context.verify(plain_password, hashed_password)
     except Exception as e:
-        # Log the error or handle it appropriately
-        # For security, avoid leaking too much information about why verification failed.
-        # get_logger().error(f"Error verifying password: {e}")
+        # Залогувати помилку або обробити її належним чином
+        # З міркувань безпеки уникайте розголошення зайвої інформації про причину невдалої перевірки.
+        # get_logger().error(f"Помилка перевірки пароля: {e}")
         return False
 
 def get_password_hash(password: str) -> str:
     """
-    Hashes a plain password.
+    Хешує звичайний пароль.
 
     Args:
-        password (str): The password in plain text.
+        password (str): Пароль у відкритому вигляді.
 
     Returns:
-        str: The hashed password.
+        str: Хешований пароль.
     """
     return pwd_context.hash(password)
 
 
-# --- JWT (JSON Web Token) Utilities ---
+# --- Утиліти JWT (JSON Web Token) ---
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """
-    Creates a new JWT access token.
+    Створює новий JWT токен доступу.
 
     Args:
-        data (dict): The data to encode into the token (typically user identifier).
-        expires_delta (Optional[timedelta]): The lifespan of the token.
-                                             Defaults to `ACCESS_TOKEN_EXPIRE_MINUTES` from settings.
+        data (dict): Дані для кодування в токен (зазвичай ідентифікатор користувача).
+        expires_delta (Optional[timedelta]): Тривалість життя токена.
+                                             За замовчуванням `ACCESS_TOKEN_EXPIRE_MINUTES` з налаштувань.
 
     Returns:
-        str: The encoded JWT access token.
+        str: Закодований JWT токен доступу.
     """
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire, "type": "access"}) # Add expiration and token type
+    to_encode.update({"exp": expire, "type": "access"}) # Додати час закінчення терміну дії та тип токена
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
 def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
     """
-    Creates a new JWT refresh token.
+    Створює новий JWT токен оновлення.
 
     Args:
-        data (dict): The data to encode into the token (typically user identifier).
-        expires_delta (Optional[timedelta]): The lifespan of the token.
-                                             Defaults to `REFRESH_TOKEN_EXPIRE_DAYS` from settings.
+        data (dict): Дані для кодування в токен (зазвичай ідентифікатор користувача).
+        expires_delta (Optional[timedelta]): Тривалість життя токена.
+                                             За замовчуванням `REFRESH_TOKEN_EXPIRE_DAYS` з налаштувань.
 
     Returns:
-        str: The encoded JWT refresh token.
+        str: Закодований JWT токен оновлення.
     """
     to_encode = data.copy()
     if expires_delta:
         expire = datetime.now(timezone.utc) + expires_delta
     else:
         expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-    to_encode.update({"exp": expire, "type": "refresh"}) # Add expiration and token type
+    to_encode.update({"exp": expire, "type": "refresh"}) # Додати час закінчення терміну дії та тип токена
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
     return encoded_jwt
 
 def decode_token(token: str) -> Optional[dict[str, Any]]:
     """
-    Decodes a JWT token and returns its payload if valid.
+    Декодує JWT токен і повертає його корисне навантаження, якщо він дійсний.
 
     Args:
-        token (str): The JWT token to decode.
+        token (str): JWT токен для декодування.
 
     Returns:
-        Optional[dict[str, Any]]: The payload of the token if it's valid and not expired,
-                                  otherwise None.
+        Optional[dict[str, Any]]: Корисне навантаження токена, якщо він дійсний і не прострочений,
+                                  в іншому випадку None.
     """
     try:
         payload = jwt.decode(
@@ -107,17 +107,17 @@ def decode_token(token: str) -> Optional[dict[str, Any]]:
             algorithms=[settings.JWT_ALGORITHM]
         )
         return payload
-    except JWTError: # Catches various JWT errors like expiration, invalid signature, etc.
-        # Consider logging the specific JWTError for debugging purposes if needed
-        # get_logger().warning(f"JWT decoding error: {e}", exc_info=True)
+    except JWTError: # Ловить різні помилки JWT, такі як закінчення терміну дії, недійний підпис тощо.
+        # Розгляньте можливість логування конкретної JWTError для налагодження, якщо потрібно
+        # get_logger().warning(f"Помилка декодування JWT: {e}", exc_info=True)
         return None
 
 
-# --- CORS (Cross-Origin Resource Sharing) Middleware Configuration (Example) ---
-# While settings for CORS origins are in `settings.py`, the actual middleware
-# is typically added in `main.py`.
-# This section is more of a note/placeholder if specific security functions related to CORS were needed here.
-# For example, a function to dynamically generate CORS parameters if they were more complex.
+# --- Конфігурація проміжного програмного забезпечення CORS (Cross-Origin Resource Sharing) (Приклад) ---
+# Хоча налаштування для джерел CORS знаходяться в `settings.py`, фактичне проміжне ПЗ
+# зазвичай додається в `main.py`.
+# Цей розділ є скоріше приміткою/заповнювачем, якщо тут потрібні були б конкретні функції безпеки, пов'язані з CORS.
+# Наприклад, функція для динамічної генерації параметрів CORS, якби вони були складнішими.
 
 # def get_cors_settings() -> dict:
 #     return {
@@ -128,63 +128,63 @@ def decode_token(token: str) -> Optional[dict[str, Any]]:
 #     }
 
 if __name__ == "__main__":
-    # Example Usage (requires a logger to be configured to see error logs from verify_password)
+    # Приклад використання (потребує налаштованого логера для перегляду логів помилок з verify_password)
     # from backend.app.src.config.logging import setup_logging, get_logger
     # setup_logging()
     # logger = get_logger(__name__)
 
-    # --- Test Password Hashing ---
-    print("--- Testing Password Hashing ---")
+    # --- Тестування хешування паролів ---
+    print("--- Тестування хешування паролів ---")
     raw_password = "s3cureP@sswOrd!"
     hashed = get_password_hash(raw_password)
-    print(f"Raw password: {raw_password}")
-    print(f"Hashed password: {hashed}")
-    print(f"Verification (correct): {verify_password(raw_password, hashed)}")
-    print(f"Verification (incorrect): {verify_password('wrongpassword', hashed)}")
+    print(f"Сирий пароль: {raw_password}")
+    print(f"Хешований пароль: {hashed}")
+    print(f"Перевірка (правильно): {verify_password(raw_password, hashed)}")
+    print(f"Перевірка (неправильно): {verify_password('wrongpassword', hashed)}")
 
-    # --- Test JWT Creation and Decoding ---
-    print("\n--- Testing JWT Creation & Decoding ---")
+    # --- Тестування створення та декодування JWT ---
+    print("\n--- Тестування створення та декодування JWT ---")
     user_data = {"sub": "testuser@example.com", "user_id": 123, "role": "user"}
 
-    # Access Token
+    # Токен доступу
     access_token = create_access_token(user_data)
-    print(f"Generated Access Token: {access_token}")
+    print(f"Згенерований токен доступу: {access_token}")
     decoded_access_payload = decode_token(access_token)
     if decoded_access_payload:
-        print(f"Decoded Access Token Payload: {decoded_access_payload}")
+        print(f"Декодоване корисне навантаження токена доступу: {decoded_access_payload}")
         exp_timestamp = decoded_access_payload.get('exp')
         if exp_timestamp:
-            print(f"Access Token Expires At (UTC): {datetime.fromtimestamp(exp_timestamp, timezone.utc)}")
+            print(f"Токен доступу закінчується (UTC): {datetime.fromtimestamp(exp_timestamp, timezone.utc)}")
     else:
-        print("Failed to decode access token (or it's invalid/expired).")
+        print("Не вдалося декодувати токен доступу (або він недійсний/прострочений).")
 
-    # Refresh Token
+    # Токен оновлення
     refresh_token = create_refresh_token(user_data)
-    print(f"\nGenerated Refresh Token: {refresh_token}")
+    print(f"\nЗгенерований токен оновлення: {refresh_token}")
     decoded_refresh_payload = decode_token(refresh_token)
     if decoded_refresh_payload:
-        print(f"Decoded Refresh Token Payload: {decoded_refresh_payload}")
+        print(f"Декодоване корисне навантаження токена оновлення: {decoded_refresh_payload}")
         exp_timestamp = decoded_refresh_payload.get('exp')
         if exp_timestamp:
-            print(f"Refresh Token Expires At (UTC): {datetime.fromtimestamp(exp_timestamp, timezone.utc)}")
+            print(f"Токен оновлення закінчується (UTC): {datetime.fromtimestamp(exp_timestamp, timezone.utc)}")
     else:
-        print("Failed to decode refresh token (or it's invalid/expired).")
+        print("Не вдалося декодувати токен оновлення (або він недійсний/прострочений).")
 
-    # Test expired token (example)
-    print("\n--- Testing Expired Token (Example) ---")
+    # Тестування простроченого токена (приклад)
+    print("\n--- Тестування простроченого токена (Приклад) ---")
     expired_access_token = create_access_token(user_data, expires_delta=timedelta(seconds=-1))
-    print(f"Generated Expired Access Token: {expired_access_token}")
+    print(f"Згенерований прострочений токен доступу: {expired_access_token}")
     decoded_expired_payload = decode_token(expired_access_token)
     if decoded_expired_payload:
-        print(f"Decoded Expired Token Payload: {decoded_expired_payload}") # Should not happen
+        print(f"Декодоване корисне навантаження простроченого токена: {decoded_expired_payload}") # Не повинно статися
     else:
-        print("Correctly failed to decode expired access token.")
+        print("Правильно не вдалося декодувати прострочений токен доступу.")
 
-    # Test invalid token
-    print("\n--- Testing Invalid Token (Example) ---")
+    # Тестування недійсного токена
+    print("\n--- Тестування недійсного токена (Приклад) ---")
     invalid_token = "this.is.not.a.valid.token"
     decoded_invalid_payload = decode_token(invalid_token)
     if decoded_invalid_payload:
-        print(f"Decoded Invalid Token Payload: {decoded_invalid_payload}") # Should not happen
+        print(f"Декодоване корисне навантаження недійсного токена: {decoded_invalid_payload}") # Не повинно статися
     else:
-        print("Correctly failed to decode invalid token.")
+        print("Правильно не вдалося декодувати недійсний токен.")

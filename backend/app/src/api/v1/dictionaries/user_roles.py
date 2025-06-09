@@ -12,25 +12,25 @@ from app.src.services.dictionaries import UserRoleService
 from app.src.repositories.dictionaries import UserRoleRepository
 from app.src.core.pagination import PagedResponse, PageParams
 from app.src.core.dependencies import paginator
-# Assuming UserModel is needed for role-based access, import it
+# Припускаючи, що UserModel потрібен для доступу на основі ролей, імпортуйте його
 # from app.src.models.auth import User as UserModel
 
 router = APIRouter(
     prefix="/user-roles",
     tags=["Dictionary - User Roles"],
-    dependencies=[Depends(get_current_active_superuser)] # TODO: Adjust permissions as per technical_task.txt
+    dependencies=[Depends(get_current_active_superuser)] # TODO: Налаштувати дозволи згідно з technical_task.txt
 )
 
-# Dependency to get UserRoleService
+# Залежність для отримання UserRoleService
 async def get_user_role_service(session: AsyncSession = Depends(get_db_session)) -> UserRoleService:
     """
-    Dependency to get an instance of UserRoleService.
+    Залежність для отримання екземпляра UserRoleService.
 
     Args:
-        session: The database session.
+        session: Сесія бази даних.
 
     Returns:
-        An instance of UserRoleService.
+        Екземпляр UserRoleService.
     """
     return UserRoleService(UserRoleRepository(session))
 
@@ -38,77 +38,77 @@ async def get_user_role_service(session: AsyncSession = Depends(get_db_session))
     "/",
     response_model=UserRoleResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a new user role",
-    description="Allows a superuser to create a new user role for the system.",
+    summary="Створити нову роль користувача",
+    description="Дозволяє суперкористувачу створювати нову роль користувача для системи.",
 )
 async def create_user_role(
     user_role_in: UserRoleCreate,
     service: UserRoleService = Depends(get_user_role_service),
 ) -> UserRoleModel:
     """
-    Create a new user role.
+    Створити нову роль користувача.
 
     Args:
-        user_role_in: The user role data to create.
-        service: The user role service.
+        user_role_in: Дані ролі користувача для створення.
+        service: Сервіс ролей користувачів.
 
     Returns:
-        The created user role.
+        Створена роль користувача.
     """
-    # TODO: Add logic based on technical_task.txt for specific roles if needed
+    # TODO: Додати логіку на основі technical_task.txt для конкретних ролей, якщо потрібно
     return await service.create(obj_in=user_role_in)
 
 @router.get(
     "/{user_role_id}",
     response_model=UserRoleResponse,
     status_code=status.HTTP_200_OK,
-    summary="Get a user role by ID",
-    description="Allows any authenticated user (TODO: verify this based on task) to retrieve a specific user role by its ID.",
+    summary="Отримати роль користувача за ID",
+    description="Дозволяє будь-якому автентифікованому користувачу (TODO: перевірити це на основі завдання) отримати конкретну роль користувача за її ID.",
 )
 async def get_user_role(
     user_role_id: UUID,
     service: UserRoleService = Depends(get_user_role_service),
-    # current_user: UserModel = Depends(get_current_active_user) # TODO: Add if needed for role-based access
+    # current_user: UserModel = Depends(get_current_active_user) # TODO: Додати, якщо потрібно для доступу на основі ролей
 ) -> UserRoleModel:
     """
-    Get a user role by its ID.
+    Отримати роль користувача за її ID.
 
     Args:
-        user_role_id: The ID of the user role to retrieve.
-        service: The user role service.
+        user_role_id: ID ролі користувача для отримання.
+        service: Сервіс ролей користувачів.
 
     Returns:
-        The user role with the given ID.
+        Роль користувача із зазначеним ID.
 
     Raises:
-        HTTPException: If the user role is not found.
+        HTTPException: Якщо роль користувача не знайдено.
     """
     db_user_role = await service.get_by_id(obj_id=user_role_id)
     if not db_user_role:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User role not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Роль користувача не знайдено")
     return db_user_role
 
 @router.get(
     "/",
     response_model=PagedResponse[UserRoleResponse],
     status_code=status.HTTP_200_OK,
-    summary="Get all user roles",
-    description="Allows any authenticated user (TODO: verify this based on task) to retrieve a paginated list of all user roles.",
+    summary="Отримати всі ролі користувачів",
+    description="Дозволяє будь-якому автентифікованому користувачу (TODO: перевірити це на основі завдання) отримати сторінковий список усіх ролей користувачів.",
 )
 async def get_all_user_roles(
     page_params: PageParams = Depends(paginator),
     service: UserRoleService = Depends(get_user_role_service),
-    # current_user: UserModel = Depends(get_current_active_user) # TODO: Add if needed for role-based access
+    # current_user: UserModel = Depends(get_current_active_user) # TODO: Додати, якщо потрібно для доступу на основі ролей
 ) -> PagedResponse[UserRoleModel]:
     """
-    Get all user roles with pagination.
+    Отримати всі ролі користувачів з пагінацією.
 
     Args:
-        page_params: Pagination parameters.
-        service: The user role service.
+        page_params: Параметри пагінації.
+        service: Сервіс ролей користувачів.
 
     Returns:
-        A paginated list of user roles.
+        Сторінковий список ролей користувачів.
     """
     user_roles = await service.get_multi(
         skip=page_params.skip,
@@ -123,8 +123,8 @@ async def get_all_user_roles(
     "/{user_role_id}",
     response_model=UserRoleResponse,
     status_code=status.HTTP_200_OK,
-    summary="Update a user role",
-    description="Allows a superuser to update an existing user role.",
+    summary="Оновити роль користувача",
+    description="Дозволяє суперкористувачу оновлювати існуючу роль користувача.",
 )
 async def update_user_role(
     user_role_id: UUID,
@@ -132,51 +132,51 @@ async def update_user_role(
     service: UserRoleService = Depends(get_user_role_service),
 ) -> UserRoleModel:
     """
-    Update an existing user role.
+    Оновити існуючу роль користувача.
 
     Args:
-        user_role_id: The ID of the user role to update.
-        user_role_in: The new user role data.
-        service: The user role service.
+        user_role_id: ID ролі користувача для оновлення.
+        user_role_in: Нові дані ролі користувача.
+        service: Сервіс ролей користувачів.
 
     Returns:
-        The updated user role.
+        Оновлена роль користувача.
 
     Raises:
-        HTTPException: If the user role is not found.
+        HTTPException: Якщо роль користувача не знайдено.
     """
     db_user_role = await service.get_by_id(obj_id=user_role_id)
     if not db_user_role:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User role not found")
-    # TODO: Add logic based on technical_task.txt for specific roles if needed
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Роль користувача не знайдено")
+    # TODO: Додати логіку на основі technical_task.txt для конкретних ролей, якщо потрібно
     return await service.update(obj_db=db_user_role, obj_in=user_role_in)
 
 @router.delete(
     "/{user_role_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a user role",
-    description="Allows a superuser to delete a user role. This is a hard delete.", # TODO: Confirm if soft delete is needed
+    summary="Видалити роль користувача",
+    description="Дозволяє суперкористувачу видалити роль користувача. Це жорстке видалення.", # TODO: Підтвердити, чи потрібне м'яке видалення
 )
 async def delete_user_role(
     user_role_id: UUID,
     service: UserRoleService = Depends(get_user_role_service),
 ) -> None:
     """
-    Delete a user role by its ID.
+    Видалити роль користувача за її ID.
 
     Args:
-        user_role_id: The ID of the user role to delete.
-        service: The user role service.
+        user_role_id: ID ролі користувача для видалення.
+        service: Сервіс ролей користувачів.
 
     Raises:
-        HTTPException: If the user role is not found.
+        HTTPException: Якщо роль користувача не знайдено.
     """
     db_user_role = await service.get_by_id(obj_id=user_role_id)
     if not db_user_role:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User role not found")
-    # TODO: Add logic based on technical_task.txt for specific roles if needed
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Роль користувача не знайдено")
+    # TODO: Додати логіку на основі technical_task.txt для конкретних ролей, якщо потрібно
     await service.delete(obj_id=user_role_id)
     return None
 
-# TODO: Add more specific endpoints if required by technical_task.txt
-# For example, get_user_role_by_code if 'code' is a unique field and used for lookup.
+# TODO: Додати більш конкретні ендпоінти, якщо це вимагається technical_task.txt
+# Наприклад, get_user_role_by_code, якщо 'code' є унікальним полем і використовується для пошуку.

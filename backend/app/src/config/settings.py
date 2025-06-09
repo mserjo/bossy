@@ -4,27 +4,27 @@ from pydantic import PostgresDsn, RedisDsn, field_validator, AnyHttpUrl, Validat
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
 
-# Load .env file from the project root (backend/.env or kudos/.env)
-dotenv_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env") # Points to backend/.env
+# Завантажити файл .env з кореня проекту (backend/.env або kudos/.env)
+dotenv_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", ".env") # Вказує на backend/.env
 if not os.path.exists(dotenv_path):
-    dotenv_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", ".env") # Points to kudos/.env
+    dotenv_path = os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", ".env") # Вказує на kudos/.env
 
 load_dotenv(dotenv_path=dotenv_path, override=True)
 
 class Settings(BaseSettings):
     """
-    Application settings are loaded from environment variables and/or a .env file.
-    Pydantic's BaseSettings provides validation and type casting.
+    Налаштування програми завантажуються зі змінних середовища та/або файлу .env.
+    Pydantic BaseSettings забезпечує валідацію та приведення типів.
     """
 
-    # --- Core Application Settings ---
+    # --- Основні налаштування програми ---
     PROJECT_NAME: str = "Kudos"
     DEBUG: bool = False
     ENVIRONMENT: str = "development"
     API_V1_STR: str = "/api/v1"
     SECRET_KEY: str = "a_very_secret_key_that_should_be_changed"
 
-    # --- Database Settings (PostgreSQL) ---
+    # --- Налаштування бази даних (PostgreSQL) ---
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "postgres"
@@ -47,7 +47,7 @@ class Settings(BaseSettings):
             path=f"/{data.get('POSTGRES_DB') or ''}",
         ))
 
-    # --- Redis Settings ---
+    # --- Налаштування Redis ---
     REDIS_HOST: str = "localhost"
     REDIS_PORT: int = 6379
     REDIS_DB: int = 0
@@ -69,13 +69,13 @@ class Settings(BaseSettings):
             return str(RedisDsn(f"{scheme}://:{password}@{host}:{port}/{db}"))
         return str(RedisDsn(f"{scheme}://{host}:{port}/{db}"))
 
-    # --- JWT Authentication Settings ---
+    # --- Налаштування JWT автентифікації ---
     JWT_SECRET_KEY: str = "another_very_secret_jwt_key_to_be_changed"
     JWT_ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
-    # --- CORS (Cross-Origin Resource Sharing) Settings ---
+    # --- Налаштування CORS (Cross-Origin Resource Sharing) ---
     BACKEND_CORS_ORIGINS: List[Union[AnyHttpUrl, str]] = ["*"]
 
     @field_validator("BACKEND_CORS_ORIGINS", mode="before")
@@ -89,24 +89,24 @@ class Settings(BaseSettings):
                     import json
                     return json.loads(v)
                 except json.JSONDecodeError:
-                    pass # Fall through to comma-separated logic
+                    pass # Перейти до логіки розділення комами
             return [origin.strip() for origin in v.split(",") if origin.strip()]
-        raise ValueError("BACKEND_CORS_ORIGINS must be a list of URLs or a comma-separated string")
+        raise ValueError("BACKEND_CORS_ORIGINS має бути списком URL-адрес або рядком, розділеним комами")
 
-    # --- Initial Superuser Settings ---
+    # --- Налаштування початкового суперкористувача ---
     FIRST_SUPERUSER_EMAIL: str = "admin@example.com"
     FIRST_SUPERUSER_PASSWORD: str = "supersecret"
 
-    # --- System User Settings ---
+    # --- Налаштування системних користувачів ---
     SYSTEM_USER_ODIN_EMAIL: str = "odin@system.kudos"
     SYSTEM_USER_SHADOW_EMAIL: str = "shadow@system.kudos"
 
-    # --- File Storage Settings ---
+    # --- Налаштування сховища файлів ---
     STATIC_FILES_DIR: str = "static"
-    UPLOADED_FILES_DIR: str = os.path.join(STATIC_FILES_DIR, "uploads") # Ensure this is a valid path segment
+    UPLOADED_FILES_DIR: str = os.path.join(STATIC_FILES_DIR, "uploads") # Переконайтеся, що це дійсний сегмент шляху
     MAX_FILE_SIZE_MB: int = 10
 
-    # --- Email Settings ---
+    # --- Налаштування електронної пошти ---
     SMTP_TLS: bool = True
     SMTP_PORT: Optional[int] = 587
     SMTP_HOST: Optional[str] = None
@@ -115,10 +115,10 @@ class Settings(BaseSettings):
     EMAILS_FROM_EMAIL: Optional[str] = None
     EMAILS_FROM_NAME: Optional[str] = "Kudos System"
 
-    # --- Logging Settings ---
+    # --- Налаштування логування ---
     LOGGING_LEVEL: str = "INFO"
-    LOG_TO_FILE: bool = False # Default to console logging for simple setups
-    LOG_DIR: str = "logs" # Directory for log files
+    LOG_TO_FILE: bool = False # За замовчуванням логування в консоль для простих налаштувань
+    LOG_DIR: str = "logs" # Директорія для файлів логів
     LOG_APP_FILE: str = "app.log"
     LOG_ERROR_FILE: str = "error.log"
     LOG_MAX_BYTES: int = 1024 * 1024 * 10
@@ -134,8 +134,8 @@ class Settings(BaseSettings):
 settings = Settings()
 
 if __name__ == "__main__":
-    print(f"Dotenv path: {dotenv_path}, Exists: {os.path.exists(dotenv_path)}")
-    print("--- Application Settings Loaded ---")
+    print(f"Шлях до .env: {dotenv_path}, Існує: {os.path.exists(dotenv_path)}")
+    print("--- Налаштування програми завантажено ---")
     for key, value in settings.model_dump().items():
         if "password" in key.lower() or "secret" in key.lower():
             print(f"{key}: ******")

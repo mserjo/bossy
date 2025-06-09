@@ -3,101 +3,101 @@ from typing import Optional, AsyncGenerator
 
 from backend.app.src.config.settings import settings
 
-# Global variable to hold the Redis client instance
-# This allows for the client to be initialized once and reused.
+# Глобальна змінна для зберігання екземпляра клієнта Redis
+# Це дозволяє ініціалізувати клієнт один раз і використовувати його повторно.
 _redis_client: Optional[aioredis.Redis] = None
 
 async def get_redis_client() -> aioredis.Redis:
     """
-    Provides an asynchronous Redis client instance.
+    Надає асинхронний екземпляр клієнта Redis.
 
-    This function initializes the Redis client if it hasn't been already,
-    using the REDIS_URL from the application settings.
-    It's designed to be used as a dependency in FastAPI or other parts of the application
-    that require Redis access.
+    Ця функція ініціалізує клієнт Redis, якщо він ще не був ініціалізований,
+    використовуючи REDIS_URL з налаштувань програми.
+    Вона призначена для використання як залежність у FastAPI або інших частинах програми,
+    які потребують доступу до Redis.
 
     Returns:
-        aioredis.Redis: An initialized asynchronous Redis client.
+        aioredis.Redis: Ініціалізований асинхронний клієнт Redis.
 
     Raises:
-        ConnectionError: If the Redis client cannot be initialized or connect to the server.
+        ConnectionError: Якщо клієнт Redis не може бути ініціалізований або підключений до сервера.
     """
     global _redis_client
     if _redis_client is None:
         try:
-            # Create a Redis client instance from the URL in settings
-            # The from_url method handles parsing the DSN and configuring the client.
+            # Створити екземпляр клієнта Redis з URL-адреси в налаштуваннях
+            # Метод from_url обробляє парсинг DSN та налаштування клієнта.
             _redis_client = aioredis.from_url(
-                str(settings.REDIS_URL), # Ensure REDIS_URL is a string
+                str(settings.REDIS_URL), # Переконайтеся, що REDIS_URL є рядком
                 encoding="utf-8",
-                decode_responses=True # Automatically decode responses from bytes to strings
+                decode_responses=True # Автоматично декодувати відповіді з байтів у рядки
             )
-            # Test the connection
+            # Перевірити з'єднання
             await _redis_client.ping()
-            print(f"Successfully connected to Redis at {settings.REDIS_URL}")
+            print(f"Успішно підключено до Redis за адресою {settings.REDIS_URL}")
         except Exception as e:
-            # Log the error or handle it as appropriate for your application
-            print(f"Error connecting to Redis: {e}")
-            # Depending on the application's needs, you might want to raise an error
-            # or allow the app to continue without Redis (e.g., with caching disabled).
-            # For now, we'll raise a ConnectionError to make it explicit.
-            _redis_client = None # Ensure client is None if connection failed
-            raise ConnectionError(f"Could not connect to Redis: {e}")
+            # Залогувати помилку або обробити її відповідно до потреб вашої програми
+            print(f"Помилка підключення до Redis: {e}")
+            # Залежно від потреб програми, ви можете викликати помилку
+            # або дозволити програмі продовжувати роботу без Redis (наприклад, з вимкненим кешуванням).
+            # Наразі ми викличемо ConnectionError, щоб зробити це явним.
+            _redis_client = None # Переконайтеся, що клієнт None, якщо з'єднання не вдалося
+            raise ConnectionError(f"Не вдалося підключитися до Redis: {e}")
     return _redis_client
 
 async def close_redis_client():
     """
-    Closes the Redis client connection if it has been initialized.
-    This is useful for graceful shutdowns of the application.
+    Закриває з'єднання клієнта Redis, якщо воно було ініціалізоване.
+    Це корисно для коректного завершення роботи програми.
     """
     global _redis_client
     if _redis_client:
         await _redis_client.close()
-        _redis_client = None # Reset the global client variable
-        print("Redis connection closed.")
+        _redis_client = None # Скинути глобальну змінну клієнта
+        print("З'єднання Redis закрито.")
 
-# --- Optional: FastAPI dependency wrapper ---
+# --- Опціонально: обгортка залежності FastAPI ---
 async def get_redis() -> AsyncGenerator[aioredis.Redis, None]:
     """
-    FastAPI dependency that provides a Redis client for a single request.
-    This is an alternative to using a global client directly if you prefer
-    managing Redis client lifecycle per request or with a connection pool per request.
+    Залежність FastAPI, яка надає клієнт Redis для одного запиту.
+    Це альтернатива прямому використанню глобального клієнта, якщо ви віддаєте перевагу
+    керуванню життєвим циклом клієнта Redis для кожного запиту або з пулом з'єднань для кожного запиту.
 
-    However, for many use cases, a single global client (`get_redis_client`) is sufficient
-    and more performant due to connection reuse.
+    Однак для багатьох випадків використання єдиний глобальний клієнт (`get_redis_client`) є достатнім
+    і більш продуктивним завдяки повторному використанню з'єднань.
 
     Yields:
-        aioredis.Redis: An asynchronous Redis client.
+        aioredis.Redis: Асинхронний клієнт Redis.
     """
-    client = await get_redis_client() # Reuses the global client logic
+    client = await get_redis_client() # Повторно використовує логіку глобального клієнта
     try:
         yield client
     finally:
-        # Typically, you don't close the client obtained from get_redis_client() here
-        # if it's meant to be a long-lived global client. Connection closing is handled
-        # by `close_redis_client()` during application shutdown.
+        # Зазвичай, ви не закриваєте тут клієнт, отриманий з get_redis_client(),
+        # якщо він призначений бути довготривалим глобальним клієнтом. Закриття з'єднання обробляється
+        # `close_redis_client()` під час завершення роботи програми.
         pass
 
 if __name__ == "__main__":
     import asyncio
 
     async def main():
-        print("Attempting to connect to Redis...")
+        print("Спроба підключитися до Redis...")
         try:
             redis_client = await get_redis_client()
-            print(f"Redis client obtained: {redis_client}")
+            print(f"Клієнт Redis отримано: {redis_client}")
 
-            # Example usage:
-            await redis_client.set("mykey", "Hello from Redis!")
+            # Приклад використання:
+            await redis_client.set("mykey", "Привіт від Redis!")
             value = await redis_client.get("mykey")
-            print(f"Retrieved value from Redis: {value}")
+            print(f"Отримане значення з Redis: {value}")
             await redis_client.delete("mykey")
-            print("Cleaned up test key.")
+            print("Тестовий ключ очищено.")
 
         except ConnectionError as e:
-            print(f"Failed to connect or use Redis: {e}")
+            print(f"Не вдалося підключитися або використати Redis: {e}")
         except Exception as e:
-            print(f"An unexpected error occurred: {e}")
+            print(f"Сталася неочікувана помилка: {e}")
         finally:
             await close_redis_client()
 

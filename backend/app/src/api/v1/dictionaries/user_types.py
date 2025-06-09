@@ -12,18 +12,18 @@ from app.src.services.dictionaries import UserTypeService
 from app.src.repositories.dictionaries import UserTypeRepository
 from app.src.core.pagination import PagedResponse, PageParams
 from app.src.core.dependencies import paginator
-# from app.src.models.auth import User as UserModel # For role-based access
+# from app.src.models.auth import User as UserModel # Для доступу на основі ролей
 
 router = APIRouter(
     prefix="/user-types",
     tags=["Dictionary - User Types"],
-    dependencies=[Depends(get_current_active_superuser)] # TODO: Adjust permissions
+    dependencies=[Depends(get_current_active_superuser)] # TODO: Налаштувати дозволи
 )
 
-# Dependency to get UserTypeService
+# Залежність для отримання UserTypeService
 async def get_user_type_service(session: AsyncSession = Depends(get_db_session)) -> UserTypeService:
     """
-    Dependency to get an instance of UserTypeService.
+    Залежність для отримання екземпляра UserTypeService.
     """
     return UserTypeService(UserTypeRepository(session))
 
@@ -31,15 +31,15 @@ async def get_user_type_service(session: AsyncSession = Depends(get_db_session))
     "/",
     response_model=UserTypeResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a new user type",
-    description="Allows a superuser to create a new user type.",
+    summary="Створити новий тип користувача",
+    description="Дозволяє суперкористувачу створювати новий тип користувача.",
 )
 async def create_user_type(
     user_type_in: UserTypeCreate,
     service: UserTypeService = Depends(get_user_type_service),
 ) -> UserTypeModel:
     """
-    Create a new user type.
+    Створити новий тип користувача.
     """
     return await service.create(obj_in=user_type_in)
 
@@ -47,36 +47,36 @@ async def create_user_type(
     "/{user_type_id}",
     response_model=UserTypeResponse,
     status_code=status.HTTP_200_OK,
-    summary="Get a user type by ID",
-    description="Allows authenticated users to retrieve a specific user type. (TODO: Verify permissions)",
+    summary="Отримати тип користувача за ID",
+    description="Дозволяє автентифікованим користувачам отримувати конкретний тип користувача. (TODO: Перевірити дозволи)",
 )
 async def get_user_type(
     user_type_id: UUID,
     service: UserTypeService = Depends(get_user_type_service),
-    # current_user: UserModel = Depends(get_current_active_user) # TODO: Adjust
+    # current_user: UserModel = Depends(get_current_active_user) # TODO: Налаштувати
 ) -> UserTypeModel:
     """
-    Get a user type by its ID.
+    Отримати тип користувача за його ID.
     """
     db_user_type = await service.get_by_id(obj_id=user_type_id)
     if not db_user_type:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User type not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип користувача не знайдено")
     return db_user_type
 
 @router.get(
     "/",
     response_model=PagedResponse[UserTypeResponse],
     status_code=status.HTTP_200_OK,
-    summary="Get all user types",
-    description="Allows authenticated users to retrieve a paginated list of user types. (TODO: Verify permissions)",
+    summary="Отримати всі типи користувачів",
+    description="Дозволяє автентифікованим користувачам отримувати сторінковий список типів користувачів. (TODO: Перевірити дозволи)",
 )
 async def get_all_user_types(
     page_params: PageParams = Depends(paginator),
     service: UserTypeService = Depends(get_user_type_service),
-    # current_user: UserModel = Depends(get_current_active_user) # TODO: Adjust
+    # current_user: UserModel = Depends(get_current_active_user) # TODO: Налаштувати
 ) -> PagedResponse[UserTypeModel]:
     """
-    Get all user types with pagination.
+    Отримати всі типи користувачів з пагінацією.
     """
     user_types = await service.get_multi(
         skip=page_params.skip,
@@ -91,8 +91,8 @@ async def get_all_user_types(
     "/{user_type_id}",
     response_model=UserTypeResponse,
     status_code=status.HTTP_200_OK,
-    summary="Update a user type",
-    description="Allows a superuser to update an existing user type.",
+    summary="Оновити тип користувача",
+    description="Дозволяє суперкористувачу оновлювати існуючий тип користувача.",
 )
 async def update_user_type(
     user_type_id: UUID,
@@ -100,30 +100,30 @@ async def update_user_type(
     service: UserTypeService = Depends(get_user_type_service),
 ) -> UserTypeModel:
     """
-    Update an existing user type.
+    Оновити існуючий тип користувача.
     """
     db_user_type = await service.get_by_id(obj_id=user_type_id)
     if not db_user_type:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User type not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип користувача не знайдено")
     return await service.update(obj_db=db_user_type, obj_in=user_type_in)
 
 @router.delete(
     "/{user_type_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a user type",
-    description="Allows a superuser to delete a user type. (Hard delete)", # TODO: Confirm soft delete requirement
+    summary="Видалити тип користувача",
+    description="Дозволяє суперкористувачу видалити тип користувача. (Жорстке видалення)", # TODO: Підтвердити вимогу щодо м'якого видалення
 )
 async def delete_user_type(
     user_type_id: UUID,
     service: UserTypeService = Depends(get_user_type_service),
 ) -> None:
     """
-    Delete a user type by its ID.
+    Видалити тип користувача за його ID.
     """
     db_user_type = await service.get_by_id(obj_id=user_type_id)
     if not db_user_type:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User type not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип користувача не знайдено")
     await service.delete(obj_id=user_type_id)
     return None
 
-# TODO: Consider get_user_type_by_code endpoint if needed.
+# TODO: Розглянути можливість додавання ендпоінта get_user_type_by_code, якщо потрібно.

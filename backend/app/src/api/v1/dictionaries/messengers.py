@@ -12,18 +12,18 @@ from app.src.services.dictionaries import MessengerPlatformService
 from app.src.repositories.dictionaries import MessengerPlatformRepository
 from app.src.core.pagination import PagedResponse, PageParams
 from app.src.core.dependencies import paginator
-# from app.src.models.auth import User as UserModel # For role-based access
+# from app.src.models.auth import User as UserModel # Для доступу на основі ролей
 
 router = APIRouter(
     prefix="/messenger-platforms",
     tags=["Dictionary - Messenger Platforms"],
-    dependencies=[Depends(get_current_active_superuser)] # TODO: Adjust permissions - Superuser only as per task
+    dependencies=[Depends(get_current_active_superuser)] # TODO: Налаштувати дозволи - Тільки суперкористувач згідно із завданням
 )
 
-# Dependency to get MessengerPlatformService
+# Залежність для отримання MessengerPlatformService
 async def get_messenger_platform_service(session: AsyncSession = Depends(get_db_session)) -> MessengerPlatformService:
     """
-    Dependency to get an instance of MessengerPlatformService.
+    Залежність для отримання екземпляра MessengerPlatformService.
     """
     return MessengerPlatformService(MessengerPlatformRepository(session))
 
@@ -31,15 +31,15 @@ async def get_messenger_platform_service(session: AsyncSession = Depends(get_db_
     "/",
     response_model=MessengerPlatformResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a new messenger platform",
-    description="Allows a superuser to create a new messenger platform.",
+    summary="Створити нову платформу месенджера",
+    description="Дозволяє суперкористувачу створювати нову платформу месенджера.",
 )
 async def create_messenger_platform(
     messenger_platform_in: MessengerPlatformCreate,
     service: MessengerPlatformService = Depends(get_messenger_platform_service),
 ) -> MessengerPlatformModel:
     """
-    Create a new messenger platform.
+    Створити нову платформу месенджера.
     """
     return await service.create(obj_in=messenger_platform_in)
 
@@ -47,36 +47,36 @@ async def create_messenger_platform(
     "/{messenger_platform_id}",
     response_model=MessengerPlatformResponse,
     status_code=status.HTTP_200_OK,
-    summary="Get a messenger platform by ID",
-    description="Allows a superuser to retrieve a specific messenger platform.", # As per task, only superuser configures this
+    summary="Отримати платформу месенджера за ID",
+    description="Дозволяє суперкористувачу отримувати конкретну платформу месенджера.", # Згідно із завданням, налаштовує тільки суперкористувач
 )
 async def get_messenger_platform(
     messenger_platform_id: UUID,
     service: MessengerPlatformService = Depends(get_messenger_platform_service),
-    # current_user: UserModel = Depends(get_current_active_superuser) # Ensure superuser
+    # current_user: UserModel = Depends(get_current_active_superuser) # Переконатися, що це суперкористувач
 ) -> MessengerPlatformModel:
     """
-    Get a messenger platform by its ID.
+    Отримати платформу месенджера за її ID.
     """
     db_messenger_platform = await service.get_by_id(obj_id=messenger_platform_id)
     if not db_messenger_platform:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Messenger platform not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Платформу месенджера не знайдено")
     return db_messenger_platform
 
 @router.get(
     "/",
     response_model=PagedResponse[MessengerPlatformResponse],
     status_code=status.HTTP_200_OK,
-    summary="Get all messenger platforms",
-    description="Allows a superuser to retrieve a paginated list of messenger platforms.", # As per task, only superuser configures this
+    summary="Отримати всі платформи месенджерів",
+    description="Дозволяє суперкористувачу отримувати сторінковий список платформ месенджерів.", # Згідно із завданням, налаштовує тільки суперкористувач
 )
 async def get_all_messenger_platforms(
     page_params: PageParams = Depends(paginator),
     service: MessengerPlatformService = Depends(get_messenger_platform_service),
-    # current_user: UserModel = Depends(get_current_active_superuser) # Ensure superuser
+    # current_user: UserModel = Depends(get_current_active_superuser) # Переконатися, що це суперкористувач
 ) -> PagedResponse[MessengerPlatformModel]:
     """
-    Get all messenger platforms with pagination.
+    Отримати всі платформи месенджерів з пагінацією.
     """
     messenger_platforms = await service.get_multi(
         skip=page_params.skip,
@@ -91,8 +91,8 @@ async def get_all_messenger_platforms(
     "/{messenger_platform_id}",
     response_model=MessengerPlatformResponse,
     status_code=status.HTTP_200_OK,
-    summary="Update a messenger platform",
-    description="Allows a superuser to update an existing messenger platform.",
+    summary="Оновити платформу месенджера",
+    description="Дозволяє суперкористувачу оновлювати існуючу платформу месенджера.",
 )
 async def update_messenger_platform(
     messenger_platform_id: UUID,
@@ -100,30 +100,30 @@ async def update_messenger_platform(
     service: MessengerPlatformService = Depends(get_messenger_platform_service),
 ) -> MessengerPlatformModel:
     """
-    Update an existing messenger platform.
+    Оновити існуючу платформу месенджера.
     """
     db_messenger_platform = await service.get_by_id(obj_id=messenger_platform_id)
     if not db_messenger_platform:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Messenger platform not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Платформу месенджера не знайдено")
     return await service.update(obj_db=db_messenger_platform, obj_in=messenger_platform_in)
 
 @router.delete(
     "/{messenger_platform_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a messenger platform",
-    description="Allows a superuser to delete a messenger platform. (Hard delete)", # TODO: Confirm soft delete
+    summary="Видалити платформу месенджера",
+    description="Дозволяє суперкористувачу видалити платформу месенджера. (Жорстке видалення)", # TODO: Підтвердити м'яке видалення
 )
 async def delete_messenger_platform(
     messenger_platform_id: UUID,
     service: MessengerPlatformService = Depends(get_messenger_platform_service),
 ) -> None:
     """
-    Delete a messenger platform by its ID.
+    Видалити платформу месенджера за її ID.
     """
     db_messenger_platform = await service.get_by_id(obj_id=messenger_platform_id)
     if not db_messenger_platform:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Messenger platform not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Платформу месенджера не знайдено")
     await service.delete(obj_id=messenger_platform_id)
     return None
 
-# TODO: Consider get_messenger_platform_by_code endpoint if needed.
+# TODO: Розглянути можливість додавання ендпоінта get_messenger_platform_by_code, якщо потрібно.

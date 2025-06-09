@@ -12,18 +12,18 @@ from app.src.services.dictionaries import BonusTypeService
 from app.src.repositories.dictionaries import BonusTypeRepository
 from app.src.core.pagination import PagedResponse, PageParams
 from app.src.core.dependencies import paginator
-# from app.src.models.auth import User as UserModel # For role-based access
+# from app.src.models.auth import User as UserModel # Для доступу на основі ролей
 
 router = APIRouter(
     prefix="/bonus-types",
     tags=["Dictionary - Bonus Types"],
-    dependencies=[Depends(get_current_active_superuser)] # TODO: Adjust permissions
+    dependencies=[Depends(get_current_active_superuser)] # TODO: Налаштувати дозволи
 )
 
-# Dependency to get BonusTypeService
+# Залежність для отримання BonusTypeService
 async def get_bonus_type_service(session: AsyncSession = Depends(get_db_session)) -> BonusTypeService:
     """
-    Dependency to get an instance of BonusTypeService.
+    Залежність для отримання екземпляра BonusTypeService.
     """
     return BonusTypeService(BonusTypeRepository(session))
 
@@ -31,15 +31,15 @@ async def get_bonus_type_service(session: AsyncSession = Depends(get_db_session)
     "/",
     response_model=BonusTypeResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a new bonus type",
-    description="Allows a superuser to create a new bonus type.",
+    summary="Створити новий тип бонусу",
+    description="Дозволяє суперкористувачу створювати новий тип бонусу.",
 )
 async def create_bonus_type(
     bonus_type_in: BonusTypeCreate,
     service: BonusTypeService = Depends(get_bonus_type_service),
 ) -> BonusTypeModel:
     """
-    Create a new bonus type.
+    Створити новий тип бонусу.
     """
     return await service.create(obj_in=bonus_type_in)
 
@@ -47,36 +47,36 @@ async def create_bonus_type(
     "/{bonus_type_id}",
     response_model=BonusTypeResponse,
     status_code=status.HTTP_200_OK,
-    summary="Get a bonus type by ID",
-    description="Allows authenticated users to retrieve a specific bonus type. (TODO: Verify permissions)",
+    summary="Отримати тип бонусу за ID",
+    description="Дозволяє автентифікованим користувачам отримувати конкретний тип бонусу. (TODO: Перевірити дозволи)",
 )
 async def get_bonus_type(
     bonus_type_id: UUID,
     service: BonusTypeService = Depends(get_bonus_type_service),
-    # current_user: UserModel = Depends(get_current_active_user) # TODO: Adjust
+    # current_user: UserModel = Depends(get_current_active_user) # TODO: Налаштувати
 ) -> BonusTypeModel:
     """
-    Get a bonus type by its ID.
+    Отримати тип бонусу за його ID.
     """
     db_bonus_type = await service.get_by_id(obj_id=bonus_type_id)
     if not db_bonus_type:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bonus type not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип бонусу не знайдено")
     return db_bonus_type
 
 @router.get(
     "/",
     response_model=PagedResponse[BonusTypeResponse],
     status_code=status.HTTP_200_OK,
-    summary="Get all bonus types",
-    description="Allows authenticated users to retrieve a paginated list of bonus types. (TODO: Verify permissions)",
+    summary="Отримати всі типи бонусів",
+    description="Дозволяє автентифікованим користувачам отримувати сторінковий список типів бонусів. (TODO: Перевірити дозволи)",
 )
 async def get_all_bonus_types(
     page_params: PageParams = Depends(paginator),
     service: BonusTypeService = Depends(get_bonus_type_service),
-    # current_user: UserModel = Depends(get_current_active_user) # TODO: Adjust
+    # current_user: UserModel = Depends(get_current_active_user) # TODO: Налаштувати
 ) -> PagedResponse[BonusTypeModel]:
     """
-    Get all bonus types with pagination.
+    Отримати всі типи бонусів з пагінацією.
     """
     bonus_types = await service.get_multi(
         skip=page_params.skip,
@@ -91,8 +91,8 @@ async def get_all_bonus_types(
     "/{bonus_type_id}",
     response_model=BonusTypeResponse,
     status_code=status.HTTP_200_OK,
-    summary="Update a bonus type",
-    description="Allows a superuser to update an existing bonus type.",
+    summary="Оновити тип бонусу",
+    description="Дозволяє суперкористувачу оновлювати існуючий тип бонусу.",
 )
 async def update_bonus_type(
     bonus_type_id: UUID,
@@ -100,30 +100,30 @@ async def update_bonus_type(
     service: BonusTypeService = Depends(get_bonus_type_service),
 ) -> BonusTypeModel:
     """
-    Update an existing bonus type.
+    Оновити існуючий тип бонусу.
     """
     db_bonus_type = await service.get_by_id(obj_id=bonus_type_id)
     if not db_bonus_type:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bonus type not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип бонусу не знайдено")
     return await service.update(obj_db=db_bonus_type, obj_in=bonus_type_in)
 
 @router.delete(
     "/{bonus_type_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a bonus type",
-    description="Allows a superuser to delete a bonus type. (Hard delete)", # TODO: Confirm soft delete requirement
+    summary="Видалити тип бонусу",
+    description="Дозволяє суперкористувачу видалити тип бонусу. (Жорстке видалення)", # TODO: Підтвердити вимогу щодо м'якого видалення
 )
 async def delete_bonus_type(
     bonus_type_id: UUID,
     service: BonusTypeService = Depends(get_bonus_type_service),
 ) -> None:
     """
-    Delete a bonus type by its ID.
+    Видалити тип бонусу за його ID.
     """
     db_bonus_type = await service.get_by_id(obj_id=bonus_type_id)
     if not db_bonus_type:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Bonus type not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип бонусу не знайдено")
     await service.delete(obj_id=bonus_type_id)
     return None
 
-# TODO: Consider get_bonus_type_by_code endpoint if needed.
+# TODO: Розглянути можливість додавання ендпоінта get_bonus_type_by_code, якщо потрібно.

@@ -12,6 +12,7 @@ from . import messengers
 
 router = APIRouter()
 
+# Включити всі роутери словників
 router.include_router(statuses.router, prefix="/statuses", tags=["Dictionary - Statuses"])
 router.include_router(user_roles.router, prefix="/user-roles", tags=["Dictionary - User Roles"])
 router.include_router(user_types.router, prefix="/user-types", tags=["Dictionary - User Types"])
@@ -21,4 +22,4 @@ router.include_router(bonus_types.router, prefix="/bonus-types", tags=["Dictiona
 router.include_router(calendars.router, prefix="/calendar-providers", tags=["Dictionary - Calendar Providers"])
 router.include_router(messengers.router, prefix="/messenger-platforms", tags=["Dictionary - Messenger Platforms"])
 
-__all__ = ["router"]
+__all__ = ["router"] # Експортувати головний роутер словників

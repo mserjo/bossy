@@ -6,17 +6,17 @@ from pathlib import Path
 
 from backend.app.src.config.settings import settings
 
-# --- Logging Configuration ---
+# --- Конфігурація логування ---
 
-# Determine the base directory for logs if logging to file is enabled
+# Визначити базову директорію для логів, якщо логування у файл увімкнено
 LOG_DIR = Path(settings.LOG_DIR) if settings.LOG_TO_FILE else None
 if LOG_DIR:
-    LOG_DIR.mkdir(parents=True, exist_ok=True) # Ensure log directory exists
+    LOG_DIR.mkdir(parents=True, exist_ok=True) # Переконатися, що директорія логів існує
 
-# Define the logging configuration dictionary
+# Визначити словник конфігурації логування
 LOGGING_CONFIG = {
     "version": 1,
-    "disable_existing_loggers": False, # Keep existing loggers (e.g., from libraries)
+    "disable_existing_loggers": False, # Залишити існуючі логери (наприклад, з бібліотек)
     "formatters": {
         "default": {
             "format": "%(asctime)s - %(name)s - %(levelname)s - %(module)s:%(funcName)s:%(lineno)d - %(message)s",
@@ -26,7 +26,7 @@ LOGGING_CONFIG = {
             "format": "%(asctime)s - %(levelname)s - %(message)s",
             "datefmt": "%Y-%m-%d %H:%M:%S",
         },
-        "json": { # Example JSON formatter (requires python-json-logger if not customizing manually)
+        "json": { # Приклад JSON форматера (потребує python-json-logger, якщо не налаштовувати вручну)
             "()": "pythonjsonlogger.jsonlogger.JsonFormatter",
             "format": "%(asctime)s %(levelname)s %(name)s %(module)s %(funcName)s %(lineno)d %(message)s"
         }
@@ -36,43 +36,43 @@ LOGGING_CONFIG = {
             "class": "logging.StreamHandler",
             "formatter": "default" if settings.DEBUG else "simple",
             "level": settings.LOGGING_LEVEL.upper(),
-            "stream": sys.stdout, # Use sys.stdout for console output
+            "stream": sys.stdout, # Використовувати sys.stdout для виводу в консоль
         },
     },
     "loggers": {
-        "uvicorn.error": { # Uvicorn's own error logger
+        "uvicorn.error": { # Власний логер помилок Uvicorn
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
         },
-        "uvicorn.access": { # Uvicorn's access logger
+        "uvicorn.access": { # Логер доступів Uvicorn
             "handlers": ["console"],
             "level": "INFO",
             "propagate": False,
         },
-        "fastapi": { # FastAPI's logger
+        "fastapi": { # Логер FastAPI
             "handlers": ["console"],
             "level": settings.LOGGING_LEVEL.upper(),
             "propagate": False,
         },
-        "sqlalchemy.engine": { # SQLAlchemy engine logging (can be verbose)
+        "sqlalchemy.engine": { # Логер SQLAlchemy engine (може бути детальним)
             "handlers": ["console"],
-            "level": "WARNING" if not settings.DEBUG else "INFO", # INFO in DEBUG to see SQL queries
+            "level": "WARNING" if not settings.DEBUG else "INFO", # INFO в режимі DEBUG для перегляду SQL-запитів
             "propagate": False,
         },
-        settings.PROJECT_NAME.lower(): { # Application-specific logger
+        settings.PROJECT_NAME.lower(): { # Логер для конкретної програми
             "handlers": ["console"],
             "level": settings.LOGGING_LEVEL.upper(),
-            "propagate": False, # Do not propagate to the root logger if handlers are defined here
+            "propagate": False, # Не поширювати на кореневий логер, якщо тут визначені обробники
         },
     },
-    "root": { # Root logger configuration
+    "root": { # Конфігурація кореневого логера
         "handlers": ["console"],
         "level": settings.LOGGING_LEVEL.upper(),
     },
 }
 
-# Add file handlers if LOG_TO_FILE is enabled in settings
+# Додати файлові обробники, якщо LOG_TO_FILE увімкнено в налаштуваннях
 if settings.LOG_TO_FILE and LOG_DIR:
     LOGGING_CONFIG["handlers"]["app_file"] = {
         "class": "logging.handlers.RotatingFileHandler",
@@ -86,85 +86,85 @@ if settings.LOG_TO_FILE and LOG_DIR:
     LOGGING_CONFIG["handlers"]["error_file"] = {
         "class": "logging.handlers.RotatingFileHandler",
         "formatter": "default",
-        "level": "ERROR", # Only log ERROR level and above to this file
+        "level": "ERROR", # Логувати лише рівень ERROR та вище у цей файл
         "filename": LOG_DIR / settings.LOG_ERROR_FILE,
         "maxBytes": settings.LOG_MAX_BYTES,
         "backupCount": settings.LOG_BACKUP_COUNT,
         "encoding": "utf-8",
     }
-    # Add file handlers to relevant loggers
+    # Додати файлові обробники до відповідних логерів
     LOGGING_CONFIG["loggers"][settings.PROJECT_NAME.lower()]["handlers"].extend(["app_file", "error_file"])
     LOGGING_CONFIG["root"]["handlers"].extend(["app_file", "error_file"])
-    # If you want specific loggers (like FastAPI) to also log to files, add handlers here too
+    # Якщо ви хочете, щоб конкретні логери (наприклад, FastAPI) також логували у файли, додайте обробники і сюди
     # LOGGING_CONFIG["loggers"]["fastapi"]["handlers"].extend(["app_file", "error_file"])
 
 
 def setup_logging():
     """
-    Applies the logging configuration defined in LOGGING_CONFIG.
-    This function should be called once when the application starts.
+    Застосовує конфігурацію логування, визначену в LOGGING_CONFIG.
+    Цю функцію слід викликати один раз під час запуску програми.
     """
     try:
         logging.config.dictConfig(LOGGING_CONFIG)
         logger = logging.getLogger(settings.PROJECT_NAME.lower())
-        logger.info(f"Logging configured. Level: {settings.LOGGING_LEVEL.upper()}, File logging: {settings.LOG_TO_FILE}")
+        logger.info(f"Логування налаштовано. Рівень: {settings.LOGGING_LEVEL.upper()}, Логування у файл: {settings.LOG_TO_FILE}")
         if settings.LOG_TO_FILE and LOG_DIR:
-            logger.info(f"Application logs will be stored in: {LOG_DIR / settings.LOG_APP_FILE}")
-            logger.info(f"Error logs will be stored in: {LOG_DIR / settings.LOG_ERROR_FILE}")
+            logger.info(f"Логи програми будуть зберігатися у: {LOG_DIR / settings.LOG_APP_FILE}")
+            logger.info(f"Логи помилок будуть зберігатися у: {LOG_DIR / settings.LOG_ERROR_FILE}")
     except Exception as e:
-        # Fallback to basic logging if configuration fails
+        # Резервне базове логування, якщо конфігурація не вдалася
         logging.basicConfig(level=logging.INFO)
-        logging.error(f"Error setting up logging configuration: {e}. Falling back to basicConfig.")
+        logging.error(f"Помилка налаштування конфігурації логування: {e}. Перехід до basicConfig.")
 
-# --- Utility function to get a logger instance ---
+# --- Допоміжна функція для отримання екземпляра логера ---
 def get_logger(name: Optional[str] = None) -> logging.Logger:
     """
-    Retrieves a logger instance, defaulting to the project's main logger.
+    Отримує екземпляр логера, за замовчуванням основного логера проекту.
 
     Args:
-        name (Optional[str]): The name of the logger. If None, defaults to
-                              the PROJECT_NAME from settings.
+        name (Optional[str]): Назва логера. Якщо None, використовується
+                              PROJECT_NAME з налаштувань.
 
     Returns:
-        logging.Logger: An instance of the logger.
+        logging.Logger: Екземпляр логера.
     """
     if name is None:
         name = settings.PROJECT_NAME.lower()
     return logging.getLogger(name)
 
 if __name__ == "__main__":
-    # Example of how to use the logging setup
-    setup_logging() # Apply the configuration
+    # Приклад використання налаштування логування
+    setup_logging() # Застосувати конфігурацію
 
-    # Get loggers
+    # Отримати логери
     root_logger = get_logger("root")
-    app_logger = get_logger() # Gets the project-specific logger
+    app_logger = get_logger() # Отримує логер, специфічний для проекту
     fastapi_logger = get_logger("fastapi")
     sqlalchemy_logger = get_logger("sqlalchemy.engine")
 
-    # Log some messages
-    root_logger.debug("This is a debug message from root logger.")
-    root_logger.info("This is an info message from root logger.")
-    root_logger.warning("This is a warning message from root logger.")
-    root_logger.error("This is an error message from root logger.")
-    root_logger.critical("This is a critical message from root logger.")
+    # Залогувати кілька повідомлень
+    root_logger.debug("Це налагоджувальне повідомлення від кореневого логера.")
+    root_logger.info("Це інформаційне повідомлення від кореневого логера.")
+    root_logger.warning("Це попереджувальне повідомлення від кореневого логера.")
+    root_logger.error("Це повідомлення про помилку від кореневого логера.")
+    root_logger.critical("Це критичне повідомлення від кореневого логера.")
 
-    app_logger.info("This is an info message from the application logger.")
-    app_logger.error("This is an error from the application, it should go to error.log if file logging is on.")
+    app_logger.info("Це інформаційне повідомлення від логера програми.")
+    app_logger.error("Це помилка з програми, вона повинна потрапити до error.log, якщо увімкнено логування у файл.")
 
-    fastapi_logger.info("This is an info message from FastAPI logger.")
+    fastapi_logger.info("Це інформаційне повідомлення від логера FastAPI.")
     if settings.DEBUG:
-        sqlalchemy_logger.info("This is an info message from SQLAlchemy logger (simulating SQL query log).")
+        sqlalchemy_logger.info("Це інформаційне повідомлення від логера SQLAlchemy (імітація логу SQL-запиту).")
     else:
-        sqlalchemy_logger.warning("This is a warning from SQLAlchemy (e.g. slow query), not an SQL log.")
+        sqlalchemy_logger.warning("Це попередження від SQLAlchemy (наприклад, повільний запит), а не SQL-лог.")
 
     try:
         1 / 0
     except ZeroDivisionError:
-        app_logger.exception("A caught exception occurred! Traceback will be logged.")
+        app_logger.exception("Стався виняток! Трасування буде залоговано.")
 
-    print(f"\nLogging settings applied. Check console output.")
+    print(f"\nНалаштування логування застосовано. Перевірте вивід консолі.")
     if settings.LOG_TO_FILE and LOG_DIR:
-        print(f"If file logging is enabled, check files in: {LOG_DIR}")
-        print(f"App log: {LOG_DIR / settings.LOG_APP_FILE}")
-        print(f"Error log: {LOG_DIR / settings.LOG_ERROR_FILE}")
+        print(f"Якщо логування у файл увімкнено, перевірте файли у: {LOG_DIR}")
+        print(f"Лог програми: {LOG_DIR / settings.LOG_APP_FILE}")
+        print(f"Лог помилок: {LOG_DIR / settings.LOG_ERROR_FILE}")

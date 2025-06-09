@@ -16,19 +16,19 @@ from app.src.core.dependencies import paginator
 router = APIRouter(
     prefix="/statuses",
     tags=["Dictionary - Statuses"],
-    dependencies=[Depends(get_current_active_superuser)] # TODO: Adjust permissions as per technical_task.txt
+    dependencies=[Depends(get_current_active_superuser)] # TODO: Налаштувати дозволи згідно з technical_task.txt
 )
 
-# Dependency to get StatusService
+# Залежність для отримання StatusService
 async def get_status_service(session: AsyncSession = Depends(get_db_session)) -> StatusService:
     """
-    Dependency to get an instance of StatusService.
+    Залежність для отримання екземпляра StatusService.
 
     Args:
-        session: The database session.
+        session: Сесія бази даних.
 
     Returns:
-        An instance of StatusService.
+        Екземпляр StatusService.
     """
     return StatusService(StatusRepository(session))
 
@@ -36,77 +36,77 @@ async def get_status_service(session: AsyncSession = Depends(get_db_session)) ->
     "/",
     response_model=StatusResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Create a new status",
-    description="Allows a superuser to create a new status type for the system.",
+    summary="Створити новий статус",
+    description="Дозволяє суперкористувачу створювати новий тип статусу для системи.",
 )
 async def create_status(
     status_in: StatusCreate,
     service: StatusService = Depends(get_status_service),
 ) -> StatusModel:
     """
-    Create a new status.
+    Створити новий статус.
 
     Args:
-        status_in: The status data to create.
-        service: The status service.
+        status_in: Дані статусу для створення.
+        service: Сервіс статусів.
 
     Returns:
-        The created status.
+        Створений статус.
     """
-    # TODO: Add logic based on technical_task.txt for specific roles if needed
+    # TODO: Додати логіку на основі technical_task.txt для конкретних ролей, якщо потрібно
     return await service.create(obj_in=status_in)
 
 @router.get(
     "/{status_id}",
     response_model=StatusResponse,
     status_code=status.HTTP_200_OK,
-    summary="Get a status by ID",
-    description="Allows any authenticated user (TODO: verify this based on task) to retrieve a specific status by its ID.",
+    summary="Отримати статус за ID",
+    description="Дозволяє будь-якому автентифікованому користувачу (TODO: перевірити це на основі завдання) отримати конкретний статус за його ID.",
 )
 async def get_status(
     status_id: UUID,
     service: StatusService = Depends(get_status_service),
-    # current_user: UserModel = Depends(get_current_active_user) # TODO: Add if needed for role-based access
+    # current_user: UserModel = Depends(get_current_active_user) # TODO: Додати, якщо потрібно для доступу на основі ролей
 ) -> StatusModel:
     """
-    Get a status by its ID.
+    Отримати статус за його ID.
 
     Args:
-        status_id: The ID of the status to retrieve.
-        service: The status service.
+        status_id: ID статусу для отримання.
+        service: Сервіс статусів.
 
     Returns:
-        The status with the given ID.
+        Статус із зазначеним ID.
 
     Raises:
-        HTTPException: If the status is not found.
+        HTTPException: Якщо статус не знайдено.
     """
     db_status = await service.get_by_id(obj_id=status_id)
     if not db_status:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status not found")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Статус не знайдено")
     return db_status
 
 @router.get(
     "/",
     response_model=PagedResponse[StatusResponse],
     status_code=status.HTTP_200_OK,
-    summary="Get all statuses",
-    description="Allows any authenticated user (TODO: verify this based on task) to retrieve a paginated list of all statuses.",
+    summary="Отримати всі статуси",
+    description="Дозволяє будь-якому автентифікованому користувачу (TODO: перевірити це на основі завдання) отримати сторінковий список усіх статусів.",
 )
 async def get_all_statuses(
     page_params: PageParams = Depends(paginator),
     service: StatusService = Depends(get_status_service),
-    # current_user: UserModel = Depends(get_current_active_user) # TODO: Add if needed for role-based access
+    # current_user: UserModel = Depends(get_current_active_user) # TODO: Додати, якщо потрібно для доступу на основі ролей
 ) -> PagedResponse[StatusModel]:
     """
-    Get all statuses with pagination.
+    Отримати всі статуси з пагінацією.
 
     Args:
-        page_params: Pagination parameters.
-        service: The status service.
+        page_params: Параметри пагінації.
+        service: Сервіс статусів.
 
     Returns:
-        A paginated list of statuses.
+        Сторінковий список статусів.
     """
     statuses = await service.get_multi(
         skip=page_params.skip,
@@ -122,8 +122,8 @@ async def get_all_statuses(
     "/{status_id}",
     response_model=StatusResponse,
     status_code=status.HTTP_200_OK,
-    summary="Update a status",
-    description="Allows a superuser to update an existing status.",
+    summary="Оновити статус",
+    description="Дозволяє суперкористувачу оновлювати існуючий статус.",
 )
 async def update_status(
     status_id: UUID,
@@ -131,51 +131,51 @@ async def update_status(
     service: StatusService = Depends(get_status_service),
 ) -> StatusModel:
     """
-    Update an existing status.
+    Оновити існуючий статус.
 
     Args:
-        status_id: The ID of the status to update.
-        status_in: The new status data.
-        service: The status service.
+        status_id: ID статусу для оновлення.
+        status_in: Нові дані статусу.
+        service: Сервіс статусів.
 
     Returns:
-        The updated status.
+        Оновлений статус.
 
     Raises:
-        HTTPException: If the status is not found.
+        HTTPException: Якщо статус не знайдено.
     """
     db_status = await service.get_by_id(obj_id=status_id)
     if not db_status:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status not found")
-    # TODO: Add logic based on technical_task.txt for specific roles if needed
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Статус не знайдено")
+    # TODO: Додати логіку на основі technical_task.txt для конкретних ролей, якщо потрібно
     return await service.update(obj_db=db_status, obj_in=status_in)
 
 @router.delete(
     "/{status_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Delete a status",
-    description="Allows a superuser to delete a status. This is a hard delete.", # TODO: Confirm if soft delete is needed based on BaseMainModel
+    summary="Видалити статус",
+    description="Дозволяє суперкористувачу видалити статус. Це жорстке видалення.", # TODO: Підтвердити, чи потрібне м'яке видалення на основі BaseMainModel
 )
 async def delete_status(
     status_id: UUID,
     service: StatusService = Depends(get_status_service),
 ) -> None:
     """
-    Delete a status by its ID.
+    Видалити статус за його ID.
 
     Args:
-        status_id: The ID of the status to delete.
-        service: The status service.
+        status_id: ID статусу для видалення.
+        service: Сервіс статусів.
 
     Raises:
-        HTTPException: If the status is not found.
+        HTTPException: Якщо статус не знайдено.
     """
     db_status = await service.get_by_id(obj_id=status_id)
     if not db_status:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Status not found")
-    # TODO: Add logic based on technical_task.txt for specific roles if needed
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Статус не знайдено")
+    # TODO: Додати логіку на основі technical_task.txt для конкретних ролей, якщо потрібно
     await service.delete(obj_id=status_id)
-    return None # FastAPI will return 204 No Content automatically
+    return None # FastAPI автоматично поверне 204 No Content
 
-# TODO: Add more specific endpoints if required by technical_task.txt
-# For example, get_status_by_code if 'code' is a unique field and frequently used for lookup.
+# TODO: Додати більш конкретні ендпоінти, якщо це вимагається technical_task.txt
+# Наприклад, get_status_by_code, якщо 'code' є унікальним полем і часто використовується для пошуку.

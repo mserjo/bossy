@@ -1,28 +1,24 @@
 # backend/app/src/api/v1/dictionaries/__init__.py
-# -*- coding: utf-8 -*-
-"""
-Підпакет для API ендпоінтів версії v1, що стосуються довідників.
+from fastapi import APIRouter
 
-Цей пакет містить всі компоненти, специфічні для управління
-різноманітними довідниками системи (наприклад, типи завдань, статуси,
-пріоритети, ролі користувачів тощо) через API v1.
+from . import statuses
+from . import user_roles
+from . import user_types
+from . import group_types
+from . import task_types
+from . import bonus_types
+from . import calendars
+from . import messengers
 
-Основний експорт (очікуваний):
-- `dictionaries_router`: Головний роутер для ендпоінтів довідників v1,
-                       визначений в `api.v1.dictionaries.router`.
-                       Він агрегує всі ендпоінти цієї функціональної групи.
-"""
+router = APIRouter()
 
-import logging
+router.include_router(statuses.router, prefix="/statuses", tags=["Dictionary - Statuses"])
+router.include_router(user_roles.router, prefix="/user-roles", tags=["Dictionary - User Roles"])
+router.include_router(user_types.router, prefix="/user-types", tags=["Dictionary - User Types"])
+router.include_router(group_types.router, prefix="/group-types", tags=["Dictionary - Group Types"])
+router.include_router(task_types.router, prefix="/task-types", tags=["Dictionary - Task Types"])
+router.include_router(bonus_types.router, prefix="/bonus-types", tags=["Dictionary - Bonus Types"])
+router.include_router(calendars.router, prefix="/calendar-providers", tags=["Dictionary - Calendar Providers"])
+router.include_router(messengers.router, prefix="/messenger-platforms", tags=["Dictionary - Messenger Platforms"])
 
-# Головний роутер для ендпоінтів довідників v1 буде визначено в .router
-# (тобто, api/v1/dictionaries/router.py) та імпортовано тут для
-# можливого ре-експорту або просто для структурування.
-# from .router import router as dictionaries_router # Або просто dictionaries_router, якщо ім'я не конфліктує
-
-# __all__ = [
-#     "dictionaries_router",
-# ]
-
-logger = logging.getLogger(__name__)
-logger.info("Підпакет 'api.v1.dictionaries' ініціалізовано.")
+__all__ = ["router"]

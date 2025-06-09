@@ -24,7 +24,9 @@ from apscheduler.executors.asyncio import AsyncIOExecutor
 from pytz import utc
 
 # from app.src.config.settings import settings # Потенційно для налаштувань часової зони, тощо
-# from app.src.tasks.system.cleanup import CleanupTask # Приклад імпорту завдання
+from app.src.tasks.system.cleanup import CleanupTask
+from app.src.tasks.system.backup import DatabaseBackupTask
+from app.src.tasks.system.monitoring import SystemMetricsCollectorTask
 # from app.src.tasks.notifications.email import SendEmailTask # Приклад імпорту завдання
 
 # Налаштування логера для цього модуля
@@ -71,12 +73,12 @@ def add_scheduled_task(func: Callable, trigger: str, **trigger_args: Any) -> Non
     except Exception as e:
         logger.error(f"Помилка додавання завдання '{getattr(func, '__name__', str(func))}' до планувальника: {e}", exc_info=True)
 
-async def example_task_function():
-    """Приклад простої функції, яку можна запускати за розкладом."""
-    logger.info("Приклад запланованого завдання виконано!")
-    # Тут може бути логіка вашого завдання, наприклад:
-    # cleanup_task_instance = CleanupTask()
-    # await cleanup_task_instance.execute()
+# async def example_task_function():
+#     """Приклад простої функції, яку можна запускати за розкладом."""
+#     logger.info("Приклад запланованого завдання виконано!")
+#     # Тут може бути логіка вашого завдання, наприклад:
+#     # cleanup_task_instance = CleanupTask()
+#     # await cleanup_task_instance.execute()
 
 
 def initialize_scheduled_tasks():
@@ -85,17 +87,50 @@ def initialize_scheduled_tasks():
     Ця функція повинна викликатися при старті додатку.
     """
     logger.info("Ініціалізація запланованих завдань...")
+    logger.info("Ініціалізація системних завдань...")
 
-    # Приклад додавання завдання, яке виконується кожні 10 хвилин
-    add_scheduled_task(example_task_function, 'interval', minutes=10)
+    # Завдання для очищення системи (щодня о 02:00)
+    cleanup_task = CleanupTask()
+    add_scheduled_task(
+        cleanup_task.execute,
+        'cron',
+        hour=2,
+        minute=0,
+        day_of_week='*', # Щодня
+        id="system_cleanup_task", # Важливо давати ID для можливості управління завданням
+        replace_existing=True     # Замінити, якщо завдання з таким ID вже існує
+    )
+    # registered_tasks["cleanup_task"] = cleanup_task # Якщо потрібно зберігати екземпляр
 
-    # Приклад додавання завдання, яке виконується щодня о 3:00 ночі
-    # add_scheduled_task(backup_database_task_function, 'cron', hour=3, minute=0)
+    # Завдання для резервного копіювання бази даних (щодня о 03:30)
+    # Переконайтеся, що pg_dump налаштований та доступний, і є права на запис в директорію бекапів.
+    db_backup_task = DatabaseBackupTask()
+    add_scheduled_task(
+        db_backup_task.execute,
+        'cron',
+        hour=3,
+        minute=30,
+        day_of_week='*', # Щодня
+        kwargs={"keep_last_n_backups": 7}, # Приклад передачі аргументів у завдання
+        id="database_backup_task",
+        replace_existing=True
+    )
+    # registered_tasks["db_backup_task"] = db_backup_task
 
-    # Приклад завдання для очищення старих логів (з tasks.system.cleanup)
-    # cleanup_task = CleanupTask(name="PeriodicCleanup")
-    # add_scheduled_task(cleanup_task.execute, 'cron', day_of_week='sun', hour='01', minute='00')
-    # registered_tasks["cleanup_task"] = cleanup_task # Збереження екземпляру, якщо потрібно
+    # Завдання для збору системних метрик (кожні 15 хвилин)
+    # Переконайтеся, що бібліотека psutil встановлена.
+    system_metrics_task = SystemMetricsCollectorTask()
+    add_scheduled_task(
+        system_metrics_task.execute,
+        'interval',
+        minutes=15,
+        id="system_metrics_collector_task",
+        replace_existing=True
+    )
+    # registered_tasks["system_metrics_task"] = system_metrics_task
+
+    # Приклад додавання завдання, яке виконується щодня о 3:00 ночі (інший приклад, якщо потрібно)
+    # add_scheduled_task(some_other_function, 'cron', hour=3, minute=0)
 
     # Додайте сюди інші ваші заплановані завдання
     # Наприклад, для синхронізації, відправки сповіщень, оновлення рейтингів тощо.

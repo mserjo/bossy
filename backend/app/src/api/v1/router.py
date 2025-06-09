@@ -26,7 +26,7 @@ from .auth import auth_router # Імпортуємо агрегований auth
 from .users import users_router # Імпортуємо агрегований users_router з users/__init__.py
 from .groups import groups_router # Імпортуємо агрегований groups_router з groups/__init__.py
 from .tasks import tasks_router # Імпортуємо агрегований tasks_router з tasks/__init__.py
-# from .bonuses.router import router as bonuses_router
+from .bonuses import bonuses_router # Імпортуємо агрегований bonuses_router з bonuses/__init__.py
 # from .gamification.router import router as gamification_router
 # from .notifications.router import router as notifications_router
 # from .integrations.router import router as integrations_router
@@ -87,17 +87,21 @@ except ImportError:
 except Exception as e:
     logger.error(f"Помилка підключення tasks_router: {e}", exc_info=True)
 
-# try:
-#     from .bonuses.router import router as bonuses_router
-#     v1_router.include_router(bonuses_router, prefix="/bonuses", tags=["V1 Bonuses & Rewards"])
-#     logger.info("Роутер v1.bonuses підключено.")
-# except ImportError: logger.warning("Роутер v1.bonuses не знайдено.")
+# Підключення роутера для бонусної системи
+try:
+    # bonuses_router вже імпортовано вище
+    v1_router.include_router(bonuses_router, prefix="/bonuses", tags=["V1 Bonus System"])
+    logger.info("Роутер v1.bonuses (бонусна система) підключено з префіксом /bonuses.")
+except ImportError:
+    logger.warning("Не вдалося імпортувати bonuses_router з api.v1.bonuses (мало б спрацювати з верхнього імпорту). Ендпоінти бонусної системи v1 не будуть доступні.")
+except Exception as e:
+    logger.error(f"Помилка підключення bonuses_router: {e}", exc_info=True)
 
 # try:
-#     from .dictionaries.router import router as dictionaries_router
-#     v1_router.include_router(dictionaries_router, prefix="/dictionaries", tags=["V1 Dictionaries"])
-#     logger.info("Роутер v1.dictionaries підключено.")
-# except ImportError: logger.warning("Роутер v1.dictionaries не знайдено.")
+#     from .gamification.router import router as gamification_router
+#     v1_router.include_router(gamification_router, prefix="/gamification", tags=["V1 Gamification"])
+#     logger.info("Роутер v1.gamification підключено.")
+# except ImportError: logger.warning("Роутер v1.gamification не знайдено.")
 
 # try:
 #     from .groups.router import router as groups_router

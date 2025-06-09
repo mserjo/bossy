@@ -1,156 +1,219 @@
 # backend/app/src/api/v1/system/health.py
 # -*- coding: utf-8 -*-
 """
-Ендпоінти для перевірки стану "здоров'я" системи API v1.
+API ендпоінти для перевірки "здоров'я" системи та її компонентів.
 
-Ці ендпоінти використовуються для моніторингу доступності та
-базової працездатності сервісу.
+Надає більш детальну інформацію про стан системи, ніж простий "ping".
+Може включати перевірку доступності бази даних, кешу, зовнішніх сервісів тощо.
 """
 
 import logging
-from typing import Dict, Any, Optional # Optional для Pydantic моделі
-from datetime import datetime # Для timestamp
+import asyncio # Для імітації асинхронних перевірок
+from typing import Dict, List, Any, Optional
+from datetime import datetime, timezone # Додано timezone для UTC
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Response, status
 # from sqlalchemy.ext.asyncio import AsyncSession # Для перевірки БД
-# from sqlalchemy import text # Для виконання простого запиту
+# from redis.asyncio import Redis as AsyncRedis # Для перевірки Redis
 
-# from app.src.core.database import get_api_db_session # Або інший спосіб отримати сесію, наприклад, з api.dependencies
-# from app.src.config.settings import settings # Можливо, для версії додатку
+# from app.src.core.database import get_db_session_context # Для отримання сесії БД
+# from app.src.core.redis_client import get_redis_client # Приклад назви залежності для Redis
+# from app.src.config.settings import settings
+# import httpx # Для перевірки зовнішніх сервісів
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# --- Модель відповіді для детального стану здоров'я (приклад) ---
-from pydantic import BaseModel # Pydantic має бути доступний у FastAPI проектах
-class DependencyStatus(BaseModel):
-    status: str
-    message: Optional[str] = None
+# --- Типи даних для відповіді ---
+# Використовуємо прості класи/константи замість Pydantic схем для відповіді,
+# щоб уникнути залежності від app.src.schemas на цьому етапі,
+# та тому що FastAPI автоматично перетворює dict у JSON.
+# У реальному проекті це могли б бути Pydantic схеми для валідації відповіді.
 
-class DetailedHealthStatus(BaseModel):
-    api_status: str = "healthy"
-    timestamp: datetime
-    app_version: Optional[str] = None # settings.APP_VERSION if settings else "N/A"
-    dependencies: Dict[str, DependencyStatus] = {}
+class HealthStatus:
+    OK = "OK"
+    WARNING = "WARNING" # Не критична проблема, система працює з обмеженнями
+    ERROR = "ERROR"   # Критична проблема, компонент не працює
 
+class ComponentHealth:
+    # Простий клас для структурування даних, не Pydantic схема
+    def __init__(self, name: str, status: str, details: Optional[str] = None):
+        self.name = name
+        self.status = status
+        self.details = details if details is not None else "N/A"
+        self.checked_at = datetime.now(timezone.utc).isoformat()
 
-@router.get(
-    "/status", # Шлях відносно префікса system_router, наприклад /api/v1/system/status
-    summary="Проста перевірка стану здоров'я API",
-    response_description="Повертає статус 'ok', якщо API працює.",
-    tags=["V1 System Health & Status"] # Тег може бути уточнений тут або успадкований
-)
-async def simple_health_check() -> Dict[str, str]:
-    """
-    Найпростіший ендпоінт для перевірки доступності API.
-    Якщо цей ендпоінт відповідає, це означає, що FastAPI додаток запущено
-    і може обробляти запити на цьому рівні.
-    Не перевіряє залежності (БД, кеш тощо).
-    """
-    logger.debug("Simple health check (/status) викликано.")
-    return {"status": "ok", "message": "API (v1/system) is running"}
+    def as_dict(self) -> Dict[str, Any]:
+        return vars(self)
 
-@router.get(
-    "/healthz", # Популярний шлях для детальної перевірки (liveness/readiness probes)
-    summary="Детальна перевірка стану здоров'я системи та її залежностей",
-    response_model=DetailedHealthStatus, # Використовуємо Pydantic модель для відповіді
-    response_description="Повертає детальний стан API та його основних залежностей.",
-    tags=["V1 System Health & Status"]
-)
-async def detailed_health_check(
-    # У реальному додатку тут була б залежність для сесії БД:
-    # db_session: AsyncSession = Depends(get_api_db_session)
-) -> DetailedHealthStatus: # Повертаємо екземпляр Pydantic моделі
-    """
-    Детальна перевірка стану здоров'я, включаючи залежності (наприклад, БД).
+# --- Функції-заглушки для перевірки компонентів ---
 
-    У цьому прикладі перевірка БД є заглушкою. В реальній системі тут
-    має бути спроба підключитися до БД та виконати простий запит (наприклад, SELECT 1).
-    Якщо будь-яка критична залежність не працює, загальний статус може
-    змінюватися, або ендпоінт може повертати HTTP 503.
-    """
-    logger.info("Detailed health check (/healthz) викликано.")
-
-    current_time = datetime.utcnow()
-
-    # --- Перевірка стану бази даних (заглушка) ---
-    db_is_healthy = True # За замовчуванням вважаємо здоровою для заглушки
-    db_status_message = "Database connection check not implemented in stub (assumed healthy)."
-
-    # Приклад реальної перевірки (потребує db_session та sqlalchemy.text):
+async def check_database_health(
+    # У реальному коді: db_session: AsyncSession = Depends(get_api_db_session)
+) -> ComponentHealth:
+    """Заглушка для перевірки стану підключення до бази даних."""
+    component_name = "База даних (PostgreSQL)"
+    logger.debug(f"Перевірка стану компонента: {component_name} (заглушка)")
     # try:
-    #     # Спроба виконати простий запит до БД
-    #     # result = await db_session.execute(text("SELECT 1"))
-    #     # if result.scalar_one() == 1:
-    #     #     db_is_healthy = True
-    #     #     db_status_message = "Database connection successful and responsive."
-    #     #     logger.debug("Health check: Database connection verified (SELECT 1).")
-    #     # else:
-    #     #     db_is_healthy = False # Малоймовірно для SELECT 1
-    #     #     db_status_message = "Database query 'SELECT 1' did not return 1."
-    #     #     logger.warning(f"Health check: {db_status_message}")
-    #
-    #     # Імітуємо невелику затримку для IO операції
-    #     await asyncio.sleep(0.01)
-    #     # Для тестування помилки можна розкоментувати:
-    #     # raise Exception("Simulated DB connection error")
-    #
+    #     # Простий запит до БД для перевірки з'єднання, наприклад, SELECT 1
+    #     # await db_session.execute(text("SELECT 1"))
+    #     await asyncio.sleep(0.05) # Імітація IO-bound операції
+    #     return ComponentHealth(name=component_name, status=HealthStatus.OK, details="Підключення успішне.")
     # except Exception as e:
-    #     db_is_healthy = False
-    #     db_status_message = f"Database connection failed: {str(e)}"
-    #     logger.error(f"Health check: Database connection or query error. Details: {e}", exc_info=True)
+    #     logger.error(f"Помилка підключення до БД '{component_name}' під час перевірки здоров'я: {e}", exc_info=False) # exc_info=False для коротшого логу
+    #     return ComponentHealth(name=component_name, status=HealthStatus.ERROR, details=f"Помилка: {str(e)[:100]}") # Обмеження довжини помилки
 
-    dependencies_status = {
-        "database": DependencyStatus(
-            status="healthy" if db_is_healthy else "unhealthy",
-            message=db_status_message
-        )
-        # Можна додати перевірки інших залежностей:
-        # "redis_cache": DependencyStatus(status="healthy", message="Connection successful (stub)."),
-        # "message_queue": DependencyStatus(status="unhealthy", message="RabbitMQ connection failed (stub).")
+    await asyncio.sleep(0.03 + (hash(datetime.now(timezone.utc).second) % 50) / 1000.0) # Імітація ~30-80ms
+    # Імітуємо випадковий стан для демонстрації
+    if hash(datetime.now(timezone.utc).second + 1) % 10 < 8: # 80% успіх
+        return ComponentHealth(name=component_name, status=HealthStatus.OK, details="Підключення успішне (заглушка).")
+    else:
+        return ComponentHealth(name=component_name, status=HealthStatus.ERROR, details="Не вдалося підключитися до БД (заглушка).")
+
+
+async def check_redis_health(
+    # У реальному коді: redis_client: AsyncRedis = Depends(get_redis_client)
+) -> ComponentHealth:
+    """Заглушка для перевірки стану підключення до Redis."""
+    component_name = "Кеш (Redis)"
+    logger.debug(f"Перевірка стану компонента: {component_name} (заглушка)")
+    # try:
+    #     # await redis_client.ping()
+    #     await asyncio.sleep(0.02) # Імітація IO-bound операції
+    #     return ComponentHealth(name=component_name, status=HealthStatus.OK, details="Підключення успішне.")
+    # except Exception as e:
+    #     logger.error(f"Помилка підключення до Redis '{component_name}' під час перевірки здоров'я: {e}", exc_info=False)
+    #     return ComponentHealth(name=component_name, status=HealthStatus.ERROR, details=f"Помилка: {str(e)[:100]}")
+
+    await asyncio.sleep(0.01 + (hash(datetime.now(timezone.utc).second + 2) % 30) / 1000.0) # Імітація ~10-40ms
+    if hash(datetime.now(timezone.utc).second + 3) % 10 < 9: # 90% успіх
+        return ComponentHealth(name=component_name, status=HealthStatus.OK, details="Підключення успішне (заглушка).")
+    else:
+        return ComponentHealth(name=component_name, status=HealthStatus.WARNING, details="Висока затримка відповіді від Redis (заглушка).")
+
+async def check_external_payment_gateway_health() -> ComponentHealth:
+    """Заглушка для перевірки доступності зовнішнього платіжного шлюзу."""
+    service_name = "Платіжний шлюз (ExamplePay)"
+    # service_url = settings.PAYMENT_GATEWAY_HEALTH_URL
+    service_url = "https://pay.example.com/health" # Заглушка URL
+    logger.debug(f"Перевірка стану зовнішнього сервісу: {service_name} ({service_url}) (заглушка)")
+
+    # try:
+    #     # async with httpx.AsyncClient(timeout=3.0) as client: # Короткий таймаут для health check
+    #     #     response = await client.get(service_url)
+    #     #     response.raise_for_status() # Викине помилку для не-2xx статусів
+    #     await asyncio.sleep(0.1) # Імітація HTTP запиту
+    #     return ComponentHealth(name=service_name, status=HealthStatus.OK, details="Сервіс доступний та відповідає.")
+    # except httpx.TimeoutException:
+    #     logger.warning(f"Таймаут підключення до зовнішнього сервісу '{service_name}'.")
+    #     return ComponentHealth(name=service_name, status=HealthStatus.WARNING, details="Таймаут відповіді від сервісу.")
+    # except httpx.HTTPStatusError as e:
+    #     logger.warning(f"Зовнішній сервіс '{service_name}' повернув помилку HTTP {e.response.status_code}.")
+    #     return ComponentHealth(name=service_name, status=HealthStatus.WARNING, details=f"Сервіс повернув помилку: {e.response.status_code}.")
+    # except Exception as e: # Інші помилки підключення
+    #     logger.warning(f"Проблема з зовнішнім сервісом '{service_name}': {e}", exc_info=False)
+    #     return ComponentHealth(name=service_name, status=HealthStatus.WARNING, details=f"Проблема підключення: {str(e)[:100]}")
+
+    await asyncio.sleep(0.05 + (hash(datetime.now(timezone.utc).second + 4) % 100) / 1000.0) # Імітація ~50-150ms
+    # Імітуємо, що цей сервіс переважно доступний
+    return ComponentHealth(name=service_name, status=HealthStatus.OK, details="Сервіс доступний (заглушка).")
+
+
+# --- Ендпоінт ---
+
+@router.get(
+    "/verbose",
+    summary="Детальна перевірка стану системи та її ключових компонентів",
+    description="""Виконує перевірку стану основних залежностей системи, таких як база даних, кеш,
+та критичні зовнішні сервіси. Повертає загальний статус системи та статус кожного компонента.
+- **200 OK**: Система функціонує нормально, або є некритичні попередження.
+- **503 Service Unavailable**: Один або декілька критичних компонентів системи не працюють.
+""",
+    tags=["V1 System Health"]
+    # response_model не використовується, оскільки ми вручну формуємо dict для відповіді
+    # і встановлюємо статус-код динамічно.
+    # Якщо б використовували Pydantic схему для відповіді, то:
+    # response_model=DetailedHealthResponseSchema # (потребував би Pydantic схему)
+)
+async def get_detailed_health_check(response: Response): # Використовуємо Response для динамічного встановлення статус-коду
+    logger.info("Запит на детальну перевірку стану системи (/verbose).")
+
+    # Паралельний запуск всіх перевірок здоров'я компонентів.
+    # `return_exceptions=True` важливо, щоб помилка в одній перевірці не зупинила всі інші.
+    component_check_tasks = [
+        check_database_health(),
+        check_redis_health(),
+        check_external_payment_gateway_health(),
+        # Додайте інші асинхронні функції перевірки тут
+    ]
+    check_results = await asyncio.gather(*component_check_tasks, return_exceptions=True)
+
+    components_health_reports: List[Dict[str, Any]] = []
+    overall_system_status: str = HealthStatus.OK # Початковий оптимістичний статус
+
+    for result_or_exception in check_results:
+        if isinstance(result_or_exception, ComponentHealth):
+            component_report = result_or_exception
+            components_health_reports.append(component_report.as_dict())
+
+            # Оновлення загального статусу системи на основі статусу компонента
+            if component_report.status == HealthStatus.ERROR:
+                overall_system_status = HealthStatus.ERROR # Якщо хоч один компонент ERROR, вся система ERROR
+            elif component_report.status == HealthStatus.WARNING and overall_system_status != HealthStatus.ERROR:
+                # Якщо є WARNING, але ще не було ERROR, встановлюємо WARNING
+                overall_system_status = HealthStatus.WARNING
+
+        elif isinstance(result_or_exception, Exception):
+            # Якщо сама функція перевірки компонента викликала непередбачений виняток
+            component_name = "Unknown Component Check" # Спробувати отримати ім'я з контексту, якщо можливо
+            # Можна спробувати отримати ім'я з self.__name__ функції, але це складно з gather
+            logger.error(
+                f"Непередбачена помилка під час виконання перевірки здоров'я компонента: {result_or_exception}",
+                exc_info=result_or_exception
+            )
+            error_report = ComponentHealth(
+                name=component_name,
+                status=HealthStatus.ERROR,
+                details=f"Internal error during health check: {str(result_or_exception)[:100]}"
+            )
+            components_health_reports.append(error_report.as_dict())
+            overall_system_status = HealthStatus.ERROR # Непередбачена помилка = критична проблема
+        else:
+            # На випадок, якщо gather поверне щось зовсім неочікуване
+            logger.error(f"Неочікуваний результат від функції перевірки здоров'я: {type(result_or_exception)} - {result_or_exception}")
+            unknown_report = ComponentHealth(
+                name="Unknown Check Result Type",
+                status=HealthStatus.ERROR,
+                details=f"Unexpected result type from health check: {type(result_or_exception).__name__}"
+            )
+            components_health_reports.append(unknown_report.as_dict())
+            overall_system_status = HealthStatus.ERROR
+
+    # Встановлення HTTP статус-коду відповіді залежно від загального стану системи
+    if overall_system_status == HealthStatus.ERROR:
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    elif overall_system_status == HealthStatus.WARNING:
+        response.status_code = status.HTTP_200_OK # Система працює, але є попередження
+    else: # HealthStatus.OK
+        response.status_code = status.HTTP_200_OK
+
+    # Формування тіла відповіді
+    health_response_payload = {
+        "overall_status": overall_system_status,
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "components": components_health_reports
     }
 
-    # Визначення загального статусу API на основі стану залежностей
-    api_overall_status = "healthy"
-    if not db_is_healthy: # Якщо будь-яка критична залежність не працює
-        api_overall_status = "degraded" # Або "unhealthy", якщо це критично
-        # У Kubernetes readiness probe, якщо повертається не 2xx, под не буде отримувати трафік.
-        # Якщо потрібно повернути 503, можна підняти HTTPException тут,
-        # але тоді Pydantic модель відповіді не буде використана для тіла помилки автоматично.
-        # Краще повернути 200 OK, але зі статусом "unhealthy" в тілі, якщо сервіс ще працює, але деградував.
-        # Якщо сервіс зовсім не може працювати без БД, тоді 503 доречний.
-        # Для прикладу, залишимо 200 ОК, але зі зміненим api_status.
-        logger.warning(f"Detailed health check: API status is '{api_overall_status}' due to unhealthy dependencies.")
+    final_log_message = f"Результат детальної перевірки стану: {overall_system_status}."
+    if overall_system_status != HealthStatus.OK:
+        # Логуємо деталі компонентів, якщо є проблеми
+        final_log_message += f" Деталі компонентів: {components_health_reports}"
+    logger.info(final_log_message)
 
-    health_response = DetailedHealthStatus(
-        api_status=api_overall_status,
-        timestamp=current_time,
-        # app_version=settings.APP_VERSION if hasattr(settings, "APP_VERSION") else "N/A",
-        app_version = "0.1.0-stub", # Заглушка для версії
-        dependencies=dependencies_status
-    )
+    # Повертаємо словник, FastAPI автоматично перетворить його на JSONResponse
+    # з встановленим раніше response.status_code.
+    return health_response_payload
 
-    # Якщо потрібно повернути 503, коли система не здорова:
-    # if api_overall_status != "healthy":
-    #     # Важливо: якщо піднімати HTTPException, то модель DetailedHealthStatus не буде автоматично
-    #     # використана для форматування тіла відповіді про помилку. Потрібен кастомний обробник для 503,
-    #     # або формувати JSONResponse вручну з тілом моделі.
-    #     # Для простоти, ми повертаємо 200, але зі статусом "unhealthy" в тілі.
-    #     # Якщо ж потрібно саме 503, то:
-    #     # raise HTTPException(
-    #     #     status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-    #     #     detail=health_response.model_dump() # Використовуємо .model_dump() для Pydantic v2
-    #     # )
-    #     pass
 
-    return health_response
-
-# Коментар для розробника:
-# Не забудьте оновити `backend/app/src/api/v1/system/__init__.py`, щоб підключити цей `router`.
-# Наприклад, додати в __init__.py:
-#
-# from .health import router as health_router
-# system_router.include_router(health_router) # Теги та префікс можна задати тут або в system_router
-
-logger.info("Модуль API v1 System Health (`health.py`) завантажено.")
+logger.info("Маршрутизатор для ендпоінтів перевірки стану системи API v1 (`health_endpoints.router`) визначено.")

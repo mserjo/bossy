@@ -1,220 +1,239 @@
 # backend/app/src/api/v1/system/monitoring.py
 # -*- coding: utf-8 -*-
 """
-Ендпоінти для моніторингу системи API v1.
+API ендпоінти для моніторингу системи.
 
-Ці ендпоінти призначені для суперкористувачів та дозволяють
-отримувати інформацію про стан системи, логи, метрики тощо.
+Надає доступ до даних моніторингу, таких як системні логи
+(SystemLog) та метрики продуктивності (PerformanceMetric).
+Доступ до цих ендпоінтів зазвичай обмежений суперкористувачами.
 """
 
-import asyncio # Додано для FakeSystemMonitoringService
 import logging
-from typing import Dict, Any, List, Optional
-from datetime import datetime # Для прикладу timestamp в логах/метриках
+from typing import List, Optional, Dict, Any
+from datetime import datetime, timedelta # timedelta для генерації даних
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field, validator
+from fastapi import APIRouter, Depends, HTTPException, status, Query
 
-# Залежності API (для автентифікації/авторизації)
-# У реальному проекті: from app.src.api.dependencies import get_current_active_superuser
-from app.src.api.dependencies import _fake_user_service # Використовуємо заглушку для тестування
+# Залежності API
+from app.src.api.dependencies import get_current_active_superuser
+# from app.src.api.dependencies import get_api_db_session # Якщо потрібна сесія БД
 
-# Сервіси для отримання даних моніторингу (будуть реалізовані пізніше в src/services/)
+# Схеми Pydantic (заглушки, будуть визначені в app.src.schemas.system.monitoring)
+# from app.src.schemas.system.monitoring import (
+#     SystemLogResponseSchema,
+#     PerformanceMetricResponseSchema,
+#     SystemLogQueryFiltersSchema # Для фільтрації логів
+# )
+
+# Сервіси (заглушки, будуть визначені в app.src.services.system.monitoring_service)
 # from app.src.services.system.monitoring_service import SystemMonitoringService
+
+# Pydantic моделі для заглушок
+from pydantic import BaseModel, Field
+
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
-# --- Pydantic моделі для відповідей моніторингу (приклади) ---
+# --- Заглушки для схем Pydantic ---
+class SystemLogBaseSchema(BaseModel): # Заглушка
+    pass
 
-class LogEntrySchema(BaseModel):
-    timestamp: datetime = Field(..., example=datetime.utcnow())
-    level: str = Field(..., example="INFO")
-    logger_name: Optional[str] = Field(None, example="app.src.services.user_service")
-    message: str = Field(..., example="User 'john_doe' logged in successfully.")
-    # Можуть бути додаткові поля: trace_id, user_id, exc_info (структуроване) тощо.
+class SystemLogResponseSchema(SystemLogBaseSchema): # Заглушка
+    id: int
+    timestamp: datetime
+    level: str = Field(..., examples=["INFO", "WARNING", "ERROR"]) # INFO, WARNING, ERROR
+    logger_name: Optional[str] = None
+    message: str
+    user_id: Optional[str] = None # Користувач, якщо пов'язано з дією користувача
+    request_id: Optional[str] = None # ID запиту, якщо лог пов'язаний з HTTP запитом
+    # extra_data: Optional[Dict[str, Any]] = None # Для додаткових структурованих даних
 
-class PaginatedLogResponse(BaseModel):
-    total_items: int = Field(..., alias="totalLogs", example=150) # Використання alias для JSON поля
-    logs: List[LogEntrySchema]
-    page: int = Field(..., example=1)
-    size: int = Field(..., example=50)
-    total_pages: Optional[int] = Field(None, alias="totalPages", example=3)
-
-    @validator('total_pages', always=True)
-    def calculate_total_pages(cls, v, values):
-        if 'total_items' in values and 'size' in values and values['size'] > 0:
-            return (values['total_items'] + values['size'] - 1) // values['size']
-        return None
+    model_config = { "from_attributes": True }
 
 
-class SystemMetricSchema(BaseModel):
-    name: str = Field(..., example="cpu_utilization_percent")
-    value: Any = Field(..., example=75.5)
-    unit: Optional[str] = Field(None, example="%")
-    timestamp: Optional[datetime] = Field(None, example=datetime.utcnow())
-    tags: Optional[Dict[str, str]] = Field(None, description="Додаткові теги/мітки для метрики", example={"core": "1", "type": "user_load"})
+class PerformanceMetricResponseSchema(SystemLogBaseSchema): # Заглушка
+    id: int
+    timestamp: datetime
+    metric_name: str = Field(..., examples=['cpu_usage_percent', 'memory_usage_gb'])
+    value: float
+    tags: Optional[Dict[str, str]] = Field(None, examples=[{"cpu_core": "1"}, {"service": "worker_1"}])
+
+    model_config = { "from_attributes": True }
 
 
-# --- Заглушка для сервісу моніторингу ---
+class SystemLogQueryFiltersSchema(BaseModel): # Заглушка для фільтрів
+    level: Optional[str] = Field(None, examples=["INFO", "ERROR"])
+    logger_name: Optional[str] = Field(None, examples=["auth_service"])
+    user_id: Optional[str] = None
+    date_from: Optional[datetime] = None
+    date_to: Optional[datetime] = None
+    message_contains: Optional[str] = None
+
+
+# --- Заглушка для сервісу ---
 class FakeSystemMonitoringService:
-    """Імітує сервіс для отримання даних моніторингу."""
+    _system_logs_db: List[SystemLogResponseSchema]
+    _performance_metrics_db: List[PerformanceMetricResponseSchema]
+
     def __init__(self):
-        # Створення більшого набору логів для кращої імітації пагінації та фільтрації
-        self._all_logs_stub: List[LogEntrySchema] = []
-        levels = ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
-        loggers = ["auth_service", "user_service", "task_processor", "payment_gateway", "system_events"]
-        messages = [
-            "User login attempt for '{}'.", "Profile updated by admin for user '{}'.",
-            "Task '{}' started.", "Task '{}' completed successfully.", "Task '{}' failed due to {}.",
-            "Payment transaction '{}' initiated.", "Payment for '{}' succeeded.", "Payment for '{}' failed: {}.",
-            "System scheduled job '{}' executed.", "Configuration reloaded.", "High CPU usage detected: {}%",
-            "Low disk space warning on /var: {}% free.", "User '{}' password reset requested.",
-            "API endpoint '{}' called with params: {}"
+        self.logger = logging.getLogger(self.__class__.__name__)
+        self._generate_fake_data()
+
+    def _generate_fake_data(self):
+        now = datetime.utcnow()
+        self._system_logs_db = [
+            SystemLogResponseSchema(id=1, timestamp=now - timedelta(minutes=60), level="INFO", logger_name="auth_service", message="User 'testuser' logged in successfully.", user_id="user_123", request_id="req_aaa"),
+            SystemLogResponseSchema(id=2, timestamp=now - timedelta(minutes=30), level="WARNING", logger_name="payment_service", message="Payment gateway timeout for transaction XYZ.", request_id="req_abc"),
+            SystemLogResponseSchema(id=3, timestamp=now - timedelta(minutes=5), level="ERROR", logger_name="task_scheduler", message="Failed to execute task 'cleanup_old_files'. Error: Disk full.", user_id="system"),
+            SystemLogResponseSchema(id=4, timestamp=now - timedelta(minutes=2), level="INFO", logger_name="api.v1.users", message="User profile for 'jane_doe' updated.", user_id="admin_user", request_id="req_def"),
+            SystemLogResponseSchema(id=5, timestamp=now - timedelta(minutes=1), level="DEBUG", logger_name="internal_worker", message="Processing item 123/500.", user_id="worker_process_1"),
         ]
-
-        current_time = datetime.utcnow()
-        for i in range(250): # Створюємо 250 логів
-            ts = current_time - timedelta(minutes=i * 5) # Різний час
-            level = levels[i % len(levels)]
-            logger_name = loggers[i % len(loggers)]
-            # Формування повідомлення з динамічними частинами
-            msg_template = messages[i % len(messages)]
-            if "{}" in msg_template:
-                if msg_template.count("{}") == 1:
-                    msg = msg_template.format(f"item_{i}")
-                elif msg_template.count("{}") == 2:
-                     msg = msg_template.format(f"item_{i}", f"detail_{i}")
-                else: # Більше двох плейсхолдерів
-                     msg = msg_template.format(f"item_{i}", f"detail_{i}", f"extra_{i}")
-            else:
-                msg = msg_template
-
-            self._all_logs_stub.append(LogEntrySchema(timestamp=ts, level=level, logger_name=logger_name, message=msg))
-
+        self._performance_metrics_db = [
+            PerformanceMetricResponseSchema(id=1, timestamp=now - timedelta(seconds=120), metric_name="cpu_usage_percent", value=25.5, tags={"core": "total"}),
+            PerformanceMetricResponseSchema(id=2, timestamp=now - timedelta(seconds=120), metric_name="memory_usage_gb", value=1.2),
+            PerformanceMetricResponseSchema(id=3, timestamp=now - timedelta(seconds=60), metric_name="cpu_usage_percent", value=30.1, tags={"core": "total"}),
+            PerformanceMetricResponseSchema(id=4, timestamp=now - timedelta(seconds=60), metric_name="memory_usage_gb", value=1.3),
+            PerformanceMetricResponseSchema(id=5, timestamp=now - timedelta(seconds=30), metric_name="db_query_duration_ms", value=150.0, tags={"query_type": "select_user_by_id"}),
+            PerformanceMetricResponseSchema(id=6, timestamp=now - timedelta(seconds=10), metric_name="active_users", value=15.0),
+        ]
 
     async def get_system_logs(
         self,
-        page: int = 1,
-        size: int = 50,
-        level_filter: Optional[str] = None,
-        search_query: Optional[str] = None,
-        start_time: Optional[datetime] = None,
-        end_time: Optional[datetime] = None
-    ) -> PaginatedLogResponse:
-        logger.debug(
-            f"FakeSystemMonitoringService: Запит логів (стор: {page}, розмір: {size}, "
-            f"рівень: {level_filter}, пошук: '{search_query}', час від: {start_time}, час до: {end_time})."
+        filters: Optional[SystemLogQueryFiltersSchema] = None,
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[SystemLogResponseSchema]:
+        self.logger.info(f"FakeService: Отримання системних логів. Фільтри: {filters.model_dump(exclude_none=True) if filters else None}, Skip: {skip}, Limit: {limit}")
+
+        filtered_logs = self._system_logs_db
+        if filters:
+            if filters.level:
+                filtered_logs = [log for log in filtered_logs if log.level.lower() == filters.level.lower()]
+            if filters.logger_name:
+                filtered_logs = [log for log in filtered_logs if log.logger_name and filters.logger_name.lower() in log.logger_name.lower()]
+            if filters.user_id:
+                filtered_logs = [log for log in filtered_logs if log.user_id == filters.user_id]
+            if filters.date_from:
+                filtered_logs = [log for log in filtered_logs if log.timestamp >= filters.date_from]
+            if filters.date_to:
+                filtered_logs = [log for log in filtered_logs if log.timestamp <= filters.date_to]
+            if filters.message_contains:
+                filtered_logs = [log for log in filtered_logs if filters.message_contains.lower() in log.message.lower()]
+
+        return filtered_logs[skip : skip + limit]
+
+    async def get_performance_metrics(
+        self,
+        metric_name_filter: Optional[str] = None,
+        date_from: Optional[datetime] = None,
+        date_to: Optional[datetime] = None,
+        tags_filter: Optional[Dict[str,str]] = None, # Додамо фільтр по тегах
+        skip: int = 0,
+        limit: int = 100
+    ) -> List[PerformanceMetricResponseSchema]:
+        self.logger.info(
+            f"FakeService: Отримання метрик. Фільтр імені: {metric_name_filter}, Дати: {date_from}-{date_to}, "
+            f"Теги: {tags_filter}, Skip: {skip}, Limit: {limit}"
         )
-        await asyncio.sleep(0.02) # Імітація IO
 
-        temp_logs = self._all_logs_stub
+        filtered_metrics = self._performance_metrics_db
+        if metric_name_filter:
+            filtered_metrics = [m for m in filtered_metrics if m.metric_name.lower() == metric_name_filter.lower()]
+        if date_from:
+            filtered_metrics = [m for m in filtered_metrics if m.timestamp >= date_from]
+        if date_to:
+            filtered_metrics = [m for m in filtered_metrics if m.timestamp <= date_to]
+        if tags_filter:
+            filtered_metrics = [
+                m for m in filtered_metrics if m.tags and
+                all(m.tags.get(key) == value for key, value in tags_filter.items())
+            ]
 
-        if level_filter:
-            temp_logs = [log for log in temp_logs if log.level.lower() == level_filter.lower()]
-        if search_query:
-            temp_logs = [log for log in temp_logs if search_query.lower() in log.message.lower() or (log.logger_name and search_query.lower() in log.logger_name.lower())]
-        if start_time:
-            temp_logs = [log for log in temp_logs if log.timestamp >= start_time]
-        if end_time:
-            temp_logs = [log for log in temp_logs if log.timestamp <= end_time]
+        return filtered_metrics[skip : skip + limit]
 
-        total_items = len(temp_logs)
-        start_index = (page - 1) * size
-        end_index = start_index + size
-        paginated_logs_for_page = temp_logs[start_index:end_index]
-
-        return PaginatedLogResponse(
-            totalLogs=total_items, # Використовуємо alias
-            logs=paginated_logs_for_page,
-            page=page,
-            size=len(paginated_logs_for_page) # Реальний розмір поточної сторінки
-        )
-
-    async def get_current_system_metrics(self) -> List[SystemMetricSchema]:
-        logger.debug("FakeSystemMonitoringService: Запит поточних системних метрик.")
-        await asyncio.sleep(0.01)
-        # Ці метрики могли б збиратися фоновим завданням (SystemMetricsCollectorTask)
-        # і зберігатися в кеші або часовій БД (наприклад, Prometheus, InfluxDB) для швидкого доступу.
-        ts = datetime.utcnow()
-        return [
-            SystemMetricSchema(name="cpu_load_avg_1min", value=round(0.1 + (ts.second % 60) * 0.01, 2), unit="load", timestamp=ts),
-            SystemMetricSchema(name="cpu_load_avg_5min", value=round(0.2 + (ts.second % 60) * 0.005, 2), unit="load", timestamp=ts),
-            SystemMetricSchema(name="memory_usage_mb", value= (1024 + (ts.second % 60) * 10), unit="MB", timestamp=ts),
-            SystemMetricSchema(name="memory_usage_percent", value=round(40.0 + (ts.second % 60) * 0.2, 1), unit="%", timestamp=ts),
-            SystemMetricSchema(name="active_db_connections", value=(10 + (ts.second % 10)), unit="connections", timestamp=ts),
-            SystemMetricSchema(name="pending_background_tasks", value=(ts.second % 5), unit="tasks", timestamp=ts),
-            SystemMetricSchema(name="disk_space_usage_percent", value=round(60.0 + (ts.minute%10)*0.1,1), unit="%", tags={"volume": "/app_data"}, timestamp=ts),
-        ]
-
-_fake_monitoring_service_instance = FakeSystemMonitoringService()
-
-# --- Імітація залежності get_current_active_superuser ---
-async def get_current_active_superuser_stub(token: str = "valid_superuser_token") -> Dict[str, Any]:
-    """Заглушка для залежності, що перевіряє права суперкористувача."""
-    user = await _fake_user_service.get_user_by_id("superuser_id") # Використовуємо заглушку з api.dependencies
-    if not user or not user.get("is_active") or not user.get("is_superuser"):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Потрібні права суперкористувача (локальна заглушка).")
-    return user
+_fake_monitoring_service = FakeSystemMonitoringService()
 
 # --- Ендпоінти ---
 
 @router.get(
     "/logs",
-    response_model=PaginatedLogResponse,
-    summary="Отримати системні логи з пагінацією та фільтрацією",
-    response_description="Повертає список системних логів з можливістю фільтрації за рівнем, пошуку за текстом та вибору часового діапазону.",
-    dependencies=[Depends(get_current_active_superuser_stub)],
-    tags=["V1 System Monitoring & Logs"]
+    response_model=List[SystemLogResponseSchema],
+    summary="Отримати системні логи",
+    description="Дозволяє суперкористувачам переглядати системні логи з можливістю фільтрації та пагінації.",
+    dependencies=[Depends(get_current_active_superuser)]
 )
-async def get_system_logs(
-    page: int = Query(1, ge=1, description="Номер сторінки результатів."),
-    size: int = Query(50, ge=1, le=200, description="Кількість записів логу на сторінці."),
-    level: Optional[str] = Query(None, description="Фільтр за рівнем логування (наприклад, INFO, WARNING, ERROR). Регістронезалежний.", examples=["ERROR", "info"]),
-    search: Optional[str] = Query(None, min_length=2, max_length=100, description="Пошуковий запит по тексту повідомлення логу або назві логера."),
-    start_time: Optional[datetime] = Query(None, description="Початковий час для фільтрації логів (ISO формат, наприклад, 2023-10-27T00:00:00Z)."),
-    end_time: Optional[datetime] = Query(None, description="Кінцевий час для фільтрації логів (ISO формат).")
-    # У реальному проекті: monitoring_service: SystemMonitoringService = Depends(get_monitoring_service)
+async def list_system_logs(
+    # Використовуємо Depends(SystemLogQueryFiltersSchema) для автоматичного створення об'єкту фільтрів з query параметрів
+    filters: SystemLogQueryFiltersSchema = Depends(),
+    skip: int = Query(0, ge=0, description="Кількість записів для пропуску (пагінація)"),
+    limit: int = Query(100, ge=1, le=500, description="Максимальна кількість записів для повернення (пагінація)"),
+    # service: SystemMonitoringService = Depends(get_system_monitoring_service), # Реальна ін'єкція
+    # current_superuser: Dict[str, Any] = Depends(get_current_active_superuser) # Залежність вже вказана вище
 ):
     """
-    Дозволяє суперкористувачам переглядати системні логи.
-    Підтримує пагінацію, фільтрацію за рівнем, пошук за текстом та часовим діапазоном.
+    Повертає список записів системного логу.
+    Доступно тільки суперкористувачам.
+    Підтримує фільтрацію за рівнем, іменем логера, ID користувача, датою та вмістом повідомлення, а також пагінацію.
     """
-    logger.info(f"Запит системних логів: стор={page}, розмір={size}, рівень='{level}', пошук='{search}', від='{start_time}', до='{end_time}'.")
-    # log_data = await monitoring_service.get_system_logs(page=page, size=size, level_filter=level, search_query=search, start_time=start_time, end_time=end_time)
-    log_data = await _fake_monitoring_service_instance.get_system_logs(
-        page=page, size=size, level_filter=level, search_query=search, start_time=start_time, end_time=end_time
+    # Логування вхідних параметрів фільтрації (якщо вони є)
+    active_filters = filters.model_dump(exclude_none=True)
+    logger.info(
+        f"Запит на список системних логів. "
+        f"Фільтри: {active_filters if active_filters else 'немає'}. "
+        f"Пагінація: skip={skip}, limit={limit}."
     )
-    return log_data
+
+    # system_logs = await service.get_system_logs(filters=filters, skip=skip, limit=limit) # Реальний виклик
+    system_logs = await _fake_monitoring_service.get_system_logs(filters=filters, skip=skip, limit=limit) # Заглушка
+    return system_logs
+
 
 @router.get(
     "/metrics",
-    response_model=List[SystemMetricSchema],
-    summary="Отримати поточні системні метрики",
-    response_description="Повертає список поточних ключових метрик системи.",
-    dependencies=[Depends(get_current_active_superuser_stub)],
-    tags=["V1 System Monitoring & Metrics"]
+    response_model=List[PerformanceMetricResponseSchema],
+    summary="Отримати метрики продуктивності",
+    description="Дозволяє суперкористувачам переглядати зібрані метрики продуктивності системи.",
+    dependencies=[Depends(get_current_active_superuser)]
 )
-async def get_system_metrics(
-    # У реальному проекті: monitoring_service: SystemMonitoringService = Depends(get_monitoring_service)
+async def list_performance_metrics(
+    metric_name: Optional[str] = Query(None, description="Фільтр за назвою метрики (наприклад, 'cpu_usage_percent')"),
+    date_from: Optional[datetime] = Query(None, description="Початкова дата для фільтрації (ISO формат)"),
+    date_to: Optional[datetime] = Query(None, description="Кінцева дата для фільтрації (ISO формат)"),
+    # Фільтрація по тегах може бути складнішою, наприклад, ?tags=service:worker,region:eu
+    # Для простоти, тут можна передати як рядок JSON або окремі параметри
+    # tags_json: Optional[str] = Query(None, description="Фільтр по тегах у форматі JSON рядка (наприклад, '{\\"service\\":\\"worker\\"}')"),
+    skip: int = Query(0, ge=0, description="Кількість записів для пропуску (пагінація)"),
+    limit: int = Query(100, ge=1, le=1000, description="Максимальна кількість записів для повернення (пагінація)"),
+    # service: SystemMonitoringService = Depends(get_system_monitoring_service),
+    # current_superuser: Dict[str, Any] = Depends(get_current_active_superuser)
 ):
     """
-    Дозволяє суперкористувачам переглядати поточні системні метрики.
-    Метрики можуть включати завантаження CPU, використання пам'яті,
-    кількість активних з'єднань з БД, розмір черг завдань тощо.
+    Повертає список зібраних метрик продуктивності.
+    Доступно тільки суперкористувачам.
+    Підтримує фільтрацію за назвою метрики, датою та пагінацію.
+    (Фільтрація по тегах - концептуально).
     """
-    logger.info("Запит поточних системних метрик.")
-    # metrics = await monitoring_service.get_current_system_metrics() # Реальний виклик
-    metrics = await _fake_monitoring_service_instance.get_current_system_metrics() # Використання заглушки
-    return metrics
+    # tags_dict: Optional[Dict[str, str]] = None
+    # if tags_json:
+    #     try:
+    #         tags_dict = json.loads(tags_json)
+    #         if not isinstance(tags_dict, dict): raise ValueError("Теги мають бути словником")
+    #     except (json.JSONDecodeError, ValueError) as e:
+    #         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=f"Некоректний формат JSON для тегів: {e}")
 
-# Коментар для розробника:
-# Не забути оновити `backend/app/src/api/v1/system/__init__.py`, щоб підключити цей `router`.
-# Наприклад, додати в __init__.py:
-#
-# from .monitoring import router as monitoring_router
-# system_router.include_router(monitoring_router, prefix="/monitoring", tags=["V1 System Monitoring"])
-# (Теги тут можуть бути більш специфічними, або успадковуватися/доповнюватися з system_router)
+    logger.info(
+        f"Запит на список метрик продуктивності. Фільтр імені: '{metric_name}', "
+        f"date_from='{date_from}', date_to='{date_to}'. " # TODO: Додати логування тегів
+        f"Пагінація: skip={skip}, limit={limit}."
+    )
 
-logger.info("Модуль API v1 System Monitoring (`monitoring.py`) завантажено.")
+    performance_metrics = await _fake_monitoring_service.get_performance_metrics(
+        metric_name_filter=metric_name, date_from=date_from, date_to=date_to,
+        # tags_filter=tags_dict, # Передача розпарсених тегів
+        skip=skip, limit=limit
+    )
+    return performance_metrics
+
+logger.info("Маршрутизатор для ендпоінтів моніторингу API v1 (`monitoring_endpoints.router`) визначено.")

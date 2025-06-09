@@ -32,7 +32,9 @@ from .hash import get_password_hash, verify_password
 from .security import generate_secure_random_string
 from .validators import is_strong_password, is_valid_phone_number
 from .formatters import format_datetime, format_currency
-# from .generators import generate_random_code
+from .generators import generate_random_code, generate_unique_slug
+from .converters import markdown_to_html
+from .helpers import get_current_utc_timestamp
 
 __all__ = [
     "get_password_hash",
@@ -42,7 +44,10 @@ __all__ = [
     "is_valid_phone_number",
     "format_datetime",
     "format_currency",
-    # "generate_random_code",
+    "generate_random_code",
+    "generate_unique_slug",
+    "markdown_to_html",
+    "get_current_utc_timestamp",
 ]
 
 logger = logging.getLogger(__name__)

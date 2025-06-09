@@ -1,12 +1,12 @@
 # backend/app/src/api/v1/auth/token.py
 from fastapi import APIRouter, Depends, HTTPException, status
-from jose import JWTError, jwt # Assuming jose for JWT operations, consistent with FastAPI examples
+from jose import JWTError, jwt # Припускаючи використання jose для операцій JWT, відповідно до прикладів FastAPI
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.src.config.settings import settings_app # To get JWT_SECRET_KEY and ALGORITHM
-from app.src.core.dependencies import get_db_session, get_current_active_superuser # Protected endpoint
+from app.src.config.settings import settings_app # Для отримання JWT_SECRET_KEY та ALGORITHM
+from app.src.core.dependencies import get_db_session, get_current_active_superuser # Захищений ендпоінт
 from app.src.schemas.auth.token import TokenData, TokenVerifyRequest, TokenVerifyResponse
-# TokenService might be needed if we interact with stored tokens or perform complex validation
+# TokenService може знадобитися, якщо ми взаємодіємо зі збереженими токенами або виконуємо складну валідацію
 # from app.src.services.auth.token import TokenService
 
 router = APIRouter()

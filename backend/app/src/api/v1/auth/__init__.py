@@ -9,22 +9,22 @@ from .profile import router as profile_router
 
 auth_router = APIRouter()
 
-# Endpoints from login.py (e.g., /login, /refresh, /logout) will be directly under /auth
+# Ендпоінти з login.py (наприклад, /login, /refresh, /logout) будуть безпосередньо під /auth
 auth_router.include_router(login_router)
-# Endpoint from register.py (e.g., /register) will be directly under /auth
+# Ендпоінт з register.py (наприклад, /register) буде безпосередньо під /auth
 auth_router.include_router(register_router)
-# Endpoints from token.py (e.g., /verify) will be under /auth/token
+# Ендпоінти з token.py (наприклад, /verify) будуть під /auth/token
 auth_router.include_router(token_router, prefix="/token")
-# Endpoints from password.py (e.g., /change, /forgot, /reset) will be under /auth/password
+# Ендпоінти з password.py (наприклад, /change, /forgot, /reset) будуть під /auth/password
 auth_router.include_router(password_router, prefix="/password")
-# Endpoints from profile.py (e.g., /me) will be under /auth/profile
+# Ендпоінти з profile.py (наприклад, /me) будуть під /auth/profile
 auth_router.include_router(profile_router, prefix="/profile")
 
-# The main inclusion in v1/router.py will use tags=["V1 Authentication"]
-# Individual routers (login.py, etc.) should ideally have their own specific tags.
-# For example, in login.py: router = APIRouter(tags=["Session Management"])
-# This way, an endpoint like /auth/login would get tags from both levels if FastAPI supports that,
-# or primarily the tags from the v1_router.include_router call.
-# FastAPI typically combines tags from `APIRouter(tags=...)` and `app.include_router(..., tags=...)`.
+# Основне включення в v1/router.py буде використовувати tags=["V1 Authentication"]
+# Окремі роутери (login.py, тощо) в ідеалі повинні мати свої специфічні теги.
+# Наприклад, у login.py: router = APIRouter(tags=["Управління сесіями"])
+# Таким чином, ендпоінт на кшталт /auth/login отримає теги з обох рівнів, якщо FastAPI це підтримує,
+# або переважно теги з виклику v1_router.include_router.
+# FastAPI зазвичай комбінує теги з APIRouter(tags=...) та app.include_router(..., tags=...).
 
 __all__ = ["auth_router"]

@@ -3,13 +3,13 @@ from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.src.config.security import create_access_token, create_refresh_token, verify_password
-from app.src.core.dependencies import get_db_session, get_current_user_from_refresh_token, get_current_active_user # Assuming get_current_active_user is for protected routes, not login itself
+from app.src.core.dependencies import get_db_session, get_current_user_from_refresh_token, get_current_active_user # Припускаючи, що get_current_active_user призначений для захищених маршрутів, а не для самого входу
 from app.src.models.auth import User, RefreshToken as RefreshTokenModel
 from app.src.repositories.auth.user import UserRepository
 from app.src.repositories.auth.token import RefreshTokenRepository
 from app.src.schemas.auth.token import TokenResponse, RefreshTokenRequest
 from app.src.schemas.auth.login import LoginRequest
-from app.src.services.auth.session import UserSessionService # For managing user sessions, if applicable on login/logout
+from app.src.services.auth.session import UserSessionService # Для керування сесіями користувачів, якщо застосовно при вході/виході
 from app.src.services.auth.token import TokenService
 
 router = APIRouter()
@@ -157,7 +157,7 @@ async def logout(
         )
 
     token_repo = RefreshTokenRepository(db)
-    await token_repo.delete(refresh_token_instance.id) # Або mark_as_used/revoke
+    await token_repo.delete(refresh_token_instance.id) # Або позначити як використаний/відкликаний
 
     # Видаляємо cookie
     response.delete_cookie(

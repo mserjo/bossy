@@ -6,7 +6,7 @@ from app.src.core.dependencies import get_db_session
 from app.src.models.auth import User as UserModel
 from app.src.schemas.auth.user import UserCreate, UserResponse
 from app.src.services.auth.user import UserService
-# from app.src.services.auth.token import TokenService # Potentially for auto-login after registration
+# from app.src.services.auth.token import TokenService # Потенційно для автоматичного входу після реєстрації
 
 router = APIRouter()
 

@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.src.core.dependencies import get_db_session, get_current_active_user
 from app.src.models.auth import User as UserModel
-from app.src.schemas.auth.user import UserResponse, UserUpdate # UserUpdate might need specific fields for profile
+from app.src.schemas.auth.user import UserResponse, UserUpdate # UserUpdate може потребувати специфічних полів для профілю
 from app.src.services.auth.user import UserService
 
 router = APIRouter()

@@ -4,15 +4,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.src.core.dependencies import get_db_session, get_current_active_user
 from app.src.models.auth import User as UserModel
-from app.src.schemas.auth.password import ( # Assuming schemas are in password.py or similar
+from app.src.schemas.auth.password import ( # Припускаючи, що схеми знаходяться в password.py або подібному файлі
     PasswordChange,
     PasswordResetRequest,
     PasswordResetConfirm
 )
-from app.src.schemas.message import MessageResponse # A generic message response schema
+from app.src.schemas.message import MessageResponse # Загальна схема відповіді з повідомленням
 from app.src.services.auth.user import UserService
-from app.src.services.auth.token import TokenService # For password reset tokens
-# from app.src.services.notifications.email import EmailNotificationService # If sending emails directly
+from app.src.services.auth.token import TokenService # Для токенів скидання паролю
+# from app.src.services.notifications.email import EmailNotificationService # Якщо надсилати електронні листи безпосередньо
 
 router = APIRouter()
 
@@ -27,7 +27,7 @@ async def change_password(
     password_data: PasswordChange,
     db: AsyncSession = Depends(get_db_session),
     current_user: UserModel = Depends(get_current_active_user),
-    user_service: UserService = Depends() # UserService can be injected
+    user_service: UserService = Depends() # UserService може бути переданий як залежність
 ):
     '''
     Змінює пароль поточного аутентифікованого користувача.
@@ -35,9 +35,9 @@ async def change_password(
     - **current_password**: Поточний пароль користувача.
     - **new_password**: Новий пароль користувача.
     '''
-    # `user_service` can be initialized inside or passed as a dependency
+    # user_service може бути ініціалізований всередині функції або переданий як залежність
     if not hasattr(user_service, 'db_session') or user_service.db_session is None:
-         user_service.db_session = db # Ensure service has db session
+         user_service.db_session = db # Переконуємося, що сервіс має сесію БД
 
     if not await user_service.verify_user_password(user=current_user, password=password_data.current_password):
         raise HTTPException(

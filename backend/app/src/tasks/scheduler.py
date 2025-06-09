@@ -27,7 +27,9 @@ from pytz import utc
 from app.src.tasks.system.cleanup import CleanupTask
 from app.src.tasks.system.backup import DatabaseBackupTask
 from app.src.tasks.system.monitoring import SystemMetricsCollectorTask
-# from app.src.tasks.notifications.email import SendEmailTask # Приклад імпорту завдання
+# from app.src.tasks.notifications.email import SendEmailTask
+# from app.src.tasks.notifications.sms import SendSmsTask
+# from app.src.tasks.notifications.messenger import SendMessengerNotificationTask
 
 # Налаштування логера для цього модуля
 logger = logging.getLogger(__name__)
@@ -134,15 +136,69 @@ def initialize_scheduled_tasks():
 
     # Додайте сюди інші ваші заплановані завдання
     # Наприклад, для синхронізації, відправки сповіщень, оновлення рейтингів тощо.
-    # Згідно з structure-claude-v2.md, сюди можуть входити:
-    # - tasks.system.cleanup.CleanupTask
-    # - tasks.system.backup.DatabaseBackupTask
-    # - tasks.system.monitoring.SystemMetricsCollectorTask
-    # - tasks.notifications.email.SendEmailTask (для масових розсилок або повторних спроб)
+    # Згідно з structure-claude-v2.md, сюди можуть входити (деякі вже додані вище):
+    # - tasks.system.cleanup.CleanupTask (вже реалізовано та заплановано)
+    # - tasks.system.backup.DatabaseBackupTask (вже реалізовано та заплановано)
+    # - tasks.system.monitoring.SystemMetricsCollectorTask (вже реалізовано та заплановано)
+    # - tasks.notifications.email.SendEmailTask (для масових розсилок або повторних спроб) - див. приклади нижче
     # - tasks.integrations.calendar.SyncCalendarTask
     # - tasks.gamification.levels.RecalculateUserLevelsTask
     # - tasks.gamification.badges.AwardBadgesTask
     # - tasks.gamification.ratings.UpdateUserRatingsTask
+
+    # --- Приклади для завдань сповіщень (зазвичай викликаються на вимогу, а не за розкладом) ---
+    # logger.info("Ініціалізація завдань сповіщень (приклади, закоментовано)...")
+
+    # Приклад: щотижневий дайджест новин на email (якщо такий функціонал потрібен)
+    # weekly_digest_email_task = SendEmailTask(name="WeeklyDigestEmail")
+    # add_scheduled_task(
+    #     weekly_digest_email_task.execute,
+    #     trigger='cron',
+    #     day_of_week='mon', # Щопонеділка
+    #     hour=9,
+    #     minute=0,
+    #     kwargs={ # Аргументи для методу run таска SendEmailTask
+    #         "recipient_email": "all_users_group@example.com", # Потребує логіки отримання списку
+    #         "subject": "Щотижневий Дайджест Kudos",
+    #         "html_body": "<h1>Ваш тижневий дайджест...</h1><p>Деталі...</p>", # Потребує генерації контенту
+    #         "text_body": "Ваш тижневий дайджест...
+Деталі..."
+    #     },
+    #     id="weekly_digest_email_task",
+    #     replace_existing=True
+    # )
+
+    # Приклад: щоденне SMS нагадування (дуже специфічний випадок)
+    # daily_sms_reminder_task = SendSmsTask(name="DailyReminderSMS")
+    # add_scheduled_task(
+    #     daily_sms_reminder_task.execute,
+    #     trigger='cron',
+    #     hour=8,
+    #     minute=0,
+    #     kwargs={
+    #         "phone_number": "+380XXXXXXXXX", # Конкретний номер або логіка вибору
+    #         "message": "Щоденне нагадування від Kudos!"
+    #     },
+    #     id="daily_sms_reminder_task",
+    #     replace_existing=True
+    # )
+
+    # Приклад: періодичне повідомлення в Telegram канал про оновлення
+    # (якщо SendMessengerNotificationTask може приймати chat_id каналу)
+    # telegram_update_task = SendMessengerNotificationTask(name="TelegramChannelUpdate")
+    # add_scheduled_task(
+    #     telegram_update_task.execute,
+    #     trigger='interval',
+    #     hours=6, # Кожні 6 годин
+    #     kwargs={
+    #         "target_identifier": "@kudos_channel_id", # ID каналу Telegram
+    #         "message_text": "Перевірте останні оновлення в системі Kudos!",
+    #         "platform": "telegram"
+    #     },
+    #     id="telegram_channel_update_task",
+    #     replace_existing=True
+    # )
+    # --- Кінець прикладів для завдань сповіщень ---
 
     logger.info("Заплановані завдання ініціалізовано.")
 

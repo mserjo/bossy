@@ -22,7 +22,7 @@ from fastapi import APIRouter
 # Ці файли та роутери будуть створені пізніше.
 # Наприклад:
 from .system import system_router # Очікуємо, що system_router експортується з api/v1/system/__init__.py
-# from .auth.router import router as auth_router
+from .auth import auth_router # Імпортуємо агрегований auth_router з auth/__init__.py
 # from .users.router import router as users_router
 # from .groups.router import router as groups_router
 # from .tasks.router import router as tasks_router
@@ -58,11 +58,14 @@ except ImportError:
 
 
 # Приклади підключення інших роутерів (будуть розкоментовані по мірі їх створення):
-# try:
-#     from .auth.router import router as auth_router
-#     v1_router.include_router(auth_router, prefix="/auth", tags=["V1 Auth"])
-#     logger.info("Роутер v1.auth підключено.")
-# except ImportError: logger.warning("Роутер v1.auth не знайдено.")
+try:
+    # auth_router вже імпортовано вище
+    v1_router.include_router(auth_router, prefix="/auth", tags=["V1 Authentication"])
+    logger.info("Роутер v1.auth (агрегований) підключено з префіксом /auth.")
+except ImportError:
+    logger.warning("Не вдалося імпортувати auth_router з api.v1.auth. Ендпоінти автентифікації v1 не будуть доступні.")
+except Exception as e:
+    logger.error(f"Помилка підключення auth_router: {e}", exc_info=True)
 
 # try:
 #     from .users.router import router as users_router

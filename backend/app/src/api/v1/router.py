@@ -28,7 +28,7 @@ from .groups import groups_router # Імпортуємо агрегований 
 from .tasks import tasks_router # Імпортуємо агрегований tasks_router з tasks/__init__.py
 from .bonuses import bonuses_router # Імпортуємо агрегований bonuses_router з bonuses/__init__.py
 from .gamification import gamification_router # Імпортуємо агрегований gamification_router з gamification/__init__.py
-# from .notifications.router import router as notifications_router
+from .notifications import notifications_router # Імпортуємо агрегований notifications_router з notifications/__init__.py
 # from .integrations.router import router as integrations_router
 # from .files.router import router as files_router
 # from .dictionaries.router import router as dictionaries_router

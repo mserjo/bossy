@@ -1,4 +1,4 @@
-# backend/app/src/api/v1/system/init_data_endpoints.py
+# backend/app/src/api/v1/system/init_data.py
 # -*- coding: utf-8 -*-
 """
 API ендпоінт для ініціалізації початкових даних системи.

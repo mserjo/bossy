@@ -18,7 +18,7 @@ from fastapi import APIRouter, Depends
 from . import settings # Змінено з settings_endpoints
 from . import monitoring # Змінено з monitoring_endpoints
 from . import health # Змінено з health_endpoints
-from . import init_data_endpoints
+from . import init_data # Змінено з init_data_endpoints
 
 # Можна імпортувати загальні залежності, якщо вони потрібні для всього /system шляху
 # from app.src.api.dependencies import get_current_active_superuser
@@ -63,11 +63,11 @@ system_router.include_router(
 logger.debug("Роутер system.health підключено до system_router з префіксом /health.")
 
 system_router.include_router(
-    init_data_endpoints.router,
+    init_data.router, # Змінено з init_data_endpoints.router
     prefix="/data-initialization", # Шляхи будуть /system/data-initialization/...
     tags=["V1 System Data Initialization"]
 )
-logger.debug("Роутер system.init_data_endpoints підключено до system_router з префіксом /data-initialization.")
+logger.debug("Роутер system.init_data підключено до system_router з префіксом /data-initialization.")
 
 
 # Приклад простого ендпоінта безпосередньо в system_router, якщо потрібно.

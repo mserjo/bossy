@@ -30,6 +30,8 @@ from app.src.tasks.system.monitoring import SystemMetricsCollectorTask
 # from app.src.tasks.notifications.email import SendEmailTask
 # from app.src.tasks.notifications.sms import SendSmsTask
 # from app.src.tasks.notifications.messenger import SendMessengerNotificationTask
+# from app.src.tasks.integrations.calendar import SyncCalendarTask
+# ProcessIncomingMessageTask зазвичай не додається в планувальник, а викликається вебхуками
 
 # Налаштування логера для цього модуля
 logger = logging.getLogger(__name__)
@@ -199,6 +201,33 @@ def initialize_scheduled_tasks():
     #     replace_existing=True
     # )
     # --- Кінець прикладів для завдань сповіщень ---
+
+    # --- Приклади для завдань інтеграцій (деякі можуть бути за розкладом, інші - на вимогу) ---
+    # logger.info("Ініціалізація завдань інтеграцій (приклади, закоментовано)...")
+
+    # Приклад: періодична синхронізація календарів для активних користувачів
+    # Ця логіка потребуватиме отримання списку користувачів з активними інтеграціями.
+    # Тут показано лише концептуальний виклик для одного користувача/провайдера.
+    # sync_google_calendar_task_instance = SyncCalendarTask(name="UserGoogleCalendarSync")
+    # add_scheduled_task(
+    #     sync_google_calendar_task_instance.execute, # Викликаємо execute, який потім викличе run
+    #     trigger='interval',
+    #     hours=1, # Наприклад, кожну годину
+    #     kwargs={
+    #         "user_id": "some_user_id_placeholder", # ID користувача, для якого синхронізувати
+    #         "calendar_provider": "google"
+    #         # Додаткові kwargs можуть включати time_min, time_max, specific_calendar_ids тощо.
+    #     },
+    #     id="sync_google_calendar_for_user_some_user_id_placeholder", # ID має бути унікальним
+    #     replace_existing=True
+    # )
+
+    # Примітка: ProcessIncomingMessageTask зазвичай не запускається за розкладом,
+    # а викликається напряму вебхуком або іншим обробником подій, передаючи payload.
+    # Наприклад:
+    # incoming_message_task = ProcessIncomingMessageTask()
+    # result = await incoming_message_task.execute(platform="telegram", payload=telegram_update_payload)
+    # --- Кінець прикладів для завдань інтеграцій ---
 
     logger.info("Заплановані завдання ініціалізовано.")
 

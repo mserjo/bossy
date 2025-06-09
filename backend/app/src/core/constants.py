@@ -1,74 +1,71 @@
 # backend/app/src/core/constants.py
-
 """
-Цей модуль визначає глобальні константи, що використовуються в усій програмі.
-Константи допомагають підтримувати узгодженість та полегшують оновлення
-глобальних значень з єдиного джерела.
-"""
+Глобальні константи для програми Kudos.
 
-# --- Загальні константи програми ---
-PROJECT_NAME: str = "Kudos" # Також може бути отримано з налаштувань, якщо потребує залежності від середовища
-API_PREFIX: str = "/api" # Загальний префікс для всіх версій API
-API_V1_STR: str = "/api/v1" # Специфічний префікс для API версії 1
+Цей модуль визначає різноманітні константи, що використовуються в різних частинах програми.
+Мета полягає в тому, щоб мати єдине джерело для таких значень, що полегшує
+їх підтримку та забезпечує узгодженість. Константи, що залежать від середовища
+(наприклад, URL-адреси, секретні ключі), повинні знаходитися в `config.settings.py`.
+"""
 
 # --- Константи пагінації ---
-DEFAULT_PAGE_NUMBER: int = 1
-DEFAULT_PAGE_SIZE: int = 20
-MAX_PAGE_SIZE: int = 100
-MIN_PAGE_SIZE: int = 1
+DEFAULT_PAGE_NUMBER: int = 1  # Номер сторінки за замовчуванням для запитів з пагінацією.
+DEFAULT_PAGE_SIZE: int = 20   # Розмір сторінки за замовчуванням.
+MAX_PAGE_SIZE: int = 100      # Максимально дозволений розмір сторінки.
+MIN_PAGE_SIZE: int = 1        # Мінімально дозволений розмір сторінки.
 
 # --- Регулярні вирази ---
-# Приклад: Базовий regex для email (для валідації не через Pydantic, Pydantic має власний EmailStr)
-# EMAIL_REGEX: str = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$
-# Приклад: Regex для імені користувача (буквено-цифрові символи, підкреслення, дефіси, 3-20 символів)
+# Регулярний вираз для перевірки імені користувача.
+# Дозволяє буквено-цифрові символи, підкреслення та дефіси. Довжина від 3 до 20 символів.
 USERNAME_REGEX: str = r"^[a-zA-Z0-9_-]{3,20}$"
-# Regex для надійного пароля: щонайменше 8 символів, 1 велика літера, 1 маленька літера, 1 цифра, 1 спеціальний символ
+
+# Регулярний вираз для перевірки надійності пароля.
+# Вимоги:
+# - щонайменше 8 символів завдовжки (максимум 128 символів)
+# - щонайменше одна мала літера (a-z)
+# - щонайменше одна велика літера (A-Z)
+# - щонайменше одна цифра (0-9)
+# - щонайменше один спеціальний символ (з набору @$!%*?&_)
 PASSWORD_REGEX: str = r"^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&_])[A-Za-z\d@$!%*?&_]{8,128}$"
 
 # --- Значення за замовчуванням для моделей ---
-DEFAULT_USERNAME_PREFIX: str = "user_"
-DEFAULT_GROUP_NAME: str = "Моя група"
-DEFAULT_TASK_POINTS: int = 10
-DEFAULT_AVATAR_FILENAME: str = "default_avatar.png"
-
-# --- Константи файлової системи ---
-# Їх краще розміщувати в налаштуваннях, якщо вони змінюються залежно від середовища,
-# але можуть бути тут, якщо це фіксовані структурні константи.
-# UPLOAD_DIRECTORY: str = "uploads"
-# AVATARS_SUBDIRECTORY: str = "avatars"
-# GROUP_ICONS_SUBDIRECTORY: str = "group_icons"
-# REWARD_ICONS_SUBDIRECTORY: str = "reward_icons"
+DEFAULT_USERNAME_PREFIX: str = "user_" # Префікс для автоматично генерованих імен користувачів (якщо потрібно).
+DEFAULT_GROUP_NAME: str = "Моя група" # TODO i18n: Translatable string. Назва групи за замовчуванням при її створенні.
+DEFAULT_TASK_POINTS: int = 10 # Кількість балів за завдання за замовчуванням.
+DEFAULT_AVATAR_FILENAME: str = "default_avatar.png" # Ім'я файлу стандартного аватара.
 
 # --- Константи, пов'язані з кешем ---
-CACHE_DEFAULT_TTL_SECONDS: int = 300  # Час життя за замовчуванням для записів у кеші (5 хвилин)
-CACHE_KEY_PREFIX_USER: str = "user_"
-CACHE_KEY_PREFIX_GROUP: str = "group_"
-CACHE_KEY_PREFIX_TASK: str = "task_"
+CACHE_DEFAULT_TTL_SECONDS: int = 300  # Час життя за замовчуванням для записів у кеші (5 хвилин).
+CACHE_KEY_PREFIX_USER: str = "user:"   # Префікс для ключів кешу, пов'язаних з користувачами.
+CACHE_KEY_PREFIX_GROUP: str = "group:" # Префікс для ключів кешу, пов'язаних з групами.
+CACHE_KEY_PREFIX_TASK: str = "task:"   # Префікс для ключів кешу, пов'язаних із завданнями.
 
 # --- Константи, пов'язані із завданнями/подіями ---
-TASK_MAX_DESCRIPTION_LENGTH: int = 5000
-EVENT_MAX_NAME_LENGTH: int = 255
-
-# --- Ролі користувачів (якщо не використовуються Enum з dicts.py або ролі з БД тут активно) ---
-# Їх часто краще визначати як Enum (див. dicts.py) або з моделі/таблиці UserRole
-# ROLE_SUPERUSER: str = "superuser"
-# ROLE_ADMIN: str = "admin"
-# ROLE_USER: str = "user"
-# ROLE_BOT: str = "bot"
-
-# --- Імена/ID системних користувачів (якщо фіксовані, а не лише в налаштуваннях) ---
-# SYSTEM_USER_ODIN_NAME: str = "odin"
-# SYSTEM_USER_SHADOW_NAME: str = "shadow"
+TASK_MAX_DESCRIPTION_LENGTH: int = 5000 # Максимальна довжина опису завдання.
+EVENT_MAX_NAME_LENGTH: int = 255        # Максимальна довжина назви події.
 
 # --- Інші константи ---
-# Приклад: константа для назви конкретного прапорця функції
+# Приклад константи для управління функціоналом (feature flag).
+# Може використовуватися для увімкнення/вимкнення нових функцій.
 FEATURE_NEW_DASHBOARD_ENABLED: str = "NEW_DASHBOARD_FEATURE_FLAG"
 
+# Константи, які були видалені з цього файлу, оскільки вони краще підходять для `settings.py`
+# або визначаються динамічно/в інших місцях:
+# - PROJECT_NAME (визначається в settings.py)
+# - API_PREFIX, API_V1_STR (API шляхи краще визначати в settings.py або при налаштуванні роутерів)
+# - EMAIL_REGEX (Pydantic EmailStr є кращим для валідації email)
+# - UPLOAD_DIRECTORY та інші файлові шляхи (визначаються в settings.py, наприклад, UPLOADED_FILES_DIR)
+# - ROLE_SUPERUSER, ROLE_ADMIN, etc. (краще визначати як Enum або отримувати з бази даних)
+# - SYSTEM_USER_ODIN_NAME, etc. (імена системних користувачів, якщо потрібні, краще в settings.py)
 
 if __name__ == "__main__":
-    print("--- Основні константи ---")
-    print(f"PROJECT_NAME: {PROJECT_NAME}")
-    print(f"API_V1_STR: {API_V1_STR}")
-    print(f"DEFAULT_PAGE_SIZE: {DEFAULT_PAGE_SIZE}")
-    print(f"PASSWORD_REGEX: {PASSWORD_REGEX}")
-    print(f"CACHE_DEFAULT_TTL_SECONDS: {CACHE_DEFAULT_TTL_SECONDS}")
+    # Блок для демонстрації визначених констант.
+    # Використовується для швидкої перевірки значень при прямому запуску файлу.
+    print("--- Демонстрація основних констант програми Kudos ---")
+    print(f"Розмір сторінки за замовчуванням: {DEFAULT_PAGE_SIZE}")
+    print(f"Максимальний розмір сторінки: {MAX_PAGE_SIZE}")
+    print(f"Регулярний вираз для пароля: {PASSWORD_REGEX}")
+    print(f"Час життя кешу за замовчуванням (секунди): {CACHE_DEFAULT_TTL_SECONDS}")
+    print(f"Префікс ключа кешу для користувача: {CACHE_KEY_PREFIX_USER}")
+    print(f"Ім'я файлу стандартного аватара: {DEFAULT_AVATAR_FILENAME}")
+    print(f"Прапорець функції нового дашборду: {FEATURE_NEW_DASHBOARD_ENABLED}")

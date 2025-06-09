@@ -1,9 +1,11 @@
 # backend/app/src/core/utils.py
-
 """
-Цей модуль надає різноманітні допоміжні функції, які можна повторно
-використовувати в різних частинах програми і які не вписуються
-в більш специфічні модулі утиліт (наприклад, validators.py або security.py з config).
+Допоміжні утиліти для програми Kudos.
+
+Цей модуль містить набір загальновживаних функцій, які можуть бути корисними
+в різних частинах програми. Вони призначені для виконання простих,
+атомарних операцій, таких як генерація рядків, форматування даних,
+математичні операції з підвищеною точністю тощо.
 """
 
 import random
@@ -12,185 +14,359 @@ import re
 from datetime import datetime, timezone, timedelta
 from typing import Any, Optional, List, Dict, Union
 from decimal import Decimal, ROUND_HALF_UP
+from backend.app.src.config.logging import get_logger
 
-# --- Утиліти для рядків ---
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
+
+
+# --- Утиліти для роботи з рядками ---
 
 def generate_random_string(length: int, chars: str = string.ascii_letters + string.digits) -> str:
     """
-    Генерує випадковий рядок заданої довжини із заданого набору символів.
+    Генерує випадковий рядок заданої довжини з вказаного набору символів.
 
     Args:
         length (int): Бажана довжина випадкового рядка.
-        chars (str): Рядок, що містить символи для вибору.
-                     За замовчуванням використовуються буквено-цифрові символи (літери + цифри).
+        chars (str): Рядок, що містить символи, з яких буде генеруватися рядок.
+                     За замовчуванням використовуються латинські літери (великі та малі) та цифри.
 
     Returns:
-        str: Згенерований випадковий рядок.
+        str: Випадково згенерований рядок.
     """
     if length <= 0:
         return ""
     return "".join(random.choice(chars) for _ in range(length))
 
+
 def generate_random_numeric_string(length: int) -> str:
     """
-    Генерує випадковий рядок, що складається лише з цифр.
+    Генерує випадковий рядок, що складається виключно з цифр.
+
+    Args:
+        length (int): Бажана довжина числового рядка.
+
+    Returns:
+        str: Випадково згенерований числовий рядок.
     """
     return generate_random_string(length, string.digits)
 
+
 def slugify(text: str, separator: str = "-") -> str:
     """
-    Генерує URL-дружній "слаг" із заданого тексту.
-    Перетворює на нижній регістр, видаляє небуквено-цифрові символи (крім пробілів та дефісів),
-    замінює пробіли та повторювані дефіси одним вказаним роздільником.
+    Створює URL-дружній "слаг" (slug) із заданого тексту.
+    Перетворює текст на нижній регістр, видаляє символи, що не є українськими/латинськими літерами,
+    цифрами, пробілами або дефісами. Послідовності пробілів та/або дефісів замінюються
+    одним вказаним роздільником. Крайні роздільники обрізаються.
+
+    TODO: Для більш надійної транслітерації нелатинських символів (наприклад, 'привіт' -> 'pryvit')
+          та обробки специфічних символів різних мов, варто розглянути використання
+          спеціалізованих бібліотек, таких як `python-slugify` або `unidecode`.
+          Поточна реалізація зберігає українські літери в слагу, що може бути або не бути бажаним
+          залежно від вимог до URL.
+
+    Args:
+        text (str): Вхідний текст для перетворення на слаг.
+        separator (str): Символ-роздільник, який використовуватиметься замість пробілів та дефісів.
+                         За замовчуванням "-".
+
+    Returns:
+        str: URL-дружній слаг.
     """
     if not text:
         return ""
     text = text.lower()
-    # Видалити спеціальні символи, поки що зберігаючи пробіли та дефіси
-    text = re.sub(r"[^a-z0-9\s-]", "", text, flags=re.UNICODE)
-    # Замінити пробіли та кілька дефісів одним роздільником
-    text = re.sub(r"[\s-]+|-", separator, text).strip(separator)
+    # Замінюємо непідтримувані символи. Зберігаємо латиницю, кирилицю (українські літери), цифри, пробіли, дефіси.
+    # Додано літери: ґ, є, і, ї.
+    text = re.sub(r"[^a-zа-яґєіїї0-9\s-]", "", text, flags=re.UNICODE)
+    # Замінюємо пробіли та групи дефісів на один вказаний роздільник.
+    text = re.sub(r"[\s-]+", separator, text).strip(separator)
     return text
+
 
 def truncate_string(text: str, max_length: int, suffix: str = "...") -> str:
     """
-    Обрізає рядок до максимальної довжини, додаючи суфікс, якщо обрізано.
+    Обрізає рядок до вказаної максимальної довжини, додаючи суфікс, якщо текст було обрізано.
+    Довжина суфікса враховується в максимальній довжині.
+
+    Args:
+        text (str): Вхідний рядок.
+        max_length (int): Максимальна бажана довжина рядка (включаючи суфікс).
+        suffix (str): Суфікс, що додається до обрізаного рядка.
+
+    Returns:
+        str: Обрізаний рядок із суфіксом, або оригінальний рядок, якщо його довжина менша або дорівнює `max_length`.
     """
     if len(text) <= max_length:
         return text
+    # Переконуємося, що не обрізаємо суфікс, якщо max_length занадто мала
+    if max_length < len(suffix):
+        return suffix[:max_length]
     return text[:max_length - len(suffix)] + suffix
 
-# --- Утиліти для дати та часу ---
+
+# --- Утиліти для роботи з датою та часом ---
 
 def get_current_utc_timestamp() -> datetime:
-    """Повертає поточну дату та час у UTC з інформацією про часовий пояс."""
+    """
+    Повертає поточний час та дату в UTC з інформацією про часовий пояс (timezone-aware).
+    """
     return datetime.now(timezone.utc)
 
-def format_datetime_for_display(dt: datetime, fmt: str = "%Y-%m-%d %H:%M:%S %Z%z") -> str:
+
+def format_datetime_for_display(dt: datetime, fmt: str = "%Y-%m-%d %H:%M:%S %Z") -> str:
     """
-    Форматує об'єкт datetime у рядок для відображення.
-    За замовчуванням використовується поширений ISO-подібний формат з часовим поясом.
+    Форматує об'єкт `datetime` у рядок для відображення користувачу.
+    За замовчуванням використовується формат "РРРР-ММ-ДД ГГ:ХХ:СС НАЗВА_ЧАСОВОГО_ПОЯСУ".
+    Якщо об'єкт `datetime` не має інформації про часовий пояс (naive), %Z буде порожнім.
+
+    Args:
+        dt (datetime): Об'єкт `datetime` для форматування.
+        fmt (str): Рядок формату, що використовується функцією `strftime`.
+
+    Returns:
+        str: Відформатований рядок дати та часу, або порожній рядок, якщо `dt` не надано.
     """
     if not dt:
         return ""
     return dt.strftime(fmt)
 
+
+def _get_ukrainian_plural(number: int, one: str, few: str, many: str) -> str:
+    """
+    Допоміжна функція для правильного відмінювання українських слів залежно від числа.
+    (Один, декілька, багато)
+
+    Args:
+        number (int): Число для визначення форми.
+        one (str): Форма для однини (наприклад, "день"). # TODO i18n: Translatable string
+        few (str): Форма для чисел 2, 3, 4 (наприклад, "дні"). # TODO i18n: Translatable string
+        many (str): Форма для чисел 0, 5-20, 21 (якщо закінчується на 1, але не 11) і т.д. (наприклад, "днів"). # TODO i18n: Translatable string
+
+    Returns:
+        str: Відповідна форма слова.
+    """
+    num_abs = abs(number)
+    if num_abs % 10 == 1 and num_abs % 100 != 11:
+        return one
+    elif 2 <= num_abs % 10 <= 4 and (num_abs % 100 < 10 or num_abs % 100 >= 20):
+        return few
+    else:
+        return many
+
+
 def human_readable_timedelta(delta: timedelta) -> str:
     """
-    Перетворює об'єкт timedelta на людиночитаний рядок (наприклад, "2 дні, 3 години").
-    """
-    seconds = int(delta.total_seconds())
-    if seconds < 0:
-        return "(від'ємна тривалість)"
-    if seconds == 0:
-        return "0 секунд"
+    Перетворює об'єкт `timedelta` на людиночитаний рядок українською мовою
+    (наприклад, "2 дні, 3 години, 5 хвилин").
+    Враховує правильні відмінки для днів, годин, хвилин, секунд.
 
-    days, remainder = divmod(seconds, 86400)
+    Args:
+        delta (timedelta): Об'єкт `timedelta` для перетворення.
+
+    Returns:
+        str: Людиночитаний рядок, що представляє тривалість.
+    """
+    total_seconds = int(delta.total_seconds())
+
+    if total_seconds < 0:
+        # Можна додати обробку від'ємних значень, якщо це потрібно
+        return "(від'ємна тривалість)"  # TODO i18n: Translatable string
+    if total_seconds == 0:
+        return "0 секунд"  # TODO i18n: Translatable string (or "щойно", "миттєво" depending on context)
+
+    days, remainder = divmod(total_seconds, 86400)
     hours, remainder = divmod(remainder, 3600)
     minutes, seconds = divmod(remainder, 60)
 
     parts = []
     if days > 0:
-        parts.append(f"{days} день{'i' if days != 1 else ''}") # Адаптація для української мови
+        # Inner strings are marked in _get_ukrainian_plural
+        parts.append(f"{days} {_get_ukrainian_plural(days, 'день', 'дні', 'днів')}")
     if hours > 0:
-        parts.append(f"{hours} годин{'а' if hours == 1 else ('и' if 1 < hours < 5 else '')}") # Адаптація для української мови
+        parts.append(f"{hours} {_get_ukrainian_plural(hours, 'година', 'години', 'годин')}")
     if minutes > 0:
-        parts.append(f"{minutes} хвилин{'а' if minutes == 1 else ('и' if 1 < minutes < 5 else '')}") # Адаптація для української мови
-    if seconds > 0 or not parts: # Показати секунди, якщо це єдина одиниця або якщо не нуль
-        parts.append(f"{seconds} секунд{'а' if seconds == 1 else ('и' if 1 < seconds < 5 else '')}") # Адаптація для української мови
+        parts.append(f"{minutes} {_get_ukrainian_plural(minutes, 'хвилина', 'хвилини', 'хвилин')}")
+    if seconds > 0 or not parts:  # Відображати секунди, якщо це єдина одиниця або якщо вони не нульові і є інші частини
+        parts.append(f"{seconds} {_get_ukrainian_plural(seconds, 'секунда', 'секунди', 'секунд')}")
 
-    return ", ".join(parts)
+    return ", ".join(parts) if parts else "0 секунд"  # TODO i18n: "0 секунд" part if needed for other locales
+
 
 # --- Числові утиліти ---
 
 def round_decimal(number: Union[float, Decimal, str], decimal_places: int = 2) -> Decimal:
     """
-    Округлює число до вказаної кількості десяткових знаків, використовуючи Decimal для точності.
-    Використовує метод округлення ROUND_HALF_UP.
+    Округлює число до вказаної кількості десяткових знаків, використовуючи `Decimal` для точності.
+    Застосовує стандартне математичне округлення (ROUND_HALF_UP: 0.5 округлюється до 1).
+
+    Args:
+        number (Union[float, Decimal, str]): Число для округлення. Може бути float, Decimal або рядком,
+                                             що представляє число.
+        decimal_places (int): Кількість десяткових знаків, до яких потрібно округлити.
+
+    Returns:
+        Decimal: Округлене число у вигляді об'єкта `Decimal`.
     """
     if not isinstance(number, Decimal):
+        # Перетворення на рядок перед Decimal запобігає проблемам з точністю float
         number = Decimal(str(number))
-    quantizer = Decimal("1e-" + str(decimal_places)) # наприклад, Decimal('0.01') для 2 знаків
+
+    # Створення квантизатора, наприклад, Decimal('0.01') для 2 десяткових знаків
+    quantizer = Decimal("1e-" + str(decimal_places))
     return number.quantize(quantizer, rounding=ROUND_HALF_UP)
 
-# --- Утиліти для колекцій ---
+
+# --- Утиліти для роботи з колекціями ---
 
 def chunk_list(data: List[Any], chunk_size: int) -> List[List[Any]]:
     """
-    Розбиває список на менші частини заданого розміру.
-    Приклад: chunk_list([1,2,3,4,5], 2) -> [[1,2], [3,4], [5]]
+    Розбиває список на менші підсписки (чанки) заданого розміру.
+    Останній чанк може бути меншим, якщо кількість елементів не ділиться націло.
+
+    Приклад:
+        `chunk_list([1, 2, 3, 4, 5], 2)` поверне `[[1, 2], [3, 4], [5]]`
+
+    Args:
+        data (List[Any]): Список для розбиття.
+        chunk_size (int): Розмір кожного чанка. Повинен бути додатним числом.
+
+    Returns:
+        List[List[Any]]: Список, що містить чанки.
+
+    Raises:
+        ValueError: Якщо `chunk_size` не є додатним цілим числом.
     """
     if chunk_size <= 0:
-        raise ValueError("Розмір частини повинен бути додатним цілим числом.")
+        # TODO i18n: Translatable message
+        raise ValueError("Розмір частини (chunk_size) повинен бути додатним цілим числом.")
     return [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
+
 
 def get_from_dict_or_object(data: Union[Dict[str, Any], object], key: str, default: Optional[Any] = None) -> Any:
     """
-    Безпечно отримує значення зі словника або атрибут з об'єкта.
+    Безпечно отримує значення за ключем зі словника або значення атрибута з об'єкта.
 
     Args:
-        data: Словник або об'єкт, з якого потрібно отримати значення.
-        key: Ключ або назва атрибута.
-        default: Значення за замовчуванням, яке повертається, якщо ключ/атрибут не знайдено.
+        data (Union[Dict[str, Any], object]): Словник або об'єкт, з якого потрібно отримати значення.
+        key (str): Ключ (для словника) або назва атрибута (для об'єкта).
+        default (Optional[Any]): Значення, яке повертається, якщо ключ або атрибут не знайдено.
+                                 За замовчуванням `None`.
 
     Returns:
-        Значення, якщо знайдено, інакше значення за замовчуванням.
+        Any: Отримане значення, або значення `default`, якщо ключ/атрибут не знайдено.
     """
     if isinstance(data, dict):
         return data.get(key, default)
     else:
         return getattr(data, key, default)
 
-# --- Інші утиліти ---
+
+# --- Інші корисні утиліти ---
 
 def generate_unique_code(length: int = 6, prefix: str = "") -> str:
     """
-    Генерує унікальний код, зазвичай для таких речей, як коди запрошень або короткі ID.
-    Поєднує префікс із випадковим рядком. Для справжньої унікальності в розподіленій системі
-    потрібні більш надійні механізми (наприклад, UUID, послідовності бази даних).
-    Це більше для людиночитаних, відносно коротких кодів.
+    Генерує код, що складається з префікса та випадкового рядка великих літер та цифр.
+    Призначений для створення людиночитаних кодів (наприклад, коди запрошень, короткі ідентифікатори).
+
+    Важливо: Для забезпечення справжньої глобальної унікальності у розподілених системах
+    або при високих навантаженнях, слід використовувати більш надійні механізми,
+    такі як UUID (Universally Unique Identifiers) або послідовності бази даних.
+    Ця функція не гарантує абсолютної унікальності при масовій генерації.
+
+    Args:
+        length (int): Довжина випадкової частини коду. За замовчуванням 6.
+        prefix (str): Префікс, що додається на початок коду. За замовчуванням порожній.
+
+    Returns:
+        str: Згенерований код у верхньому регістрі.
     """
     random_part = generate_random_string(length, string.ascii_uppercase + string.digits)
     return f"{prefix}{random_part}".upper()
 
 
+# Блок для демонстрації та базового тестування утиліт при прямому запуску модуля.
 if __name__ == "__main__":
-    print("--- Демонстрація основних утиліт ---")
+    logger.info("--- Демонстрація Основних Допоміжних Утиліт ---")
 
-    # Рядкові утиліти
-    print(f"\nВипадковий рядок (10 символів): {generate_random_string(10)}")
-    print(f"Випадковий числовий рядок (8 символів): {generate_random_numeric_string(8)}")
-    print(f"Slugify 'Привіт Світ! 123': {slugify('Привіт Світ! 123')}")
-    print(f"Slugify '  --Зайві--Дефіси--  ': {slugify('  --Зайві--Дефіси--  ')}")
-    print(f"Обрізати 'Це довгий рядок' (макс 10): {truncate_string('Це довгий рядок', 10)}")
-    print(f"Обрізати 'Короткий' (макс 10): {truncate_string('Короткий', 10)}")
+    # Утиліти для рядків
+    logger.info(f"\nВипадковий рядок (12 символів): {generate_random_string(12)}")
+    logger.info(f"Випадковий числовий рядок (6 символів): {generate_random_numeric_string(6)}")
+
+    test_slovak_text = "Тестування функції слагіфікації з українськими літерами: Привіт, Світ 123! Як справи?"
+    logger.info(f"\nТест slugify для '{test_slovak_text}':\n  '{slugify(test_slovak_text)}'")
+    logger.info(f"Тест slugify '  --Багато--Роздільників--  і----ще':\n  '{slugify('  --Багато--Роздільників--  і----ще')}'")
+    logger.info(
+        f"Тест slugify з іншим роздільником 'Спеціальні_Символи!@#$%^':\n  '{slugify('Спеціальні_Символи!@#$%^', '_')}'")
+    logger.info(f"Тест slugify для 'Україна ҐЄІЇї!':\n  '{slugify('Україна ҐЄІЇї!')}'")
+    logger.info(f"Тест slugify для порожнього рядка: '{slugify('')}'")
+    logger.info(f"Тест slugify для рядка з роздільників: '{slugify('---')}'")
+
+    logger.info(
+        f"\nОбрізати рядок 'Дуже довгий текст, який потрібно обрізати' (макс 20): '{truncate_string('Дуже довгий текст, який потрібно обрізати', 20)}'")
+    logger.info(f"Обрізати рядок 'Короткий текст' (макс 20): '{truncate_string('Короткий текст', 20)}'")
+    logger.info(
+        f"Обрізати рядок 'Текст' (макс 2, суфікс '...'): '{truncate_string('Текст', 2, '...')}'")  # Суфікс довший за ліміт
 
     # Утиліти для дати та часу
-    utc_now = get_current_utc_timestamp()
-    print(f"\nПоточна мітка часу UTC: {utc_now}")
-    print(f"Відформатована мітка часу UTC: {format_datetime_for_display(utc_now)}")
-    delta_example = timedelta(days=2, hours=3, minutes=30, seconds=5)
-    print(f"Людиночитаний timedelta ({delta_example}): {human_readable_timedelta(delta_example)}")
-    print(f"Людиночитаний timedelta (0 секунд): {human_readable_timedelta(timedelta(seconds=0))}")
+    current_utc_time = get_current_utc_timestamp()
+    logger.info(f"\nПоточна мітка часу UTC: {current_utc_time}")
+    logger.info(f"Відформатована мітка часу UTC для відображення: {format_datetime_for_display(current_utc_time)}")
+
+    logger.info("\nТести для human_readable_timedelta:")
+    test_deltas = [
+        timedelta(days=3, hours=5, minutes=22, seconds=7),
+        timedelta(days=1, hours=1, minutes=1, seconds=1),
+        timedelta(days=0, hours=2, minutes=3, seconds=4),
+        timedelta(days=0, hours=0, minutes=5, seconds=25),
+        timedelta(days=4, seconds=0),
+        timedelta(hours=23),
+        timedelta(minutes=59),
+        timedelta(seconds=1),
+        timedelta(seconds=2),
+        timedelta(seconds=5),
+        timedelta(days=0),  # 0 секунд
+        timedelta(days=21),  # 21 день
+        timedelta(days=22),  # 22 дні
+        timedelta(days=11),  # 11 днів
+    ]
+    for i, delta_ex in enumerate(test_deltas):
+        logger.info(f"  Приклад {i + 1} ({delta_ex}): {human_readable_timedelta(delta_ex)}")
 
     # Числові утиліти
-    print(f"\nОкруглити 123.456 (2 знаки): {round_decimal(123.456, 2)}")
-    print(f"Округлити 123.454 (2 знаки): {round_decimal(123.454, 2)}")
-    print(f"Округлити 123.45 (0 знаків): {round_decimal(123.45, 0)}")
+    logger.info(f"\nОкруглення Decimal:")
+    logger.info(f"  Округлити 123.4567 (2 знаки): {round_decimal(123.4567, 2)}")
+    logger.info(f"  Округлити 123.454 (2 знаки): {round_decimal('123.454', 2)}")  # Тест з рядком
+    logger.info(f"  Округлити 123.999 (2 знаки): {round_decimal(123.999, 2)}")
+    logger.info(f"  Округлити 123.45 (0 знаків): {round_decimal(123.45, 0)}")
+    logger.info(f"  Округлити 0.5 (0 знаків): {round_decimal(0.5, 0)}")  # Має бути 1
+    logger.info(f"  Округлити 2.5 (0 знаків): {round_decimal(2.5, 0)}")  # Має бути 3
 
     # Утиліти для колекцій
-    my_list = list(range(10))
-    print(f"\nРозбити список {my_list} (розмір 3): {chunk_list(my_list, 3)}")
-    my_dict = {"name": "Аліса", "age": 30}
-    print(f"Отримати 'name' зі словника: {get_from_dict_or_object(my_dict, 'name')}")
-    print(f"Отримати 'city' зі словника (за замовчуванням 'N/A'): {get_from_dict_or_object(my_dict, 'city', 'N/A')}")
+    example_list = list(range(13))
+    logger.info(f"\nРозбиття списку {example_list} на частини розміром 4: {chunk_list(example_list, 4)}")
+    try:
+        chunk_list(example_list, 0)
+    except ValueError as e:
+        logger.info(f"  Перевірка помилки для chunk_list (розмір 0): {e}")
 
-    class MyObj:
-        def __init__(self):
-            self.title = "Тестовий об'єкт"
-    my_obj_instance = MyObj()
-    print(f"Отримати 'title' з об'єкта: {get_from_dict_or_object(my_obj_instance, 'title')}")
+    example_dict = {"назва": "Продукт А", "ціна": 150, "валюта": "UAH"}
+    logger.info(f"\nОтримання зі словника 'ціна': {get_from_dict_or_object(example_dict, 'ціна')}")
+    logger.info(
+        f"Отримання зі словника 'опис' (за замовчуванням 'Немає опису'): {get_from_dict_or_object(example_dict, 'опис', 'Немає опису')}")
+
+
+    class DemoObject:
+        def __init__(self, name="Демо", version="1.0"):
+            self.name = name
+            self.version = version
+
+
+    demo_instance = DemoObject()
+    logger.info(f"Отримання з об'єкта 'name': {get_from_dict_or_object(demo_instance, 'name')}")
+    logger.info(
+        f"Отримання з об'єкта 'author' (за замовчуванням 'Невідомий'): {get_from_dict_or_object(demo_instance, 'author', 'Невідомий')}")
 
     # Інші утиліти
-    print(f"\nУнікальний код (префікс 'INV-'): {generate_unique_code(6, 'INV-')}")
-    print(f"Унікальний код (за замовчуванням): {generate_unique_code()}")
+    logger.info(f"\nЗгенерований унікальний код (префікс 'ЗАПИС-'): {generate_unique_code(8, 'ЗАПИС-')}")
+    logger.info(f"Згенерований унікальний код (без префіксу, довжина 4): {generate_unique_code(4)}")

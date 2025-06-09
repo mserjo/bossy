@@ -47,15 +47,15 @@ api_router = APIRouter(
 
 # Підключення роутера для API версії 1
 # Коли `api/v1/router.py` та `v1_router` в ньому будуть створені, розкоментуйте наступні рядки:
-# try:
-#     from .v1.router import router as v1_router
-#     api_router.include_router(v1_router, prefix="/v1", tags=["API v1"])
-#     logger.info("Роутер для API v1 успішно підключено до api_router.")
-# except ImportError:
-#     logger.warning("Не вдалося імпортувати v1_router з api.v1.router. API v1 не буде доступне.")
-#     # Можна залишити pass або додати обробку, якщо v1 є критичним
-#     pass
-logger.info("Концептуальне місце для підключення роутера API v1 (api.v1.router).")
+try:
+    from .v1 import v1_router # Імпортуємо v1_router з api/v1/__init__.py
+    api_router.include_router(v1_router, prefix="/v1", tags=["API v1"])
+    logger.info("Роутер для API v1 успішно підключено до api_router.")
+except ImportError as e:
+    logger.warning(f"Не вдалося імпортувати v1_router з api.v1: {e}. API v1 не буде доступне.")
+    # Можна залишити pass або додати обробку, якщо v1 є критичним
+    pass
+# logger.info("Концептуальне місце для підключення роутера API v1 (api.v1.router).") # Замінено реальним підключенням
 
 
 # Підключення роутера для API версії 2 (приклад на майбутнє)

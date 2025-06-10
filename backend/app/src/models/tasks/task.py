@@ -7,12 +7,15 @@
 бали за виконання або штрафи, а також можуть бути пов'язані з групами.
 Модель також підтримує рекурентні завдання та ієрархію підзавдань.
 """
-from datetime import datetime
-from typing import TYPE_CHECKING, List, Optional
+import datetime as dt # Alias to distinguish from sqlalchemy.DateTime
+from typing import TYPE_CHECKING, List, Optional, Dict # Added Dict for JSON type hint
 from decimal import Decimal  # Для полів балів/штрафів
 
-from sqlalchemy import String, ForeignKey, Text, Numeric, Boolean  # Boolean для is_recurring, is_mandatory
+from sqlalchemy import String, ForeignKey, Text, Numeric, Boolean, Date # Added Date
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql.expression import false
+from sqlalchemy.types import JSON
+from sqlalchemy import DateTime # Explicitly import DateTime for clarity
 
 # Абсолютний імпорт базової моделі та інших необхідних типів
 from backend.app.src.models.base import BaseMainModel
@@ -89,12 +92,39 @@ class Task(BaseMainModel):
     due_date: Mapped[Optional[datetime]] = mapped_column(
         nullable=True, comment="Термін виконання завдання (кінцева дата)"
     )
+
+    # --- Поля для повторюваних завдань та нагадувань ---
+    is_recurring_template: Mapped[bool] = mapped_column(
+        Boolean, default=False, server_default=false(), comment="Чи є це завдання шаблоном для повторюваних завдань"
+    )
+    # is_recurring поле вже існує, воно може вказувати, чи є цей конкретний екземпляр частиною серії.
+    # Або is_recurring_template може замінити is_recurring, якщо логіка така, що is_recurring=True тільки для шаблонів.
+    # Поки що залишаю обидва, але це потребує уточнення логіки. Якщо is_recurring_template=True, то is_recurring також має бути True.
     is_recurring: Mapped[bool] = mapped_column(
-        Boolean, default=False, nullable=False, comment="Прапорець: чи є завдання рекурентним"
+        Boolean, default=False, nullable=False, comment="Прапорець: чи є завдання екземпляром повторюваного завдання (або старим полем для шаблону)"
     )
     recurrence_pattern: Mapped[Optional[str]] = mapped_column(
-        String(255), nullable=True, comment="Шаблон рекурентності (наприклад, RRULE або cron)"
+        String(255), nullable=True, comment="Шаблон повторення (наприклад, RRULE або cron-вираз)"
     )
+    recurrence_start_date: Mapped[Optional[dt.date]] = mapped_column(
+        Date, nullable=True, comment="Дата початку повторення"
+    )
+    recurrence_end_date: Mapped[Optional[dt.date]] = mapped_column(
+        Date, nullable=True, comment="Дата завершення повторення (якщо є)"
+    )
+    last_instance_created_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="Час створення останнього екземпляру повторюваного завдання"
+    )
+    next_occurrence_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True, comment="Розрахунковий час наступного виконання для шаблону"
+    )
+    last_reminder_sent_at: Mapped[Optional[dt.datetime]] = mapped_column(
+        DateTime(timezone=True), nullable=True, comment="Час останнього надісланого нагадування"
+    )
+    reminder_config: Mapped[Optional[Dict[str, Any]]] = mapped_column( # SQLAlchemy 2.0 Mapped type for JSON
+        JSON, nullable=True, comment="Конфігурація нагадувань (наприклад, {'before_due': '1d', 'repeat': 'every_4h'})"
+    )
+
     is_mandatory: Mapped[bool] = mapped_column(
         Boolean, default=False, nullable=False, comment="Прапорець: чи є завдання обов'язковим"
     )
@@ -152,11 +182,15 @@ class Task(BaseMainModel):
 
     # _repr_fields успадковуються та збираються з BaseMainModel та його міксинів.
     # Додаємо специфічні для Task поля.
-    _repr_fields = ["task_type_id", "status_id", "due_date", "is_recurring", "parent_task_id"]
+    _repr_fields = [
+        "task_type_id", "status_id", "due_date", "is_recurring", "parent_task_id",
+        "is_recurring_template", "next_occurrence_at" # Додано нові поля
+    ]
 
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі Task.
+    from datetime import timezone, timedelta # Для прикладу нижче
     logger.info("--- Модель Завдання/Події (Task) ---")
     logger.info(f"Назва таблиці: {Task.__tablename__}")
 
@@ -164,7 +198,11 @@ if __name__ == "__main__":
     expected_fields = [
         'id', 'name', 'description', 'state', 'group_id', 'notes',
         'created_at', 'updated_at', 'deleted_at',
-        'task_type_id', 'status_id', 'due_date', 'is_recurring', 'recurrence_pattern',
+        'task_type_id', 'status_id', 'due_date',
+        'is_recurring', # Зберігається для сумісності або для позначення екземплярів
+        'is_recurring_template', 'recurrence_pattern', 'recurrence_start_date', 'recurrence_end_date',
+        'last_instance_created_at', 'next_occurrence_at',
+        'last_reminder_sent_at', 'reminder_config',
         'is_mandatory', 'parent_task_id', 'points_reward', 'penalty_amount',
         'event_start_time', 'event_end_time', 'event_location'
     ]

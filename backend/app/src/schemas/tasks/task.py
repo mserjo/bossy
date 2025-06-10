@@ -9,16 +9,18 @@ Pydantic схеми для сутності "Завдання" (Task).
 - Представлення завдання у відповідях API (`TaskSchema`).
 - Деталізованого представлення завдання (`TaskDetailSchema`).
 """
-from datetime import datetime
-from typing import Optional, List, Any  # Any для тимчасових полів
+# TODO: Pydantic v1/v2 consistency: Review .dict() vs .model_dump(), .from_orm vs .model_validate
+from datetime import datetime, date, timedelta  # date для дат, timedelta для прикладів
+from typing import Optional, List, Any, Dict  # Dict для JSON
 from decimal import Decimal
 
-from pydantic import Field, EmailStr  # EmailStr тут не потрібен, але може бути в UserPublicProfileSchema
+from pydantic import Field
 
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin, BaseMainSchema
 from backend.app.src.core.dicts import TaskStatus as TaskStatusEnum  # Для значень за замовчуванням та валідації
-from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.config.logging import get_logger
+
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
@@ -85,9 +87,22 @@ class TaskBaseSchema(BaseSchema):
     recurrence_pattern: Optional[str] = Field(
         None,
         max_length=TASK_RECURRENCE_PATTERN_MAX_LENGTH,
-        description="Шаблон рекурентності (наприклад, RRULE або cron-вираз).",
+        description="Шаблон повторення (наприклад, RRULE або cron-вираз).",
         examples=["RRULE:FREQ=WEEKLY;BYDAY=MO;INTERVAL=1"]
     )
+    recurrence_start_date: Optional[date] = Field(  # Використовуємо date
+        None,
+        description="Дата початку повторення."
+    )
+    recurrence_end_date: Optional[date] = Field(  # Використовуємо date
+        None,
+        description="Дата завершення повторення (якщо є)."
+    )
+    reminder_config: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Конфігурація нагадувань (JSON, наприклад, {'before_due': '1d', 'repeat': 'every_4h'})."
+    )
+
     is_mandatory: bool = Field(
         default=False,
         description="Прапорець: чи є завдання обов'язковим для виконання."
@@ -146,21 +161,31 @@ class TaskUpdateSchema(TaskBaseSchema):
     Всі поля, успадковані з `TaskBaseSchema`, стають опціональними для оновлення.
     """
     # Робимо всі поля з TaskBaseSchema опціональними
-    name: Optional[str] = Field(None, max_length=TASK_NAME_MAX_LENGTH)
-    description: Optional[str] = None
-    task_type_code: Optional[str] = None
-    state: Optional[str] = Field(None, max_length=50)
-    due_date: Optional[datetime] = None
-    is_recurring: Optional[bool] = None
-    recurrence_pattern: Optional[str] = Field(None, max_length=TASK_RECURRENCE_PATTERN_MAX_LENGTH)
-    is_mandatory: Optional[bool] = None
-    parent_task_id: Optional[int] = None  # Може бути None для видалення зв'язку
-    points_reward: Optional[Decimal] = Field(None, ge=0)
-    penalty_amount: Optional[Decimal] = Field(None, ge=0)
-    notes: Optional[str] = None
-    event_start_time: Optional[datetime] = None
-    event_end_time: Optional[datetime] = None
-    event_location: Optional[str] = Field(None, max_length=TASK_EVENT_LOCATION_MAX_LENGTH)
+    name: Optional[str] = Field(None, max_length=TASK_NAME_MAX_LENGTH, description="Нова назва завдання.")
+    description: Optional[str] = Field(None, description="Новий опис завдання.")
+    task_type_code: Optional[str] = Field(None, description="Новий код типу завдання.")
+    state: Optional[str] = Field(None, max_length=50, description="Новий стан завдання.")
+    due_date: Optional[datetime] = Field(None, description="Новий термін виконання.")
+
+    is_recurring: Optional[bool] = Field(None, description="Оновити прапорець повторюваності екземпляра.")
+    is_recurring_template: Optional[bool] = Field(None,
+                                                  description="Оновити прапорець, чи є це шаблоном повторюваних завдань.")
+    recurrence_pattern: Optional[str] = Field(None, max_length=TASK_RECURRENCE_PATTERN_MAX_LENGTH,
+                                              description="Новий шаблон повторення.")
+    recurrence_start_date: Optional[date] = Field(None, description="Нова дата початку повторення.")
+    recurrence_end_date: Optional[date] = Field(None, description="Нова дата завершення повторення.")
+    reminder_config: Optional[Dict[str, Any]] = Field(None, description="Нова конфігурація нагадувань.")
+
+    is_mandatory: Optional[bool] = Field(None, description="Оновити прапорець обов'язковості завдання.")
+    parent_task_id: Optional[int] = Field(None,
+                                          description="Новий ID батьківського завдання (None для видалення зв'язку).")
+    points_reward: Optional[Decimal] = Field(None, ge=0, description="Нова кількість балів за виконання.")
+    penalty_amount: Optional[Decimal] = Field(None, ge=0, description="Нова сума штрафу.")
+    notes: Optional[str] = Field(None, description="Нові нотатки до завдання.")
+    event_start_time: Optional[datetime] = Field(None, description="Новий час початку події.")
+    event_end_time: Optional[datetime] = Field(None, description="Новий час закінчення події.")
+    event_location: Optional[str] = Field(None, max_length=TASK_EVENT_LOCATION_MAX_LENGTH,
+                                          description="Нове місце проведення події.")
 
 
 class TaskSchema(
@@ -171,33 +196,40 @@ class TaskSchema(
     # id, name, description, state, notes, group_id, created_at, updated_at, deleted_at - успадковані
 
     # Специфічні поля моделі Task, що не входять до BaseMainSchema або потребують іншого представлення
-    task_type_code: Optional[str] = Field(None,
-                                          description="Код типу завдання.")  # З моделі Task, але може бути корисним і в BaseMainSchema
+    task_type_code: Optional[str] = Field(None, description="Код типу завдання.")
 
-    # TODO: Узгодити status_code/status_id з успадкованим полем `state`.
-    # Якщо `state` є основним, то `status` (об'єкт StatusSchema) може його деталізувати.
-    # Або `status_id` з моделі може мапитися сюди.
     status_code: Optional[str] = Field(None, description="Код поточного статусу завдання (з довідника dict_statuses).")
 
-    due_date: Optional[datetime] = None
-    is_recurring: bool
-    recurrence_pattern: Optional[str] = None
-    is_mandatory: bool
-    parent_task_id: Optional[int] = None
-    points_reward: Optional[Decimal] = None
-    penalty_amount: Optional[Decimal] = None
-    event_start_time: Optional[datetime] = None
-    event_end_time: Optional[datetime] = None
-    event_location: Optional[str] = None
+    due_date: Optional[datetime] = Field(None, description="Термін виконання завдання.")
+
+    # Поля повторення та нагадувань
+    is_recurring: bool = Field(description="Чи є завдання екземпляром повторюваного (або старим полем шаблону).")
+    is_recurring_template: Optional[bool] = Field(None,
+                                                  description="Чи є це завдання шаблоном для повторюваних завдань.")
+    recurrence_pattern: Optional[str] = Field(None, description="Шаблон повторення.")
+    recurrence_start_date: Optional[date] = Field(None, description="Дата початку повторення.")
+    recurrence_end_date: Optional[date] = Field(None, description="Дата завершення повторення.")
+    last_instance_created_at: Optional[datetime] = Field(None,
+                                                         description="Час створення останнього екземпляру (для шаблонів).")
+    next_occurrence_at: Optional[datetime] = Field(None,
+                                                   description="Розрахунковий час наступного виконання (для шаблонів).")
+    last_reminder_sent_at: Optional[datetime] = Field(None, description="Час останнього надісланого нагадування.")
+    reminder_config: Optional[Dict[str, Any]] = Field(None, description="Конфігурація нагадувань.")
+
+    is_mandatory: bool = Field(description="Чи є завдання обов'язковим.")
+    parent_task_id: Optional[int] = Field(None, description="ID батьківського завдання.")
+    points_reward: Optional[Decimal] = Field(None, description="Бали за виконання.")
+    penalty_amount: Optional[Decimal] = Field(None, description="Штраф за невиконання.")
+    event_start_time: Optional[datetime] = Field(None, description="Час початку події.")
+    event_end_time: Optional[datetime] = Field(None, description="Час закінчення події.")
+    event_location: Optional[str] = Field(None, description="Місце проведення події.")
 
     # Пов'язані об'єкти (для розширеної інформації)
-    # TODO: Замінити Any на відповідні схеми
     task_type: Optional[TaskTypeSchema] = Field(None, description="Об'єкт типу завдання.")
-    status: Optional[StatusSchema] = Field(None,
-                                           description="Об'єкт статусу завдання (з довідника).")  # Якщо використовується status_id
+    status: Optional[StatusSchema] = Field(None, description="Об'єкт статусу завдання (з довідника).")
 
     parent_task: Optional[Any] = Field(None,
-                                       description="Коротка інформація про батьківське завдання (може бути TaskSchema).")  # Рекурсивна схема
+                                       description="Коротка інформація про батьківське завдання (може бути TaskSchema).")
 
     # Обчислювані поля (зазвичай додаються сервісом)
     sub_tasks_count: Optional[int] = Field(None, description="Кількість підзавдань.")

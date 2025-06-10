@@ -1,84 +1,96 @@
 # backend/app/src/repositories/tasks/event_repository.py
 
 """
-Repository for Event entities.
-Provides CRUD operations and specific methods for managing events.
+Репозиторій для сутностей "Подія" (Event).
+Надає CRUD операції та специфічні методи для управління подіями.
 """
 
-import logging
 from typing import Optional, List
-from datetime import datetime, timezone # Added timezone
+from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, and_ # Added or_, and_
+from sqlalchemy import select, or_, and_
+from sqlalchemy.orm import selectinload # Імпорт для "жадібного" завантаження
 
 from backend.app.src.models.tasks.event import Event
-from backend.app.src.schemas.tasks.event import EventCreate, EventUpdate
+from backend.app.src.schemas.tasks.event import EventCreateSchema, EventUpdateSchema # Використовуємо оновлені імена схем
 from backend.app.src.repositories.base import BaseRepository
+from backend.app.src.config.logging import get_logger # Оновлений імпорт логера
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
-class EventRepository(BaseRepository[Event, EventCreate, EventUpdate]):
+class EventRepository(BaseRepository[Event, EventCreateSchema, EventUpdateSchema]):
     """
-    Repository for managing Event records.
+    Репозиторій для управління записами Подій (Event).
     """
 
-    def __init__(self):
-        super().__init__(Event)
+    def __init__(self, db_session: AsyncSession):
+        """
+        Ініціалізує репозиторій з сесією БД та моделлю Event.
+
+        Args:
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
+        """
+        super().__init__(db_session, Event)
 
     async def get_events_for_group(
         self,
-        db: AsyncSession,
+        # db: AsyncSession, # db тепер є self.db_session з BaseRepository __init__
         *,
         group_id: int,
-        start_after: Optional[datetime] = None, # Events starting after this time
-        end_before: Optional[datetime] = None,   # Events ending before this time
+        start_after: Optional[datetime] = None, # Події, що починаються після цього часу
+        end_before: Optional[datetime] = None,   # Події, що закінчуються до цього часу
         include_deleted: bool = False,
         skip: int = 0,
         limit: int = 100
     ) -> List[Event]:
         """
-        Retrieves events for a specific group, optionally filtered by start/end times.
+        Отримує події для конкретної групи, опціонально фільтровані за часом початку/закінчення.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            group_id: The ID of the group.
-            start_after: Optional. Filter for events starting after this datetime.
-            end_before: Optional. Filter for events ending before this datetime (or starting before if no end_time).
-            include_deleted: Optional. If True, includes soft-deleted events.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            group_id (int): Ідентифікатор групи.
+            start_after (Optional[datetime]): Фільтр для подій, що починаються після цієї дати/часу.
+            end_before (Optional[datetime]): Фільтр для подій, що закінчуються до цієї дати/часу (або починаються раніше, якщо немає часу закінчення).
+            include_deleted (bool): Якщо True, включає "м'яко" видалені події.
+            skip (int): Кількість записів, яку потрібно пропустити.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            A list of Event objects.
+            List[Event]: Список об'єктів Event.
         """
-        conditions = [self.model.group_id == group_id] # type: ignore[attr-defined]
+        # self.model тут посилається на Event
+        conditions = [self.model.group_id == group_id]
         if start_after:
-            conditions.append(self.model.start_time > start_after) # type: ignore[attr-defined]
+            conditions.append(self.model.start_time > start_after)
         if end_before:
             conditions.append(
                 or_(
-                    self.model.end_time < end_before, # type: ignore[attr-defined]
-                    and_(self.model.end_time.is_(None), self.model.start_time < end_before) # type: ignore[attr-defined]
+                    self.model.end_time < end_before,
+                    and_(self.model.end_time.is_(None), self.model.start_time < end_before)
                 )
             )
 
         if not include_deleted and hasattr(self.model, "deleted_at"):
-            conditions.append(self.model.deleted_at.is_(None)) # type: ignore[attr-defined]
+            conditions.append(self.model.deleted_at.is_(None))
 
         statement = (
             select(self.model)
             .where(*conditions)
-            .order_by(self.model.start_time.asc()) # type: ignore[attr-defined]
+            .options(
+                selectinload(self.model.created_by),
+                selectinload(self.model.assignments),
+                selectinload(self.model.completions)
+            ) # "Жадібне" завантаження пов'язаних об'єктів
+            .order_by(self.model.start_time.asc())
             .offset(skip)
             .limit(limit)
         )
-        result = await db.execute(statement)
+        result = await self.db_session.execute(statement)
         return list(result.scalars().all())
 
     async def get_events_in_date_range(
         self,
-        db: AsyncSession,
+        # db: AsyncSession, # db тепер є self.db_session
         *,
         range_start: datetime,
         range_end: datetime,
@@ -88,45 +100,62 @@ class EventRepository(BaseRepository[Event, EventCreate, EventUpdate]):
         limit: int = 100
     ) -> List[Event]:
         """
-        Retrieves events that are active (start_time before range_end AND (end_time after range_start OR end_time is NULL))
-        within the given date range [range_start, range_end].
-        Optionally filters by group_id.
+        Отримує події, які активні (start_time < range_end ТА (end_time > range_start АБО end_time IS NULL))
+        в межах заданого діапазону дат [range_start, range_end].
+        Опціонально фільтрує за group_id.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            range_start: The start of the date range.
-            range_end: The end of the date range.
-            group_id: Optional. Filter by a specific group ID.
-            include_deleted: Optional. If True, includes soft-deleted events.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            range_start (datetime): Початок діапазону дат.
+            range_end (datetime): Кінець діапазону дат.
+            group_id (Optional[int]): Опціональний фільтр за ID групи.
+            include_deleted (bool): Якщо True, включає "м'яко" видалені події.
+            skip (int): Кількість записів, яку потрібно пропустити.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            A list of Event objects active within the range.
+            List[Event]: Список об'єктів Event, активних в межах діапазону.
         """
         conditions = [
-            self.model.start_time < range_end, # type: ignore[attr-defined]
+            self.model.start_time < range_end,
             or_(
-                self.model.end_time > range_start, # type: ignore[attr-defined]
-                self.model.end_time.is_(None)    # type: ignore[attr-defined]
+                self.model.end_time > range_start,
+                self.model.end_time.is_(None)
             )
         ]
         if group_id is not None:
-            conditions.append(self.model.group_id == group_id) # type: ignore[attr-defined]
+            conditions.append(self.model.group_id == group_id)
 
         if not include_deleted and hasattr(self.model, "deleted_at"):
-            conditions.append(self.model.deleted_at.is_(None)) # type: ignore[attr-defined]
+            conditions.append(self.model.deleted_at.is_(None))
 
         statement = (
             select(self.model)
             .where(*conditions)
-            .order_by(self.model.start_time.asc()) # type: ignore[attr-defined]
+            .options(
+                selectinload(self.model.created_by),
+                selectinload(self.model.assignments),
+                selectinload(self.model.completions)
+            ) # "Жадібне" завантаження
+            .order_by(self.model.start_time.asc())
             .offset(skip)
             .limit(limit)
         )
-        result = await db.execute(statement)
+        result = await self.db_session.execute(statement)
         return list(result.scalars().all())
 
-    # BaseRepository methods create, get, update, remove are inherited.
-    # Event creation will need group_id, start_time, etc., handled by service.
-    # Event updates will use EventUpdate schema.
+    # Методи BaseRepository: create, get, update, delete успадковуються.
+    # Створення подій потребуватиме group_id, start_time тощо, що обробляється сервісом.
+    # Оновлення подій використовуватиме схему EventUpdateSchema.
+    # Для get() та get_by_id() з BaseRepository, "жадібне" завантаження зв'язків
+    # (created_by, assignments, completions) буде залежати від конфігурації lazy='selectin' у моделі Event.
+    # Якщо потрібно гарантоване "жадібне" завантаження для окремих запитів get,
+    # можна перевизначити get() або додати новий метод get_with_details(id: int).
+    # Наприклад:
+    # async def get_with_details(self, record_id: int) -> Optional[Event]:
+    #     statement = select(self.model).where(self.model.id == record_id).options(
+    #         selectinload(self.model.created_by),
+    #         selectinload(self.model.assignments),
+    #         selectinload(self.model.completions)
+    #     )
+    #     result = await self.db_session.execute(statement)
+    #     return result.scalar_one_or_none()

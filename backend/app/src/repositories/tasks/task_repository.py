@@ -8,9 +8,11 @@
 та підзавдань.
 """
 
-from typing import List, Optional, Tuple, Any
+from typing import List, Optional, Tuple, Any, Sequence  # Added Sequence
+import datetime  # For type hints
+from sqlalchemy.sql.expression import false, true  # For boolean comparisons
 
-from sqlalchemy import select, func, join
+from sqlalchemy import select, func, join, and_, or_, not_  # Added and_, or_, not_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -24,13 +26,19 @@ from backend.app.src.models.dictionaries.statuses import Status  # Для філ
 from backend.app.src.schemas.tasks.task import TaskCreateSchema, TaskUpdateSchema
 from backend.app.src.core.dicts import TaskStatus as TaskStatusEnum  # Для active_only
 from backend.app.src.config.logging import get_logger  # Імпорт логера
+
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
+
+# Необхідно імпортувати UserModel для type hints в selectinload, якщо він використовується.
+# Припускаючи, що UserModel знаходиться в backend.app.src.models.auth.user
+if True:  # Умовний імпорт для TYPE_CHECKING, якщо потрібно
+    from backend.app.src.models.auth.user import User as UserModel
 
 
 class TaskRepository(BaseRepository[Task, TaskCreateSchema, TaskUpdateSchema]):
     """
-    Репозиторій для управління записами завдань/подій (`Task`).
+    Репозиторій для управління записами завдань (`Task`).
 
     Успадковує базові CRUD-методи від `BaseRepository` та надає
     додаткові методи для специфічного пошуку та отримання завдань.
@@ -112,11 +120,55 @@ class TaskRepository(BaseRepository[Task, TaskCreateSchema, TaskUpdateSchema]):
 
         stmt = stmt.offset(skip).limit(limit).order_by(self.model.created_at.desc())
         # .options(selectinload(self.model.task_type), selectinload(self.model.status)) # Приклад жадібного завантаження
+        # Додаємо жадібне завантаження для полів, які можуть знадобитися при перетворенні на схеми відповіді
+        stmt = stmt.options(
+            selectinload(self.model.task_type),
+            selectinload(self.model.status),
+            selectinload(self.model.created_by_user),
+            selectinload(self.model.group)
+        )
 
         items_result = await self.db_session.execute(stmt)
         items = list(items_result.scalars().all())
 
         return items, total
+
+    async def get_task_with_all_details(self, task_id: int) -> Optional[Task]:
+        """
+        Отримує одне завдання з усіма пов'язаними деталями, необхідними для TaskDetailSchema.
+        """
+        stmt = select(self.model).where(self.model.id == task_id).options(
+            selectinload(self.model.group),
+            selectinload(self.model.task_type),
+            selectinload(self.model.status),
+            selectinload(self.model.created_by_user),
+            selectinload(self.model.parent_task),
+            selectinload(self.model.sub_tasks),
+            selectinload(self.model.assignments).options(
+                selectinload(TaskAssignment.user)
+            ),
+            selectinload(self.model.completions).options(
+                selectinload(TaskAssignment.user)  # Помилка тут, має бути TaskCompletion.user
+            ),
+            selectinload(self.model.reviews).options(
+                selectinload(TaskAssignment.user)  # Помилка тут, має бути TaskReview.user
+            ),
+            selectinload(self.model.bonus_rules)
+        )
+        # Correcting options for completions and reviews
+        stmt = stmt.options(
+            selectinload(self.model.completions).options(
+                selectinload(TaskAssignment.user).options(selectinload(UserModel.user_type))
+                # Assuming TaskCompletion has 'user' and User has 'user_type'
+            ),
+            selectinload(self.model.reviews).options(
+                selectinload(TaskAssignment.user).options(selectinload(UserModel.user_type))
+                # Assuming TaskReview has 'user'
+            )
+        )
+
+        result = await self.db_session.execute(stmt)
+        return result.scalar_one_or_none()
 
     async def get_tasks_assigned_to_user(
             self,
@@ -162,8 +214,12 @@ class TaskRepository(BaseRepository[Task, TaskCreateSchema, TaskUpdateSchema]):
             .offset(skip)
             .limit(limit)
             .order_by(self.model.due_date.asc().nulls_last(), self.model.created_at.desc())
-        # Пріоритет за терміном виконання
-            # .options(selectinload(self.model.task_type), selectinload(self.model.status))
+            # Пріоритет за терміном виконання
+            .options(
+                selectinload(self.model.task_type),
+                selectinload(self.model.status),
+                selectinload(self.model.group)
+            )
         )
 
         items_result = await self.db_session.execute(stmt)
@@ -201,6 +257,91 @@ if __name__ == "__main__":
     logger.info("  - get_tasks_by_group_id(group_id, skip, limit, active_only, task_type_code, status_code)")
     logger.info("  - get_tasks_assigned_to_user(user_id, group_id, skip, limit, active_only)")
     logger.info("  - get_sub_tasks(parent_task_id, skip, limit)")
+    logger.info("  - get_recurring_task_templates_due(current_time)")
+    logger.info("  - get_tasks_needing_reminders(window_start, window_end, reminder_delta)")
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
     logger.info("TODO: Узгодити логіку фільтрації за статусом (Task.state vs Task.status_id) в get_tasks_by_group_id.")
+    logger.info(
+        "TODO: Реалізувати get_task_with_all_details з коректним завантаженням зв'язків для completions та reviews.")
+
+
+    async def get_recurring_task_templates_due(self, current_time: datetime.datetime) -> Sequence[Task]:
+        """
+        Отримує шаблони повторюваних завдань, для яких настав час створення нового екземпляра.
+
+        Args:
+            current_time (datetime.datetime): Поточний час для перевірки.
+
+        Returns:
+            Sequence[Task]: Послідовність активних шаблонів завдань, готових до створення екземплярів.
+        """
+        logger.debug(f"Запит шаблонів повторюваних завдань, актуальних на {current_time}")
+        stmt = (
+            select(self.model)
+            .where(
+                self.model.is_recurring_template == true(),
+                self.model.is_active == true(),  # Припускаємо, що шаблони можуть бути деактивовані
+                or_(self.model.recurrence_end_date == None, self.model.recurrence_end_date >= current_time.date()),
+                or_(self.model.recurrence_start_date == None, self.model.recurrence_start_date <= current_time.date()),
+                self.model.next_occurrence_at <= current_time
+            )
+            .options(
+                selectinload(self.model.created_by_user),  # Потрібен для TaskService
+                selectinload(self.model.task_type),  # Потрібен для TaskService
+                selectinload(self.model.group),  # Потрібен для TaskService
+                selectinload(self.model.status)  # Потрібен для TaskService
+                # selectinload(self.model.assignments)    # Якщо потрібно копіювати призначення
+            )
+            .order_by(self.model.next_occurrence_at.asc())
+        )
+        result = await self.db_session.execute(stmt)
+        return result.scalars().all()
+
+
+    async def get_tasks_needing_reminders(
+            self,
+            window_start: datetime.datetime,
+            window_end: datetime.datetime,
+            reminder_delta: datetime.timedelta
+    ) -> Sequence[Task]:
+        """
+        Отримує завдання, для яких потрібно надіслати нагадування.
+
+        Args:
+            window_start (datetime.datetime): Початок вікна для перевірки due_date.
+            window_end (datetime.datetime): Кінець вікна для перевірки due_date.
+            reminder_delta (datetime.timedelta): Проміжок часу, раніше якого нагадування не надсилалося.
+
+        Returns:
+            Sequence[Task]: Послідовність завдань, що потребують нагадування.
+        """
+        logger.debug(
+            f"Запит завдань для нагадувань з {window_start} по {window_end}, дельта нагадування: {reminder_delta}")
+
+        # Час, до якого останнє нагадування мало б бути надіслане, щоб не надсилати знову
+        latest_allowed_reminder_time = window_start - reminder_delta
+
+        stmt = (
+            select(self.model)
+            .join(self.model.status.and_on(Status.id == self.model.status_id))  # Явне приєднання до Status
+            .where(
+                self.model.is_recurring_template == false(),
+                self.model.is_active == true(),  # Розглядаємо лише активні завдання
+                self.model.due_date.between(window_start, window_end),
+                Status.code.notin_([TaskStatusEnum.COMPLETED.value, TaskStatusEnum.CANCELLED.value]),
+                or_(
+                    self.model.last_reminder_sent_at == None,
+                    self.model.last_reminder_sent_at < latest_allowed_reminder_time
+                )
+            )
+            .options(
+                selectinload(self.model.assignments).options(
+                    selectinload(TaskAssignment.user)  # Потрібно для надсилання сповіщення конкретному користувачу
+                ),
+                selectinload(self.model.group)  # Для контексту в сповіщенні
+            )
+            .order_by(self.model.due_date.asc())
+        )
+        result = await self.db_session.execute(stmt)
+        return result.scalars().unique().all()  # unique() на випадок дублікатів через join (хоча selectinload не має створювати їх для Task)

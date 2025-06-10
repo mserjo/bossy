@@ -61,17 +61,22 @@ class Session(Base, TimestampedMixin):
     ip_address: Mapped[Optional[str]] = mapped_column(
         String(100), nullable=True, comment="IP-адреса клієнта сесії"
     )
+    last_active_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(),
+        comment="Час останньої активності сесії"
+    )
 
     # Зв'язок з користувачем
     user: Mapped["User"] = relationship(back_populates="sessions", lazy="selectin")
 
     # Поля для __repr__
     # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
-    _repr_fields = ["id", "user_id", "expires_at", "ip_address"]
+    _repr_fields = ["id", "user_id", "expires_at", "ip_address", "last_active_at"]
 
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі Session.
+    from datetime import timezone, timedelta # Для прикладу нижче
     logger.info("--- Модель Сесії Користувача (Session) ---")
     logger.info(f"Назва таблиці: {Session.__tablename__}")
 

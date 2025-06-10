@@ -14,6 +14,9 @@ from backend.app.src.repositories.dictionaries.base_dict_repository import BaseD
 # Абсолютний імпорт моделі та схем для Постачальників Календарів
 from backend.app.src.models.dictionaries.calendars import CalendarProvider
 from backend.app.src.schemas.dictionaries.calendars import CalendarProviderCreateSchema, CalendarProviderUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class CalendarProviderRepository(
@@ -39,9 +42,9 @@ class CalendarProviderRepository(
 
 if __name__ == "__main__":
     # Демонстраційний блок для CalendarProviderRepository.
-    print("--- Репозиторій для Довідника Постачальників Календарів (CalendarProviderRepository) ---")
+    logger.info("--- Репозиторій для Довідника Постачальників Календарів (CalendarProviderRepository) ---")
 
-    print("Для тестування CalendarProviderRepository потрібна асинхронна сесія SQLAlchemy.")
-    print(f"Він успадковує методи від BaseDictionaryRepository для моделі {CalendarProvider.__name__}.")
-    print(f"  Очікує схему створення: {CalendarProviderCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {CalendarProviderUpdateSchema.__name__}")
+    logger.info("Для тестування CalendarProviderRepository потрібна асинхронна сесія SQLAlchemy.")
+    logger.info(f"Він успадковує методи від BaseDictionaryRepository для моделі {CalendarProvider.__name__}.")
+    logger.info(f"  Очікує схему створення: {CalendarProviderCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {CalendarProviderUpdateSchema.__name__}")

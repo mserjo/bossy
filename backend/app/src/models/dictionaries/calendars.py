@@ -9,6 +9,9 @@
 
 # Абсолютний імпорт базової моделі для довідників
 from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 # Можливо, знадобляться додаткові імпорти, якщо будуть специфічні поля.
@@ -42,16 +45,16 @@ class CalendarProvider(BaseDictionaryModel):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі CalendarProvider.
-    print("--- Модель Довідника: CalendarProvider ---")
-    print(f"Назва таблиці: {CalendarProvider.__tablename__}")
+    logger.info("--- Модель Довідника: CalendarProvider ---")
+    logger.info(f"Назва таблиці: {CalendarProvider.__tablename__}")
 
-    print("\nОчікувані поля (успадковані та власні):")
+    logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = ['id', 'name', 'description', 'code', 'created_at', 'updated_at', 'deleted_at', 'state',
                        'group_id', 'notes']
     # Якщо додано кастомні поля:
     # expected_fields.extend(['api_endpoint_url', 'icon_url'])
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_calendar_provider = CalendarProvider(
@@ -62,8 +65,8 @@ if __name__ == "__main__":
         state="active"
     )
 
-    print(f"\nПриклад екземпляра CalendarProvider (без сесії):\n  {example_calendar_provider}")
+    logger.info(f"\nПриклад екземпляра CalendarProvider (без сесії):\n  {example_calendar_provider}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <CalendarProvider(id=1, name='Google Calendar', code='GOOGLE_CALENDAR', state='active')>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

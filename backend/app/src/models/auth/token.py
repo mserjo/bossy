@@ -14,6 +14,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.src.models.base import Base  # Успадковуємо від Base, а не BaseMainModel
 from backend.app.src.models.mixins import TimestampedMixin  # Додаємо часові мітки
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User  # Для зв'язку user
@@ -66,16 +69,16 @@ class RefreshToken(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі RefreshToken.
-    print("--- Модель Токена Оновлення (RefreshToken) ---")
-    print(f"Назва таблиці: {RefreshToken.__tablename__}")
+    logger.info("--- Модель Токена Оновлення (RefreshToken) ---")
+    logger.info(f"Назва таблиці: {RefreshToken.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = ['id', 'token', 'user_id', 'expires_at', 'created_at', 'updated_at']
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
-    print(f"  - user (до User)")
+    logger.info("\nОчікувані зв'язки (relationships):")
+    logger.info(f"  - user (до User)")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     from datetime import timedelta
@@ -93,10 +96,10 @@ if __name__ == "__main__":
     example_token.created_at = datetime.now(timezone.utc)
     example_token.updated_at = datetime.now(timezone.utc)
 
-    print(f"\nПриклад екземпляра RefreshToken (без сесії):\n  {example_token}")
+    logger.info(f"\nПриклад екземпляра RefreshToken (без сесії):\n  {example_token}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <RefreshToken(id=1, user_id=101, expires_at=..., created_at=..., updated_at=...)>
     # Поле 'token' не включено в _repr_fields за замовчуванням через його довжину та чутливість.
 
-    print("\nВАЖЛИВО: У реальному застосунку поле 'token' повинно зберігатися хешованим!")
-    print("Примітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nВАЖЛИВО: У реальному застосунку поле 'token' повинно зберігатися хешованим!")
+    logger.info("Примітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

@@ -34,7 +34,7 @@ def confirm_action(prompt: str) -> bool:
         elif response == "ні":
             return False
         else:
-            print("Будь ласка, введіть 'так' або 'ні'.")
+            logger.info("Будь ласка, введіть 'так' або 'ні'.")
 
 def cleanup_files(directories: List[str], patterns: List[str], max_age_days: int, dry_run: bool):
     """

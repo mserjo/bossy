@@ -22,11 +22,10 @@ from backend.app.src.schemas.gamification.achievement import (
     # UserAchievementUpdateSchema зазвичай не потрібна, досягнення не змінюються
 )
 from pydantic import BaseModel as PydanticBaseModel  # Для UpdateSchemaType
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 # Досягнення зазвичай не оновлюються, а видаляються та створюються заново, якщо потрібно коригування.
 class UserAchievementUpdateSchema(PydanticBaseModel):
@@ -122,16 +121,16 @@ class UserAchievementRepository(
 
 if __name__ == "__main__":
     # Демонстраційний блок для UserAchievementRepository.
-    print("--- Репозиторій Досягнень Користувача (UserAchievementRepository) ---")
+    logger.info("--- Репозиторій Досягнень Користувача (UserAchievementRepository) ---")
 
-    print("Для тестування UserAchievementRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {UserAchievement.__name__}.")
-    print(f"  Очікує схему створення: {UserAchievementCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {UserAchievementUpdateSchema.__name__} (зараз порожня)")
+    logger.info("Для тестування UserAchievementRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {UserAchievement.__name__}.")
+    logger.info(f"  Очікує схему створення: {UserAchievementCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {UserAchievementUpdateSchema.__name__} (зараз порожня)")
 
-    print("\nСпецифічні методи:")
-    print("  - get_by_user_and_badge(user_id: int, badge_id: int, group_id: Optional[int] = None)")
-    print(
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_user_and_badge(user_id: int, badge_id: int, group_id: Optional[int] = None)")
+    logger.info(
         "  - get_achievements_for_user(user_id: int, group_id: Optional[int] = None, include_global: bool = True, skip: int = 0, limit: int = 100)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

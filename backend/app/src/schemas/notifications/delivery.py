@@ -14,7 +14,9 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Визначити та імпортувати Enums NotificationChannelType та DeliveryStatusType з core.dicts.
 # from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType
@@ -85,18 +87,18 @@ class NotificationDeliveryAttemptSchema(NotificationDeliveryAttemptBaseSchema, I
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем спроб доставки сповіщень.
-    print("--- Pydantic Схеми для Спроб Доставки Сповіщень (NotificationDeliveryAttempt) ---")
+    logger.info("--- Pydantic Схеми для Спроб Доставки Сповіщень (NotificationDeliveryAttempt) ---")
 
-    print("\nNotificationDeliveryAttemptCreateSchema (приклад для створення):")
+    logger.info("\nNotificationDeliveryAttemptCreateSchema (приклад для створення):")
     create_attempt_data = {
         "notification_id": 101,
         "channel": TempNotificationChannelType.EMAIL,  # TODO: Замінити на Enum.value
         "status": TempDeliveryStatusType.PENDING,  # TODO: Замінити на Enum.value
     }
     create_attempt_instance = NotificationDeliveryAttemptCreateSchema(**create_attempt_data)
-    print(create_attempt_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(create_attempt_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nNotificationDeliveryAttemptSchema (приклад відповіді API):")
+    logger.info("\nNotificationDeliveryAttemptSchema (приклад відповіді API):")
     attempt_response_data = {
         "id": 1,
         "notification_id": 101,
@@ -108,7 +110,7 @@ if __name__ == "__main__":
         # Може бути таким же, як created_at, якщо статус не змінювався
     }
     attempt_response_instance = NotificationDeliveryAttemptSchema(**attempt_response_data)
-    print(attempt_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(attempt_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     # Приклад з помилкою
     attempt_failed_data = {
@@ -121,10 +123,10 @@ if __name__ == "__main__":
         "updated_at": datetime.now()
     }
     attempt_failed_instance = NotificationDeliveryAttemptSchema(**attempt_failed_data)
-    print(f"\nПриклад невдалої спроби:\n{attempt_failed_instance.model_dump_json(indent=2, exclude_none=True)}")
+    logger.info(f"\nПриклад невдалої спроби:\n{attempt_failed_instance.model_dump_json(indent=2, exclude_none=True)}")
 
-    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних спроб доставки.")
-    print(
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних спроб доставки.")
+    logger.info(
         "TODO: Інтегрувати Enum 'NotificationChannelType' та 'DeliveryStatusType' з core.dicts для полів 'channel' та 'status'.")
 
 # Потрібно для timedelta в __main__

@@ -15,6 +15,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Абсолютний імпорт базових класів та міксинів
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # `updated_at` як час останнього розрахунку рейтингу
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Визначити Enum RatingType в core.dicts.py, наприклад:
 # class RatingType(str, Enum):
@@ -105,22 +108,22 @@ class UserGroupRating(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі UserGroupRating.
-    print("--- Модель Рейтингу Користувача в Групі (UserGroupRating) ---")
-    print(f"Назва таблиці: {UserGroupRating.__tablename__}")
+    logger.info("--- Модель Рейтингу Користувача в Групі (UserGroupRating) ---")
+    logger.info(f"Назва таблиці: {UserGroupRating.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = [
         'id', 'user_id', 'group_id', 'rating_score',
         'period_start_date', 'period_end_date', 'rating_type',
         'created_at', 'updated_at'
     ]
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['user', 'group']
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_rating = UserGroupRating(
@@ -135,9 +138,9 @@ if __name__ == "__main__":
     example_rating.created_at = datetime.now(tz=timezone.utc) - timedelta(days=30)  # Створено місяць тому
     example_rating.updated_at = datetime.now(tz=timezone.utc)  # Оновлено сьогодні
 
-    print(f"\nПриклад екземпляра UserGroupRating (без сесії):\n  {example_rating}")
+    logger.info(f"\nПриклад екземпляра UserGroupRating (без сесії):\n  {example_rating}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <UserGroupRating(id=1, user_id=101, group_id=202, rating_score=1500, rating_type='overall', updated_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
-    print("TODO: Не забудьте визначити Enum 'RatingType' в core.dicts.py та оновити поле 'rating_type'.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("TODO: Не забудьте визначити Enum 'RatingType' в core.dicts.py та оновити поле 'rating_type'.")

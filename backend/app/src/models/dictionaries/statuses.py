@@ -11,6 +11,9 @@ from sqlalchemy.orm import Mapped  # Mapped тут не потрібен, якщ
 
 # Абсолютний імпорт базової моделі для довідників
 from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class Status(BaseDictionaryModel):
@@ -36,19 +39,19 @@ class Status(BaseDictionaryModel):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі Status.
-    print("--- Модель Довідника: Status ---")
+    logger.info("--- Модель Довідника: Status ---")
 
     # Інформація про таблицю та колонки (потребує відображення SQLAlchemy)
     # Для простої демонстрації, ми виведемо очікувані поля.
-    print(f"Назва таблиці: {Status.__tablename__}")
+    logger.info(f"Назва таблиці: {Status.__tablename__}")
 
-    print("\nОчікувані поля (успадковані та власні):")
+    logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = ['id', 'name', 'description', 'code', 'created_at', 'updated_at', 'deleted_at', 'state',
                        'group_id', 'notes']
     # Якщо додано кастомні поля, наприклад, color_representation, їх теж сюди:
     # expected_fields.append('color_representation')
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     # У реальному коді це робиться через сесію SQLAlchemy.
@@ -60,9 +63,9 @@ if __name__ == "__main__":
         state="enabled"  # Наприклад, сам запис довідника може бути 'enabled' або 'deprecated'
     )
 
-    print(f"\nПриклад екземпляра Status (без сесії):\n  {example_status}")
+    logger.info(f"\nПриклад екземпляра Status (без сесії):\n  {example_status}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <Status(id=1, name='Активний', code='ACTIVE', state='enabled')>
     # (created_at, updated_at і т.д. будуть None, якщо не встановлені вручну або через БД)
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

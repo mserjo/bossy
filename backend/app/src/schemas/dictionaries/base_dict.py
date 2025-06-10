@@ -18,6 +18,9 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем з головного модуля схем
 from backend.app.src.schemas.base import BaseSchema, BaseMainSchema
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Максимальна довжина для поля 'name' та 'code' може бути винесена в константи,
 # якщо це потрібно для узгодженості з моделями або іншими частинами системи.
@@ -108,9 +111,9 @@ class DictionaryUpdateSchema(BaseSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для базових схем довідників.
-    print("--- Базові Схеми Pydantic для Довідників ---")
+    logger.info("--- Базові Схеми Pydantic для Довідників ---")
 
-    print("\nBaseDictionarySchema (приклад):")
+    logger.info("\nBaseDictionarySchema (приклад):")
     # Для демонстрації BaseDictionarySchema потрібні всі поля з BaseMainSchema
     from datetime import datetime
     try:
@@ -124,27 +127,27 @@ if __name__ == "__main__":
             updated_at=datetime.now()
             # group_id, notes, deleted_at - опціональні
         )
-        print(base_dict_example.model_dump_json(indent=2, exclude_none=True))
+        logger.info(base_dict_example.model_dump_json(indent=2, exclude_none=True))
     except Exception as e:
-        print(f"Помилка створення BaseDictionarySchema: {e}")
+        logger.info(f"Помилка створення BaseDictionarySchema: {e}")
 
 
-    print("\nDictionaryCreateSchema (приклад):")
+    logger.info("\nDictionaryCreateSchema (приклад):")
     create_data = {
         "name": "Новий Статус",
         "code": "NEW_STATUS",
         "description": "Опис нового статусу."
     }
     create_schema_instance = DictionaryCreateSchema(**create_data)
-    print(create_schema_instance.model_dump_json(indent=2))
+    logger.info(create_schema_instance.model_dump_json(indent=2))
 
-    print("\nDictionaryUpdateSchema (приклад):")
+    logger.info("\nDictionaryUpdateSchema (приклад):")
     update_data = {
         "name": "Оновлена Назва Статусу",
         "state": "deprecated"
     }
     update_schema_instance = DictionaryUpdateSchema(**update_data)
-    print(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці базові схеми призначені для успадкування конкретними схемами довідників.")
-    print("Конфігурація моделі (наприклад, from_attributes=True) успадковується від BaseSchema.")
+    logger.info("\nПримітка: Ці базові схеми призначені для успадкування конкретними схемами довідників.")
+    logger.info("Конфігурація моделі (наприклад, from_attributes=True) успадковується від BaseSchema.")

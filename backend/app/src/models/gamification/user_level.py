@@ -14,6 +14,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Абсолютний імпорт базових класів та міксинів
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час досягнення рівня
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
@@ -90,18 +93,18 @@ class UserLevel(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі UserLevel.
-    print("--- Модель Рівня Користувача (UserLevel) ---")
-    print(f"Назва таблиці: {UserLevel.__tablename__}")
+    logger.info("--- Модель Рівня Користувача (UserLevel) ---")
+    logger.info(f"Назва таблиці: {UserLevel.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = ['id', 'user_id', 'level_id', 'group_id', 'created_at', 'updated_at']
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['user', 'level', 'group']
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_user_level = UserLevel(
@@ -114,8 +117,8 @@ if __name__ == "__main__":
     example_user_level.created_at = datetime.now(tz=timezone.utc)
     example_user_level.updated_at = datetime.now(tz=timezone.utc)
 
-    print(f"\nПриклад екземпляра UserLevel (без сесії):\n  {example_user_level}")
+    logger.info(f"\nПриклад екземпляра UserLevel (без сесії):\n  {example_user_level}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <UserLevel(id=1, user_id=101, level_id=1, group_id=202, created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

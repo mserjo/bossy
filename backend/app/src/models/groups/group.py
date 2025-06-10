@@ -10,6 +10,9 @@ from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import String, ForeignKey, Text  # Text може знадобитися для description з міксину
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Абсолютний імпорт базових класів та міксинів
 from backend.app.src.models.base import Base
@@ -116,22 +119,22 @@ class Group(
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі Group.
-    print("--- Модель Групи (Group) ---")
-    print(f"Назва таблиці: {Group.__tablename__}")
+    logger.info("--- Модель Групи (Group) ---")
+    logger.info(f"Назва таблиці: {Group.__tablename__}")
 
-    print("\nОчікувані поля (успадковані та власні):")
+    logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = [
         'id', 'name', 'description', 'state', 'notes',
         'created_at', 'updated_at', 'deleted_at',
         'group_type_id', 'owner_id'
     ]
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['group_type', 'owner', 'memberships', 'settings', 'invitations', 'tasks', 'rewards']
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     # У реальному коді це робиться через сесію SQLAlchemy.
@@ -145,9 +148,9 @@ if __name__ == "__main__":
     )
     example_group.created_at = datetime.now(tz=timezone.utc)  # Імітація
 
-    print(f"\nПриклад екземпляра Group (без сесії):\n  {example_group}")
+    logger.info(f"\nПриклад екземпляра Group (без сесії):\n  {example_group}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <Group(id=1, name='Моя перша група', state='active', owner_id=101, group_type_id=1, created_at=...)>
 
-    print(
+    logger.info(
         "\nПримітка: Для повноцінної роботи з моделлю та її зв'язками потрібна сесія SQLAlchemy та підключення до БД.")

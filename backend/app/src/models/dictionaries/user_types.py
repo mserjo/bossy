@@ -10,7 +10,9 @@
 
 # Абсолютний імпорт базової моделі для довідників
 from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
-
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Можливо, знадобляться додаткові імпорти, якщо будуть специфічні поля.
 # from sqlalchemy.orm import Mapped, mapped_column
@@ -42,16 +44,16 @@ class UserType(BaseDictionaryModel):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі UserType.
-    print("--- Модель Довідника: UserType ---")
-    print(f"Назва таблиці: {UserType.__tablename__}")
+    logger.info("--- Модель Довідника: UserType ---")
+    logger.info(f"Назва таблиці: {UserType.__tablename__}")
 
-    print("\nОчікувані поля (успадковані та власні):")
+    logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = ['id', 'name', 'description', 'code', 'created_at', 'updated_at', 'deleted_at', 'state',
                        'group_id', 'notes']
     # Якщо додано кастомні поля:
     # expected_fields.append('can_own_multiple_groups')
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_user_type = UserType(
@@ -62,8 +64,8 @@ if __name__ == "__main__":
         state="active"
     )
 
-    print(f"\nПриклад екземпляра UserType (без сесії):\n  {example_user_type}")
+    logger.info(f"\nПриклад екземпляра UserType (без сесії):\n  {example_user_type}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <UserType(id=1, name='Звичайний користувач', code='REGULAR_USER', state='active')>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

@@ -13,8 +13,10 @@ from typing import Optional, Any  # Any для тимчасових полів
 from pydantic import Field, AnyHttpUrl
 
 # Абсолютний імпорт базових схем
-from backend.app.src.schemas.base import BaseSchema, \
-    BaseMainSchema  # IDSchemaMixin, TimestampedSchemaMixin вже в BaseMainSchema
+from backend.app.src.schemas.base import BaseSchema, BaseMainSchema  # IDSchemaMixin, TimestampedSchemaMixin вже в BaseMainSchema
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретну схему GroupSchema (коротка версія), коли вона буде готова.
 # from backend.app.src.schemas.groups.group import GroupBriefSchema
@@ -101,9 +103,9 @@ class BadgeSchema(BaseMainSchema):  # Успадковує id, name, description
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем бейджів.
-    print("--- Pydantic Схеми для Бейджів Гейміфікації (Badge) ---")
+    logger.info("--- Pydantic Схеми для Бейджів Гейміфікації (Badge) ---")
 
-    print("\nBadgeCreateSchema (приклад для створення):")
+    logger.info("\nBadgeCreateSchema (приклад для створення):")
     create_badge_data = {
         "name": "Зірка Спільноти",  # TODO i18n
         "description": "Надається за активну допомогу іншим учасникам.",  # TODO i18n
@@ -112,17 +114,17 @@ if __name__ == "__main__":
         # group_id може бути None для глобального бейджа
     }
     create_badge_instance = BadgeCreateSchema(**create_badge_data)
-    print(create_badge_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(create_badge_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nBadgeUpdateSchema (приклад для оновлення):")
+    logger.info("\nBadgeUpdateSchema (приклад для оновлення):")
     update_badge_data = {
         "description": "Оновлений опис для Зірки Спільноти: надається за 100 корисних відповідей.",  # TODO i18n
         "icon_url": "https://example.com/icons/community_star_v2.png"
     }
     update_badge_instance = BadgeUpdateSchema(**update_badge_data)
-    print(update_badge_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_badge_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nBadgeSchema (приклад відповіді API):")
+    logger.info("\nBadgeSchema (приклад відповіді API):")
     badge_response_data = {
         "id": 1,
         "name": "Ранній Птах",  # TODO i18n
@@ -134,7 +136,7 @@ if __name__ == "__main__":
         "icon_url": "https://example.com/icons/early_bird.png",
     }
     badge_response_instance = BadgeSchema(**badge_response_data)
-    print(badge_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(badge_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Схема для `group` наразі є заповнювачем (Any).")
-    print("Її потрібно буде замінити на `GroupBriefSchema` після її визначення.")
+    logger.info("\nПримітка: Схема для `group` наразі є заповнювачем (Any).")
+    logger.info("Її потрібно буде замінити на `GroupBriefSchema` після її визначення.")

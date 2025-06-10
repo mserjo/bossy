@@ -16,6 +16,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час спроби/подання
 from backend.app.src.core.dicts import TaskStatus  # Для статусу виконання
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
@@ -107,21 +110,21 @@ class TaskCompletion(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі TaskCompletion.
-    print("--- Модель Виконання Завдання (TaskCompletion) ---")
-    print(f"Назва таблиці: {TaskCompletion.__tablename__}")
+    logger.info("--- Модель Виконання Завдання (TaskCompletion) ---")
+    logger.info(f"Назва таблиці: {TaskCompletion.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = [
         'id', 'task_id', 'user_id', 'completed_at', 'verified_at',
         'verifier_id', 'status', 'notes', 'created_at', 'updated_at'
     ]
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['task', 'user', 'verifier']
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     from datetime import timedelta
@@ -137,10 +140,10 @@ if __name__ == "__main__":
     example_completion.created_at = datetime.now(timezone.utc)
     example_completion.updated_at = datetime.now(timezone.utc)
 
-    print(f"\nПриклад екземпляра TaskCompletion (без сесії):\n  {example_completion}")
+    logger.info(f"\nПриклад екземпляра TaskCompletion (без сесії):\n  {example_completion}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <TaskCompletion(id=1, task_id=1, user_id=101, status='pending_review', completed_at=..., created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
-    print(
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info(
         f"Використовується TaskStatus Enum для поля 'status', наприклад: TaskStatus.COMPLETED = '{TaskStatus.COMPLETED.value}'")

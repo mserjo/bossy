@@ -15,6 +15,9 @@ from pydantic import Field, AnyHttpUrl, field_validator
 # Абсолютний імпорт базової схеми та Enum
 from backend.app.src.schemas.base import BaseSchema
 from backend.app.src.core.dicts import FileType as FileTypeEnum # Enum для призначення файлу
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 FILE_NAME_MAX_LENGTH_UPLOAD = 255 # Збігається з FileRecord
 MIME_TYPE_MAX_LENGTH_UPLOAD = 100 # Збігається з FileRecord
@@ -112,9 +115,9 @@ class FileUploadResponse(BaseSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем процесу завантаження файлів.
-    print("--- Pydantic Схеми для Процесу Завантаження Файлів ---")
+    logger.info("--- Pydantic Схеми для Процесу Завантаження Файлів ---")
 
-    print("\nFileUploadInitiateRequestSchema (приклад запиту на ініціацію):")
+    logger.info("\nFileUploadInitiateRequestSchema (приклад запиту на ініціацію):")
     initiate_data = {
         "file_name": "contract_final.docx", # TODO i18n example
         "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
@@ -122,32 +125,32 @@ if __name__ == "__main__":
         "purpose": FileTypeEnum.GENERAL_DOCUMENT.value
     }
     initiate_instance = FileUploadInitiateRequestSchema(**initiate_data)
-    print(initiate_instance.model_dump_json(indent=2))
+    logger.info(initiate_instance.model_dump_json(indent=2))
     try:
         FileUploadInitiateRequestSchema(file_name="test.txt", mime_type="text/plain", file_size=10, purpose="INVALID_PURPOSE")
     except ValueError as e:
-        print(f"Помилка валідації FileUploadInitiateRequestSchema (очікувано для purpose): {e}")
+        logger.info(f"Помилка валідації FileUploadInitiateRequestSchema (очікувано для purpose): {e}")
 
 
-    print("\nPresignedUploadURLResponse (приклад відповіді з URL для завантаження):")
+    logger.info("\nPresignedUploadURLResponse (приклад відповіді з URL для завантаження):")
     presigned_data = {
         "upload_url": "https://s3.example.com/bucket-name/user_xyz/contract_final.docx?AWSAccessKeyId=...",
         "fields": {"key": "user_xyz/contract_final.docx", "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
         "file_record_id": 101
     }
     presigned_instance = PresignedUploadURLResponse(**presigned_data)
-    print(presigned_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(presigned_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nFileUploadCompleteRequestSchema (приклад запиту на підтвердження):")
+    logger.info("\nFileUploadCompleteRequestSchema (приклад запиту на підтвердження):")
     complete_data = {
         "file_record_id": 101,
         "upload_key": "user_xyz/contract_final.docx_completed", # Може змінитися, якщо на сервері інша логіка
         "e_tag": "\"abcdef1234567890fedcba0987654321\""
     }
     complete_instance = FileUploadCompleteRequestSchema(**complete_data)
-    print(complete_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(complete_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nFileUploadResponse (приклад фінальної відповіді):")
+    logger.info("\nFileUploadResponse (приклад фінальної відповіді):")
     final_response_data = {
         "file_id": 101, # Або fileRecordId, якщо використовується аліас при серіалізації
         "file_name": "contract_final.docx",
@@ -158,8 +161,8 @@ if __name__ == "__main__":
     }
     # Для демонстрації аліасу при створенні екземпляра
     final_response_instance_alias = FileUploadResponse(fileRecordId=101, **{k:v for k,v in final_response_data.items() if k != 'file_id'})
-    print(final_response_instance_alias.model_dump_json(indent=2, by_alias=True, exclude_none=True)) # by_alias=True для використання аліасів при серіалізації
+    logger.info(final_response_instance_alias.model_dump_json(indent=2, by_alias=True, exclude_none=True)) # by_alias=True для використання аліасів при серіалізації
 
-    print("\nПримітка: Ці схеми описують кроки процесу завантаження файлів.")
-    print("TODO: Додати валідацію 'purpose' на основі Enum FileTypeEnum в FileUploadInitiateRequestSchema.")
-    print("TODO: Додати обмеження на 'file_size' в FileUploadInitiateRequestSchema згідно з налаштуваннями.")
+    logger.info("\nПримітка: Ці схеми описують кроки процесу завантаження файлів.")
+    logger.info("TODO: Додати валідацію 'purpose' на основі Enum FileTypeEnum в FileUploadInitiateRequestSchema.")
+    logger.info("TODO: Додати обмеження на 'file_size' в FileUploadInitiateRequestSchema згідно з налаштуваннями.")

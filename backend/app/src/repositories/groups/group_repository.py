@@ -20,11 +20,10 @@ from backend.app.src.models.groups.group import Group
 from backend.app.src.models.groups.membership import GroupMembership  # Для join в get_groups_for_member
 from backend.app.src.models.auth.user import User  # Необов'язково тут, якщо фільтри передаються як вирази
 from backend.app.src.schemas.groups.group import GroupCreateSchema, GroupUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 class GroupRepository(BaseRepository[Group, GroupCreateSchema, GroupUpdateSchema]):
     """
@@ -117,24 +116,24 @@ class GroupRepository(BaseRepository[Group, GroupCreateSchema, GroupUpdateSchema
 
 if __name__ == "__main__":
     # Демонстраційний блок для GroupRepository.
-    print("--- Репозиторій Груп (GroupRepository) ---")
+    logger.info("--- Репозиторій Груп (GroupRepository) ---")
 
-    print("Для тестування GroupRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {Group.__name__}.")
-    print(f"  Очікує схему створення: {GroupCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {GroupUpdateSchema.__name__}")
+    logger.info("Для тестування GroupRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {Group.__name__}.")
+    logger.info(f"  Очікує схему створення: {GroupCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {GroupUpdateSchema.__name__}")
 
-    print("\nСпецифічні методи:")
-    print("  - get_groups_by_owner_id(owner_id: int, skip: int = 0, limit: int = 100)")
-    print("  - get_groups_for_member(user_id: int, skip: int = 0, limit: int = 100)")
-    print("  - search_groups_by_name(name_query: str, skip: int = 0, limit: int = 100)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_groups_by_owner_id(owner_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("  - get_groups_for_member(user_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("  - search_groups_by_name(name_query: str, skip: int = 0, limit: int = 100)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
     # Концептуальний приклад (потребує макетів або реальної сесії):
     # async def demo_group_repo():
     #     # ... setup mock session ...
     #     # repo = GroupRepository(mock_session)
     #     # groups_owned = await repo.get_groups_by_owner_id(owner_id=1)
-    #     # print(f"Групи, що належать користувачу 1: {groups_owned}")
+    #     # logger.info(f"Групи, що належать користувачу 1: {groups_owned}")
     # import asyncio
     # asyncio.run(demo_group_repo())

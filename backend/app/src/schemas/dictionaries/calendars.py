@@ -7,6 +7,9 @@ Pydantic схеми для довідника "Постачальники Кал
 """
 
 from typing import Optional
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
@@ -52,9 +55,9 @@ class CalendarProviderUpdateSchema(DictionaryUpdateSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем CalendarProvider.
-    print("--- Pydantic Схеми для Довідника: CalendarProvider ---")
+    logger.info("--- Pydantic Схеми для Довідника: CalendarProvider ---")
 
-    print("\nCalendarProviderSchema (приклад для відповіді API):")
+    logger.info("\nCalendarProviderSchema (приклад для відповіді API):")
     calendar_provider_data_from_db = {
         "id": 1,
         "name": "Google Calendar",  # TODO i18n
@@ -73,23 +76,23 @@ if __name__ == "__main__":
         calendar_provider_data_from_db['updated_at'].replace('Z', '+00:00'))
 
     calendar_provider_schema_instance = CalendarProviderSchema(**calendar_provider_data_from_db)
-    print(calendar_provider_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(calendar_provider_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nCalendarProviderCreateSchema (приклад для створення):")
+    logger.info("\nCalendarProviderCreateSchema (приклад для створення):")
     create_data = {
         "name": "Outlook Calendar",  # TODO i18n
         "code": "OUTLOOK_CALENDAR",
         "description": "Інтеграція з сервісом Outlook Calendar."  # TODO i18n
     }
     create_schema_instance = CalendarProviderCreateSchema(**create_data)
-    print(create_schema_instance.model_dump_json(indent=2))
+    logger.info(create_schema_instance.model_dump_json(indent=2))
 
-    print("\nCalendarProviderUpdateSchema (приклад для оновлення):")
+    logger.info("\nCalendarProviderUpdateSchema (приклад для оновлення):")
     update_data = {
         "description": "Оновлений опис для інтеграції з Outlook Calendar.",  # TODO i18n
         "state": "beta"  # TODO i18n
     }
     update_schema_instance = CalendarProviderUpdateSchema(**update_data)
-    print(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")
+    logger.info("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")

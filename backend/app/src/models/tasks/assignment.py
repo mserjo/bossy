@@ -15,6 +15,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Абсолютні імпорти базових класів та Enum
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # Для відстеження часу призначення
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Визначити Enum TaskAssignmentStatus в core.dicts.py, наприклад:
 # class TaskAssignmentStatus(str, Enum):
@@ -82,18 +85,18 @@ class TaskAssignment(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі TaskAssignment.
-    print("--- Модель Призначення Завдання (TaskAssignment) ---")
-    print(f"Назва таблиці: {TaskAssignment.__tablename__}")
+    logger.info("--- Модель Призначення Завдання (TaskAssignment) ---")
+    logger.info(f"Назва таблиці: {TaskAssignment.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = ['task_id', 'user_id', 'status', 'created_at', 'updated_at']
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['task', 'user']
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_assignment = TaskAssignment(
@@ -105,9 +108,9 @@ if __name__ == "__main__":
     example_assignment.created_at = datetime.now(tz=timezone.utc)
     example_assignment.updated_at = datetime.now(tz=timezone.utc)
 
-    print(f"\nПриклад екземпляра TaskAssignment (без сесії):\n  {example_assignment}")
+    logger.info(f"\nПриклад екземпляра TaskAssignment (без сесії):\n  {example_assignment}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <TaskAssignment(task_id=1, user_id=101, status='assigned', created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
-    print("TODO: Не забудьте визначити Enum 'TaskAssignmentStatus' в core.dicts.py та оновити поле 'status'.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("TODO: Не забудьте визначити Enum 'TaskAssignmentStatus' в core.dicts.py та оновити поле 'status'.")

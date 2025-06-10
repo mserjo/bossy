@@ -17,6 +17,9 @@ from pydantic import BaseModel, Field, EmailStr
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import UserState  # Для значення за замовчуванням
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретні схеми довідників, коли вони будуть повністю визначені та імпортовані.
 # Наприклад, from backend.app.src.schemas.dictionaries.user_types import UserTypeSchema
@@ -132,14 +135,14 @@ class UserPublicProfileSchema(BaseSchema, IDSchemaMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем користувача.
-    print("--- Pydantic Схеми для Користувача (User) ---")
+    logger.info("--- Pydantic Схеми для Користувача (User) ---")
 
-    print("\nUserBaseSchema (приклад):")
+    logger.info("\nUserBaseSchema (приклад):")
     base_data = {"email": "base@example.com", "first_name": "Базовий", "last_name": "Користувач"}  # TODO i18n
     base_instance = UserBaseSchema(**base_data)
-    print(base_instance.model_dump_json(indent=2))
+    logger.info(base_instance.model_dump_json(indent=2))
 
-    print("\nUserCreateSchema (приклад):")
+    logger.info("\nUserCreateSchema (приклад):")
     create_data = {
         "email": "newuser@example.com",
         "password": "HardPassword123!",
@@ -151,18 +154,18 @@ if __name__ == "__main__":
         "state": UserState.ACTIVE.value
     }
     create_instance = UserCreateSchema(**create_data)
-    print(create_instance.model_dump_json(indent=2))
+    logger.info(create_instance.model_dump_json(indent=2))
     try:
         UserCreateSchema(email="test@test.com", password="short")  # Невалідна довжина пароля
     except Exception as e:
-        print(f"Помилка валідації UserCreateSchema (очікувано): {e}")
+        logger.info(f"Помилка валідації UserCreateSchema (очікувано): {e}")
 
-    print("\nUserUpdateSchema (приклад):")
+    logger.info("\nUserUpdateSchema (приклад):")
     update_data = {"first_name": "Оновлене Ім'я", "phone_number": "+380509876543"}  # TODO i18n
     update_instance = UserUpdateSchema(**update_data)
-    print(update_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nUserSchema (приклад відповіді API):")
+    logger.info("\nUserSchema (приклад відповіді API):")
     user_response_data = {
         "id": 1,
         "email": "api.user@example.com",
@@ -179,18 +182,18 @@ if __name__ == "__main__":
         # "avatar_url": "https://example.com/path/to/avatar.png"
     }
     user_response_instance = UserSchema(**user_response_data)
-    print(user_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(user_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nUserPublicProfileSchema (приклад публічного профілю):")
+    logger.info("\nUserPublicProfileSchema (приклад публічного профілю):")
     public_profile_data = {
         "id": 2,
         "name": "Публічний Юзер",  # TODO i18n
         # "avatar_url": "https://example.com/path/to/public_avatar.png"
     }
     public_profile_instance = UserPublicProfileSchema(**public_profile_data)
-    print(public_profile_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(public_profile_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Схеми `UserTypeSchema` та `UserRoleSchema` наразі є заповнювачами (Any).")
-    print("Їх потрібно буде імпортувати з `schemas.dictionaries` після їх рефакторингу.")
-    print("Також, поле `avatar_url` потребує визначення логіки його заповнення.")
-    print("Валідація номера телефону (`phone_number`) потребує інтеграції з `phonenumbers`.")
+    logger.info("\nПримітка: Схеми `UserTypeSchema` та `UserRoleSchema` наразі є заповнювачами (Any).")
+    logger.info("Їх потрібно буде імпортувати з `schemas.dictionaries` після їх рефакторингу.")
+    logger.info("Також, поле `avatar_url` потребує визначення логіки його заповнення.")
+    logger.info("Валідація номера телефону (`phone_number`) потребує інтеграції з `phonenumbers`.")

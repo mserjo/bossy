@@ -14,6 +14,9 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
 # from backend.app.src.schemas.auth.user import UserPublicProfileSchema
@@ -65,18 +68,18 @@ class UserAchievementSchema(UserAchievementBaseSchema, IDSchemaMixin, Timestampe
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем досягнень користувача.
-    print("--- Pydantic Схеми для Досягнень Користувача (UserAchievement) ---")
+    logger.info("--- Pydantic Схеми для Досягнень Користувача (UserAchievement) ---")
 
-    print("\nUserAchievementCreateSchema (приклад для створення сервісом):")
+    logger.info("\nUserAchievementCreateSchema (приклад для створення сервісом):")
     create_achievement_data = {
         "user_id": 101,
         "badge_id": 2,  # ID бейджа "Зірка Спільноти"
         "group_id": 1  # ID групи, якщо це групове досягнення
     }
     create_achievement_instance = UserAchievementCreateSchema(**create_achievement_data)
-    print(create_achievement_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(create_achievement_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nUserAchievementSchema (приклад відповіді API):")
+    logger.info("\nUserAchievementSchema (приклад відповіді API):")
     achievement_response_data = {
         "id": 1,
         "user_id": 101,
@@ -89,10 +92,10 @@ if __name__ == "__main__":
         # "group": {"id": 1, "name": "Команда Розробки"} # Приклад GroupBriefSchema
     }
     achievement_response_instance = UserAchievementSchema(**achievement_response_data)
-    print(achievement_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(achievement_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, BadgeSchema, GroupBriefSchema)")
-    print("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
+    logger.info("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, BadgeSchema, GroupBriefSchema)")
+    logger.info("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
 
 # Потрібно для timedelta в __main__
 from datetime import timedelta

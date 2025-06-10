@@ -16,6 +16,9 @@ from pydantic import Field
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class TaskReviewBaseSchema(BaseSchema):
@@ -88,28 +91,28 @@ class TaskReviewSchema(TaskReviewBaseSchema, IDSchemaMixin, TimestampedSchemaMix
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем відгуків на завдання.
-    print("--- Pydantic Схеми для Відгуків на Завдання (TaskReview) ---")
+    logger.info("--- Pydantic Схеми для Відгуків на Завдання (TaskReview) ---")
 
-    print("\nTaskReviewCreateSchema (приклад для створення):")
+    logger.info("\nTaskReviewCreateSchema (приклад для створення):")
     create_review_data = {
         "rating": 5,
         "comment": "Дуже корисне завдання, дякую!"  # TODO i18n
     }
     create_review_instance = TaskReviewCreateSchema(**create_review_data)
-    print(create_review_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(create_review_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nTaskReviewUpdateSchema (приклад для оновлення):")
+    logger.info("\nTaskReviewUpdateSchema (приклад для оновлення):")
     update_review_data = {
         "comment": "Оновлений коментар: завдання було справді корисним для команди."  # TODO i18n
     }
     update_review_instance = TaskReviewUpdateSchema(**update_review_data)
-    print(update_review_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_review_instance.model_dump_json(indent=2, exclude_none=True))
     try:
         TaskReviewUpdateSchema(rating=7)  # Невалідний рейтинг
     except Exception as e:
-        print(f"Помилка валідації TaskReviewUpdateSchema (очікувано): {e}")
+        logger.info(f"Помилка валідації TaskReviewUpdateSchema (очікувано): {e}")
 
-    print("\nTaskReviewSchema (приклад відповіді API):")
+    logger.info("\nTaskReviewSchema (приклад відповіді API):")
     review_response_data = {
         "id": 1,
         "task_id": 10,
@@ -121,9 +124,9 @@ if __name__ == "__main__":
         "user": {"id": 101, "name": "Рецензент Користувач"}  # TODO i18n
     }
     review_response_instance = TaskReviewSchema(**review_response_data)
-    print(review_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(review_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних відгуків на завдання.")
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних відгуків на завдання.")
 
 # Потрібно для timedelta в __main__
 from datetime import timedelta

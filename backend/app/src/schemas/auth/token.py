@@ -14,6 +14,9 @@ from pydantic import Field
 
 # Абсолютний імпорт базової схеми
 from backend.app.src.schemas.base import BaseSchema
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class TokenPayload(BaseSchema):
@@ -71,9 +74,9 @@ class RefreshTokenCreateSchema(BaseSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем токенів.
-    print("--- Pydantic Схеми для Токенів (Token) ---")
+    logger.info("--- Pydantic Схеми для Токенів (Token) ---")
 
-    print("\nTokenPayload (приклад):")
+    logger.info("\nTokenPayload (приклад):")
     payload_data = {
         "sub": "user@example.com",
         "user_id": 123,
@@ -94,32 +97,32 @@ if __name__ == "__main__":
         # dump_payload = payload_instance.model_dump(exclude_none=True)
         # dump_payload['exp'] = dump_payload['exp'].isoformat()
         # dump_payload['iat'] = dump_payload['iat'].isoformat()
-        # print(json.dumps(dump_payload, indent=2))
-        print(payload_instance.model_dump_json(indent=2, exclude_none=True))
+        # logger.info(json.dumps(dump_payload, indent=2))
+        logger.info(payload_instance.model_dump_json(indent=2, exclude_none=True))
 
         invalid_payload_data = payload_data.copy()
         invalid_payload_data["type"] = "invalid_type"
         TokenPayload(**invalid_payload_data)  # Це має викликати помилку валідації
     except Exception as e:
-        print(f"Помилка валідації TokenPayload (очікувано для invalid_type): {e}")
+        logger.info(f"Помилка валідації TokenPayload (очікувано для invalid_type): {e}")
 
-    print("\nTokenResponse (приклад):")
+    logger.info("\nTokenResponse (приклад):")
     token_response_data = {
         "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhY2Nlc3NfdXNlciIsImV4cCI6MTY3ODg4NjQwMH0.example_access_token",
         "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoX3VzZXIiLCJleHAiOjE2Nzk0OTEyMDB9.example_refresh_token",
         # token_type має значення за замовчуванням "bearer"
     }
     token_response_instance = TokenResponse(**token_response_data)
-    print(token_response_instance.model_dump_json(indent=2))
+    logger.info(token_response_instance.model_dump_json(indent=2))
 
-    print("\nRefreshTokenRequest (приклад):")
+    logger.info("\nRefreshTokenRequest (приклад):")
     refresh_request_data = {
         "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoX3VzZXIiLCJleHAiOjE2Nzk0OTEyMDB9.example_refresh_token_for_request"
     }
     refresh_request_instance = RefreshTokenRequest(**refresh_request_data)
-    print(refresh_request_instance.model_dump_json(indent=2))
+    logger.info(refresh_request_instance.model_dump_json(indent=2))
 
-    print("\nПримітка: Ці схеми використовуються для валідації даних, пов'язаних з JWT токенами.")
+    logger.info("\nПримітка: Ці схеми використовуються для валідації даних, пов'язаних з JWT токенами.")
 
 # Потрібно для timedelta в __main__
 from datetime import timedelta

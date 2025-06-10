@@ -14,6 +14,9 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
 # from backend.app.src.schemas.auth.user import UserPublicProfileSchema
@@ -64,18 +67,18 @@ class UserLevelSchema(UserLevelBaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем рівнів користувача.
-    print("--- Pydantic Схеми для Рівнів Користувача (UserLevel) ---")
+    logger.info("--- Pydantic Схеми для Рівнів Користувача (UserLevel) ---")
 
-    print("\nUserLevelCreateSchema (приклад для створення сервісом):")
+    logger.info("\nUserLevelCreateSchema (приклад для створення сервісом):")
     create_user_level_data = {
         "user_id": 101,
         "level_id": 5,  # ID рівня "Золотий Рівень"
         "group_id": 1  # ID групи
     }
     create_user_level_instance = UserLevelCreateSchema(**create_user_level_data)
-    print(create_user_level_instance.model_dump_json(indent=2))
+    logger.info(create_user_level_instance.model_dump_json(indent=2))
 
-    print("\nUserLevelSchema (приклад відповіді API):")
+    logger.info("\nUserLevelSchema (приклад відповіді API):")
     user_level_response_data = {
         "id": 1,
         "user_id": 101,
@@ -88,10 +91,10 @@ if __name__ == "__main__":
         # "group": {"id": 1, "name": "Ігрова Група"} # Приклад GroupBriefSchema
     }
     user_level_response_instance = UserLevelSchema(**user_level_response_data)
-    print(user_level_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(user_level_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, LevelSchema, GroupBriefSchema)")
-    print("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
+    logger.info("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, LevelSchema, GroupBriefSchema)")
+    logger.info("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
 
 # Потрібно для timedelta в __main__
 from datetime import timedelta

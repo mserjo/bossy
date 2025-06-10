@@ -17,11 +17,10 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.tasks.completion import TaskCompletion
 from backend.app.src.schemas.tasks.completion import TaskCompletionCreateSchema, TaskCompletionUpdateSchema
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 class TaskCompletionRepository(BaseRepository[TaskCompletion, TaskCompletionCreateSchema, TaskCompletionUpdateSchema]):
     """
@@ -105,17 +104,17 @@ class TaskCompletionRepository(BaseRepository[TaskCompletion, TaskCompletionCrea
 
 if __name__ == "__main__":
     # Демонстраційний блок для TaskCompletionRepository.
-    print("--- Репозиторій Виконань Завдань (TaskCompletionRepository) ---")
+    logger.info("--- Репозиторій Виконань Завдань (TaskCompletionRepository) ---")
 
-    print("Для тестування TaskCompletionRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {TaskCompletion.__name__}.")
-    print(f"  Очікує схему створення: {TaskCompletionCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {TaskCompletionUpdateSchema.__name__}")
+    logger.info("Для тестування TaskCompletionRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {TaskCompletion.__name__}.")
+    logger.info(f"  Очікує схему створення: {TaskCompletionCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {TaskCompletionUpdateSchema.__name__}")
 
-    print("\nСпецифічні методи:")
-    print("  - get_by_task_and_user(task_id: int, user_id: int) -> Optional[TaskCompletion] (повертає останнє)")
-    print(
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_task_and_user(task_id: int, user_id: int) -> Optional[TaskCompletion] (повертає останнє)")
+    logger.info(
         "  - get_all_by_task_and_user(task_id: int, user_id: int, skip: int = 0, limit: int = 100) -> Tuple[List[TaskCompletion], int]")
-    print("  - get_completions_for_task(task_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("  - get_completions_for_task(task_id: int, skip: int = 0, limit: int = 100)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

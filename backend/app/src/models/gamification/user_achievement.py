@@ -14,6 +14,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Абсолютний імпорт базових класів та міксинів
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час отримання досягнення
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
@@ -92,18 +95,18 @@ class UserAchievement(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі UserAchievement.
-    print("--- Модель Досягнення Користувача (UserAchievement) ---")
-    print(f"Назва таблиці: {UserAchievement.__tablename__}")
+    logger.info("--- Модель Досягнення Користувача (UserAchievement) ---")
+    logger.info(f"Назва таблиці: {UserAchievement.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = ['id', 'user_id', 'badge_id', 'group_id', 'created_at', 'updated_at']
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['user', 'badge', 'group']
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_achievement = UserAchievement(
@@ -116,8 +119,8 @@ if __name__ == "__main__":
     example_achievement.created_at = datetime.now(tz=timezone.utc)
     example_achievement.updated_at = datetime.now(tz=timezone.utc)
 
-    print(f"\nПриклад екземпляра UserAchievement (без сесії):\n  {example_achievement}")
+    logger.info(f"\nПриклад екземпляра UserAchievement (без сесії):\n  {example_achievement}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <UserAchievement(id=1, user_id=101, badge_id=1, group_id=None, created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

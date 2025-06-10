@@ -7,6 +7,10 @@
 їх підтримку та забезпечує узгодженість. Константи, що залежать від середовища
 (наприклад, URL-адреси, секретні ключі), повинні знаходитися в `config.settings.py`.
 """
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
+
 
 # --- Константи пагінації ---
 DEFAULT_PAGE_NUMBER: int = 1  # Номер сторінки за замовчуванням для запитів з пагінацією.
@@ -61,11 +65,11 @@ FEATURE_NEW_DASHBOARD_ENABLED: str = "NEW_DASHBOARD_FEATURE_FLAG"
 if __name__ == "__main__":
     # Блок для демонстрації визначених констант.
     # Використовується для швидкої перевірки значень при прямому запуску файлу.
-    print("--- Демонстрація основних констант програми Kudos ---")
-    print(f"Розмір сторінки за замовчуванням: {DEFAULT_PAGE_SIZE}")
-    print(f"Максимальний розмір сторінки: {MAX_PAGE_SIZE}")
-    print(f"Регулярний вираз для пароля: {PASSWORD_REGEX}")
-    print(f"Час життя кешу за замовчуванням (секунди): {CACHE_DEFAULT_TTL_SECONDS}")
-    print(f"Префікс ключа кешу для користувача: {CACHE_KEY_PREFIX_USER}")
-    print(f"Ім'я файлу стандартного аватара: {DEFAULT_AVATAR_FILENAME}")
-    print(f"Прапорець функції нового дашборду: {FEATURE_NEW_DASHBOARD_ENABLED}")
+    logger.info("--- Демонстрація основних констант програми Kudos ---")
+    logger.info(f"Розмір сторінки за замовчуванням: {DEFAULT_PAGE_SIZE}")
+    logger.info(f"Максимальний розмір сторінки: {MAX_PAGE_SIZE}")
+    logger.info(f"Регулярний вираз для пароля: {PASSWORD_REGEX}")
+    logger.info(f"Час життя кешу за замовчуванням (секунди): {CACHE_DEFAULT_TTL_SECONDS}")
+    logger.info(f"Префікс ключа кешу для користувача: {CACHE_KEY_PREFIX_USER}")
+    logger.info(f"Ім'я файлу стандартного аватара: {DEFAULT_AVATAR_FILENAME}")
+    logger.info(f"Прапорець функції нового дашборду: {FEATURE_NEW_DASHBOARD_ENABLED}")

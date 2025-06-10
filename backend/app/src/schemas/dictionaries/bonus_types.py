@@ -7,6 +7,9 @@ Pydantic схеми для довідника "Типи Бонусів".
 """
 
 from typing import Optional
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
@@ -52,9 +55,9 @@ class BonusTypeUpdateSchema(DictionaryUpdateSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем BonusType.
-    print("--- Pydantic Схеми для Довідника: BonusType ---")
+    logger.info("--- Pydantic Схеми для Довідника: BonusType ---")
 
-    print("\nBonusTypeSchema (приклад для відповіді API):")
+    logger.info("\nBonusTypeSchema (приклад для відповіді API):")
     bonus_type_data_from_db = {
         "id": 1,
         "name": "Бонус за активність",  # TODO i18n
@@ -72,22 +75,22 @@ if __name__ == "__main__":
         bonus_type_data_from_db['updated_at'].replace('Z', '+00:00'))
 
     bonus_type_schema_instance = BonusTypeSchema(**bonus_type_data_from_db)
-    print(bonus_type_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(bonus_type_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nBonusTypeCreateSchema (приклад для створення):")
+    logger.info("\nBonusTypeCreateSchema (приклад для створення):")
     create_data = {
         "name": "Штраф за запізнення",  # TODO i18n
         "code": "LATE_PENALTY",
         "description": "Списується за запізнення на командні зустрічі."  # TODO i18n
     }
     create_schema_instance = BonusTypeCreateSchema(**create_data)
-    print(create_schema_instance.model_dump_json(indent=2))
+    logger.info(create_schema_instance.model_dump_json(indent=2))
 
-    print("\nBonusTypeUpdateSchema (приклад для оновлення):")
+    logger.info("\nBonusTypeUpdateSchema (приклад для оновлення):")
     update_data = {
         "description": "Оновлений опис для штрафу за запізнення."  # TODO i18n
     }
     update_schema_instance = BonusTypeUpdateSchema(**update_data)
-    print(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")
+    logger.info("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")

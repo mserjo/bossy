@@ -16,6 +16,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час створення сповіщення
 from backend.app.src.core.dicts import NotificationType as NotificationTypeEnum  # Реальний Enum з core.dicts
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
@@ -105,22 +108,22 @@ class Notification(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі Notification.
-    print("--- Модель Сповіщення (Notification) ---")
-    print(f"Назва таблиці: {Notification.__tablename__}")
+    logger.info("--- Модель Сповіщення (Notification) ---")
+    logger.info(f"Назва таблиці: {Notification.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = [
         'id', 'user_id', 'template_id', 'title', 'message', 'is_read', 'read_at',
         'notification_type', 'related_entity_type', 'related_entity_id',
         'created_at', 'updated_at'
     ]
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['user', 'template', 'delivery_attempts']
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_notification = Notification(
@@ -136,10 +139,10 @@ if __name__ == "__main__":
     example_notification.created_at = datetime.now(tz=timezone.utc)
     example_notification.updated_at = datetime.now(tz=timezone.utc)
 
-    print(f"\nПриклад екземпляра Notification (без сесії):\n  {example_notification}")
+    logger.info(f"\nПриклад екземпляра Notification (без сесії):\n  {example_notification}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <Notification(id=1, user_id=101, notification_type='task_assigned', title='Нове завдання призначено', is_read=False, created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
-    print(
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info(
         f"Використовується NotificationType Enum для поля 'notification_type', наприклад: NotificationTypeEnum.BONUS_AWARDED = '{NotificationTypeEnum.BONUS_AWARDED.value}'")

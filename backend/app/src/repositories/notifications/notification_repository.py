@@ -15,6 +15,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
+
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.notifications.notification import Notification
 from backend.app.src.schemas.notifications.notification import (
@@ -24,9 +28,7 @@ from backend.app.src.schemas.notifications.notification import (
 
 
 # from backend.app.src.core.dicts import NotificationType as NotificationTypeEnum # Для фільтрації
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
 
-# logger = get_logger(__name__)
 
 class NotificationRepository(BaseRepository[Notification, NotificationCreateSchema, NotificationUpdateSchema]):
     """
@@ -131,17 +133,17 @@ class NotificationRepository(BaseRepository[Notification, NotificationCreateSche
 
 if __name__ == "__main__":
     # Демонстраційний блок для NotificationRepository.
-    print("--- Репозиторій Сповіщень (NotificationRepository) ---")
+    logger.info("--- Репозиторій Сповіщень (NotificationRepository) ---")
 
-    print("Для тестування NotificationRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {Notification.__name__}.")
-    print(f"  Очікує схему створення: {NotificationCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {NotificationUpdateSchema.__name__} (для is_read)")
+    logger.info("Для тестування NotificationRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {Notification.__name__}.")
+    logger.info(f"  Очікує схему створення: {NotificationCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {NotificationUpdateSchema.__name__} (для is_read)")
 
-    print("\nСпецифічні методи:")
-    print("  - get_notifications_for_user(user_id, is_read, notification_type, skip, limit)")
-    print("  - mark_as_read(notification_id, user_id)")
-    print("  - mark_all_as_read_for_user(user_id)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_notifications_for_user(user_id, is_read, notification_type, skip, limit)")
+    logger.info("  - mark_as_read(notification_id, user_id)")
+    logger.info("  - mark_all_as_read_for_user(user_id)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    print("TODO: Переконатися, що `notification_type` у `get_notifications_for_user` коректно обробляється з Enum.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("TODO: Переконатися, що `notification_type` у `get_notifications_for_user` коректно обробляється з Enum.")

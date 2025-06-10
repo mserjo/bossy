@@ -14,6 +14,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 # Абсолютний імпорт базових класів
 from backend.app.src.models.base import Base
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Визначити Enum LogLevel в core.dicts.py (може бути схожий на стандартні рівні logging)
 # from backend.app.src.core.dicts import LogLevel as LogLevelEnum
@@ -121,11 +124,11 @@ class PerformanceMetric(Base):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделей моніторингу.
-    print("--- Моделі Системного Моніторингу ---")
+    logger.info("--- Моделі Системного Моніторингу ---")
 
-    print(f"\n--- Модель Системного Логу (SystemLog) ---")
-    print(f"Назва таблиці: {SystemLog.__tablename__}")
-    print("Очікувані поля: id, timestamp, level, message, source, details, user_id")
+    logger.info(f"\n--- Модель Системного Логу (SystemLog) ---")
+    logger.info(f"Назва таблиці: {SystemLog.__tablename__}")
+    logger.info("Очікувані поля: id, timestamp, level, message, source, details, user_id")
 
     example_log = SystemLog(
         id=1,
@@ -135,11 +138,11 @@ if __name__ == "__main__":
         source="auth_service",
         user_id=101
     )
-    print(f"Приклад екземпляра SystemLog (без сесії):\n  {example_log}")
+    logger.info(f"Приклад екземпляра SystemLog (без сесії):\n  {example_log}")
 
-    print(f"\n--- Модель Метрики Продуктивності (PerformanceMetric) ---")
-    print(f"Назва таблиці: {PerformanceMetric.__tablename__}")
-    print("Очікувані поля: id, timestamp, metric_name, value, unit, tags")
+    logger.info(f"\n--- Модель Метрики Продуктивності (PerformanceMetric) ---")
+    logger.info(f"Назва таблиці: {PerformanceMetric.__tablename__}")
+    logger.info("Очікувані поля: id, timestamp, metric_name, value, unit, tags")
 
     example_metric = PerformanceMetric(
         id=1,
@@ -149,7 +152,7 @@ if __name__ == "__main__":
         unit="ms",
         tags={"endpoint": "/api/v1/items", "method": "GET"}
     )
-    print(f"Приклад екземпляра PerformanceMetric (без сесії):\n  {example_metric}")
+    logger.info(f"Приклад екземпляра PerformanceMetric (без сесії):\n  {example_metric}")
 
-    print("\nПримітка: Для повноцінної роботи з моделями потрібна сесія SQLAlchemy та підключення до БД.")
-    print("TODO: Не забудьте визначити Enum 'LogLevel' в core.dicts.py та оновити поле 'level' в SystemLog.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделями потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("TODO: Не забудьте визначити Enum 'LogLevel' в core.dicts.py та оновити поле 'level' в SystemLog.")

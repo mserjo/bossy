@@ -18,6 +18,9 @@ from typing import Optional, List, Any
 
 from sqlalchemy import Text, func, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column  # removed declared_attr as it's used in mixins
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Імпорт міксинів з локального файлу mixins.py
 # Використовуємо абсолютний шлях для надійності
@@ -125,9 +128,9 @@ class BaseMainModel(
 
 # Для демонстрації, якщо цей файл запускається окремо
 if __name__ == "__main__":
-    print("--- Базові класи моделей SQLAlchemy ---")
-    print(f"Клас Base: {Base}")
-    print(f"Клас BaseMainModel: {BaseMainModel}")
+    logger.info("--- Базові класи моделей SQLAlchemy ---")
+    logger.info(f"Клас Base: {Base}")
+    logger.info(f"Клас BaseMainModel: {BaseMainModel}")
 
 
     # Створення прикладу моделі, що успадковує BaseMainModel, для демонстрації
@@ -143,15 +146,15 @@ if __name__ == "__main__":
         _repr_fields = ["extra_data"]  # Це поле буде додано до тих, що збираються з міксинів
 
 
-    print(f"\nСтворено демонстраційну модель ExampleEntity, що успадковує BaseMainModel.")
-    print(f"Очікувані атрибути в ExampleEntity (включаючи успадковані):")
+    logger.info(f"\nСтворено демонстраційну модель ExampleEntity, що успадковує BaseMainModel.")
+    logger.info(f"Очікувані атрибути в ExampleEntity (включаючи успадковані):")
     # Приблизний список атрибутів, які мають бути в ExampleEntity
     # Реальний introspection краще робити через SQLAlchemy Inspector після створення таблиць.
     expected_attrs = ['id', 'created_at', 'updated_at', 'deleted_at', 'name',
                       'description', 'state', 'group_id', 'notes', 'extra_data']
-    print(f"  Очікувані атрибути: {', '.join(expected_attrs)}")
+    logger.info(f"  Очікувані атрибути: {', '.join(expected_attrs)}")
 
-    print("\nДемонстрація __repr__:")
+    logger.info("\nДемонстрація __repr__:")
     # Створюємо фіктивний екземпляр. Для реального __repr__ з усіма полями,
     # особливо тими, що з @declared_attr, потрібна ініціалізація через SQLAlchemy.
     # Ця демонстрація буде обмеженою без реальної сесії.
@@ -192,7 +195,7 @@ if __name__ == "__main__":
     test_instance.extra_data = "Це додаткові дані"
     # updated_at, deleted_at, description, group_id, notes - залишаться None або значеннями за замовчуванням
 
-    print(f"  Екземпляр TestReprEntity: {test_instance}")
+    logger.info(f"  Екземпляр TestReprEntity: {test_instance}")
     # Очікуваний вивід буде приблизно:
     # <TestReprEntity(id=1, name='Тестовий Запис', state='активний', created_at=datetime.datetime(2023, 1, 1, 10, 0), extra_data='Це додаткові дані')>
     # (порядок може трохи відрізнятися через сортування set, крім id)
@@ -200,7 +203,7 @@ if __name__ == "__main__":
     test_instance_minimal = TestReprEntity()
     test_instance_minimal.id = 2
     test_instance_minimal.name = "Мінімальний"
-    print(f"  Екземпляр TestReprEntity (мінімальний): {test_instance_minimal}")
+    logger.info(f"  Екземпляр TestReprEntity (мінімальний): {test_instance_minimal}")
 
-    print("\nПримітка: Повноцінне тестування SQLAlchemy моделей та їх __repr__")
-    print("зазвичай включає створення тестової бази даних та взаємодію з сесіями.")
+    logger.info("\nПримітка: Повноцінне тестування SQLAlchemy моделей та їх __repr__")
+    logger.info("зазвичай включає створення тестової бази даних та взаємодію з сесіями.")

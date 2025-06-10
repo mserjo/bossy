@@ -14,6 +14,9 @@ from backend.app.src.repositories.dictionaries.base_dict_repository import BaseD
 # Абсолютний імпорт моделі та схем для Типів Бонусів
 from backend.app.src.models.dictionaries.bonus_types import BonusType
 from backend.app.src.schemas.dictionaries.bonus_types import BonusTypeCreateSchema, BonusTypeUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class BonusTypeRepository(BaseDictionaryRepository[BonusType, BonusTypeCreateSchema, BonusTypeUpdateSchema]):
@@ -38,9 +41,9 @@ class BonusTypeRepository(BaseDictionaryRepository[BonusType, BonusTypeCreateSch
 
 if __name__ == "__main__":
     # Демонстраційний блок для BonusTypeRepository.
-    print("--- Репозиторій для Довідника Типів Бонусів (BonusTypeRepository) ---")
+    logger.info("--- Репозиторій для Довідника Типів Бонусів (BonusTypeRepository) ---")
 
-    print("Для тестування BonusTypeRepository потрібна асинхронна сесія SQLAlchemy.")
-    print(f"Він успадковує методи від BaseDictionaryRepository для моделі {BonusType.__name__}.")
-    print(f"  Очікує схему створення: {BonusTypeCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {BonusTypeUpdateSchema.__name__}")
+    logger.info("Для тестування BonusTypeRepository потрібна асинхронна сесія SQLAlchemy.")
+    logger.info(f"Він успадковує методи від BaseDictionaryRepository для моделі {BonusType.__name__}.")
+    logger.info(f"  Очікує схему створення: {BonusTypeCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {BonusTypeUpdateSchema.__name__}")

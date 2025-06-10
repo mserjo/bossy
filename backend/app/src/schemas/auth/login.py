@@ -12,7 +12,9 @@ from pydantic import BaseModel, Field, EmailStr
 
 # Абсолютний імпорт базової схеми
 from backend.app.src.schemas.base import BaseSchema
-
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Імпорт констант для валідації, якщо потрібно (наприклад, PASSWORD_REGEX)
 # from backend.app.src.core.constants import PASSWORD_REGEX
@@ -56,34 +58,34 @@ class PasswordResetConfirmSchema(BaseSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем логіну та відновлення пароля.
-    print("--- Pydantic Схеми для Логіну та Відновлення Паролю ---")
+    logger.info("--- Pydantic Схеми для Логіну та Відновлення Паролю ---")
 
-    print("\nLoginRequest (приклад):")
+    logger.info("\nLoginRequest (приклад):")
     login_data = {"username": "testlogin@example.com", "password": "securepassword123"}
     login_instance = LoginRequest(**login_data)
-    print(login_instance.model_dump_json(indent=2))
+    logger.info(login_instance.model_dump_json(indent=2))
     try:
         LoginRequest(username="not-an-email", password="pw")
     except Exception as e:
-        print(f"Помилка валідації LoginRequest (очікувано): {e}")
+        logger.info(f"Помилка валідації LoginRequest (очікувано): {e}")
 
-    print("\nPasswordResetRequestSchema (приклад):")
+    logger.info("\nPasswordResetRequestSchema (приклад):")
     password_reset_request_data = {"email": "forgotpassword@example.com"}
     password_reset_request_instance = PasswordResetRequestSchema(**password_reset_request_data)
-    print(password_reset_request_instance.model_dump_json(indent=2))
+    logger.info(password_reset_request_instance.model_dump_json(indent=2))
 
-    print("\nPasswordResetConfirmSchema (приклад):")
+    logger.info("\nPasswordResetConfirmSchema (приклад):")
     password_reset_confirm_data = {
         "token": "valid_reset_token_string_12345",
         "new_password": "NewStrongPassword123!"
     }
     password_reset_confirm_instance = PasswordResetConfirmSchema(**password_reset_confirm_data)
-    print(password_reset_confirm_instance.model_dump_json(indent=2))
+    logger.info(password_reset_confirm_instance.model_dump_json(indent=2))
     try:
         PasswordResetConfirmSchema(token="t", new_password="short")
     except Exception as e:
-        print(f"Помилка валідації PasswordResetConfirmSchema (очікувано): {e}")
+        logger.info(f"Помилка валідації PasswordResetConfirmSchema (очікувано): {e}")
 
-    print(
+    logger.info(
         "\nПримітка: Ці схеми використовуються для обробки запитів, пов'язаних з автентифікацією та відновленням доступу.")
-    print("TODO: Для поля 'new_password' в PasswordResetConfirmSchema додати валідацію надійності пароля.")
+    logger.info("TODO: Для поля 'new_password' в PasswordResetConfirmSchema додати валідацію надійності пароля.")

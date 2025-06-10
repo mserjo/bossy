@@ -15,6 +15,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Абсолютний імпорт базових класів
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час спроби доставки
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Визначити Enums NotificationChannelType та DeliveryStatusType в core.dicts.py
 # Наприклад:
@@ -100,21 +103,21 @@ class NotificationDeliveryAttempt(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі NotificationDeliveryAttempt.
-    print("--- Модель Спроби Доставки Сповіщення (NotificationDeliveryAttempt) ---")
-    print(f"Назва таблиці: {NotificationDeliveryAttempt.__tablename__}")
+    logger.info("--- Модель Спроби Доставки Сповіщення (NotificationDeliveryAttempt) ---")
+    logger.info(f"Назва таблиці: {NotificationDeliveryAttempt.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = [
         'id', 'notification_id', 'channel', 'status',
         'error_message', 'external_message_id', 'created_at', 'updated_at'
     ]
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['notification']
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_attempt = NotificationDeliveryAttempt(
@@ -128,10 +131,10 @@ if __name__ == "__main__":
     example_attempt.created_at = datetime.now(tz=timezone.utc)
     example_attempt.updated_at = datetime.now(tz=timezone.utc)
 
-    print(f"\nПриклад екземпляра NotificationDeliveryAttempt (без сесії):\n  {example_attempt}")
+    logger.info(f"\nПриклад екземпляра NotificationDeliveryAttempt (без сесії):\n  {example_attempt}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <NotificationDeliveryAttempt(id=1, notification_id=1, channel='email', status='sent', created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
-    print(
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info(
         "TODO: Не забудьте визначити Enum 'NotificationChannelType' та 'DeliveryStatusType' в core.dicts.py та оновити відповідні поля.")

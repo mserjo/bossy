@@ -19,6 +19,9 @@ from datetime import datetime
 from typing import List, Optional, TypeVar, Generic, Any
 
 from pydantic import BaseModel, ConfigDict, Field, EmailStr, AnyHttpUrl # EmailStr, AnyHttpUrl для можливого використання в майбутніх базових схемах
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Узагальнений тип для використання в DataResponse та PaginatedResponse
 T = TypeVar("T")
@@ -119,7 +122,7 @@ class PaginatedResponse(BaseSchema, Generic[T]):
 
 # Блок для демонстрації та базового тестування схем при прямому запуску модуля.
 if __name__ == "__main__":
-    print("--- Демонстрація Базових Схем Pydantic ---")
+    logger.info("--- Демонстрація Базових Схем Pydantic ---")
 
     # Демонстрація BaseMainSchema
     class ConcreteMain(BaseMainSchema):
@@ -137,11 +140,11 @@ if __name__ == "__main__":
         # group_id, notes, deleted_at - опціональні
     }
     main_instance = ConcreteMain(**main_instance_data)
-    print(f"\nЕкземпляр ConcreteMain:\n{main_instance.model_dump_json(indent=2, exclude_none=True)}")
+    logger.info(f"\nЕкземпляр ConcreteMain:\n{main_instance.model_dump_json(indent=2, exclude_none=True)}")
 
     # Демонстрація MsgResponse
     msg_response = MsgResponse(msg="Операція успішно завершена.") # TODO i18n
-    print(f"\nЕкземпляр MsgResponse:\n{msg_response.model_dump_json(indent=2)}")
+    logger.info(f"\nЕкземпляр MsgResponse:\n{msg_response.model_dump_json(indent=2)}")
 
     # Демонстрація DataResponse
     class DummyData(BaseSchema):
@@ -151,7 +154,7 @@ if __name__ == "__main__":
 
     dummy_data_instance = DummyData(field_a="текст", field_b=123) # TODO i18n
     data_response = DataResponse[DummyData](data=dummy_data_instance)
-    print(f"\nЕкземпляр DataResponse[DummyData]:\n{data_response.model_dump_json(indent=2)}")
+    logger.info(f"\nЕкземпляр DataResponse[DummyData]:\n{data_response.model_dump_json(indent=2)}")
 
     # Демонстрація PaginatedResponse
     items_list = [
@@ -165,12 +168,12 @@ if __name__ == "__main__":
         pageSize=2,
         totalPages=50
     )
-    print(f"\nЕкземпляр PaginatedResponse[DummyData]:\n{paginated_response.model_dump_json(indent=2)}")
-    print(f"\nДоступ через Python атрибут (не аліас): paginated_response.total_items = {paginated_response.total_items}")
+    logger.info(f"\nЕкземпляр PaginatedResponse[DummyData]:\n{paginated_response.model_dump_json(indent=2)}")
+    logger.info(f"\nДоступ через Python атрибут (не аліас): paginated_response.total_items = {paginated_response.total_items}")
 
-    print("\nПеревірка конфігурації моделі в BaseSchema:")
-    print(f"  BaseSchema.model_config['from_attributes'] = {BaseSchema.model_config.get('from_attributes')}")
-    print(f"  BaseSchema.model_config['populate_by_name'] = {BaseSchema.model_config.get('populate_by_name')}")
-    print(f"  BaseSchema.model_config['arbitrary_types_allowed'] = {BaseSchema.model_config.get('arbitrary_types_allowed')}")
+    logger.info("\nПеревірка конфігурації моделі в BaseSchema:")
+    logger.info(f"  BaseSchema.model_config['from_attributes'] = {BaseSchema.model_config.get('from_attributes')}")
+    logger.info(f"  BaseSchema.model_config['populate_by_name'] = {BaseSchema.model_config.get('populate_by_name')}")
+    logger.info(f"  BaseSchema.model_config['arbitrary_types_allowed'] = {BaseSchema.model_config.get('arbitrary_types_allowed')}")
 
-    print("\nПримітка: Ці базові схеми призначені для успадкування конкретними схемами даних у модулях `schemas`.")
+    logger.info("\nПримітка: Ці базові схеми призначені для успадкування конкретними схемами даних у модулях `schemas`.")

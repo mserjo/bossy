@@ -10,7 +10,9 @@ from typing import Optional
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # from pydantic import Field # Може знадобитися для кастомних атрибутів Field
 
@@ -44,7 +46,7 @@ class SessionCreateSchema(BaseSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схеми SessionSchema.
-    print("--- Pydantic Схема для Сесії Користувача (SessionSchema) ---")
+    logger.info("--- Pydantic Схема для Сесії Користувача (SessionSchema) ---")
 
     session_data_example = {
         "id": 1,
@@ -58,9 +60,9 @@ if __name__ == "__main__":
     }
 
     session_instance = SessionSchema(**session_data_example)
-    print(f"\nПриклад екземпляра SessionSchema:\n{session_instance.model_dump_json(indent=2, exclude_none=True)}")
+    logger.info(f"\nПриклад екземпляра SessionSchema:\n{session_instance.model_dump_json(indent=2, exclude_none=True)}")
 
-    print("\nПримітка: Ця схема використовується для представлення даних сесій у відповідях API.")
+    logger.info("\nПримітка: Ця схема використовується для представлення даних сесій у відповідях API.")
 
 # Потрібно для timedelta в __main__
 from datetime import timedelta

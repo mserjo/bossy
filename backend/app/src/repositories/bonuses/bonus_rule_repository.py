@@ -18,7 +18,9 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.bonuses.bonus_rule import BonusRule
 from backend.app.src.schemas.bonuses.bonus_rule import BonusRuleCreateSchema, BonusRuleUpdateSchema
-
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # from backend.app.src.core.dicts import SomeStateEnum # Якщо поле state використовує Enum
 # from backend.app.src.config.logging import get_logger # Якщо потрібне логування
@@ -100,17 +102,17 @@ class BonusRuleRepository(BaseRepository[BonusRule, BonusRuleCreateSchema, Bonus
 
 if __name__ == "__main__":
     # Демонстраційний блок для BonusRuleRepository.
-    print("--- Репозиторій Правил Нарахування Бонусів (BonusRuleRepository) ---")
+    logger.info("--- Репозиторій Правил Нарахування Бонусів (BonusRuleRepository) ---")
 
-    print("Для тестування BonusRuleRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {BonusRule.__name__}.")
-    print(f"  Очікує схему створення: {BonusRuleCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {BonusRuleUpdateSchema.__name__}")
+    logger.info("Для тестування BonusRuleRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {BonusRule.__name__}.")
+    logger.info(f"  Очікує схему створення: {BonusRuleCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {BonusRuleUpdateSchema.__name__}")
 
-    print("\nСпецифічні методи:")
-    print("  - get_rules_for_task(task_id: int, active_only: bool = True)")
-    print("  - get_rules_for_event_task(event_task_id: int, active_only: bool = True)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_rules_for_task(task_id: int, active_only: bool = True)")
+    logger.info("  - get_rules_for_event_task(event_task_id: int, active_only: bool = True)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    print("TODO: Узгодити логіку фільтрації 'active_only' з реальним полем стану в моделі BonusRule.")
-    print("TODO: Уточнити використання `event_id` у `get_rules_for_event_task`.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("TODO: Узгодити логіку фільтрації 'active_only' з реальним полем стану в моделі BonusRule.")
+    logger.info("TODO: Уточнити використання `event_id` у `get_rules_for_event_task`.")

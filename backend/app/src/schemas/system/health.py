@@ -14,7 +14,9 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Визначити та імпортувати Enum HealthStatusType з core.dicts
 # from backend.app.src.core.dicts import HealthStatusType
@@ -81,9 +83,9 @@ class OverallHealthStatusSchema(BaseSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем стану здоров'я системи.
-    print("--- Pydantic Схеми для Стану Здоров'я Системи ---")
+    logger.info("--- Pydantic Схеми для Стану Здоров'я Системи ---")
 
-    print("\nServiceHealthStatusSchema (приклад відповіді API для окремого сервісу):")
+    logger.info("\nServiceHealthStatusSchema (приклад відповіді API для окремого сервісу):")
     db_health_data = {
         "id": 1,
         "service_name": "PostgreSQL Database",  # TODO i18n
@@ -93,7 +95,7 @@ if __name__ == "__main__":
         "updated_at": datetime.now()  # Час останньої перевірки
     }
     db_health_instance = ServiceHealthStatusSchema(**db_health_data)
-    print(db_health_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(db_health_instance.model_dump_json(indent=2, exclude_none=True))
 
     redis_health_data = {
         "id": 2,
@@ -104,9 +106,9 @@ if __name__ == "__main__":
         "updated_at": datetime.now() - timedelta(minutes=5)
     }
     redis_health_instance = ServiceHealthStatusSchema(**redis_health_data)
-    print(redis_health_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(redis_health_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nOverallHealthStatusSchema (приклад загального звіту про стан здоров'я):")
+    logger.info("\nOverallHealthStatusSchema (приклад загального звіту про стан здоров'я):")
     overall_status_data = {
         "overall_status": TempHealthStatusType.DEGRADED,
         # TODO: Замінити на Enum.value (розраховується на основі станів сервісів)
@@ -117,10 +119,10 @@ if __name__ == "__main__":
         ]
     }
     overall_status_instance = OverallHealthStatusSchema(**overall_status_data)
-    print(overall_status_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(overall_status_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для представлення стану здоров'я системи та її компонентів.")
-    print("TODO: Інтегрувати Enum 'HealthStatusType' з core.dicts для полів 'status' та 'overall_status'.")
+    logger.info("\nПримітка: Ці схеми використовуються для представлення стану здоров'я системи та її компонентів.")
+    logger.info("TODO: Інтегрувати Enum 'HealthStatusType' з core.dicts для полів 'status' та 'overall_status'.")
 
 # Потрібно для timedelta в __main__
 from datetime import timedelta

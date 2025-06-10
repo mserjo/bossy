@@ -16,6 +16,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin
 from backend.app.src.core.dicts import FileType as FileTypeEnum  # Enum для поля purpose
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
@@ -87,22 +90,22 @@ class FileRecord(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі FileRecord.
-    print("--- Модель Запису Файлу (FileRecord) ---")
-    print(f"Назва таблиці: {FileRecord.__tablename__}")
+    logger.info("--- Модель Запису Файлу (FileRecord) ---")
+    logger.info(f"Назва таблиці: {FileRecord.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = [
         'id', 'file_name', 'file_path', 'mime_type', 'file_size',
         'uploader_user_id', 'purpose', 'metadata',
         'created_at', 'updated_at'
     ]
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['uploader']  # , 'user_avatar_link' (якщо додано)
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     from datetime import timezone
@@ -121,10 +124,10 @@ if __name__ == "__main__":
     example_file.created_at = datetime.now(tz=timezone.utc)
     example_file.updated_at = datetime.now(tz=timezone.utc)
 
-    print(f"\nПриклад екземпляра FileRecord (без сесії):\n  {example_file}")
+    logger.info(f"\nПриклад екземпляра FileRecord (без сесії):\n  {example_file}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <FileRecord(id=1, file_name='profile_pic.jpg', mime_type='image/jpeg', file_size=102400, uploader_user_id=101, purpose='avatar', created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
-    print(
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info(
         f"Використовується FileType Enum для поля 'purpose', наприклад: FileTypeEnum.TASK_ATTACHMENT = '{FileTypeEnum.TASK_ATTACHMENT.value}'")

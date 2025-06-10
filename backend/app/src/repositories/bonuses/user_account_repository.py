@@ -19,7 +19,9 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.bonuses.account import UserAccount
 from backend.app.src.schemas.bonuses.account import UserAccountCreateSchema, UserAccountUpdateSchema
-
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # from backend.app.src.config.logging import get_logger # Якщо потрібне логування
 
@@ -141,19 +143,19 @@ class UserAccountRepository(BaseRepository[UserAccount, UserAccountCreateSchema,
 
 if __name__ == "__main__":
     # Демонстраційний блок для UserAccountRepository.
-    print("--- Репозиторій Рахунків Користувачів (UserAccountRepository) ---")
+    logger.info("--- Репозиторій Рахунків Користувачів (UserAccountRepository) ---")
 
-    print("Для тестування UserAccountRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {UserAccount.__name__}.")
+    logger.info("Для тестування UserAccountRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {UserAccount.__name__}.")
     # UserAccountUpdateSchema зараз дозволяє оновлювати лише баланс.
-    print(f"  Очікує схему створення: {UserAccountCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {UserAccountUpdateSchema.__name__}")
+    logger.info(f"  Очікує схему створення: {UserAccountCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {UserAccountUpdateSchema.__name__}")
 
-    print("\nСпецифічні методи:")
-    print("  - get_by_user_and_group(user_id: int, group_id: int)")
-    print("  - get_accounts_for_user(user_id: int, skip: int = 0, limit: int = 100)")
-    print("  - get_accounts_for_group(group_id: int, skip: int = 0, limit: int = 100)")
-    print("  - update_balance(account_id: int, amount_change: Decimal)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_user_and_group(user_id: int, group_id: int)")
+    logger.info("  - get_accounts_for_user(user_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("  - get_accounts_for_group(group_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("  - update_balance(account_id: int, amount_change: Decimal)")
 
-    print("\nПримітка: Метод `update_balance` виконує атомарне оновлення. Створення запису AccountTransaction")
-    print("має відбуватися на сервісному рівні для забезпечення цілісності даних.")
+    logger.info("\nПримітка: Метод `update_balance` виконує атомарне оновлення. Створення запису AccountTransaction")
+    logger.info("має відбуватися на сервісному рівні для забезпечення цілісності даних.")

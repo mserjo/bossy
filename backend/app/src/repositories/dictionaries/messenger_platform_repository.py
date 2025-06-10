@@ -14,6 +14,9 @@ from backend.app.src.repositories.dictionaries.base_dict_repository import BaseD
 # Абсолютний імпорт моделі та схем для Платформ Месенджерів
 from backend.app.src.models.dictionaries.messengers import MessengerPlatform
 from backend.app.src.schemas.dictionaries.messengers import MessengerPlatformCreateSchema, MessengerPlatformUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class MessengerPlatformRepository(
@@ -39,9 +42,9 @@ class MessengerPlatformRepository(
 
 if __name__ == "__main__":
     # Демонстраційний блок для MessengerPlatformRepository.
-    print("--- Репозиторій для Довідника Платформ Месенджерів (MessengerPlatformRepository) ---")
+    logger.info("--- Репозиторій для Довідника Платформ Месенджерів (MessengerPlatformRepository) ---")
 
-    print("Для тестування MessengerPlatformRepository потрібна асинхронна сесія SQLAlchemy.")
-    print(f"Він успадковує методи від BaseDictionaryRepository для моделі {MessengerPlatform.__name__}.")
-    print(f"  Очікує схему створення: {MessengerPlatformCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {MessengerPlatformUpdateSchema.__name__}")
+    logger.info("Для тестування MessengerPlatformRepository потрібна асинхронна сесія SQLAlchemy.")
+    logger.info(f"Він успадковує методи від BaseDictionaryRepository для моделі {MessengerPlatform.__name__}.")
+    logger.info(f"  Очікує схему створення: {MessengerPlatformCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {MessengerPlatformUpdateSchema.__name__}")

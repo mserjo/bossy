@@ -14,6 +14,9 @@ from backend.app.src.repositories.dictionaries.base_dict_repository import BaseD
 # Абсолютний імпорт моделі та схем для Типів Завдань
 from backend.app.src.models.dictionaries.task_types import TaskType
 from backend.app.src.schemas.dictionaries.task_types import TaskTypeCreateSchema, TaskTypeUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class TaskTypeRepository(BaseDictionaryRepository[TaskType, TaskTypeCreateSchema, TaskTypeUpdateSchema]):
@@ -38,9 +41,9 @@ class TaskTypeRepository(BaseDictionaryRepository[TaskType, TaskTypeCreateSchema
 
 if __name__ == "__main__":
     # Демонстраційний блок для TaskTypeRepository.
-    print("--- Репозиторій для Довідника Типів Завдань (TaskTypeRepository) ---")
+    logger.info("--- Репозиторій для Довідника Типів Завдань (TaskTypeRepository) ---")
 
-    print("Для тестування TaskTypeRepository потрібна асинхронна сесія SQLAlchemy.")
-    print(f"Він успадковує методи від BaseDictionaryRepository для моделі {TaskType.__name__}.")
-    print(f"  Очікує схему створення: {TaskTypeCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {TaskTypeUpdateSchema.__name__}")
+    logger.info("Для тестування TaskTypeRepository потрібна асинхронна сесія SQLAlchemy.")
+    logger.info(f"Він успадковує методи від BaseDictionaryRepository для моделі {TaskType.__name__}.")
+    logger.info(f"  Очікує схему створення: {TaskTypeCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {TaskTypeUpdateSchema.__name__}")

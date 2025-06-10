@@ -17,6 +17,9 @@ from pydantic import Field, field_validator
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача та верифікатора
 from backend.app.src.core.dicts import TaskStatus  # Enum для статусів виконання
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class TaskCompletionBaseSchema(BaseSchema):
@@ -111,31 +114,31 @@ class TaskCompletionSchema(TaskCompletionBaseSchema, IDSchemaMixin, TimestampedS
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем виконань завдань.
-    print("--- Pydantic Схеми для Виконань Завдань (TaskCompletion) ---")
+    logger.info("--- Pydantic Схеми для Виконань Завдань (TaskCompletion) ---")
 
-    print("\nTaskCompletionCreateSchema (приклад для створення):")
+    logger.info("\nTaskCompletionCreateSchema (приклад для створення):")
     create_completion_data = {
         "completed_at": datetime.now(),
         "status": TaskStatus.PENDING_REVIEW.value,
         "notes": "Завдання виконано, очікую на перевірку."  # TODO i18n
     }
     create_completion_instance = TaskCompletionCreateSchema(**create_completion_data)
-    print(create_completion_instance.model_dump_json(indent=2))
+    logger.info(create_completion_instance.model_dump_json(indent=2))
 
-    print("\nTaskCompletionUpdateSchema (приклад для оновлення адміністратором):")
+    logger.info("\nTaskCompletionUpdateSchema (приклад для оновлення адміністратором):")
     update_completion_data = {
         "verified_at": datetime.now(),
         "status": TaskStatus.COMPLETED.value,
         "notes": "Чудова робота!"  # TODO i18n
     }
     update_completion_instance = TaskCompletionUpdateSchema(**update_completion_data)
-    print(update_completion_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_completion_instance.model_dump_json(indent=2, exclude_none=True))
     try:
         TaskCompletionUpdateSchema(status="невірний_статус")  # Невірний статус
     except Exception as e:
-        print(f"Помилка валідації TaskCompletionUpdateSchema (очікувано): {e}")
+        logger.info(f"Помилка валідації TaskCompletionUpdateSchema (очікувано): {e}")
 
-    print("\nTaskCompletionSchema (приклад відповіді API):")
+    logger.info("\nTaskCompletionSchema (приклад відповіді API):")
     completion_response_data = {
         "id": 1,
         "task_id": 10,
@@ -150,10 +153,10 @@ if __name__ == "__main__":
         "verifier": {"id": 2, "name": "Адмін Перевіряючий"}  # TODO i18n
     }
     completion_response_instance = TaskCompletionSchema(**completion_response_data)
-    print(completion_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(completion_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних виконань завдань.")
-    print(
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних виконань завдань.")
+    logger.info(
         f"Використовується TaskStatus Enum для поля 'status', наприклад: TaskStatus.REJECTED = '{TaskStatus.REJECTED.value}'")
 
 # Потрібно для timedelta в __main__

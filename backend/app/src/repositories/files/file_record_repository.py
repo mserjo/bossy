@@ -17,12 +17,11 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.files.file import FileRecord
 from backend.app.src.schemas.files.file import FileRecordCreateSchema
-
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # from backend.app.src.core.dicts import FileType as FileTypeEnum # Для фільтрації за purpose
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 # Записи файлів зазвичай не оновлюються після створення (окрім, можливо, metadata або purpose).
 # Якщо потрібне оновлення, можна створити більш конкретну схему.
@@ -110,17 +109,17 @@ class FileRecordRepository(BaseRepository[FileRecord, FileRecordCreateSchema, Fi
 
 if __name__ == "__main__":
     # Демонстраційний блок для FileRecordRepository.
-    print("--- Репозиторій Записів Файлів (FileRecordRepository) ---")
+    logger.info("--- Репозиторій Записів Файлів (FileRecordRepository) ---")
 
-    print("Для тестування FileRecordRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {FileRecord.__name__}.")
-    print(f"  Очікує схему створення: {FileRecordCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {FileRecordUpdateSchema.__name__} (зараз порожня)")
+    logger.info("Для тестування FileRecordRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {FileRecord.__name__}.")
+    logger.info(f"  Очікує схему створення: {FileRecordCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {FileRecordUpdateSchema.__name__} (зараз порожня)")
 
-    print("\nСпецифічні методи:")
-    print("  - get_by_file_path(file_path: str)")
-    print("  - get_files_by_uploader(uploader_user_id: int, skip: int = 0, limit: int = 100)")
-    print("  - get_files_by_purpose(purpose: str, skip: int = 0, limit: int = 100)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_file_path(file_path: str)")
+    logger.info("  - get_files_by_uploader(uploader_user_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("  - get_files_by_purpose(purpose: str, skip: int = 0, limit: int = 100)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    print("TODO: Інтегрувати Enum 'FileType' для аргументу `purpose` в get_files_by_purpose.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("TODO: Інтегрувати Enum 'FileType' для аргументу `purpose` в get_files_by_purpose.")

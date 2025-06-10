@@ -18,13 +18,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.files.avatar import UserAvatar
-from backend.app.src.schemas.files.avatar import UserAvatarCreateSchema, \
-    UserAvatarUpdateSchema  # UserAvatarUpdateSchema може бути простою
+from backend.app.src.schemas.files.avatar import UserAvatarCreateSchema, UserAvatarUpdateSchema  # UserAvatarUpdateSchema може бути простою
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 class UserAvatarRepository(BaseRepository[UserAvatar, UserAvatarCreateSchema, UserAvatarUpdateSchema]):
     """
@@ -138,17 +136,17 @@ class UserAvatarRepository(BaseRepository[UserAvatar, UserAvatarCreateSchema, Us
 
 if __name__ == "__main__":
     # Демонстраційний блок для UserAvatarRepository.
-    print("--- Репозиторій Аватарів Користувачів (UserAvatarRepository) ---")
+    logger.info("--- Репозиторій Аватарів Користувачів (UserAvatarRepository) ---")
 
-    print("Для тестування UserAvatarRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {UserAvatar.__name__}.")
-    print(f"  Очікує схему створення: {UserAvatarCreateSchema.__name__}")
-    print(
+    logger.info("Для тестування UserAvatarRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {UserAvatar.__name__}.")
+    logger.info(f"  Очікує схему створення: {UserAvatarCreateSchema.__name__}")
+    logger.info(
         f"  Очікує схему оновлення: {UserAvatarUpdateSchema.__name__} (може бути простою, оскільки оновлюється переважно is_active)")
 
-    print("\nСпецифічні методи:")
-    print("  - get_by_user_id(user_id: int) -> Optional[UserAvatar]")
-    print("  - get_active_avatar_for_user(user_id: int) -> Optional[UserAvatar]")
-    print("  - set_active_avatar(user_id: int, file_record_id: int) -> UserAvatar")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_user_id(user_id: int) -> Optional[UserAvatar]")
+    logger.info("  - get_active_avatar_for_user(user_id: int) -> Optional[UserAvatar]")
+    logger.info("  - set_active_avatar(user_id: int, file_record_id: int) -> UserAvatar")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

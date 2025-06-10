@@ -17,7 +17,9 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.bonuses.reward import Reward
 from backend.app.src.schemas.bonuses.reward import RewardCreateSchema, RewardUpdateSchema
-
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # from backend.app.src.core.dicts import SomeStateEnum # Якщо поле state використовує Enum
 # from backend.app.src.config.logging import get_logger # Якщо потрібне логування
@@ -78,15 +80,15 @@ class RewardRepository(BaseRepository[Reward, RewardCreateSchema, RewardUpdateSc
 
 if __name__ == "__main__":
     # Демонстраційний блок для RewardRepository.
-    print("--- Репозиторій Нагород (RewardRepository) ---")
+    logger.info("--- Репозиторій Нагород (RewardRepository) ---")
 
-    print("Для тестування RewardRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {Reward.__name__}.")
-    print(f"  Очікує схему створення: {RewardCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {RewardUpdateSchema.__name__}")
+    logger.info("Для тестування RewardRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {Reward.__name__}.")
+    logger.info(f"  Очікує схему створення: {RewardCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {RewardUpdateSchema.__name__}")
 
-    print("\nСпецифічні методи:")
-    print("  - get_rewards_by_group_id(group_id: int, active_only: bool = True, skip: int = 0, limit: int = 100)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_rewards_by_group_id(group_id: int, active_only: bool = True, skip: int = 0, limit: int = 100)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    print("TODO: Узгодити значення 'active' для фільтра `active_only` з можливим Enum для станів.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("TODO: Узгодити значення 'active' для фільтра `active_only` з можливим Enum для станів.")

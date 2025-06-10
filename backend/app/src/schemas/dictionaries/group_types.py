@@ -7,6 +7,9 @@ Pydantic схеми для довідника "Типи Груп".
 """
 
 from typing import Optional
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
@@ -50,9 +53,9 @@ class GroupTypeUpdateSchema(DictionaryUpdateSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем GroupType.
-    print("--- Pydantic Схеми для Довідника: GroupType ---")
+    logger.info("--- Pydantic Схеми для Довідника: GroupType ---")
 
-    print("\nGroupTypeSchema (приклад для відповіді API):")
+    logger.info("\nGroupTypeSchema (приклад для відповіді API):")
     group_type_data_from_db = {
         "id": 1,
         "name": "Команда Розробки",  # TODO i18n
@@ -70,22 +73,22 @@ if __name__ == "__main__":
         group_type_data_from_db['updated_at'].replace('Z', '+00:00'))
 
     group_type_schema_instance = GroupTypeSchema(**group_type_data_from_db)
-    print(group_type_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(group_type_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nGroupTypeCreateSchema (приклад для створення):")
+    logger.info("\nGroupTypeCreateSchema (приклад для створення):")
     create_data = {
         "name": "Сім'я",  # TODO i18n
         "code": "FAMILY",
         "description": "Група для членів сім'ї."  # TODO i18n
     }
     create_schema_instance = GroupTypeCreateSchema(**create_data)
-    print(create_schema_instance.model_dump_json(indent=2))
+    logger.info(create_schema_instance.model_dump_json(indent=2))
 
-    print("\nGroupTypeUpdateSchema (приклад для оновлення):")
+    logger.info("\nGroupTypeUpdateSchema (приклад для оновлення):")
     update_data = {
         "description": "Оновлений опис для типу групи Сім'я."  # TODO i18n
     }
     update_schema_instance = GroupTypeUpdateSchema(**update_data)
-    print(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")
+    logger.info("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")

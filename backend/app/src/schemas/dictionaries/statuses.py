@@ -7,6 +7,9 @@ Pydantic схеми для довідника "Статуси".
 """
 
 from typing import Optional  # Необхідно для опціональних полів в Update схемі
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
@@ -57,9 +60,9 @@ class StatusUpdateSchema(DictionaryUpdateSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем Статусів.
-    print("--- Pydantic Схеми для Довідника: Status ---")
+    logger.info("--- Pydantic Схеми для Довідника: Status ---")
 
-    print("\nStatusSchema (приклад для відповіді API):")
+    logger.info("\nStatusSchema (приклад для відповіді API):")
     status_data_from_db = {
         "id": 1,
         "name": "Активний",
@@ -75,32 +78,32 @@ if __name__ == "__main__":
     status_data_from_db['updated_at'] = datetime.fromisoformat(status_data_from_db['updated_at'].replace('Z', '+00:00'))
 
     status_schema_instance = StatusSchema(**status_data_from_db)
-    print(status_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(status_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nStatusCreateSchema (приклад для створення):")
+    logger.info("\nStatusCreateSchema (приклад для створення):")
     create_data = {
         "name": "Новий Статус",
         "code": "NEW_STATUS_01",
         "description": "Опис для нового статусу, що створюється."
     }
     create_schema_instance = StatusCreateSchema(**create_data)
-    print(create_schema_instance.model_dump_json(indent=2))
+    logger.info(create_schema_instance.model_dump_json(indent=2))
     # Перевірка валідації (приклад)
     try:
         invalid_create_data = {"code": "INVALID"}  # Відсутнє обов'язкове поле 'name'
         StatusCreateSchema(**invalid_create_data)
     except Exception as e:
-        print(f"Помилка валідації StatusCreateSchema (очікувано): {e}")
+        logger.info(f"Помилка валідації StatusCreateSchema (очікувано): {e}")
 
-    print("\nStatusUpdateSchema (приклад для оновлення):")
+    logger.info("\nStatusUpdateSchema (приклад для оновлення):")
     update_data = {
         "description": "Оновлений опис для існуючого статусу.",
         "state": "deprecated"
     }
     update_schema_instance = StatusUpdateSchema(**update_data)
-    print(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")
+    logger.info("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")
 
 # Необхідно додати datetime для прикладу в __main__
 from datetime import datetime

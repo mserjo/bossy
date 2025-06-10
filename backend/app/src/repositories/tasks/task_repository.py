@@ -23,11 +23,10 @@ from backend.app.src.models.dictionaries.task_types import TaskType  # Для ф
 from backend.app.src.models.dictionaries.statuses import Status  # Для фільтрації за status_code
 from backend.app.src.schemas.tasks.task import TaskCreateSchema, TaskUpdateSchema
 from backend.app.src.core.dicts import TaskStatus as TaskStatusEnum  # Для active_only
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 class TaskRepository(BaseRepository[Task, TaskCreateSchema, TaskUpdateSchema]):
     """
@@ -191,17 +190,17 @@ class TaskRepository(BaseRepository[Task, TaskCreateSchema, TaskUpdateSchema]):
 
 if __name__ == "__main__":
     # Демонстраційний блок для TaskRepository.
-    print("--- Репозиторій Завдань/Подій (TaskRepository) ---")
+    logger.info("--- Репозиторій Завдань/Подій (TaskRepository) ---")
 
-    print("Для тестування TaskRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {Task.__name__}.")
-    print(f"  Очікує схему створення: {TaskCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {TaskUpdateSchema.__name__}")
+    logger.info("Для тестування TaskRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {Task.__name__}.")
+    logger.info(f"  Очікує схему створення: {TaskCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {TaskUpdateSchema.__name__}")
 
-    print("\nСпецифічні методи:")
-    print("  - get_tasks_by_group_id(group_id, skip, limit, active_only, task_type_code, status_code)")
-    print("  - get_tasks_assigned_to_user(user_id, group_id, skip, limit, active_only)")
-    print("  - get_sub_tasks(parent_task_id, skip, limit)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_tasks_by_group_id(group_id, skip, limit, active_only, task_type_code, status_code)")
+    logger.info("  - get_tasks_assigned_to_user(user_id, group_id, skip, limit, active_only)")
+    logger.info("  - get_sub_tasks(parent_task_id, skip, limit)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    print("TODO: Узгодити логіку фільтрації за статусом (Task.state vs Task.status_id) в get_tasks_by_group_id.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("TODO: Узгодити логіку фільтрації за статусом (Task.state vs Task.status_id) в get_tasks_by_group_id.")

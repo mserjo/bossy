@@ -21,7 +21,9 @@ from backend.app.src.schemas.bonuses.transaction import (
     # AccountTransactionUpdateSchema зазвичай не потрібна, транзакції незмінні
 )
 from pydantic import BaseModel as PydanticBaseModel  # Для "заглушки" UpdateSchema
-
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # from backend.app.src.config.logging import get_logger # Якщо потрібне логування
 
@@ -110,17 +112,17 @@ class AccountTransactionRepository(
 
 if __name__ == "__main__":
     # Демонстраційний блок для AccountTransactionRepository.
-    print("--- Репозиторій Транзакцій по Рахунках (AccountTransactionRepository) ---")
+    logger.info("--- Репозиторій Транзакцій по Рахунках (AccountTransactionRepository) ---")
 
-    print("Для тестування AccountTransactionRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {AccountTransaction.__name__}.")
-    print(f"  Очікує схему створення: {AccountTransactionCreateSchema.__name__}")
-    print(
+    logger.info("Для тестування AccountTransactionRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {AccountTransaction.__name__}.")
+    logger.info(f"  Очікує схему створення: {AccountTransactionCreateSchema.__name__}")
+    logger.info(
         f"  Очікує схему оновлення: {AccountTransactionUpdateSchema.__name__} (зараз порожня, транзакції зазвичай незмінні)")
 
-    print("\nСпецифічні методи:")
-    print(
+    logger.info("\nСпецифічні методи:")
+    logger.info(
         "  - get_transactions_for_account(account_id: int, skip: int = 0, limit: int = 100, order_by_desc_created_at: bool = True)")
-    print("  - get_transactions_by_type(account_id: int, transaction_type: str, skip: int = 0, limit: int = 100)")
+    logger.info("  - get_transactions_by_type(account_id: int, transaction_type: str, skip: int = 0, limit: int = 100)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

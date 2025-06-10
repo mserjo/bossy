@@ -17,7 +17,9 @@ from pydantic import Field, EmailStr, field_validator
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import GroupRole  # Enum для ролей в групі
-
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Імпортувати InvitationStatus Enum з core.dicts, коли він буде визначений.
 # from backend.app.src.core.dicts import InvitationStatus
@@ -106,32 +108,32 @@ class GroupInvitationAcceptSchema(BaseSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем запрошень до груп.
-    print("--- Pydantic Схеми для Запрошень до Груп (GroupInvitation) ---")
+    logger.info("--- Pydantic Схеми для Запрошень до Груп (GroupInvitation) ---")
 
-    print("\nGroupInvitationBaseSchema (приклад):")
+    logger.info("\nGroupInvitationBaseSchema (приклад):")
     base_invite_data = {"email": "invitee@example.com", "role_to_assign": GroupRole.MEMBER.value}
     base_invite_instance = GroupInvitationBaseSchema(**base_invite_data)
-    print(base_invite_instance.model_dump_json(indent=2))
+    logger.info(base_invite_instance.model_dump_json(indent=2))
     try:
         GroupInvitationBaseSchema(email="test@test.com", role_to_assign="invalid_role")
     except Exception as e:
-        print(f"Помилка валідації GroupInvitationBaseSchema (очікувано): {e}")
+        logger.info(f"Помилка валідації GroupInvitationBaseSchema (очікувано): {e}")
 
-    print("\nGroupInvitationCreateSchema (приклад для створення):")
+    logger.info("\nGroupInvitationCreateSchema (приклад для створення):")
     create_invite_data = {
         "email": "new_invite@example.com",
         "role_to_assign": GroupRole.ADMIN.value,
         "expires_at": datetime.now() + timedelta(days=3)
     }
     create_invite_instance = GroupInvitationCreateSchema(**create_invite_data)
-    print(create_invite_instance.model_dump_json(indent=2))
+    logger.info(create_invite_instance.model_dump_json(indent=2))
 
-    print("\nGroupInvitationUpdateSchema (приклад для оновлення статусу):")
+    logger.info("\nGroupInvitationUpdateSchema (приклад для оновлення статусу):")
     update_invite_data = {"status": "cancelled"}  # TODO: Замінити на InvitationStatus.CANCELLED.value
     update_invite_instance = GroupInvitationUpdateSchema(**update_invite_data)
-    print(update_invite_instance.model_dump_json(indent=2))
+    logger.info(update_invite_instance.model_dump_json(indent=2))
 
-    print("\nGroupInvitationSchema (приклад відповіді API):")
+    logger.info("\nGroupInvitationSchema (приклад відповіді API):")
     invitation_response_data = {
         "id": 1,
         "group_id": 10,
@@ -145,16 +147,16 @@ if __name__ == "__main__":
         "updated_at": datetime.now() - timedelta(minutes=30)
     }
     invitation_response_instance = GroupInvitationSchema(**invitation_response_data)
-    print(invitation_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(invitation_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nGroupInvitationAcceptSchema (приклад для прийняття запрошення):")
+    logger.info("\nGroupInvitationAcceptSchema (приклад для прийняття запрошення):")
     accept_data = {"invitation_code": "VALIDCODE789"}
     accept_instance = GroupInvitationAcceptSchema(**accept_data)
-    print(accept_instance.model_dump_json(indent=2))
+    logger.info(accept_instance.model_dump_json(indent=2))
 
-    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних запрошень до груп.")
-    print("TODO: Інтегрувати Enum 'InvitationStatus' та валідацію 'phone_number'.")
-    print(
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних запрошень до груп.")
+    logger.info("TODO: Інтегрувати Enum 'InvitationStatus' та валідацію 'phone_number'.")
+    logger.info(
         "TODO: Розглянути `model_validator` в `GroupInvitationCreateSchema` для перевірки наявності email або phone_number.")
 
 # Потрібно для timedelta в __main__

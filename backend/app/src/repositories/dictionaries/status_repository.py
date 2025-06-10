@@ -15,11 +15,10 @@ from backend.app.src.repositories.dictionaries.base_dict_repository import BaseD
 # Абсолютний імпорт моделі та схем для Статусів
 from backend.app.src.models.dictionaries.statuses import Status
 from backend.app.src.schemas.dictionaries.statuses import StatusCreateSchema, StatusUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 class StatusRepository(BaseDictionaryRepository[Status, StatusCreateSchema, StatusUpdateSchema]):
     """
@@ -50,7 +49,7 @@ class StatusRepository(BaseDictionaryRepository[Status, StatusCreateSchema, Stat
 if __name__ == "__main__":
     # Демонстраційний блок для StatusRepository.
     # Для реального тестування потрібна активна сесія БД та налаштована база даних.
-    print("--- Репозиторій для Довідника Статусів (StatusRepository) ---")
+    logger.info("--- Репозиторій для Довідника Статусів (StatusRepository) ---")
 
     # Концептуальна демонстрація створення екземпляра:
     # async def demo():
@@ -58,16 +57,16 @@ if __name__ == "__main__":
     #     mock_session = None # Замініть на реальну або макет сесії
     #     if mock_session:
     #         repo = StatusRepository(mock_session)
-    #         print(f"Екземпляр StatusRepository створено: {repo}")
+    #         logger.info(f"Екземпляр StatusRepository створено: {repo}")
     #         # Тут можна було б викликати методи, якби сесія була активною
     #         # Наприклад:
     #         # active_statuses = await repo.get_active_statuses()
-    #         # print(f"Активні статуси: {active_statuses}")
+    #         # logger.info(f"Активні статуси: {active_statuses}")
     # import asyncio
     # asyncio.run(demo())
 
-    print("Для тестування StatusRepository потрібна асинхронна сесія SQLAlchemy.")
-    print(f"Він успадковує методи від BaseDictionaryRepository для моделі {Status.__name__}.")
+    logger.info("Для тестування StatusRepository потрібна асинхронна сесія SQLAlchemy.")
+    logger.info(f"Він успадковує методи від BaseDictionaryRepository для моделі {Status.__name__}.")
     # Показати, які схеми він очікує (для інформації)
-    print(f"  Очікує схему створення: {StatusCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {StatusUpdateSchema.__name__}")
+    logger.info(f"  Очікує схему створення: {StatusCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {StatusUpdateSchema.__name__}")

@@ -16,6 +16,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Абсолютний імпорт базових класів та міксинів
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час встановлення аватара
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
@@ -83,21 +86,21 @@ class UserAvatar(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі UserAvatar.
-    print("--- Модель Аватара Користувача (UserAvatar) ---")
-    print(f"Назва таблиці: {UserAvatar.__tablename__}")
+    logger.info("--- Модель Аватара Користувача (UserAvatar) ---")
+    logger.info(f"Назва таблиці: {UserAvatar.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = [
         'id', 'user_id', 'file_record_id', 'is_active',
         'created_at', 'updated_at'
     ]
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['user', 'file_record']
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_avatar_link = UserAvatar(
@@ -110,8 +113,8 @@ if __name__ == "__main__":
     example_avatar_link.created_at = datetime.now(tz=timezone.utc)
     example_avatar_link.updated_at = datetime.now(tz=timezone.utc)
 
-    print(f"\nПриклад екземпляра UserAvatar (без сесії):\n  {example_avatar_link}")
+    logger.info(f"\nПриклад екземпляра UserAvatar (без сесії):\n  {example_avatar_link}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <UserAvatar(id=1, user_id=101, file_record_id=1, is_active=True, created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

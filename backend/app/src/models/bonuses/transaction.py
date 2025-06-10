@@ -17,6 +17,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час транзакції
 from backend.app.src.core.dicts import TransactionType  # Enum для типів транзакцій
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.bonuses.account import UserAccount
@@ -112,22 +115,22 @@ class AccountTransaction(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі AccountTransaction.
-    print("--- Модель Транзакції по Рахунку (AccountTransaction) ---")
-    print(f"Назва таблиці: {AccountTransaction.__tablename__}")
+    logger.info("--- Модель Транзакції по Рахунку (AccountTransaction) ---")
+    logger.info(f"Назва таблиці: {AccountTransaction.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = [
         'id', 'account_id', 'transaction_type', 'amount', 'description',
         'related_task_completion_id', 'related_reward_id', 'created_by_user_id',
         'created_at', 'updated_at'
     ]
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['account', 'task_completion', 'reward', 'created_by']
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_transaction = AccountTransaction(
@@ -141,9 +144,9 @@ if __name__ == "__main__":
     example_transaction.created_at = datetime.now(tz=timezone.utc)
     example_transaction.updated_at = datetime.now(tz=timezone.utc)
 
-    print(f"\nПриклад екземпляра AccountTransaction (без сесії):\n  {example_transaction}")
+    logger.info(f"\nПриклад екземпляра AccountTransaction (без сесії):\n  {example_transaction}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <AccountTransaction(id=1, account_id=1, transaction_type='credit', amount=Decimal('25.50'), created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
-    print(f"Використовується TransactionType Enum для поля 'transaction_type', наприклад: TransactionType.DEBIT = '{TransactionType.DEBIT.value}'")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info(f"Використовується TransactionType Enum для поля 'transaction_type', наприклад: TransactionType.DEBIT = '{TransactionType.DEBIT.value}'")

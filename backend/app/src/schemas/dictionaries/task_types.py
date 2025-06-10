@@ -7,6 +7,9 @@ Pydantic схеми для довідника "Типи Завдань".
 """
 
 from typing import Optional
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
@@ -50,9 +53,9 @@ class TaskTypeUpdateSchema(DictionaryUpdateSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем TaskType.
-    print("--- Pydantic Схеми для Довідника: TaskType ---")
+    logger.info("--- Pydantic Схеми для Довідника: TaskType ---")
 
-    print("\nTaskTypeSchema (приклад для відповіді API):")
+    logger.info("\nTaskTypeSchema (приклад для відповіді API):")
     task_type_data_from_db = {
         "id": 1,
         "name": "Термінове Завдання",  # TODO i18n
@@ -70,22 +73,22 @@ if __name__ == "__main__":
         task_type_data_from_db['updated_at'].replace('Z', '+00:00'))
 
     task_type_schema_instance = TaskTypeSchema(**task_type_data_from_db)
-    print(task_type_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(task_type_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nTaskTypeCreateSchema (приклад для створення):")
+    logger.info("\nTaskTypeCreateSchema (приклад для створення):")
     create_data = {
         "name": "Подія",  # TODO i18n
         "code": "EVENT",
         "description": "Тип для відстеження подій."  # TODO i18n
     }
     create_schema_instance = TaskTypeCreateSchema(**create_data)
-    print(create_schema_instance.model_dump_json(indent=2))
+    logger.info(create_schema_instance.model_dump_json(indent=2))
 
-    print("\nTaskTypeUpdateSchema (приклад для оновлення):")
+    logger.info("\nTaskTypeUpdateSchema (приклад для оновлення):")
     update_data = {
         "description": "Оновлений опис для типу Подія."  # TODO i18n
     }
     update_schema_instance = TaskTypeUpdateSchema(**update_data)
-    print(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")
+    logger.info("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")

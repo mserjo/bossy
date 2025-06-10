@@ -14,6 +14,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.src.models.base import Base  # Успадковуємо від Base
 from backend.app.src.models.mixins import TimestampedMixin  # Додаємо часові мітки
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User  # Для зв'язку user
@@ -69,19 +72,19 @@ class Session(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі Session.
-    print("--- Модель Сесії Користувача (Session) ---")
-    print(f"Назва таблиці: {Session.__tablename__}")
+    logger.info("--- Модель Сесії Користувача (Session) ---")
+    logger.info(f"Назва таблиці: {Session.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = [
         'id', 'session_key', 'user_id', 'expires_at',
         'user_agent', 'ip_address', 'created_at', 'updated_at'
     ]
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
-    print(f"  - user (до User)")
+    logger.info("\nОчікувані зв'язки (relationships):")
+    logger.info(f"  - user (до User)")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     from datetime import timedelta, timezone
@@ -98,9 +101,9 @@ if __name__ == "__main__":
     example_session.created_at = datetime.now(timezone.utc)
     example_session.updated_at = datetime.now(timezone.utc)
 
-    print(f"\nПриклад екземпляра Session (без сесії):\n  {example_session}")
+    logger.info(f"\nПриклад екземпляра Session (без сесії):\n  {example_session}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <Session(id=1, user_id=101, ip_address='192.168.1.100', expires_at=..., created_at=..., updated_at=...)>
     # Поле 'session_key' та 'user_agent' не включено в _repr_fields за замовчуванням через їх потенційну довжину.
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

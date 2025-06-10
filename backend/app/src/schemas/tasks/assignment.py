@@ -15,7 +15,9 @@ from pydantic import Field, field_validator
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, TimestampedSchemaMixin
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача
-
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Визначити та імпортувати TaskAssignmentStatus Enum з core.dicts
 # from backend.app.src.core.dicts import TaskAssignmentStatus
@@ -82,29 +84,29 @@ class TaskAssignmentSchema(TaskAssignmentBaseSchema, TimestampedSchemaMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем призначень завдань.
-    print("--- Pydantic Схеми для Призначень Завдань (TaskAssignment) ---")
+    logger.info("--- Pydantic Схеми для Призначень Завдань (TaskAssignment) ---")
 
-    print("\nTaskAssignmentBaseSchema (приклад):")
+    logger.info("\nTaskAssignmentBaseSchema (приклад):")
     base_assign_data = {"task_id": 1, "user_id": 101, "status": TempTaskAssignmentStatus.ACCEPTED}
     base_assign_instance = TaskAssignmentBaseSchema(**base_assign_data)
-    print(base_assign_instance.model_dump_json(indent=2))
+    logger.info(base_assign_instance.model_dump_json(indent=2))
 
-    print("\nTaskAssignmentCreateSchema (приклад для створення):")
+    logger.info("\nTaskAssignmentCreateSchema (приклад для створення):")
     create_assign_data = {"user_id": 102, "status": TempTaskAssignmentStatus.ASSIGNED}
     create_assign_instance = TaskAssignmentCreateSchema(**create_assign_data)
-    print(create_assign_instance.model_dump_json(indent=2))
+    logger.info(create_assign_instance.model_dump_json(indent=2))
     # Приклад з помилкою (якщо б був валідатор на Enum)
     # try:
     #     TaskAssignmentCreateSchema(user_id=103, status="невірний_статус")
     # except Exception as e:
-    #     print(f"Помилка валідації TaskAssignmentCreateSchema (очікувано): {e}")
+    #     logger.info(f"Помилка валідації TaskAssignmentCreateSchema (очікувано): {e}")
 
-    print("\nTaskAssignmentUpdateSchema (приклад для оновлення):")
+    logger.info("\nTaskAssignmentUpdateSchema (приклад для оновлення):")
     update_assign_data = {"status": TempTaskAssignmentStatus.DECLINED}
     update_assign_instance = TaskAssignmentUpdateSchema(**update_assign_data)
-    print(update_assign_instance.model_dump_json(indent=2))
+    logger.info(update_assign_instance.model_dump_json(indent=2))
 
-    print("\nTaskAssignmentSchema (приклад відповіді API):")
+    logger.info("\nTaskAssignmentSchema (приклад відповіді API):")
     assignment_response_data = {
         "task_id": 1,
         "user_id": 101,
@@ -114,7 +116,7 @@ if __name__ == "__main__":
         "user": {"id": 101, "name": "Призначений Користувач"}  # TODO i18n (UserPublicProfileSchema)
     }
     assignment_response_instance = TaskAssignmentSchema(**assignment_response_data)
-    print(assignment_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(assignment_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних призначень завдань.")
-    print("TODO: Інтегрувати Enum 'TaskAssignmentStatus' з core.dicts для поля 'status'.")
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних призначень завдань.")
+    logger.info("TODO: Інтегрувати Enum 'TaskAssignmentStatus' з core.dicts для поля 'status'.")

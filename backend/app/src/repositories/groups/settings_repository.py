@@ -17,11 +17,10 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.groups.settings import GroupSetting
 from backend.app.src.schemas.groups.settings import GroupSettingCreateSchema, GroupSettingUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 class GroupSettingRepository(BaseRepository[GroupSetting, GroupSettingCreateSchema, GroupSettingUpdateSchema]):
     """
@@ -66,16 +65,16 @@ class GroupSettingRepository(BaseRepository[GroupSetting, GroupSettingCreateSche
 
 if __name__ == "__main__":
     # Демонстраційний блок для GroupSettingRepository.
-    print("--- Репозиторій Налаштувань Груп (GroupSettingRepository) ---")
+    logger.info("--- Репозиторій Налаштувань Груп (GroupSettingRepository) ---")
 
-    print("Для тестування GroupSettingRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {GroupSetting.__name__}.")
-    print(
+    logger.info("Для тестування GroupSettingRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {GroupSetting.__name__}.")
+    logger.info(
         f"  Очікує схему створення: {GroupSettingCreateSchema.__name__}")  # GroupSettingCreateSchema має містити group_id
-    print(f"  Очікує схему оновлення: {GroupSettingUpdateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {GroupSettingUpdateSchema.__name__}")
 
-    print("\nСпецифічні методи:")
-    print("  - get_by_group_id(group_id: int)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_group_id(group_id: int)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    print("При створенні налаштувань через `create()`, `group_id` має бути в схемі `GroupSettingCreateSchema`.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("При створенні налаштувань через `create()`, `group_id` має бути в схемі `GroupSettingCreateSchema`.")

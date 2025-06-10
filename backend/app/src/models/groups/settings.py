@@ -15,6 +15,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Абсолютний імпорт базових класів та міксинів
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # Для відстеження часу створення/оновлення налаштувань
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.groups.group import Group
@@ -89,10 +92,10 @@ class GroupSetting(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі GroupSetting.
-    print("--- Модель Налаштувань Групи (GroupSetting) ---")
-    print(f"Назва таблиці: {GroupSetting.__tablename__}")
+    logger.info("--- Модель Налаштувань Групи (GroupSetting) ---")
+    logger.info(f"Назва таблиці: {GroupSetting.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = [
         'id', 'group_id', 'currency_name', 'allow_decimal_bonuses', 'max_debt_amount',
         'task_completion_requires_review', 'allow_task_reviews',
@@ -100,10 +103,10 @@ if __name__ == "__main__":
         'created_at', 'updated_at'
     ]
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
-    print(f"  - group (до Group)")
+    logger.info("\nОчікувані зв'язки (relationships):")
+    logger.info(f"  - group (до Group)")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_settings = GroupSetting(
@@ -118,8 +121,8 @@ if __name__ == "__main__":
     example_settings.created_at = datetime.now(tz=timezone.utc)
     example_settings.updated_at = datetime.now(tz=timezone.utc)
 
-    print(f"\nПриклад екземпляра GroupSetting (без сесії):\n  {example_settings}")
+    logger.info(f"\nПриклад екземпляра GroupSetting (без сесії):\n  {example_settings}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <GroupSetting(id=1, group_id=202, currency_name='пункти', created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

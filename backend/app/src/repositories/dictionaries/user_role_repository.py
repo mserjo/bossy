@@ -14,6 +14,9 @@ from backend.app.src.repositories.dictionaries.base_dict_repository import BaseD
 # Абсолютний імпорт моделі та схем для Системних Ролей Користувачів
 from backend.app.src.models.dictionaries.user_roles import UserRole
 from backend.app.src.schemas.dictionaries.user_roles import UserRoleCreateSchema, UserRoleUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class UserRoleRepository(BaseDictionaryRepository[UserRole, UserRoleCreateSchema, UserRoleUpdateSchema]):
@@ -39,9 +42,9 @@ class UserRoleRepository(BaseDictionaryRepository[UserRole, UserRoleCreateSchema
 
 if __name__ == "__main__":
     # Демонстраційний блок для UserRoleRepository.
-    print("--- Репозиторій для Довідника Системних Ролей Користувачів (UserRoleRepository) ---")
+    logger.info("--- Репозиторій для Довідника Системних Ролей Користувачів (UserRoleRepository) ---")
 
-    print("Для тестування UserRoleRepository потрібна асинхронна сесія SQLAlchemy.")
-    print(f"Він успадковує методи від BaseDictionaryRepository для моделі {UserRole.__name__}.")
-    print(f"  Очікує схему створення: {UserRoleCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {UserRoleUpdateSchema.__name__}")
+    logger.info("Для тестування UserRoleRepository потрібна асинхронна сесія SQLAlchemy.")
+    logger.info(f"Він успадковує методи від BaseDictionaryRepository для моделі {UserRole.__name__}.")
+    logger.info(f"  Очікує схему створення: {UserRoleCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {UserRoleUpdateSchema.__name__}")

@@ -7,6 +7,9 @@ Pydantic схеми для довідника "Платформи Месендж
 """
 
 from typing import Optional
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
@@ -52,9 +55,9 @@ class MessengerPlatformUpdateSchema(DictionaryUpdateSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем MessengerPlatform.
-    print("--- Pydantic Схеми для Довідника: MessengerPlatform ---")
+    logger.info("--- Pydantic Схеми для Довідника: MessengerPlatform ---")
 
-    print("\nMessengerPlatformSchema (приклад для відповіді API):")
+    logger.info("\nMessengerPlatformSchema (приклад для відповіді API):")
     messenger_platform_data_from_db = {
         "id": 1,
         "name": "Telegram",  # TODO i18n
@@ -72,23 +75,23 @@ if __name__ == "__main__":
         messenger_platform_data_from_db['updated_at'].replace('Z', '+00:00'))
 
     messenger_platform_schema_instance = MessengerPlatformSchema(**messenger_platform_data_from_db)
-    print(messenger_platform_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(messenger_platform_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nMessengerPlatformCreateSchema (приклад для створення):")
+    logger.info("\nMessengerPlatformCreateSchema (приклад для створення):")
     create_data = {
         "name": "Viber",  # TODO i18n
         "code": "VIBER",
         "description": "Платформа для обміну повідомленнями Viber."  # TODO i18n
     }
     create_schema_instance = MessengerPlatformCreateSchema(**create_data)
-    print(create_schema_instance.model_dump_json(indent=2))
+    logger.info(create_schema_instance.model_dump_json(indent=2))
 
-    print("\nMessengerPlatformUpdateSchema (приклад для оновлення):")
+    logger.info("\nMessengerPlatformUpdateSchema (приклад для оновлення):")
     update_data = {
         "description": "Оновлений опис для платформи Viber.",  # TODO i18n
         "state": "beta"  # TODO i18n
     }
     update_schema_instance = MessengerPlatformUpdateSchema(**update_data)
-    print(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")
+    logger.info("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")

@@ -10,7 +10,9 @@
 
 # Абсолютний імпорт базової моделі для довідників
 from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
-
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Можливо, знадобляться додаткові імпорти, якщо будуть специфічні поля.
 # from sqlalchemy.orm import Mapped, mapped_column
@@ -42,16 +44,16 @@ class BonusType(BaseDictionaryModel):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі BonusType.
-    print("--- Модель Довідника: BonusType ---")
-    print(f"Назва таблиці: {BonusType.__tablename__}")
+    logger.info("--- Модель Довідника: BonusType ---")
+    logger.info(f"Назва таблиці: {BonusType.__tablename__}")
 
-    print("\nОчікувані поля (успадковані та власні):")
+    logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = ['id', 'name', 'description', 'code', 'created_at', 'updated_at', 'deleted_at', 'state',
                        'group_id', 'notes']
     # Якщо додано кастомні поля:
     # expected_fields.append('default_multiplier')
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_bonus_type = BonusType(
@@ -62,8 +64,8 @@ if __name__ == "__main__":
         state="active"
     )
 
-    print(f"\nПриклад екземпляра BonusType (без сесії):\n  {example_bonus_type}")
+    logger.info(f"\nПриклад екземпляра BonusType (без сесії):\n  {example_bonus_type}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <BonusType(id=1, name='Нагорода за завдання', code='REWARD', state='active')>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

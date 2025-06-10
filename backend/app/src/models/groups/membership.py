@@ -16,6 +16,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # Для відстеження часу приєднання
 from backend.app.src.core.dicts import GroupRole  # Enum для ролей в групі
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
@@ -83,18 +86,18 @@ class GroupMembership(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі GroupMembership.
-    print("--- Модель Членства в Групі (GroupMembership) ---")
-    print(f"Назва таблиці: {GroupMembership.__tablename__}")
+    logger.info("--- Модель Членства в Групі (GroupMembership) ---")
+    logger.info(f"Назва таблиці: {GroupMembership.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = ['user_id', 'group_id', 'role', 'created_at', 'updated_at']
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['user', 'group']
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     # У реальному коді це робиться через сесію SQLAlchemy.
@@ -111,8 +114,8 @@ if __name__ == "__main__":
     example_membership.created_at = datetime.now(tz=timezone.utc)
     example_membership.updated_at = datetime.now(tz=timezone.utc)
 
-    print(f"\nПриклад екземпляра GroupMembership (без сесії):\n  {example_membership}")
+    logger.info(f"\nПриклад екземпляра GroupMembership (без сесії):\n  {example_membership}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <GroupMembership(user_id=101, group_id=202, role='admin', created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

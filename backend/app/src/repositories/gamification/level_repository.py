@@ -17,11 +17,10 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.gamification.level import Level
 from backend.app.src.schemas.gamification.level import LevelCreateSchema, LevelUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 class LevelRepository(BaseRepository[Level, LevelCreateSchema, LevelUpdateSchema]):
     """
@@ -102,16 +101,16 @@ class LevelRepository(BaseRepository[Level, LevelCreateSchema, LevelUpdateSchema
 
 if __name__ == "__main__":
     # Демонстраційний блок для LevelRepository.
-    print("--- Репозиторій Рівнів Гейміфікації (LevelRepository) ---")
+    logger.info("--- Репозиторій Рівнів Гейміфікації (LevelRepository) ---")
 
-    print("Для тестування LevelRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {Level.__name__}.")
-    print(f"  Очікує схему створення: {LevelCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {LevelUpdateSchema.__name__}")
+    logger.info("Для тестування LevelRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {Level.__name__}.")
+    logger.info(f"  Очікує схему створення: {LevelCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {LevelUpdateSchema.__name__}")
 
-    print("\nСпецифічні методи:")
-    print("  - get_levels_by_group_id(group_id: Optional[int], skip: int = 0, limit: int = 100)")
-    print("  - get_level_by_number(group_id: Optional[int], level_number: int)")
-    print("  - get_level_by_points(group_id: Optional[int], points: int)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_levels_by_group_id(group_id: Optional[int], skip: int = 0, limit: int = 100)")
+    logger.info("  - get_level_by_number(group_id: Optional[int], level_number: int)")
+    logger.info("  - get_level_by_points(group_id: Optional[int], points: int)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

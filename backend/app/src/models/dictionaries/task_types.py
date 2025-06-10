@@ -9,6 +9,9 @@
 
 # Абсолютний імпорт базової моделі для довідників
 from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 # Можливо, знадобляться додаткові імпорти, якщо будуть специфічні поля.
@@ -41,16 +44,16 @@ class TaskType(BaseDictionaryModel):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі TaskType.
-    print("--- Модель Довідника: TaskType ---")
-    print(f"Назва таблиці: {TaskType.__tablename__}")
+    logger.info("--- Модель Довідника: TaskType ---")
+    logger.info(f"Назва таблиці: {TaskType.__tablename__}")
 
-    print("\nОчікувані поля (успадковані та власні):")
+    logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = ['id', 'name', 'description', 'code', 'created_at', 'updated_at', 'deleted_at', 'state',
                        'group_id', 'notes']
     # Якщо додано кастомні поля:
     # expected_fields.append('allows_multiple_completions')
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_task_type = TaskType(
@@ -61,8 +64,8 @@ if __name__ == "__main__":
         state="active"
     )
 
-    print(f"\nПриклад екземпляра TaskType (без сесії):\n  {example_task_type}")
+    logger.info(f"\nПриклад екземпляра TaskType (без сесії):\n  {example_task_type}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <TaskType(id=1, name='Звичайне завдання', code='REGULAR_TASK', state='active')>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

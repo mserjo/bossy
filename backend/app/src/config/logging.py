@@ -219,8 +219,8 @@ if __name__ == "__main__":
         # app_logger.error("Виникла помилка ділення на нуль!", exc_info=True) # Альтернативний спосіб логування трасування
         app_logger.exception("Виник виняток ZeroDivisionError! Трасування стеку буде автоматично додано.")
 
-    print(f"\nНалаштування логування успішно застосовано. Перевірте вивід консолі.")
+    app_logger.info(f"\nНалаштування логування успішно застосовано. Перевірте вивід консолі.")
     if settings.LOG_TO_FILE and LOG_DIR_PATH:
-        print(f"Якщо логування у файл увімкнено, перевірте файли у директорії: {LOG_DIR_PATH.resolve()}")
-        print(f"  Лог програми: {LOG_DIR_PATH / settings.LOG_APP_FILE}")
-        print(f"  Лог помилок: {LOG_DIR_PATH / settings.LOG_ERROR_FILE}")
+        app_logger.info(f"Якщо логування у файл увімкнено, перевірте файли у директорії: {LOG_DIR_PATH.resolve()}")
+        app_logger.info(f"  Лог програми: {LOG_DIR_PATH / settings.LOG_APP_FILE}")
+        app_logger.info(f"  Лог помилок: {LOG_DIR_PATH / settings.LOG_ERROR_FILE}")

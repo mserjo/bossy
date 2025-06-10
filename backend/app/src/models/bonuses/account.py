@@ -15,6 +15,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Абсолютний імпорт базових класів та міксинів
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # Для відстеження часу створення/оновлення рахунку
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
@@ -86,21 +89,21 @@ class UserAccount(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі UserAccount.
-    print("--- Модель Рахунку Користувача (UserAccount) ---")
-    print(f"Назва таблиці: {UserAccount.__tablename__}")
+    logger.info("--- Модель Рахунку Користувача (UserAccount) ---")
+    logger.info(f"Назва таблиці: {UserAccount.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = [
         'id', 'user_id', 'group_id', 'balance', 'currency',
         'created_at', 'updated_at'
     ]
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['user', 'group', 'transactions']
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_account = UserAccount(
@@ -115,8 +118,8 @@ if __name__ == "__main__":
         tz=datetime.now().astimezone().tzinfo)  # Використовуємо локальний часовий пояс для прикладу
     example_account.updated_at = datetime.now(tz=datetime.now().astimezone().tzinfo)
 
-    print(f"\nПриклад екземпляра UserAccount (без сесії):\n  {example_account}")
+    logger.info(f"\nПриклад екземпляра UserAccount (без сесії):\n  {example_account}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <UserAccount(id=1, user_id=101, group_id=202, balance=Decimal('150.75'), currency='бали', created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

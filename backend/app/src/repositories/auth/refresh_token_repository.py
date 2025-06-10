@@ -19,7 +19,9 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі RefreshToken та схеми RefreshTokenCreateSchema
 from backend.app.src.models.auth.token import RefreshToken
 from backend.app.src.schemas.auth.token import RefreshTokenCreateSchema
-
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # from backend.app.src.config.logging import get_logger # Якщо потрібне логування
 
@@ -94,19 +96,19 @@ class RefreshTokenRepository(BaseRepository[RefreshToken, RefreshTokenCreateSche
 
 if __name__ == "__main__":
     # Демонстраційний блок для RefreshTokenRepository.
-    print("--- Репозиторій Токенів Оновлення (RefreshTokenRepository) ---")
+    logger.info("--- Репозиторій Токенів Оновлення (RefreshTokenRepository) ---")
 
-    print("Для тестування RefreshTokenRepository потрібна асинхронна сесія SQLAlchemy.")
-    print(f"Він успадковує методи від BaseRepository для моделі {RefreshToken.__name__}.")
-    print(f"  Очікує схему створення: {RefreshTokenCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {RefreshTokenUpdateSchema.__name__} (зараз порожня)")
+    logger.info("Для тестування RefreshTokenRepository потрібна асинхронна сесія SQLAlchemy.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {RefreshToken.__name__}.")
+    logger.info(f"  Очікує схему створення: {RefreshTokenCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {RefreshTokenUpdateSchema.__name__} (зараз порожня)")
 
-    print("\nСпецифічні методи:")
-    print("  - get_by_token(token_value: str)")
-    print("  - remove_expired_tokens(user_id: Optional[int] = None)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_token(token_value: str)")
+    logger.info("  - remove_expired_tokens(user_id: Optional[int] = None)")
 
-    print("\nВАЖЛИВО: Метод get_by_token потребує адаптації, якщо токени зберігаються хешованими.")
-    print("Примітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("\nВАЖЛИВО: Метод get_by_token потребує адаптації, якщо токени зберігаються хешованими.")
+    logger.info("Примітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
 
     # Концептуальний приклад використання (потребує макетів або реальної сесії)
     # async def demo_refresh_token_repo():
@@ -118,9 +120,9 @@ if __name__ == "__main__":
     #         # from datetime import timedelta
     #         # new_token_data = RefreshTokenCreateSchema(user_id=1, token="testrefreshtoken", expires_at=datetime.now(timezone.utc) + timedelta(days=7))
     #         # created_token = await repo.create(new_token_data)
-    #         # print(f"Створено токен: {created_token}")
+    #         # logger.info(f"Створено токен: {created_token}")
     #         #
     #         # expired_count = await repo.remove_expired_tokens()
-    #         # print(f"Видалено прострочених токенів: {expired_count}")
+    #         # logger.info(f"Видалено прострочених токенів: {expired_count}")
     # import asyncio
     # asyncio.run(demo_refresh_token_repo())

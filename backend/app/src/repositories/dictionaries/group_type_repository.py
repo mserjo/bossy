@@ -14,6 +14,9 @@ from backend.app.src.repositories.dictionaries.base_dict_repository import BaseD
 # Абсолютний імпорт моделі та схем для Типів Груп
 from backend.app.src.models.dictionaries.group_types import GroupType
 from backend.app.src.schemas.dictionaries.group_types import GroupTypeCreateSchema, GroupTypeUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class GroupTypeRepository(BaseDictionaryRepository[GroupType, GroupTypeCreateSchema, GroupTypeUpdateSchema]):
@@ -38,9 +41,9 @@ class GroupTypeRepository(BaseDictionaryRepository[GroupType, GroupTypeCreateSch
 
 if __name__ == "__main__":
     # Демонстраційний блок для GroupTypeRepository.
-    print("--- Репозиторій для Довідника Типів Груп (GroupTypeRepository) ---")
+    logger.info("--- Репозиторій для Довідника Типів Груп (GroupTypeRepository) ---")
 
-    print("Для тестування GroupTypeRepository потрібна асинхронна сесія SQLAlchemy.")
-    print(f"Він успадковує методи від BaseDictionaryRepository для моделі {GroupType.__name__}.")
-    print(f"  Очікує схему створення: {GroupTypeCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {GroupTypeUpdateSchema.__name__}")
+    logger.info("Для тестування GroupTypeRepository потрібна асинхронна сесія SQLAlchemy.")
+    logger.info(f"Він успадковує методи від BaseDictionaryRepository для моделі {GroupType.__name__}.")
+    logger.info(f"  Очікує схему створення: {GroupTypeCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {GroupTypeUpdateSchema.__name__}")

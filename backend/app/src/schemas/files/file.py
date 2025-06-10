@@ -15,6 +15,9 @@ from pydantic import Field, AnyHttpUrl, field_validator
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import FileType as FileTypeEnum
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Замінити Any на UserPublicProfileSchema, коли вона буде доступна/рефакторена.
 # from backend.app.src.schemas.auth.user import UserPublicProfileSchema
@@ -109,9 +112,9 @@ class FileRecordSchema(FileRecordBaseSchema, IDSchemaMixin, TimestampedSchemaMix
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем записів файлів.
-    print("--- Pydantic Схеми для Записів Файлів (FileRecord) ---")
+    logger.info("--- Pydantic Схеми для Записів Файлів (FileRecord) ---")
 
-    print("\nFileRecordBaseSchema (приклад валідних даних):")
+    logger.info("\nFileRecordBaseSchema (приклад валідних даних):")
     base_file_data = {
         "file_name": "мій_документ.pdf",  # TODO i18n
         "mime_type": "application/pdf",
@@ -120,19 +123,19 @@ if __name__ == "__main__":
         "metadata": {"pages": 10, "author": "Іван Іваненко"}  # TODO i18n
     }
     base_file_instance = FileRecordBaseSchema(**base_file_data)
-    print(base_file_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(base_file_instance.model_dump_json(indent=2, exclude_none=True))
     try:
         FileRecordBaseSchema(file_name="test.txt", mime_type="text/plain", file_size=10, purpose="INVALID_PURPOSE")
     except ValueError as e:
-        print(f"Помилка валідації FileRecordBaseSchema (очікувано для purpose): {e}")
+        logger.info(f"Помилка валідації FileRecordBaseSchema (очікувано для purpose): {e}")
 
-    print("\nFileRecordCreateSchema (приклад використання):")
+    logger.info("\nFileRecordCreateSchema (приклад використання):")
     # FileRecordCreateSchema успадковує від FileRecordBaseSchema, тому використовуємо ті ж дані.
     # `uploader_user_id` та `file_path` додаються сервісом.
     create_file_instance = FileRecordCreateSchema(**base_file_data)
-    print(create_file_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(create_file_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nFileRecordSchema (приклад відповіді API):")
+    logger.info("\nFileRecordSchema (приклад відповіді API):")
     file_response_data = {
         "id": 1,
         "file_name": "аватар_користувача.png",  # TODO i18n
@@ -147,9 +150,9 @@ if __name__ == "__main__":
         # "uploader": {"id": 101, "name": "Завантажувач Користувач"} # Приклад UserPublicProfileSchema
     }
     file_response_instance = FileRecordSchema(**file_response_data)
-    print(file_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(file_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Схеми для пов'язаних об'єктів (`uploader`) та поле `url`")
-    print("потребують заповнення на рівні сервісу або через @computed_field (для URL).")
-    print(
+    logger.info("\nПримітка: Схеми для пов'язаних об'єктів (`uploader`) та поле `url`")
+    logger.info("потребують заповнення на рівні сервісу або через @computed_field (для URL).")
+    logger.info(
         f"Поле 'purpose' використовує значення з Enum `FileType` (наприклад, '{FileTypeEnum.TASK_ATTACHMENT.value}').")

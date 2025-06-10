@@ -17,11 +17,10 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.groups.invitation import GroupInvitation
 from backend.app.src.schemas.groups.invitation import GroupInvitationCreateSchema, GroupInvitationUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 class GroupInvitationRepository(
     BaseRepository[GroupInvitation, GroupInvitationCreateSchema, GroupInvitationUpdateSchema]):
@@ -111,17 +110,17 @@ class GroupInvitationRepository(
 
 if __name__ == "__main__":
     # Демонстраційний блок для GroupInvitationRepository.
-    print("--- Репозиторій Запрошень до Груп (GroupInvitationRepository) ---")
+    logger.info("--- Репозиторій Запрошень до Груп (GroupInvitationRepository) ---")
 
-    print("Для тестування GroupInvitationRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {GroupInvitation.__name__}.")
-    print(f"  Очікує схему створення: {GroupInvitationCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {GroupInvitationUpdateSchema.__name__}")
+    logger.info("Для тестування GroupInvitationRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {GroupInvitation.__name__}.")
+    logger.info(f"  Очікує схему створення: {GroupInvitationCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {GroupInvitationUpdateSchema.__name__}")
 
-    print("\nСпецифічні методи:")
-    print("  - get_by_code(code: str)")
-    print("  - get_by_group_id(group_id: int, skip: int = 0, limit: int = 100)")
-    print("  - get_by_email_and_group(email: str, group_id: int)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_code(code: str)")
+    logger.info("  - get_by_group_id(group_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("  - get_by_email_and_group(email: str, group_id: int)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    print("TODO: Метод get_by_email_and_group може потребувати доопрацювання для фільтрації за статусом/терміном дії.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("TODO: Метод get_by_email_and_group може потребувати доопрацювання для фільтрації за статусом/терміном дії.")

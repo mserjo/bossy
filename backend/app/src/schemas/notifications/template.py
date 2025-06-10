@@ -9,6 +9,9 @@ Pydantic схеми для сутності "Шаблон Сповіщення" 
 from typing import Optional
 
 from pydantic import Field
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
@@ -93,10 +96,10 @@ class NotificationTemplateSchema(BaseDictionarySchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем шаблонів сповіщень.
-    print("--- Pydantic Схеми для Шаблонів Сповіщень (NotificationTemplate) ---")
+    logger.info("--- Pydantic Схеми для Шаблонів Сповіщень (NotificationTemplate) ---")
     from datetime import datetime  # Потрібно для прикладів з BaseDictionarySchema
 
-    print("\nNotificationTemplateCreateSchema (приклад для створення):")
+    logger.info("\nNotificationTemplateCreateSchema (приклад для створення):")
     create_template_data = {
         "name": "Вітальний Email",  # TODO i18n
         "code": "WELCOME_EMAIL_V2",
@@ -108,17 +111,17 @@ if __name__ == "__main__":
         "state": "active"
     }
     create_template_instance = NotificationTemplateCreateSchema(**create_template_data)
-    print(create_template_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(create_template_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nNotificationTemplateUpdateSchema (приклад для оновлення):")
+    logger.info("\nNotificationTemplateUpdateSchema (приклад для оновлення):")
     update_template_data = {
         "subject_template": "Ласкаво просимо до оновленого {project_name}, {{user_name}}!",  # TODO i18n
         "state": "inactive"
     }
     update_template_instance = NotificationTemplateUpdateSchema(**update_template_data)
-    print(update_template_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_template_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nNotificationTemplateSchema (приклад відповіді API):")
+    logger.info("\nNotificationTemplateSchema (приклад відповіді API):")
     template_response_data = {
         "id": 1,
         "code": "TASK_REMINDER_SMS",
@@ -133,7 +136,7 @@ if __name__ == "__main__":
         "updated_at": datetime.now()
     }
     template_response_instance = NotificationTemplateSchema(**template_response_data)
-    print(template_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(template_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних шаблонів сповіщень.")
-    print("TODO: Інтегрувати Enum 'NotificationChannelType' з core.dicts для поля 'template_type'.")
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних шаблонів сповіщень.")
+    logger.info("TODO: Інтегрувати Enum 'NotificationChannelType' з core.dicts для поля 'template_type'.")

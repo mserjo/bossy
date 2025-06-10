@@ -15,6 +15,9 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Визначити та імпортувати RatingType Enum з core.dicts
 # from backend.app.src.core.dicts import RatingType
@@ -83,9 +86,9 @@ class UserGroupRatingSchema(UserGroupRatingBaseSchema, IDSchemaMixin, Timestampe
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем рейтингів користувачів у групах.
-    print("--- Pydantic Схеми для Рейтингів Користувачів в Групах (UserGroupRating) ---")
+    logger.info("--- Pydantic Схеми для Рейтингів Користувачів в Групах (UserGroupRating) ---")
 
-    print("\nUserGroupRatingCreateSchema (приклад для створення сервісом):")
+    logger.info("\nUserGroupRatingCreateSchema (приклад для створення сервісом):")
     create_rating_data = {
         "user_id": 101,
         "group_id": 1,
@@ -93,14 +96,14 @@ if __name__ == "__main__":
         "rating_type": "overall"  # TODO: Замінити на RatingType.OVERALL.value
     }
     create_rating_instance = UserGroupRatingCreateSchema(**create_rating_data)
-    print(create_rating_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(create_rating_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nUserGroupRatingUpdateSchema (приклад для оновлення):")
+    logger.info("\nUserGroupRatingUpdateSchema (приклад для оновлення):")
     update_rating_data = {"rating_score": 1550}
     update_rating_instance = UserGroupRatingUpdateSchema(**update_rating_data)
-    print(update_rating_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_rating_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nUserGroupRatingSchema (приклад відповіді API):")
+    logger.info("\nUserGroupRatingSchema (приклад відповіді API):")
     rating_response_data = {
         "id": 1,
         "user_id": 101,
@@ -115,11 +118,11 @@ if __name__ == "__main__":
         # "group": {"id": 1, "name": "Головна Ліга"}  # Приклад GroupBriefSchema
     }
     rating_response_instance = UserGroupRatingSchema(**rating_response_data)
-    print(rating_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(rating_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, GroupBriefSchema)")
-    print("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
-    print("TODO: Інтегрувати Enum 'RatingType' з core.dicts для поля 'rating_type'.")
+    logger.info("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, GroupBriefSchema)")
+    logger.info("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
+    logger.info("TODO: Інтегрувати Enum 'RatingType' з core.dicts для поля 'rating_type'.")
 
 # Потрібно для timedelta в __main__
 from datetime import timedelta

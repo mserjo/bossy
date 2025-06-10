@@ -15,7 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Абсолютний імпорт базового репозиторію та TypeVars
 from backend.app.src.repositories.base import BaseRepository
 from backend.app.src.core.base import ModelType, CreateSchemaType, UpdateSchemaType
-
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # from backend.app.src.config.logging import get_logger # Якщо потрібне логування
 
@@ -94,7 +96,7 @@ if __name__ == "__main__":
     # Це концептуальна демонстрація, оскільки для повноцінної роботи потрібні
     # конкретні моделі, схеми та реальна асинхронна сесія.
 
-    print("--- Базовий Репозиторій для Довідників (BaseDictionaryRepository) ---")
+    logger.info("--- Базовий Репозиторій для Довідників (BaseDictionaryRepository) ---")
 
     # 1. Визначення фіктивних моделей та схем для тестування
     from pydantic import BaseModel as PydanticBaseModel  # Для схем
@@ -179,7 +181,7 @@ if __name__ == "__main__":
 
 
     async def run_dict_repository_demo():
-        print("\n--- Демонстрація роботи BaseDictionaryRepository з Макетами ---")
+        logger.info("\n--- Демонстрація роботи BaseDictionaryRepository з Макетами ---")
         mock_session = MockAsyncSession()
 
         # Створюємо екземпляр репозиторію для нашої фіктивної моделі
@@ -188,10 +190,10 @@ if __name__ == "__main__":
         ](db_session=mock_session, model=MockDictModel)
 
         # 1. Створення запису довідника
-        print("\n1. Тест створення запису довідника:")
+        logger.info("\n1. Тест створення запису довідника:")
         create_schema = MockDictCreateSchema(name="Активний", code="ACTIVE", description="Статус активного елемента")
         created_dict_item = await dict_repo.create(create_schema)
-        print(f"  Створено: {created_dict_item}")
+        logger.info(f"  Створено: {created_dict_item}")
         assert created_dict_item.code == "ACTIVE"
 
         # Додамо ще один для тестування get_by_name
@@ -200,36 +202,36 @@ if __name__ == "__main__":
         await dict_repo.create(create_schema_pending)
 
         # 2. Отримання за кодом (імітація)
-        print("\n2. Тест отримання за кодом (імітація):")
+        logger.info("\n2. Тест отримання за кодом (імітація):")
         # Наш макет execute дуже спрощений, тому цей тест не буде реально фільтрувати.
         # Він поверне перший елемент або нічого.
         # У реальному тесті з БД це б працювало.
         item_by_code = await dict_repo.get_by_code("ACTIVE")
-        print(f"  Отримано за кодом 'ACTIVE': {item_by_code}")
+        logger.info(f"  Отримано за кодом 'ACTIVE': {item_by_code}")
         if item_by_code:  # Може бути None через обмеження макета
             assert item_by_code.code == "ACTIVE"
 
         item_by_code_non_existent = await dict_repo.get_by_code("NON_EXISTENT")
-        print(f"  Отримано за кодом 'NON_EXISTENT': {item_by_code_non_existent}")
+        logger.info(f"  Отримано за кодом 'NON_EXISTENT': {item_by_code_non_existent}")
         assert item_by_code_non_existent is None  # Очікуємо None, бо макет поверне порожній список
 
         # 3. Отримання за назвою (імітація)
-        print("\n3. Тест отримання за назвою (імітація):")
+        logger.info("\n3. Тест отримання за назвою (імітація):")
         item_by_name = await dict_repo.get_by_name("Активний")
-        print(f"  Отримано за назвою 'Активний': {item_by_name}")
+        logger.info(f"  Отримано за назвою 'Активний': {item_by_name}")
         if item_by_name:  # Може бути None через обмеження макета
             assert item_by_name.name == "Активний"
 
         item_by_name_non_existent = await dict_repo.get_by_name("Неіснуюча Назва")
-        print(f"  Отримано за назвою 'Неіснуюча Назва': {item_by_name_non_existent}")
+        logger.info(f"  Отримано за назвою 'Неіснуюча Назва': {item_by_name_non_existent}")
         assert item_by_name_non_existent is None
 
-        print("\nПримітка: Демонстрація використовує сильно спрощені макети.")
-        print("Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+        logger.info("\nПримітка: Демонстрація використовує сильно спрощені макети.")
+        logger.info("Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
 
 
     import asyncio
 
     # asyncio.run(run_dict_repository_demo())
-    print(
+    logger.info(
         "\nЗапуск демонстрації BaseDictionaryRepository закоментовано через складність повного макетування SQLAlchemy.")

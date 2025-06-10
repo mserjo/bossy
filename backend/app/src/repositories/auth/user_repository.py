@@ -19,7 +19,9 @@ from backend.app.src.models.auth.user import User
 from backend.app.src.schemas.auth.user import UserCreateSchema, UserUpdateSchema
 # Абсолютний імпорт функції хешування паролю
 from backend.app.src.config.security import get_password_hash
-
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # from backend.app.src.config.logging import get_logger # Якщо потрібне логування
 
@@ -161,26 +163,26 @@ class UserRepository(BaseRepository[User, UserCreateSchema, UserUpdateSchema]):
 if __name__ == "__main__":
     # Демонстраційний блок для UserRepository.
     # Потребує макетів для AsyncSession, UserCreateSchema, UserUpdateSchema, User моделі.
-    print("--- Репозиторій Користувачів (UserRepository) ---")
+    logger.info("--- Репозиторій Користувачів (UserRepository) ---")
 
     # Концептуальна демонстрація. Реальне тестування потребує інтеграційних тестів.
     # from backend.app.src.core.dependencies import UserModel as User # Використання UserModel-заповнювача
 
-    print(f"Репозиторій працює з моделлю: {User.__name__}")
-    print(f"  Очікує схему створення: {UserCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {UserUpdateSchema.__name__}")
+    logger.info(f"Репозиторій працює з моделлю: {User.__name__}")
+    logger.info(f"  Очікує схему створення: {UserCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {UserUpdateSchema.__name__}")
 
-    print("\nОсновні методи:")
-    print("  - get_by_email(email: str)")
-    print("  - get_by_phone_number(phone_number: str)")
-    print("  - create(obj_in: UserCreateSchema) -> User (з хешуванням паролю)")
-    print("  - update(*, db_obj: User, obj_in: UserUpdateSchema) -> User (з хешуванням паролю, якщо надано)")
-    print("  - get(record_id: Any) (успадковано)")
-    print("  - get_multi(...) (успадковано)")
-    print("  - delete(record_id: Any) (успадковано)")
-    print("  - soft_delete(db_obj: User) (успадковано, якщо модель User підтримує)")
-    print("  - count(filters: List) (успадковано)")
+    logger.info("\nОсновні методи:")
+    logger.info("  - get_by_email(email: str)")
+    logger.info("  - get_by_phone_number(phone_number: str)")
+    logger.info("  - create(obj_in: UserCreateSchema) -> User (з хешуванням паролю)")
+    logger.info("  - update(*, db_obj: User, obj_in: UserUpdateSchema) -> User (з хешуванням паролю, якщо надано)")
+    logger.info("  - get(record_id: Any) (успадковано)")
+    logger.info("  - get_multi(...) (успадковано)")
+    logger.info("  - delete(record_id: Any) (успадковано)")
+    logger.info("  - soft_delete(db_obj: User) (успадковано, якщо модель User підтримує)")
+    logger.info("  - count(filters: List) (успадковано)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    print(
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info(
         "TODO: Реалізувати логіку перетворення *code (напр. user_type_code) на *_id в методах create/update, або перенести це на сервісний рівень.")

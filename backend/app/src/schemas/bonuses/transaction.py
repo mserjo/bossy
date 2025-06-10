@@ -16,6 +16,9 @@ from pydantic import Field, field_validator
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import TransactionType  # Enum для типів транзакцій
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
 # from backend.app.src.schemas.auth.user import UserPublicProfileSchema # Для created_by
@@ -90,9 +93,9 @@ class AccountTransactionSchema(AccountTransactionBaseSchema, IDSchemaMixin, Time
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем транзакцій.
-    print("--- Pydantic Схеми для Транзакцій по Рахунку (AccountTransaction) ---")
+    logger.info("--- Pydantic Схеми для Транзакцій по Рахунку (AccountTransaction) ---")
 
-    print("\nAccountTransactionBaseSchema (приклад):")
+    logger.info("\nAccountTransactionBaseSchema (приклад):")
     base_tx_data = {
         "account_id": 1,
         "transaction_type": TransactionType.CREDIT.value,
@@ -100,13 +103,13 @@ if __name__ == "__main__":
         "description": "Нарахування за участь у заході."  # TODO i18n
     }
     base_tx_instance = AccountTransactionBaseSchema(**base_tx_data)
-    print(base_tx_instance.model_dump_json(indent=2))
+    logger.info(base_tx_instance.model_dump_json(indent=2))
     try:
         AccountTransactionBaseSchema(account_id=1, transaction_type="INVALID_TYPE", amount=10)
     except Exception as e:
-        print(f"Помилка валідації AccountTransactionBaseSchema (очікувано): {e}")
+        logger.info(f"Помилка валідації AccountTransactionBaseSchema (очікувано): {e}")
 
-    print("\nAccountTransactionCreateSchema (приклад для створення):")
+    logger.info("\nAccountTransactionCreateSchema (приклад для створення):")
     create_tx_data = {
         "account_id": 2,
         "transaction_type": TransactionType.DEBIT.value,
@@ -115,9 +118,9 @@ if __name__ == "__main__":
         "related_reward_id": 5
     }
     create_tx_instance = AccountTransactionCreateSchema(**create_tx_data)
-    print(create_tx_instance.model_dump_json(indent=2))
+    logger.info(create_tx_instance.model_dump_json(indent=2))
 
-    print("\nAccountTransactionSchema (приклад відповіді API):")
+    logger.info("\nAccountTransactionSchema (приклад відповіді API):")
     tx_response_data = {
         "id": 1001,
         "account_id": 1,
@@ -130,8 +133,8 @@ if __name__ == "__main__":
         # "created_by": None # Приклад UserPublicProfileSchema
     }
     tx_response_instance = AccountTransactionSchema(**tx_response_data)
-    print(tx_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(tx_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних транзакцій.")
-    print(
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних транзакцій.")
+    logger.info(
         f"Використовується TransactionType Enum для поля 'transaction_type', наприклад: TransactionType.REFUND = '{TransactionType.REFUND.value}'")

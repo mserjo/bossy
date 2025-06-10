@@ -14,6 +14,9 @@ from backend.app.src.repositories.dictionaries.base_dict_repository import BaseD
 # Абсолютний імпорт моделі та схем для Типів Користувачів
 from backend.app.src.models.dictionaries.user_types import UserType
 from backend.app.src.schemas.dictionaries.user_types import UserTypeCreateSchema, UserTypeUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class UserTypeRepository(BaseDictionaryRepository[UserType, UserTypeCreateSchema, UserTypeUpdateSchema]):
@@ -38,9 +41,9 @@ class UserTypeRepository(BaseDictionaryRepository[UserType, UserTypeCreateSchema
 
 if __name__ == "__main__":
     # Демонстраційний блок для UserTypeRepository.
-    print("--- Репозиторій для Довідника Типів Користувачів (UserTypeRepository) ---")
+    logger.info("--- Репозиторій для Довідника Типів Користувачів (UserTypeRepository) ---")
 
-    print("Для тестування UserTypeRepository потрібна асинхронна сесія SQLAlchemy.")
-    print(f"Він успадковує методи від BaseDictionaryRepository для моделі {UserType.__name__}.")
-    print(f"  Очікує схему створення: {UserTypeCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {UserTypeUpdateSchema.__name__}")
+    logger.info("Для тестування UserTypeRepository потрібна асинхронна сесія SQLAlchemy.")
+    logger.info(f"Він успадковує методи від BaseDictionaryRepository для моделі {UserType.__name__}.")
+    logger.info(f"  Очікує схему створення: {UserTypeCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {UserTypeUpdateSchema.__name__}")

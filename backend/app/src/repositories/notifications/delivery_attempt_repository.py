@@ -21,13 +21,13 @@ from backend.app.src.schemas.notifications.delivery import (
     # NotificationDeliveryAttemptUpdateSchema зазвичай не потрібна
 )
 from pydantic import BaseModel as PydanticBaseModel  # Для "заглушки" UpdateSchema
-
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Імпортувати Enums NotificationChannelType та DeliveryStatusType з core.dicts
 # from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType
 
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-# logger = get_logger(__name__)
 
 # Спроби доставки зазвичай не оновлюються, а створюються нові для кожної спроби.
 class NotificationDeliveryAttemptUpdateSchema(PydanticBaseModel):
@@ -107,17 +107,17 @@ class NotificationDeliveryAttemptRepository(
 
 if __name__ == "__main__":
     # Демонстраційний блок для NotificationDeliveryAttemptRepository.
-    print("--- Репозиторій Спроб Доставки Сповіщень (NotificationDeliveryAttemptRepository) ---")
+    logger.info("--- Репозиторій Спроб Доставки Сповіщень (NotificationDeliveryAttemptRepository) ---")
 
-    print(
+    logger.info(
         "Для тестування NotificationDeliveryAttemptRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {NotificationDeliveryAttempt.__name__}.")
-    print(f"  Очікує схему створення: {NotificationDeliveryAttemptCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {NotificationDeliveryAttemptUpdateSchema.__name__} (зараз порожня)")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {NotificationDeliveryAttempt.__name__}.")
+    logger.info(f"  Очікує схему створення: {NotificationDeliveryAttemptCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {NotificationDeliveryAttemptUpdateSchema.__name__} (зараз порожня)")
 
-    print("\nСпецифічні методи:")
-    print("  - get_attempts_for_notification(notification_id: int, skip: int = 0, limit: int = 100)")
-    print("  - get_failed_attempts_by_channel(channel: str, skip: int = 0, limit: int = 100)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_attempts_for_notification(notification_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("  - get_failed_attempts_by_channel(channel: str, skip: int = 0, limit: int = 100)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    print("TODO: Інтегрувати Enums 'NotificationChannelType' та 'DeliveryStatusType' з core.dicts для фільтрації.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("TODO: Інтегрувати Enums 'NotificationChannelType' та 'DeliveryStatusType' з core.dicts для фільтрації.")

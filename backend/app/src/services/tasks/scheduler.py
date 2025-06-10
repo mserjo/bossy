@@ -236,7 +236,7 @@ class TaskSchedulingService(BaseService):
                     try:
                         logger.info(f"Sending reminder for task ID {task.id} ('{task.title}') to user ID {assignment.user_id}.")
                         # await notification_service.send_task_deadline_reminder(user=assignment.user, task=task)
-                        print(f"SIMULATED REMINDER (to user {assignment.user.username}): Task '{task.title}' in group '{task.group.name}' is due at {task.due_date}.")
+                        logger.info(f"SIMULATED REMINDER (to user {assignment.user.username}): Task '{task.title}' in group '{task.group.name}' is due at {task.due_date}.")
 
                         reminders_sent_count += 1
 

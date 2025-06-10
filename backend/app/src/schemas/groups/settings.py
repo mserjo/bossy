@@ -15,6 +15,9 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class GroupSettingBaseSchema(BaseSchema):
@@ -97,26 +100,26 @@ class GroupSettingSchema(GroupSettingBaseSchema, IDSchemaMixin, TimestampedSchem
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем налаштувань групи.
-    print("--- Pydantic Схеми для Налаштувань Групи (GroupSetting) ---")
+    logger.info("--- Pydantic Схеми для Налаштувань Групи (GroupSetting) ---")
 
-    print("\nGroupSettingBaseSchema (приклад):")
+    logger.info("\nGroupSettingBaseSchema (приклад):")
     base_settings_data = {
         "currency_name": "кристали",  # TODO i18n
         "allow_decimal_bonuses": True,
         "max_debt_amount": Decimal("50.00")
     }
     base_settings_instance = GroupSettingBaseSchema(**base_settings_data)
-    print(base_settings_instance.model_dump_json(indent=2))
+    logger.info(base_settings_instance.model_dump_json(indent=2))
 
-    print("\nGroupSettingUpdateSchema (приклад для оновлення):")
+    logger.info("\nGroupSettingUpdateSchema (приклад для оновлення):")
     update_settings_data = {
         "currency_name": "золоті монети",  # TODO i18n
         "allow_task_reviews": False
     }
     update_settings_instance = GroupSettingUpdateSchema(**update_settings_data)
-    print(update_settings_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_settings_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nGroupSettingSchema (приклад відповіді API):")
+    logger.info("\nGroupSettingSchema (приклад відповіді API):")
     setting_response_data = {
         "id": 1,  # ID самого запису налаштувань
         "group_id": 101,  # ID групи
@@ -132,7 +135,7 @@ if __name__ == "__main__":
         "updated_at": datetime.now()
     }
     setting_response_instance = GroupSettingSchema(**setting_response_data)
-    print(setting_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(setting_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних налаштувань групи.")
-    print("Поле 'max_debt_amount' може потребувати уточнення логіки (чи може бути від'ємним для позначення ліміту).")
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних налаштувань групи.")
+    logger.info("Поле 'max_debt_amount' може потребувати уточнення логіки (чи може бути від'ємним для позначення ліміту).")

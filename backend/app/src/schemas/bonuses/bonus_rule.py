@@ -16,6 +16,9 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Оскільки BonusRule модель успадковує NameDescriptionMixin, StateMixin, їх поля теж мають бути тут.
 
@@ -116,9 +119,9 @@ class BonusRuleSchema(BonusRuleBaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем правил нарахування бонусів.
-    print("--- Pydantic Схеми для Правил Нарахування Бонусів (BonusRule) ---")
+    logger.info("--- Pydantic Схеми для Правил Нарахування Бонусів (BonusRule) ---")
 
-    print("\nBonusRuleBaseSchema (приклад):")
+    logger.info("\nBonusRuleBaseSchema (приклад):")
     base_rule_data = {
         "name": "Щоденний бонус за вхід",  # TODO i18n
         "bonus_type_code": "DAILY_LOGIN_REWARD",
@@ -126,9 +129,9 @@ if __name__ == "__main__":
         "state": "active"
     }
     base_rule_instance = BonusRuleBaseSchema(**base_rule_data)
-    print(base_rule_instance.model_dump_json(indent=2))
+    logger.info(base_rule_instance.model_dump_json(indent=2))
 
-    print("\nBonusRuleCreateSchema (приклад для створення):")
+    logger.info("\nBonusRuleCreateSchema (приклад для створення):")
     create_rule_data = {
         "name": "Бонус за реєстрацію друга",  # TODO i18n
         "description": "Нараховується користувачу, який запросив друга, після реєстрації друга.",  # TODO i18n
@@ -137,14 +140,14 @@ if __name__ == "__main__":
         "state": "active"
     }
     create_rule_instance = BonusRuleCreateSchema(**create_rule_data)
-    print(create_rule_instance.model_dump_json(indent=2))
+    logger.info(create_rule_instance.model_dump_json(indent=2))
 
-    print("\nBonusRuleUpdateSchema (приклад для оновлення):")
+    logger.info("\nBonusRuleUpdateSchema (приклад для оновлення):")
     update_rule_data = {"amount": Decimal("60.00"), "description": "Збільшений бонус за реєстрацію друга."}  # TODO i18n
     update_rule_instance = BonusRuleUpdateSchema(**update_rule_data)
-    print(update_rule_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_rule_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nBonusRuleSchema (приклад відповіді API):")
+    logger.info("\nBonusRuleSchema (приклад відповіді API):")
     rule_response_data = {
         "id": 1,
         "name": "Бонус за виконання завдання 'Титан'",  # TODO i18n
@@ -158,9 +161,9 @@ if __name__ == "__main__":
         # "task": {"id": 123, "name": "Завдання 'Титан'"} # Приклад TaskSchema (коротка версія)
     }
     rule_response_instance = BonusRuleSchema(**rule_response_data)
-    print(rule_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(rule_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Схеми для пов'язаних об'єктів (BonusTypeSchema, TaskSchema) наразі є заповнювачами (Any).")
-    print("Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
-    print("Також, `bonus_type_code` потребує валідації на рівні сервісу або схеми.")
-    print("Уточнення щодо `event_id` та його зв'язку з `task_id` залишається актуальним (TODO).")
+    logger.info("\nПримітка: Схеми для пов'язаних об'єктів (BonusTypeSchema, TaskSchema) наразі є заповнювачами (Any).")
+    logger.info("Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
+    logger.info("Також, `bonus_type_code` потребує валідації на рівні сервісу або схеми.")
+    logger.info("Уточнення щодо `event_id` та його зв'язку з `task_id` залишається актуальним (TODO).")

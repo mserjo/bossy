@@ -12,8 +12,10 @@ from typing import Optional, Dict, Any, List  # List може знадобити
 from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
-from backend.app.src.schemas.base import BaseSchema, \
-    IDSchemaMixin  # TimestampedSchemaMixin тут не потрібен, бо timestamp є власним полем
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin  # TimestampedSchemaMixin тут не потрібен, бо timestamp є власним полем
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Визначити та імпортувати Enum LogLevel з core.dicts
 # from backend.app.src.core.dicts import LogLevel as LogLevelEnum
@@ -145,9 +147,9 @@ class PerformanceMetricSchema(PerformanceMetricBaseSchema, IDSchemaMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем моніторингу.
-    print("--- Pydantic Схеми для Моніторингу (SystemLog, PerformanceMetric) ---")
+    logger.info("--- Pydantic Схеми для Моніторингу (SystemLog, PerformanceMetric) ---")
 
-    print("\nSystemLogCreateSchema (приклад для створення логу):")
+    logger.info("\nSystemLogCreateSchema (приклад для створення логу):")
     create_log_data = {
         "level": TempLogLevel.INFO,  # TODO: Замінити на Enum.value
         "message": "Користувач user@example.com успішно оновив профіль.",  # TODO i18n
@@ -157,9 +159,9 @@ if __name__ == "__main__":
     }
     create_log_instance = SystemLogCreateSchema(**create_log_data)
     # timestamp буде додано автоматично default_factory, якщо не передано
-    print(create_log_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(create_log_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nSystemLogSchema (приклад відповіді API):")
+    logger.info("\nSystemLogSchema (приклад відповіді API):")
     log_response_data = {
         "id": 1,
         "timestamp": datetime.now(),
@@ -169,9 +171,9 @@ if __name__ == "__main__":
         # "user": {"id": 101, "name": "Ініціатор Дії"} # Приклад UserPublicProfileSchema
     }
     log_response_instance = SystemLogSchema(**log_response_data)
-    print(log_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(log_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nPerformanceMetricCreateSchema (приклад для створення метрики):")
+    logger.info("\nPerformanceMetricCreateSchema (приклад для створення метрики):")
     create_metric_data = {
         "metric_name": "login_api_response_time",
         "value": 125.5,
@@ -179,9 +181,9 @@ if __name__ == "__main__":
         "tags": {"endpoint": "/api/v1/auth/login", "method": "POST"}
     }
     create_metric_instance = PerformanceMetricCreateSchema(**create_metric_data)
-    print(create_metric_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(create_metric_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nPerformanceMetricSchema (приклад відповіді API):")
+    logger.info("\nPerformanceMetricSchema (приклад відповіді API):")
     metric_response_data = {
         "id": 1,
         "timestamp": datetime.now(),
@@ -190,8 +192,8 @@ if __name__ == "__main__":
         "unit": "count"
     }
     metric_response_instance = PerformanceMetricSchema(**metric_response_data)
-    print(metric_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(metric_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних системного моніторингу.")
-    print("TODO: Інтегрувати Enum 'LogLevel' з core.dicts для поля 'level' в SystemLog.")
-    print("TODO: Замінити Any на UserPublicProfileSchema в SystemLogSchema.")
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних системного моніторингу.")
+    logger.info("TODO: Інтегрувати Enum 'LogLevel' з core.dicts для поля 'level' в SystemLog.")
+    logger.info("TODO: Замінити Any на UserPublicProfileSchema в SystemLogSchema.")

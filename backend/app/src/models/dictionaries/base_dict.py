@@ -13,6 +13,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 
 # Абсолютний імпорт базової моделі з основного модуля моделей
 from backend.app.src.models.base import BaseMainModel
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class BaseDictionaryModel(BaseMainModel):
@@ -50,9 +53,9 @@ class BaseDictionaryModel(BaseMainModel):
 
 if __name__ == "__main__":
     # Цей блок для демонстрації та базового тестування при прямому запуску модуля.
-    print("--- Базова модель для довідників (BaseDictionaryModel) ---")
-    print(f"Клас BaseDictionaryModel: {BaseDictionaryModel}")
-    print(f"Абстрактний: {getattr(BaseDictionaryModel, '__abstract__', False)}")
+    logger.info("--- Базова модель для довідників (BaseDictionaryModel) ---")
+    logger.info(f"Клас BaseDictionaryModel: {BaseDictionaryModel}")
+    logger.info(f"Абстрактний: {getattr(BaseDictionaryModel, '__abstract__', False)}")
 
     # Демонстрація очікуваних атрибутів (для цього потрібне відображення SQLAlchemy)
     # У реальному сценарії це перевіряється через інстанціювання конкретної моделі-довідника.
@@ -62,12 +65,12 @@ if __name__ == "__main__":
     ]
     expected_attrs_own = ['code']
 
-    print("\nОчікувані атрибути, успадковані від BaseMainModel:")
+    logger.info("\nОчікувані атрибути, успадковані від BaseMainModel:")
     for attr in expected_attrs_from_basemainmodel:
-        print(f"  - {attr}")
-    print("\nВласні атрибути BaseDictionaryModel:")
+        logger.info(f"  - {attr}")
+    logger.info("\nВласні атрибути BaseDictionaryModel:")
     for attr in expected_attrs_own:
-        print(f"  - {attr}")
+        logger.info(f"  - {attr}")
 
     # Приклад того, як __repr__ може виглядати для моделі, що успадковує BaseDictionaryModel
     # (спрощена імітація без реальної інженерії SQLAlchemy)
@@ -102,7 +105,7 @@ if __name__ == "__main__":
     dummy_status_instance.description = "Статус активного елемента"
     dummy_status_instance.state = "enabled"  # Приклад стану для самого довідника
 
-    print(f"\nПриклад __repr__ для екземпляра DummyStatus:\n  {dummy_status_instance}")
+    logger.info(f"\nПриклад __repr__ для екземпляра DummyStatus:\n  {dummy_status_instance}")
     # Очікуваний вивід (порядок може відрізнятися):
     # <DummyStatus(id=1, name='Активний', code='ACTIVE', created_at=datetime.datetime(2023, 1, 1, 12, 0), state='enabled')>
 
@@ -111,4 +114,4 @@ if __name__ == "__main__":
     mixins.NameDescriptionMixin._repr_fields = ['name']
     mixins.StateMixin._repr_fields = ['state']
 
-    print("\nПримітка: Поля `group_id` та `notes` також успадковуються, але не показані в цьому простому __repr__ прикладі.")
+    logger.info("\nПримітка: Поля `group_id` та `notes` також успадковуються, але не показані в цьому простому __repr__ прикладі.")

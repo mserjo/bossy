@@ -14,6 +14,9 @@ from pydantic import Field, AnyHttpUrl
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
 # from backend.app.src.schemas.auth.user import UserPublicProfileSchema
@@ -62,18 +65,18 @@ class UserAvatarSchema(UserAvatarBaseSchema, IDSchemaMixin, TimestampedSchemaMix
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем аватарів користувачів.
-    print("--- Pydantic Схеми для Аватарів Користувачів (UserAvatar) ---")
+    logger.info("--- Pydantic Схеми для Аватарів Користувачів (UserAvatar) ---")
 
-    print("\nUserAvatarCreateSchema (приклад для створення сервісом):")
+    logger.info("\nUserAvatarCreateSchema (приклад для створення сервісом):")
     create_avatar_data = {
         "user_id": 101,
         "file_record_id": 205,
         "is_active": True
     }
     create_avatar_instance = UserAvatarCreateSchema(**create_avatar_data)
-    print(create_avatar_instance.model_dump_json(indent=2))
+    logger.info(create_avatar_instance.model_dump_json(indent=2))
 
-    print("\nUserAvatarSchema (приклад відповіді API):")
+    logger.info("\nUserAvatarSchema (приклад відповіді API):")
     avatar_response_data = {
         "id": 1,
         "user_id": 101,
@@ -94,10 +97,10 @@ if __name__ == "__main__":
         # }
     }
     avatar_response_instance = UserAvatarSchema(**avatar_response_data)
-    print(avatar_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(avatar_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Схеми для пов'язаних об'єктів (`user`, `file_record`) та поле `file_url`")
-    print("наразі є заповнювачами (Any) або потребують заповнення сервісом.")
+    logger.info("\nПримітка: Схеми для пов'язаних об'єктів (`user`, `file_record`) та поле `file_url`")
+    logger.info("наразі є заповнювачами (Any) або потребують заповнення сервісом.")
 
 # Потрібно для timedelta в __main__
 from datetime import timedelta

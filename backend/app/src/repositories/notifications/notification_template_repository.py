@@ -13,6 +13,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Абсолютний імпорт базового репозиторію для довідників
 from backend.app.src.repositories.dictionaries.base_dict_repository import BaseDictionaryRepository
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
+
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.notifications.template import NotificationTemplate
 from backend.app.src.schemas.notifications.template import (
@@ -25,8 +29,6 @@ from backend.app.src.schemas.notifications.template import (
 #       для використання у get_by_template_type.
 # from backend.app.src.core.dicts import NotificationChannelType
 
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-# logger = get_logger(__name__)
 
 class NotificationTemplateRepository(
     BaseDictionaryRepository[NotificationTemplate, NotificationTemplateCreateSchema, NotificationTemplateUpdateSchema]):
@@ -79,19 +81,19 @@ class NotificationTemplateRepository(
 
 if __name__ == "__main__":
     # Демонстраційний блок для NotificationTemplateRepository.
-    print("--- Репозиторій Шаблонів Сповіщень (NotificationTemplateRepository) ---")
+    logger.info("--- Репозиторій Шаблонів Сповіщень (NotificationTemplateRepository) ---")
 
-    print("Для тестування NotificationTemplateRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseDictionaryRepository для моделі {NotificationTemplate.__name__}.")
-    print(f"  Очікує схему створення: {NotificationTemplateCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {NotificationTemplateUpdateSchema.__name__}")
+    logger.info("Для тестування NotificationTemplateRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseDictionaryRepository для моделі {NotificationTemplate.__name__}.")
+    logger.info(f"  Очікує схему створення: {NotificationTemplateCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {NotificationTemplateUpdateSchema.__name__}")
 
-    print("\nСпецифічні методи успадковані з BaseDictionaryRepository:")
-    print("  - get_by_code(code: str)")
-    print("  - get_by_name(name: str)")
-    print("\nВласні специфічні методи:")
-    print("  - get_by_template_type(template_type: str, active_only: bool = True, skip: int = 0, limit: int = 100)")
+    logger.info("\nСпецифічні методи успадковані з BaseDictionaryRepository:")
+    logger.info("  - get_by_code(code: str)")
+    logger.info("  - get_by_name(name: str)")
+    logger.info("\nВласні специфічні методи:")
+    logger.info("  - get_by_template_type(template_type: str, active_only: bool = True, skip: int = 0, limit: int = 100)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    print("TODO: Інтегрувати Enum 'NotificationChannelType' для аргументу `template_type`.")
-    print("TODO: Узгодити значення 'active' для фільтра `active_only` з можливим Enum для станів.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("TODO: Інтегрувати Enum 'NotificationChannelType' для аргументу `template_type`.")
+    logger.info("TODO: Узгодити значення 'active' для фільтра `active_only` з можливим Enum для станів.")

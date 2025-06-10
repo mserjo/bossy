@@ -14,6 +14,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Абсолютний імпорт базових класів
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # Для created_at, updated_at
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
@@ -80,18 +83,18 @@ class TaskReview(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі TaskReview.
-    print("--- Модель Відгуку на Завдання (TaskReview) ---")
-    print(f"Назва таблиці: {TaskReview.__tablename__}")
+    logger.info("--- Модель Відгуку на Завдання (TaskReview) ---")
+    logger.info(f"Назва таблиці: {TaskReview.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = ['id', 'task_id', 'user_id', 'rating', 'comment', 'created_at', 'updated_at']
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['task', 'user']
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_review = TaskReview(
@@ -105,8 +108,8 @@ if __name__ == "__main__":
     example_review.created_at = datetime.now(tz=timezone.utc)
     example_review.updated_at = datetime.now(tz=timezone.utc)
 
-    print(f"\nПриклад екземпляра TaskReview (без сесії):\n  {example_review}")
+    logger.info(f"\nПриклад екземпляра TaskReview (без сесії):\n  {example_review}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <TaskReview(id=1, task_id=1, user_id=101, rating=5, created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

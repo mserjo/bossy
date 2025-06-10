@@ -13,8 +13,10 @@ from typing import Optional, Any  # Any для тимчасових полів
 from pydantic import Field, AnyHttpUrl
 
 # Абсолютний імпорт базових схем
-from backend.app.src.schemas.base import BaseSchema, \
-    BaseMainSchema  # IDSchemaMixin, TimestampedSchemaMixin вже в BaseMainSchema
+from backend.app.src.schemas.base import BaseSchema, BaseMainSchema  # IDSchemaMixin, TimestampedSchemaMixin вже в BaseMainSchema
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретну схему GroupSchema (коротка версія), коли вона буде готова.
 # from backend.app.src.schemas.groups.group import GroupBriefSchema
@@ -116,9 +118,9 @@ class LevelSchema(BaseMainSchema):  # Успадковує id, name, description
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем рівнів.
-    print("--- Pydantic Схеми для Рівнів Гейміфікації (Level) ---")
+    logger.info("--- Pydantic Схеми для Рівнів Гейміфікації (Level) ---")
 
-    print("\nLevelCreateSchema (приклад для створення):")
+    logger.info("\nLevelCreateSchema (приклад для створення):")
     create_level_data = {
         "name": "Золотий Рівень",  # TODO i18n
         "description": "Визначний рівень для найактивніших учасників.",  # TODO i18n
@@ -129,17 +131,17 @@ if __name__ == "__main__":
         "state": "active"
     }
     create_level_instance = LevelCreateSchema(**create_level_data)
-    print(create_level_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(create_level_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nLevelUpdateSchema (приклад для оновлення):")
+    logger.info("\nLevelUpdateSchema (приклад для оновлення):")
     update_level_data = {
         "description": "Оновлений опис для Золотого Рівня, тепер вимагає більше балів.",  # TODO i18n
         "required_points": 12000
     }
     update_level_instance = LevelUpdateSchema(**update_level_data)
-    print(update_level_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_level_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nLevelSchema (приклад відповіді API):")
+    logger.info("\nLevelSchema (приклад відповіді API):")
     level_response_data = {
         "id": 1,
         "name": "Срібний Рівень",  # TODO i18n
@@ -154,7 +156,7 @@ if __name__ == "__main__":
         # "group": {"id": 1, "name": "Команда Альфа"} # Приклад GroupBriefSchema
     }
     level_response_instance = LevelSchema(**level_response_data)
-    print(level_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(level_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Схема для `group` наразі є заповнювачем (Any).")
-    print("Її потрібно буде замінити на `GroupBriefSchema` після її визначення.")
+    logger.info("\nПримітка: Схема для `group` наразі є заповнювачем (Any).")
+    logger.info("Її потрібно буде замінити на `GroupBriefSchema` після її визначення.")

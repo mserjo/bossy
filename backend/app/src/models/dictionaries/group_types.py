@@ -9,6 +9,9 @@
 
 # Абсолютний імпорт базової моделі для довідників
 from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 # Можливо, знадобляться додаткові імпорти, якщо будуть специфічні поля.
@@ -41,16 +44,16 @@ class GroupType(BaseDictionaryModel):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі GroupType.
-    print("--- Модель Довідника: GroupType ---")
-    print(f"Назва таблиці: {GroupType.__tablename__}")
+    logger.info("--- Модель Довідника: GroupType ---")
+    logger.info(f"Назва таблиці: {GroupType.__tablename__}")
 
-    print("\nОчікувані поля (успадковані та власні):")
+    logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = ['id', 'name', 'description', 'code', 'created_at', 'updated_at', 'deleted_at', 'state',
                        'group_id', 'notes']
     # Якщо додано кастомні поля:
     # expected_fields.append('default_max_members')
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_group_type = GroupType(
@@ -61,8 +64,8 @@ if __name__ == "__main__":
         state="active"
     )
 
-    print(f"\nПриклад екземпляра GroupType (без сесії):\n  {example_group_type}")
+    logger.info(f"\nПриклад екземпляра GroupType (без сесії):\n  {example_group_type}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <GroupType(id=1, name='Сім'я', code='FAMILY', state='active')>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

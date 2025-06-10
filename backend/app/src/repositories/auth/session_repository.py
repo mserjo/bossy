@@ -18,7 +18,9 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі Session та схеми SessionCreateSchema
 from backend.app.src.models.auth.session import Session
 from backend.app.src.schemas.auth.session import SessionCreateSchema
-
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # from backend.app.src.config.logging import get_logger # Якщо потрібне логування
 
@@ -85,15 +87,15 @@ class SessionRepository(BaseRepository[Session, SessionCreateSchema, SessionUpda
 
 if __name__ == "__main__":
     # Демонстраційний блок для SessionRepository.
-    print("--- Репозиторій Сесій Користувачів (SessionRepository) ---")
+    logger.info("--- Репозиторій Сесій Користувачів (SessionRepository) ---")
 
-    print("Для тестування SessionRepository потрібна асинхронна сесія SQLAlchemy.")
-    print(f"Він успадковує методи від BaseRepository для моделі {Session.__name__}.")
-    print(f"  Очікує схему створення: {SessionCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {SessionUpdateSchema.__name__} (зараз порожня)")
+    logger.info("Для тестування SessionRepository потрібна асинхронна сесія SQLAlchemy.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {Session.__name__}.")
+    logger.info(f"  Очікує схему створення: {SessionCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {SessionUpdateSchema.__name__} (зараз порожня)")
 
-    print("\nСпецифічні методи:")
-    print("  - get_by_session_key(session_key: str)")
-    print("  - remove_expired_sessions(user_id: Optional[int] = None)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_session_key(session_key: str)")
+    logger.info("  - remove_expired_sessions(user_id: Optional[int] = None)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

@@ -14,6 +14,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 # Абсолютний імпорт базових класів та міксинів
 from backend.app.src.models.base import Base  # Системні налаштування можуть не мати всіх полів BaseMainModel
 from backend.app.src.models.mixins import TimestampedMixin, NameDescriptionMixin  # Name/Description можуть бути корисні
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 # TODO: Визначити Enum SettingValueType в core.dicts.py, наприклад:
@@ -91,10 +94,10 @@ class SystemSetting(Base, TimestampedMixin, NameDescriptionMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі SystemSetting.
-    print("--- Модель Системного Налаштування (SystemSetting) ---")
-    print(f"Назва таблиці: {SystemSetting.__tablename__}")
+    logger.info("--- Модель Системного Налаштування (SystemSetting) ---")
+    logger.info(f"Назва таблиці: {SystemSetting.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = [
         'id', 'name', 'description',  # З NameDescriptionMixin (name тут буде ключем)
         'created_at', 'updated_at',  # З TimestampedMixin
@@ -102,7 +105,7 @@ if __name__ == "__main__":
     ]
     # BaseMainModel не успадковується, тому state, group_id, notes, deleted_at тут не буде.
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     from datetime import datetime, timezone
@@ -119,9 +122,9 @@ if __name__ == "__main__":
     )
     example_setting.created_at = datetime.now(tz=timezone.utc)
 
-    print(f"\nПриклад екземпляра SystemSetting (без сесії):\n  {example_setting}")
+    logger.info(f"\nПриклад екземпляра SystemSetting (без сесії):\n  {example_setting}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <SystemSetting(id=1, name='Режим обслуговування сайту', key='site_maintenance_mode', value_type='boolean', is_editable=True, created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
-    print("TODO: Не забудьте визначити Enum 'SettingValueType' в core.dicts.py та оновити поле 'value_type'.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("TODO: Не забудьте визначити Enum 'SettingValueType' в core.dicts.py та оновити поле 'value_type'.")

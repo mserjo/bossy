@@ -22,6 +22,9 @@ from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedS
 
 # TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для owner та members
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # from backend.app.src.schemas.dictionaries.group_types import GroupTypeSchema # Для group_type
 # from backend.app.src.schemas.groups.settings import GroupSettingSchema # Для settings
@@ -129,18 +132,18 @@ class GroupDetailSchema(GroupSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем груп.
-    print("--- Pydantic Схеми для Груп (Group) ---")
+    logger.info("--- Pydantic Схеми для Груп (Group) ---")
 
-    print("\nGroupBaseSchema (приклад):")
+    logger.info("\nGroupBaseSchema (приклад):")
     base_data = {
         "name": "Базова Група",  # TODO i18n
         "group_type_code": "DEPARTMENT",
         "description": "Опис базової групи."  # TODO i18n
     }
     base_instance = GroupBaseSchema(**base_data)
-    print(base_instance.model_dump_json(indent=2))
+    logger.info(base_instance.model_dump_json(indent=2))
 
-    print("\nGroupCreateSchema (приклад):")
+    logger.info("\nGroupCreateSchema (приклад):")
     create_data = {
         "name": "Нова Команда",  # TODO i18n
         "group_type_code": "TEAM_PROJECT",
@@ -148,14 +151,14 @@ if __name__ == "__main__":
         # owner_id не вказується клієнтом, а встановлюється сервером
     }
     create_instance = GroupCreateSchema(**create_data)
-    print(create_instance.model_dump_json(indent=2))
+    logger.info(create_instance.model_dump_json(indent=2))
 
-    print("\nGroupUpdateSchema (приклад):")
+    logger.info("\nGroupUpdateSchema (приклад):")
     update_data = {"description": "Оновлений опис команди для проекту X.", "state": "archived"}  # TODO i18n
     update_instance = GroupUpdateSchema(**update_data)
-    print(update_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nGroupSchema (приклад відповіді API):")
+    logger.info("\nGroupSchema (приклад відповіді API):")
     group_response_data = {
         "id": 1,
         "name": "Основна Група",  # TODO i18n
@@ -167,9 +170,9 @@ if __name__ == "__main__":
         "members_count": 5
     }
     group_response_instance = GroupSchema(**group_response_data)
-    print(group_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(group_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nGroupDetailSchema (приклад деталізованої відповіді API):")
+    logger.info("\nGroupDetailSchema (приклад деталізованої відповіді API):")
     group_detail_data = {
         **group_response_data,  # Успадковує поля з GroupSchema
         "members": [
@@ -179,9 +182,9 @@ if __name__ == "__main__":
         # "settings": {"currency_name": "бали", "allow_decimal_bonuses": False} # Приклад GroupSettingSchema
     }
     group_detail_instance = GroupDetailSchema(**group_detail_data)
-    print(group_detail_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(group_detail_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Схеми `GroupTypeSchema`, `GroupSettingSchema` та представлення учасників (`members`)")
-    print("наразі використовують заповнювачі (Any або базові типи). Їх потрібно буде замінити")
-    print("на відповідні конкретні схеми після їх рефакторингу/визначення.")
-    print("Також, `group_type_code` потребує валідації на рівні сервісу або схеми.")
+    logger.info("\nПримітка: Схеми `GroupTypeSchema`, `GroupSettingSchema` та представлення учасників (`members`)")
+    logger.info("наразі використовують заповнювачі (Any або базові типи). Їх потрібно буде замінити")
+    logger.info("на відповідні конкретні схеми після їх рефакторингу/визначення.")
+    logger.info("Також, `group_type_code` потребує валідації на рівні сервісу або схеми.")

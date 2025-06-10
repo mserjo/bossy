@@ -16,6 +16,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin
 from backend.app.src.core.dicts import GroupRole  # Для ролі за замовчуванням
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Визначити Enum InvitationStatus в core.dicts.py, наприклад:
 # class InvitationStatus(str, Enum):
@@ -101,22 +104,22 @@ class GroupInvitation(Base, TimestampedMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі GroupInvitation.
-    print("--- Модель Запрошення до Групи (GroupInvitation) ---")
-    print(f"Назва таблиці: {GroupInvitation.__tablename__}")
+    logger.info("--- Модель Запрошення до Групи (GroupInvitation) ---")
+    logger.info(f"Назва таблиці: {GroupInvitation.__tablename__}")
 
-    print("\nОчікувані поля:")
+    logger.info("\nОчікувані поля:")
     expected_fields = [
         'id', 'group_id', 'email', 'phone_number', 'invitation_code',
         'role_to_assign', 'expires_at', 'created_by_user_id', 'status',
         'created_at', 'updated_at'
     ]
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['group', 'created_by']
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_invitation = GroupInvitation(
@@ -133,9 +136,9 @@ if __name__ == "__main__":
     example_invitation.created_at = datetime.now(timezone.utc)
     example_invitation.updated_at = datetime.now(timezone.utc)
 
-    print(f"\nПриклад екземпляра GroupInvitation (без сесії):\n  {example_invitation}")
+    logger.info(f"\nПриклад екземпляра GroupInvitation (без сесії):\n  {example_invitation}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <GroupInvitation(id=1, group_id=202, invitation_code='UNIQUECODE123', status='pending', expires_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
-    print("TODO: Не забудьте визначити Enum 'InvitationStatus' в core.dicts.py та оновити поле 'status'.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("TODO: Не забудьте визначити Enum 'InvitationStatus' в core.dicts.py та оновити поле 'status'.")

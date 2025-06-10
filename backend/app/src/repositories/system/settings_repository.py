@@ -17,11 +17,10 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.system.settings import SystemSetting
 from backend.app.src.schemas.system.settings import SystemSettingCreateSchema, SystemSettingUpdateSchema
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 class SystemSettingRepository(BaseRepository[SystemSetting, SystemSettingCreateSchema, SystemSettingUpdateSchema]):
     """
@@ -72,15 +71,15 @@ class SystemSettingRepository(BaseRepository[SystemSetting, SystemSettingCreateS
 
 if __name__ == "__main__":
     # Демонстраційний блок для SystemSettingRepository.
-    print("--- Репозиторій Системних Налаштувань (SystemSettingRepository) ---")
+    logger.info("--- Репозиторій Системних Налаштувань (SystemSettingRepository) ---")
 
-    print("Для тестування SystemSettingRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {SystemSetting.__name__}.")
-    print(f"  Очікує схему створення: {SystemSettingCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {SystemSettingUpdateSchema.__name__}")
+    logger.info("Для тестування SystemSettingRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {SystemSetting.__name__}.")
+    logger.info(f"  Очікує схему створення: {SystemSettingCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {SystemSettingUpdateSchema.__name__}")
 
-    print("\nСпецифічні методи:")
-    print("  - get_by_key(key: str)")
-    print("  - get_editable_settings(skip: int = 0, limit: int = 100)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_key(key: str)")
+    logger.info("  - get_editable_settings(skip: int = 0, limit: int = 100)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

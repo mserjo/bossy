@@ -12,6 +12,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 # Абсолютний імпорт базової моделі
 from backend.app.src.models.base import BaseMainModel  # Включає id, name, description, state, group_id, etc.
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.groups.group import Group
@@ -62,22 +65,22 @@ class Badge(BaseMainModel):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі Badge.
-    print("--- Модель Бейджа Гейміфікації (Badge) ---")
-    print(f"Назва таблиці: {Badge.__tablename__}")
+    logger.info("--- Модель Бейджа Гейміфікації (Badge) ---")
+    logger.info(f"Назва таблиці: {Badge.__tablename__}")
 
-    print("\nОчікувані поля (успадковані та власні):")
+    logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = [
         'id', 'name', 'description', 'state', 'group_id', 'notes',
         'created_at', 'updated_at', 'deleted_at',
         'icon_url'
     ]
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['group']  # , 'user_achievements' (якщо додано)
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     from datetime import datetime, timezone
@@ -92,8 +95,8 @@ if __name__ == "__main__":
     )
     example_badge.created_at = datetime.now(tz=timezone.utc)
 
-    print(f"\nПриклад екземпляра Badge (без сесії):\n  {example_badge}")
+    logger.info(f"\nПриклад екземпляра Badge (без сесії):\n  {example_badge}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <Badge(id=1, name='Майстер Завдань', state='active', icon_url='https://example.com/icons/master_of_tasks.png', created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

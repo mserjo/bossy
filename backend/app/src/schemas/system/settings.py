@@ -15,7 +15,9 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Визначити та імпортувати Enum SettingValueType з core.dicts
 # from backend.app.src.core.dicts import SettingValueType
@@ -113,9 +115,9 @@ class SystemSettingSchema(SystemSettingBaseSchema, IDSchemaMixin, TimestampedSch
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем системних налаштувань.
-    print("--- Pydantic Схеми для Системних Налаштувань (SystemSetting) ---")
+    logger.info("--- Pydantic Схеми для Системних Налаштувань (SystemSetting) ---")
 
-    print("\nSystemSettingCreateSchema (приклад для створення):")
+    logger.info("\nSystemSettingCreateSchema (приклад для створення):")
     create_setting_data = {
         "key": "max_users_per_group",
         "name": "Макс. користувачів у групі",  # TODO i18n
@@ -126,14 +128,14 @@ if __name__ == "__main__":
         "is_sensitive": False
     }
     create_setting_instance = SystemSettingCreateSchema(**create_setting_data)
-    print(create_setting_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(create_setting_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nSystemSettingUpdateSchema (приклад для оновлення значення):")
+    logger.info("\nSystemSettingUpdateSchema (приклад для оновлення значення):")
     update_setting_data = {"value": "150"}
     update_setting_instance = SystemSettingUpdateSchema(**update_setting_data)
-    print(update_setting_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_setting_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nSystemSettingSchema (приклад відповіді API):")
+    logger.info("\nSystemSettingSchema (приклад відповіді API):")
     setting_response_data = {
         "id": 1,
         "key": "api_key_external_service",
@@ -146,8 +148,8 @@ if __name__ == "__main__":
         "updated_at": datetime.now()
     }
     setting_response_instance = SystemSettingSchema(**setting_response_data)
-    print(setting_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(setting_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних системних налаштувань.")
-    print("TODO: Інтегрувати Enum 'SettingValueType' з core.dicts для поля 'value_type' та додати валідацію.")
-    print("Маскування чутливих значень (`is_sensitive`) має оброблятися на рівні сервісу/API.")
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних системних налаштувань.")
+    logger.info("TODO: Інтегрувати Enum 'SettingValueType' з core.dicts для поля 'value_type' та додати валідацію.")
+    logger.info("Маскування чутливих значень (`is_sensitive`) має оброблятися на рівні сервісу/API.")

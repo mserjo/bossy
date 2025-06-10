@@ -16,11 +16,10 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.gamification.badge import Badge
 from backend.app.src.schemas.gamification.badge import BadgeCreateSchema, BadgeUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 class BadgeRepository(BaseRepository[Badge, BadgeCreateSchema, BadgeUpdateSchema]):
     """
@@ -77,16 +76,16 @@ class BadgeRepository(BaseRepository[Badge, BadgeCreateSchema, BadgeUpdateSchema
 
 if __name__ == "__main__":
     # Демонстраційний блок для BadgeRepository.
-    print("--- Репозиторій Бейджів Гейміфікації (BadgeRepository) ---")
+    logger.info("--- Репозиторій Бейджів Гейміфікації (BadgeRepository) ---")
 
-    print("Для тестування BadgeRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {Badge.__name__}.")
-    print(f"  Очікує схему створення: {BadgeCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {BadgeUpdateSchema.__name__}")
+    logger.info("Для тестування BadgeRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {Badge.__name__}.")
+    logger.info(f"  Очікує схему створення: {BadgeCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {BadgeUpdateSchema.__name__}")
 
-    print("\nСпецифічні методи:")
-    print(
+    logger.info("\nСпецифічні методи:")
+    logger.info(
         "  - get_badges_by_group_id(group_id: Optional[int], active_only: bool = True, skip: int = 0, limit: int = 100)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    print("TODO: Узгодити логіку фільтрації 'active_only' з реальним полем/Enum стану в моделі Badge.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("TODO: Узгодити логіку фільтрації 'active_only' з реальним полем/Enum стану в моделі Badge.")

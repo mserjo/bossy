@@ -16,6 +16,9 @@ from pydantic import Field
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import NotificationType as NotificationTypeEnum  # Реальний Enum
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
 # from backend.app.src.schemas.notifications.template import NotificationTemplateSchema
@@ -103,10 +106,10 @@ class NotificationSchema(NotificationBaseSchema, IDSchemaMixin, TimestampedSchem
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем сповіщень.
-    print("--- Pydantic Схеми для Сповіщень (Notification) ---")
+    logger.info("--- Pydantic Схеми для Сповіщень (Notification) ---")
     from datetime import timedelta  # Для timedelta в прикладах
 
-    print("\nNotificationCreateSchema (приклад для створення):")
+    logger.info("\nNotificationCreateSchema (приклад для створення):")
     create_notification_data = {
         "user_id": 101,
         "title": "Ваш щотижневий звіт готовий!",  # TODO i18n
@@ -118,14 +121,14 @@ if __name__ == "__main__":
         "data_payload": {"report_url": "/reports/789"}
     }
     create_notification_instance = NotificationCreateSchema(**create_notification_data)
-    print(create_notification_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(create_notification_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nNotificationUpdateSchema (приклад для оновлення статусу прочитання):")
+    logger.info("\nNotificationUpdateSchema (приклад для оновлення статусу прочитання):")
     update_notification_data = {"is_read": True}
     update_notification_instance = NotificationUpdateSchema(**update_notification_data)
-    print(update_notification_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_notification_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nNotificationSchema (приклад відповіді API):")
+    logger.info("\nNotificationSchema (приклад відповіді API):")
     notification_response_data = {
         "id": 1,
         "user_id": 101,
@@ -140,10 +143,10 @@ if __name__ == "__main__":
         # "template": {"id": 3, "name": "Шаблон Отримання Бейджа"}, # Приклад NotificationTemplateSchema
     }
     notification_response_instance = NotificationSchema(**notification_response_data)
-    print(notification_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(notification_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Схеми для пов'язаних об'єктів (`template`, `user`) наразі є заповнювачами (Any).")
-    print("Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
-    print(
+    logger.info("\nПримітка: Схеми для пов'язаних об'єктів (`template`, `user`) наразі є заповнювачами (Any).")
+    logger.info("Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
+    logger.info(
         f"Поле 'notification_type' використовує значення з Enum `NotificationType` (наприклад, '{NotificationTypeEnum.TASK_REMINDER.value}').")
-    print("TODO: Додати валідатор для `notification_type` на основі Enum.")
+    logger.info("TODO: Додати валідатор для `notification_type` на основі Enum.")

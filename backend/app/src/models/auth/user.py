@@ -17,6 +17,9 @@ from sqlalchemy import String, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.src.models.base import BaseMainModel
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # _repr_fields з BaseMainModel та його міксинів будуть автоматично зібрані
 # через __repr__ в Base. Додамо специфічні для User поля в _repr_fields тут.
@@ -117,10 +120,10 @@ class User(BaseMainModel):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі User.
-    print("--- Модель Користувача (User) ---")
-    print(f"Назва таблиці: {User.__tablename__}")
+    logger.info("--- Модель Користувача (User) ---")
+    logger.info(f"Назва таблиці: {User.__tablename__}")
 
-    print("\nОчікувані поля (успадковані та власні):")
+    logger.info("\nОчікувані поля (успадковані та власні):")
     # Поля з BaseMainModel та його міксинів:
     # id, name, description, state, group_id (може бути None), notes, created_at, updated_at, deleted_at
     # Власні поля User:
@@ -137,12 +140,12 @@ if __name__ == "__main__":
         'last_login_at', 'user_type_id', 'system_role_id'
     ]
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = ['user_type', 'system_role', 'sessions', 'refresh_tokens', 'avatar', 'memberships']
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     # У реальному коді це робиться через сесію SQLAlchemy.
@@ -161,8 +164,8 @@ if __name__ == "__main__":
     )
     example_user.created_at = datetime.now(timezone.utc)  # Імітація
 
-    print(f"\nПриклад екземпляра User (без сесії):\n  {example_user}")
+    logger.info(f"\nПриклад екземпляра User (без сесії):\n  {example_user}")
     # Очікуваний __repr__ (порядок може відрізнятися, але 'id' має бути першим):
     # <User(id=1, email='ivan.franko@example.com', first_name='Іван', is_active=True, is_superuser=False, last_name='Франко', name='Іван Франко', state='active', created_at=...)>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю та її зв'язками потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю та її зв'язками потрібна сесія SQLAlchemy та підключення до БД.")

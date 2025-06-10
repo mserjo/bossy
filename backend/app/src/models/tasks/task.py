@@ -16,6 +16,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 # Абсолютний імпорт базової моделі та інших необхідних типів
 from backend.app.src.models.base import BaseMainModel
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # from backend.app.src.core.dicts import TaskStatus as TaskStatusEnum # Буде використовуватися для поля state
 
@@ -154,10 +157,10 @@ class Task(BaseMainModel):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі Task.
-    print("--- Модель Завдання/Події (Task) ---")
-    print(f"Назва таблиці: {Task.__tablename__}")
+    logger.info("--- Модель Завдання/Події (Task) ---")
+    logger.info(f"Назва таблиці: {Task.__tablename__}")
 
-    print("\nОчікувані поля (успадковані та власні):")
+    logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = [
         'id', 'name', 'description', 'state', 'group_id', 'notes',
         'created_at', 'updated_at', 'deleted_at',
@@ -166,15 +169,15 @@ if __name__ == "__main__":
         'event_start_time', 'event_end_time', 'event_location'
     ]
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
-    print("\nОчікувані зв'язки (relationships):")
+    logger.info("\nОчікувані зв'язки (relationships):")
     expected_relationships = [
         'group', 'task_type', 'status', 'parent_task', 'sub_tasks',
         'assignments', 'completions', 'reviews', 'bonus_rules'
     ]
     for rel in expected_relationships:
-        print(f"  - {rel}")
+        logger.info(f"  - {rel}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_task = Task(
@@ -193,10 +196,10 @@ if __name__ == "__main__":
     )
     example_task.created_at = datetime.now(tz=timezone.utc)
 
-    print(f"\nПриклад екземпляра Task (без сесії):\n  {example_task}")
+    logger.info(f"\nПриклад екземпляра Task (без сесії):\n  {example_task}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <Task(id=1, name='Виконати щотижневий звіт', state='open', task_type_id=1, due_date=..., created_at=...)>
 
-    print(
+    logger.info(
         "\nПримітка: Для повноцінної роботи з моделлю та її зв'язками потрібна сесія SQLAlchemy та підключення до БД.")
-    print("TODO: Узгодити використання поля 'state' (успадковане) та 'status_id' (специфічне для Task).")
+    logger.info("TODO: Узгодити використання поля 'state' (успадковане) та 'status_id' (специфічне для Task).")

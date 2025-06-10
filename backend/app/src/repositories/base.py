@@ -18,7 +18,9 @@ from pydantic import BaseModel  # Для перевірки типу схеми 
 
 # Абсолютний імпорт TypeVars з core.base
 from backend.app.src.core.base import ModelType, CreateSchemaType, UpdateSchemaType
-
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # from backend.app.src.config.logging import get_logger # Якщо потрібне логування
 
@@ -231,7 +233,7 @@ if __name__ == "__main__":
     # тому повноцінне тестування тут складне. Краще тестувати через інтеграційні тести.
     # Нижче наведено дуже спрощену концептуальну демонстрацію.
 
-    print("--- Демонстрація Базового Репозиторію (BaseRepository) ---")
+    logger.info("--- Демонстрація Базового Репозиторію (BaseRepository) ---")
 
 
     # 1. Визначення фіктивних моделей та схем для тестування
@@ -453,5 +455,5 @@ if __name__ == "__main__":
     # У реальному застосунку FastAPI це обробляє.
     # logger = get_logger(__name__) # Переміщено наверх для використання в run_repository_demo
     # asyncio.run(run_repository_demo())
-    print("\nЗапуск демонстрації BaseRepository закоментовано через складність повного макетування SQLAlchemy.")
-    print("Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("\nЗапуск демонстрації BaseRepository закоментовано через складність повного макетування SQLAlchemy.")
+    logger.info("Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

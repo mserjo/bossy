@@ -17,6 +17,9 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
 # from backend.app.src.schemas.auth.user import UserPublicProfileSchema
@@ -92,9 +95,9 @@ class UserAccountTransactionHistorySchema(UserAccountSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем рахунків користувачів.
-    print("--- Pydantic Схеми для Рахунків Користувачів (UserAccount) ---")
+    logger.info("--- Pydantic Схеми для Рахунків Користувачів (UserAccount) ---")
 
-    print("\nUserAccountBaseSchema (приклад):")
+    logger.info("\nUserAccountBaseSchema (приклад):")
     base_account_data = {
         "user_id": 1,
         "group_id": 10,
@@ -102,23 +105,23 @@ if __name__ == "__main__":
         "currency": "кредити"  # TODO i18n
     }
     base_account_instance = UserAccountBaseSchema(**base_account_data)
-    print(base_account_instance.model_dump_json(indent=2))
+    logger.info(base_account_instance.model_dump_json(indent=2))
 
-    print("\nUserAccountCreateSchema (приклад для створення):")
+    logger.info("\nUserAccountCreateSchema (приклад для створення):")
     create_account_data = {
         "user_id": 2,
         "group_id": 10
         # balance та currency візьмуться за замовчуванням
     }
     create_account_instance = UserAccountCreateSchema(**create_account_data)
-    print(create_account_instance.model_dump_json(indent=2))
+    logger.info(create_account_instance.model_dump_json(indent=2))
 
-    print("\nUserAccountUpdateSchema (приклад для оновлення балансу):")
+    logger.info("\nUserAccountUpdateSchema (приклад для оновлення балансу):")
     update_account_data = {"balance": Decimal("200.00")}
     update_account_instance = UserAccountUpdateSchema(**update_account_data)
-    print(update_account_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_account_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nUserAccountSchema (приклад відповіді API):")
+    logger.info("\nUserAccountSchema (приклад відповіді API):")
     account_response_data = {
         "id": 1,
         "user_id": 1,
@@ -131,9 +134,9 @@ if __name__ == "__main__":
         # "group": {"id": 10, "name": "Група Тестування"}  # Приклад GroupSchema (коротка версія)
     }
     account_response_instance = UserAccountSchema(**account_response_data)
-    print(account_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(account_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nUserAccountTransactionHistorySchema (приклад відповіді API з транзакціями):")
+    logger.info("\nUserAccountTransactionHistorySchema (приклад відповіді API з транзакціями):")
     history_response_data = {
         **account_response_data,  # Успадковує поля з UserAccountSchema
         "transactions": [  # Приклад AccountTransactionSchema
@@ -144,7 +147,7 @@ if __name__ == "__main__":
         ]
     }
     history_response_instance = UserAccountTransactionHistorySchema(**history_response_data)
-    print(history_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(history_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, GroupSchema, AccountTransactionSchema)")
-    print("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
+    logger.info("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, GroupSchema, AccountTransactionSchema)")
+    logger.info("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")

@@ -9,6 +9,9 @@
 
 # Абсолютний імпорт базової моделі для довідників
 from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 # Можливо, знадобляться додаткові імпорти, якщо будуть специфічні поля.
@@ -42,16 +45,16 @@ class MessengerPlatform(BaseDictionaryModel):
 
 if __name__ == "__main__":
     # Демонстраційний блок для моделі MessengerPlatform.
-    print("--- Модель Довідника: MessengerPlatform ---")
-    print(f"Назва таблиці: {MessengerPlatform.__tablename__}")
+    logger.info("--- Модель Довідника: MessengerPlatform ---")
+    logger.info(f"Назва таблиці: {MessengerPlatform.__tablename__}")
 
-    print("\nОчікувані поля (успадковані та власні):")
+    logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = ['id', 'name', 'description', 'code', 'created_at', 'updated_at', 'deleted_at', 'state',
                        'group_id', 'notes']
     # Якщо додано кастомні поля:
     # expected_fields.extend(['webhook_url_template', 'supports_buttons'])
     for field in expected_fields:
-        print(f"  - {field}")
+        logger.info(f"  - {field}")
 
     # Приклад створення екземпляра (без взаємодії з БД)
     example_messenger = MessengerPlatform(
@@ -62,8 +65,8 @@ if __name__ == "__main__":
         state="active"
     )
 
-    print(f"\nПриклад екземпляра MessengerPlatform (без сесії):\n  {example_messenger}")
+    logger.info(f"\nПриклад екземпляра MessengerPlatform (без сесії):\n  {example_messenger}")
     # Очікуваний __repr__ (порядок може відрізнятися):
     # <MessengerPlatform(id=1, name='Telegram', code='TELEGRAM', state='active')>
 
-    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

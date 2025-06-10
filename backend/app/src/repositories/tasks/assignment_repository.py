@@ -14,6 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
+
 # Абсолютний імпорт моделей та схем
 from backend.app.src.models.tasks.task import Task  # Для join в get_assignments_for_user_in_group
 from backend.app.src.models.tasks.assignment import TaskAssignment
@@ -22,10 +26,6 @@ from backend.app.src.schemas.tasks.assignment import (
     TaskAssignmentUpdateSchema  # Хоча оновлення призначень може бути обмеженим
 )
 
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 class TaskAssignmentRepository(BaseRepository[TaskAssignment, TaskAssignmentCreateSchema, TaskAssignmentUpdateSchema]):
     """
@@ -129,17 +129,17 @@ class TaskAssignmentRepository(BaseRepository[TaskAssignment, TaskAssignmentCrea
 
 if __name__ == "__main__":
     # Демонстраційний блок для TaskAssignmentRepository.
-    print("--- Репозиторій Призначень Завдань (TaskAssignmentRepository) ---")
+    logger.info("--- Репозиторій Призначень Завдань (TaskAssignmentRepository) ---")
 
-    print("Для тестування TaskAssignmentRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {TaskAssignment.__name__}.")
+    logger.info("Для тестування TaskAssignmentRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {TaskAssignment.__name__}.")
     # TaskAssignmentUpdateSchema може бути дуже простою або не використовуватися, якщо оновлюється лише статус через сервіс
-    print(f"  Очікує схему створення: {TaskAssignmentCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {TaskAssignmentUpdateSchema.__name__}")
+    logger.info(f"  Очікує схему створення: {TaskAssignmentCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {TaskAssignmentUpdateSchema.__name__}")
 
-    print("\nСпецифічні методи:")
-    print("  - get_by_task_and_user(task_id: int, user_id: int)")
-    print("  - get_assignments_for_task(task_id: int, skip: int = 0, limit: int = 100)")
-    print("  - get_assignments_for_user(user_id: int, group_id: Optional[int] = None, skip: int = 0, limit: int = 100)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_task_and_user(task_id: int, user_id: int)")
+    logger.info("  - get_assignments_for_task(task_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("  - get_assignments_for_user(user_id: int, group_id: Optional[int] = None, skip: int = 0, limit: int = 100)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

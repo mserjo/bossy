@@ -17,6 +17,9 @@ from pydantic import Field, field_validator  # field_validator для валід
 from backend.app.src.schemas.base import BaseSchema, TimestampedSchemaMixin
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача
 from backend.app.src.core.dicts import GroupRole  # Enum для ролей в групі
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class GroupMembershipBaseSchema(BaseSchema):
@@ -101,28 +104,28 @@ class GroupMembershipSchema(GroupMembershipBaseSchema, TimestampedSchemaMixin):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем членства в групах.
-    print("--- Pydantic Схеми для Членства в Групах (GroupMembership) ---")
+    logger.info("--- Pydantic Схеми для Членства в Групах (GroupMembership) ---")
 
-    print("\nGroupMembershipBaseSchema (приклад):")
+    logger.info("\nGroupMembershipBaseSchema (приклад):")
     base_data = {"user_id": 1, "group_id": 10, "role": GroupRole.ADMIN.value}
     base_instance = GroupMembershipBaseSchema(**base_data)
-    print(base_instance.model_dump_json(indent=2))
+    logger.info(base_instance.model_dump_json(indent=2))
     try:
         GroupMembershipBaseSchema(user_id=1, group_id=10, role="invalid_role")
     except Exception as e:
-        print(f"Помилка валідації GroupMembershipBaseSchema (очікувано): {e}")
+        logger.info(f"Помилка валідації GroupMembershipBaseSchema (очікувано): {e}")
 
-    print("\nGroupMembershipCreateSchema (приклад для створення):")
+    logger.info("\nGroupMembershipCreateSchema (приклад для створення):")
     create_data = {"user_id": 2, "role": GroupRole.MEMBER.value}
     create_instance = GroupMembershipCreateSchema(**create_data)
-    print(create_instance.model_dump_json(indent=2))
+    logger.info(create_instance.model_dump_json(indent=2))
 
-    print("\nGroupMembershipUpdateSchema (приклад для оновлення):")
+    logger.info("\nGroupMembershipUpdateSchema (приклад для оновлення):")
     update_data = {"role": GroupRole.ADMIN.value}
     update_instance = GroupMembershipUpdateSchema(**update_data)
-    print(update_instance.model_dump_json(indent=2))
+    logger.info(update_instance.model_dump_json(indent=2))
 
-    print("\nGroupMembershipSchema (приклад відповіді API):")
+    logger.info("\nGroupMembershipSchema (приклад відповіді API):")
     membership_response_data = {
         "user_id": 1,
         "group_id": 10,
@@ -132,7 +135,7 @@ if __name__ == "__main__":
         "user": {"id": 1, "name": "Адміністратор Групи"}  # TODO i18n (UserPublicProfileSchema)
     }
     membership_response_instance = GroupMembershipSchema(**membership_response_data)
-    print(membership_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(membership_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних членства в групах.")
-    print(f"Використовується GroupRole Enum для поля 'role', наприклад: GroupRole.MEMBER = '{GroupRole.MEMBER.value}'")
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних членства в групах.")
+    logger.info(f"Використовується GroupRole Enum для поля 'role', наприклад: GroupRole.MEMBER = '{GroupRole.MEMBER.value}'")

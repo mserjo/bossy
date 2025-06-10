@@ -17,6 +17,9 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin, BaseMainSchema
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # BaseMainSchema не успадковується напряму RewardBaseSchema, бо group_id там опціональний,
 # а для створення нагороди group_id зазвичай обов'язковий (або з контексту).
@@ -138,9 +141,9 @@ class RedeemRewardRequestSchema(BaseSchema):
 
 if __name__ == "__main__":
     # Демонстраційний блок для схем нагород.
-    print("--- Pydantic Схеми для Нагород (Reward) ---")
+    logger.info("--- Pydantic Схеми для Нагород (Reward) ---")
 
-    print("\nRewardCreateSchema (приклад для створення):")
+    logger.info("\nRewardCreateSchema (приклад для створення):")
     create_reward_data = {
         "name": "Подарунковий сертифікат на 200 грн",  # TODO i18n
         "description": "Сертифікат на покупки в магазині-партнері.",  # TODO i18n
@@ -151,17 +154,17 @@ if __name__ == "__main__":
         "state": "active"
     }
     create_reward_instance = RewardCreateSchema(**create_reward_data)
-    print(create_reward_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(create_reward_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nRewardUpdateSchema (приклад для оновлення):")
+    logger.info("\nRewardUpdateSchema (приклад для оновлення):")
     update_reward_data = {
         "description": "Сертифікат на покупки в магазині-партнері 'СуперМаркет'.",  # TODO i18n
         "quantity_available": 50
     }
     update_reward_instance = RewardUpdateSchema(**update_reward_data)
-    print(update_reward_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(update_reward_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nRewardSchema (приклад відповіді API):")
+    logger.info("\nRewardSchema (приклад відповіді API):")
     reward_response_data = {
         "id": 1,
         "name": "Ексклюзивна Футболка",  # TODO i18n
@@ -175,12 +178,12 @@ if __name__ == "__main__":
         "updated_at": datetime.now()
     }
     reward_response_instance = RewardSchema(**reward_response_data)
-    print(reward_response_instance.model_dump_json(indent=2, exclude_none=True))
+    logger.info(reward_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    print("\nRedeemRewardRequestSchema (приклад запиту на отримання):")
+    logger.info("\nRedeemRewardRequestSchema (приклад запиту на отримання):")
     redeem_data = {"reward_id": 1, "quantity": 1}
     redeem_instance = RedeemRewardRequestSchema(**redeem_data)
-    print(redeem_instance.model_dump_json(indent=2))
+    logger.info(redeem_instance.model_dump_json(indent=2))
 
-    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних нагород.")
-    print("Поле 'state' для нагород може використовувати значення з довідника статусів або спеціального Enum.")
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних нагород.")
+    logger.info("Поле 'state' для нагород може використовувати значення з довідника статусів або спеціального Enum.")

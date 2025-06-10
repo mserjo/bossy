@@ -17,11 +17,10 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.groups.membership import GroupMembership
 from backend.app.src.schemas.groups.membership import GroupMembershipCreateSchema, GroupMembershipUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 class GroupMembershipRepository(
     BaseRepository[GroupMembership, GroupMembershipCreateSchema, GroupMembershipUpdateSchema]):
@@ -116,17 +115,17 @@ class GroupMembershipRepository(
 
 if __name__ == "__main__":
     # Демонстраційний блок для GroupMembershipRepository.
-    print("--- Репозиторій Членства в Групах (GroupMembershipRepository) ---")
+    logger.info("--- Репозиторій Членства в Групах (GroupMembershipRepository) ---")
 
-    print("Для тестування GroupMembershipRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {GroupMembership.__name__}.")
-    print(f"  Очікує схему створення: {GroupMembershipCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {GroupMembershipUpdateSchema.__name__}")
+    logger.info("Для тестування GroupMembershipRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {GroupMembership.__name__}.")
+    logger.info(f"  Очікує схему створення: {GroupMembershipCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {GroupMembershipUpdateSchema.__name__}")
 
-    print("\nСпецифічні методи:")
-    print("  - get_by_user_and_group(user_id: int, group_id: int)")
-    print("  - get_members_of_group(group_id: int, skip: int = 0, limit: int = 100)")
-    print("  - get_user_group_memberships(user_id: int, skip: int = 0, limit: int = 100)")
-    print("  - get_user_group_ids(user_id: int)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_user_and_group(user_id: int, group_id: int)")
+    logger.info("  - get_members_of_group(group_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("  - get_user_group_memberships(user_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("  - get_user_group_ids(user_id: int)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

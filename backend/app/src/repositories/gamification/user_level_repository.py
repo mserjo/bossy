@@ -20,11 +20,10 @@ from backend.app.src.repositories.base import BaseRepository
 from backend.app.src.models.gamification.user_level import UserLevel
 from backend.app.src.models.gamification.level import Level  # Для join в get_by_user_and_group
 from backend.app.src.schemas.gamification.user_level import UserLevelCreateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 # Записи UserLevel зазвичай не оновлюються; створюється новий запис при досягненні нового рівня.
 # Тому UpdateSchema може бути простою заглушкою.
@@ -108,15 +107,15 @@ class UserLevelRepository(BaseRepository[UserLevel, UserLevelCreateSchema, UserL
 
 if __name__ == "__main__":
     # Демонстраційний блок для UserLevelRepository.
-    print("--- Репозиторій Рівнів Користувача (UserLevelRepository) ---")
+    logger.info("--- Репозиторій Рівнів Користувача (UserLevelRepository) ---")
 
-    print("Для тестування UserLevelRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {UserLevel.__name__}.")
-    print(f"  Очікує схему створення: {UserLevelCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {UserLevelUpdateSchema.__name__} (зараз порожня)")
+    logger.info("Для тестування UserLevelRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {UserLevel.__name__}.")
+    logger.info(f"  Очікує схему створення: {UserLevelCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {UserLevelUpdateSchema.__name__} (зараз порожня)")
 
-    print("\nСпецифічні методи:")
-    print("  - get_current_level_for_user_in_group(user_id: int, group_id: int) -> Optional[UserLevel]")
-    print("  - get_all_achieved_levels_for_user_in_group(user_id: int, group_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_current_level_for_user_in_group(user_id: int, group_id: int) -> Optional[UserLevel]")
+    logger.info("  - get_all_achieved_levels_for_user_in_group(user_id: int, group_id: int, skip: int = 0, limit: int = 100)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

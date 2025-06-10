@@ -15,6 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.gamification.rating import UserGroupRating
 from backend.app.src.schemas.gamification.rating import (
@@ -22,10 +25,6 @@ from backend.app.src.schemas.gamification.rating import (
     UserGroupRatingUpdateSchema
 )
 
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 class UserGroupRatingRepository(
     BaseRepository[UserGroupRating, UserGroupRatingCreateSchema, UserGroupRatingUpdateSchema]):
@@ -123,16 +122,16 @@ class UserGroupRatingRepository(
 
 if __name__ == "__main__":
     # Демонстраційний блок для UserGroupRatingRepository.
-    print("--- Репозиторій Рейтингів Користувачів в Групах (UserGroupRatingRepository) ---")
+    logger.info("--- Репозиторій Рейтингів Користувачів в Групах (UserGroupRatingRepository) ---")
 
-    print("Для тестування UserGroupRatingRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
-    print(f"Він успадковує методи від BaseRepository для моделі {UserGroupRating.__name__}.")
-    print(f"  Очікує схему створення: {UserGroupRatingCreateSchema.__name__}")
-    print(f"  Очікує схему оновлення: {UserGroupRatingUpdateSchema.__name__}")
+    logger.info("Для тестування UserGroupRatingRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {UserGroupRating.__name__}.")
+    logger.info(f"  Очікує схему створення: {UserGroupRatingCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {UserGroupRatingUpdateSchema.__name__}")
 
-    print("\nСпецифічні методи:")
-    print("  - get_rating_for_user_in_group(user_id, group_id, rating_type, period_end_date)")
-    print("  - get_top_ratings_for_group(group_id, rating_type, period_end_date, limit)")
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_rating_for_user_in_group(user_id, group_id, rating_type, period_end_date)")
+    logger.info("  - get_top_ratings_for_group(group_id, rating_type, period_end_date, limit)")
 
-    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    print("TODO: Інтегрувати Enum 'RatingType' з core.dicts для поля 'rating_type' та відповідної логіки фільтрації.")
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("TODO: Інтегрувати Enum 'RatingType' з core.dicts для поля 'rating_type' та відповідної логіки фільтрації.")

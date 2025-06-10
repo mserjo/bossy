@@ -1,119 +1,137 @@
 # backend/app/src/schemas/bonuses/transaction.py
-
 """
-Pydantic schemas for Account Transactions.
+Pydantic схеми для сутності "Транзакція по Рахунку" (AccountTransaction).
+
+Цей модуль визначає схеми для:
+- Базового представлення транзакції (`AccountTransactionBaseSchema`).
+- Створення нової транзакції (`AccountTransactionCreateSchema`).
+- Представлення даних про транзакцію у відповідях API (`AccountTransactionSchema`).
 """
+from datetime import datetime
+from typing import Optional, Any  # Any для тимчасових полів
+from decimal import Decimal
 
-import logging
-from typing import Optional, Dict, Any # For Dict, Any in related_entity_details if used
-from datetime import datetime, timezone, timedelta # For examples and BaseResponseSchema
-from decimal import Decimal # For amount and balance fields
+from pydantic import Field, field_validator
 
-from pydantic import Field
+# Абсолютний імпорт базових схем та Enum
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.core.dicts import TransactionType  # Enum для типів транзакцій
 
-from backend.app.src.schemas.base import BaseSchema, BaseResponseSchema
-from backend.app.src.models.bonuses.transaction import TransactionTypeEnum # Import Enum from model
+# TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
+# from backend.app.src.schemas.auth.user import UserPublicProfileSchema # Для created_by
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
-
-# --- Locally defined Basic Info schemas for demonstration ---
-class UserBasicInfo(BaseSchema): # Inherit BaseSchema for consistent config (e.g. camelCase)
-    id: int = Field(..., example=10)
-    name: Optional[str] = Field(None, example="Admin User")
-
-class UserAccountBasicInfo(BaseSchema): # Inherit BaseSchema
-    id: int = Field(..., example=1)
-    currency_name: str = Field(..., example="Kudos Points")
-    user_id: int = Field(..., example=101) # Added for context
-    group_id: int = Field(..., example=1)  # Added for context
-# --- End of local Basic Info schemas ---
+UserPublicProfileSchema = Any  # Тимчасовий заповнювач
 
 
-# --- AccountTransaction Schemas ---
-
-class AccountTransactionBase(BaseSchema):
-    """Base schema for account transaction data."""
-    # account_id is often a path parameter or derived when creating transactions for an account.
-    transaction_type: TransactionTypeEnum = Field(..., description="Type of the transaction.", example=TransactionTypeEnum.CREDIT_MANUAL_BONUS)
-    amount: Decimal = Field(..., max_digits=10, decimal_places=2, description="Transaction amount; positive for credit, negative for debit.", example=Decimal("50.00"))
-    description: Optional[str] = Field(None, description="Human-readable description or reason for the transaction.", example="Bonus for excellent presentation.")
-    related_entity_type: Optional[str] = Field(None, max_length=100, description="Type of entity related to this transaction (e.g., 'task', 'reward').", example="manual_adjustment")
-    related_entity_id: Optional[int] = Field(None, description="ID of the related entity.", example=None) # No specific entity for manual bonus
-    # performed_by_user_id is usually the authenticated user (e.g., an admin performing a manual adjustment).
-    # balance_after_transaction is calculated and stored by the system, not part of create/update payload.
-
-class AccountTransactionCreate(AccountTransactionBase):
+class AccountTransactionBaseSchema(BaseSchema):
     """
-    Schema for creating a new account transaction (e.g., manual adjustments by an admin).
-    `account_id` would typically be specified (e.g., from path or explicit selection).
-    `performed_by_user_id` would be the authenticated admin user (set by service).
+    Базова схема для полів транзакції по рахунку.
     """
-    account_id: int = Field(..., description="ID of the UserAccount this transaction affects.")
-    # Ensure all mandatory fields from AccountTransactionBase are covered or have defaults.
-    # transaction_type and amount are mandatory from base.
-    pass
+    account_id: int = Field(description="Ідентифікатор рахунку користувача, до якого відноситься транзакція.")
+    # TODO: Додати валідатор для transaction_type на основі Enum TransactionType
+    transaction_type: str = Field(
+        description=f"Тип транзакції. Допустимі значення: {', '.join([tt.value for tt in TransactionType])}."
+    )
+    amount: Decimal = Field(
+        description="Сума транзакції. Для списань може бути від'ємною, або завжди позитивною, а напрямок визначається типом.")
+    description: Optional[str] = Field(None, description="Опис або призначення транзакції.",
+                                       examples=["Нарахування за завдання 'X'", "Витрата на нагороду 'Y'"])
 
-# AccountTransactionUpdate is typically not needed as transactions are usually immutable records.
-# Adjustments are made by creating new, counter-transactions.
+    related_task_completion_id: Optional[int] = Field(None,
+                                                      description="ID пов'язаного виконання завдання (якщо транзакція є результатом завдання).")
+    related_reward_id: Optional[int] = Field(None,
+                                             description="ID пов'язаної отриманої нагороди (якщо транзакція є покупкою нагороди).")
 
-class AccountTransactionResponse(BaseResponseSchema, AccountTransactionBase):
+    # created_by_user_id встановлюється сервісом, не передається клієнтом при створенні звичайної транзакції
+    # (може передаватися для ручних адмінських транзакцій)
+
+    # model_config успадковується з BaseSchema (from_attributes=True)
+
+    @field_validator('transaction_type')
+    @classmethod
+    def validate_transaction_type(cls, value: str) -> str:
+        """Перевіряє, чи надане значення типу транзакції є допустимим членом Enum TransactionType."""
+        allowed_types = {t.value for t in TransactionType}
+        if value not in allowed_types:
+            # TODO i18n: Translatable error message
+            raise ValueError(f"Недопустимий тип транзакції '{value}'. Дозволені типи: {', '.join(allowed_types)}")
+        return value
+
+
+class AccountTransactionCreateSchema(AccountTransactionBaseSchema):
     """
-    Schema for representing an account transaction in API responses.
-    Includes 'id', 'created_at', 'updated_at' from BaseResponseSchema.
-    `created_at` effectively serves as the transaction_date.
+    Схема для створення нової транзакції по рахунку.
+    `account_id` може бути отриманий з контексту або переданий явно.
+    `created_by_user_id` зазвичай встановлюється сервісом (поточний користувач для ручних операцій, або системний).
     """
-    # Fields from AccountTransactionBase: transaction_type, amount, description, related_entity_type, related_entity_id
-    # Fields from BaseResponseSchema: id, created_at, updated_at
+    # Успадковує всі поля від AccountTransactionBaseSchema.
+    # Поле created_by_user_id може бути додано сюди, якщо клієнт може його вказувати (наприклад, для адмін. операцій)
+    created_by_user_id: Optional[int] = Field(None,
+                                              description="ID користувача (адміністратора), який ініціював ручну транзакцію (необов'язково).")
 
-    account: UserAccountBasicInfo = Field(..., description="Basic information about the account affected.")
-    performed_by: Optional[UserBasicInfo] = Field(None, description="Basic information about the user who performed/authorized this transaction (if applicable).")
-    balance_after_transaction: Optional[Decimal] = Field(None, max_digits=10, decimal_places=2, description="Account balance immediately after this transaction was applied.", example=Decimal("150.00"))
+
+class AccountTransactionSchema(AccountTransactionBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+    """
+    Схема для представлення даних про транзакцію у відповідях API.
+    `created_at` з TimestampedSchemaMixin позначає час проведення транзакції.
+    """
+    # id, created_at, updated_at успадковані.
+    # account_id, transaction_type, amount, description, related_task_completion_id, related_reward_id успадковані.
+
+    created_by_user_id: Optional[int] = Field(None, description="ID користувача, який створив транзакцію (якщо є).")
+    # TODO: Замінити Any на UserPublicProfileSchema.
+    created_by: Optional[UserPublicProfileSchema] = Field(None,
+                                                          description="Інформація про користувача, який створив транзакцію (якщо є).")
+
+    # Можна додати деталізовані пов'язані об'єкти, якщо потрібно:
+    # task_completion: Optional[TaskCompletionSchema] = None # Потребує TaskCompletionSchema
+    # reward: Optional[RewardSchema] = None # Потребує RewardSchema
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем транзакцій.
+    print("--- Pydantic Схеми для Транзакцій по Рахунку (AccountTransaction) ---")
 
-    logger.info("--- AccountTransaction Schemas --- Demonstration")
-
-    # AccountTransactionCreate Example
-    # Assume performed_by_user_id=current_admin.id from service/context
-    tx_create_data = {
-        "accountId": 1, # camelCase for account_id
-        "transactionType": TransactionTypeEnum.ADJUSTMENT_CREDIT, # Pass Enum member
-        "amount": Decimal("15.25"),
-        "description": "Manual correction for Q2 bonus calculation error.",
-        "relatedEntityType": "admin_action",
-        # "relatedEntityId": 789 # e.g., ID of an admin action log
+    print("\nAccountTransactionBaseSchema (приклад):")
+    base_tx_data = {
+        "account_id": 1,
+        "transaction_type": TransactionType.CREDIT.value,
+        "amount": Decimal("50.25"),
+        "description": "Нарахування за участь у заході."  # TODO i18n
     }
+    base_tx_instance = AccountTransactionBaseSchema(**base_tx_data)
+    print(base_tx_instance.model_dump_json(indent=2))
     try:
-        create_schema = AccountTransactionCreate(**tx_create_data) # type: ignore[call-arg]
-        logger.info(f"AccountTransactionCreate valid: {create_schema.model_dump(by_alias=True)}")
+        AccountTransactionBaseSchema(account_id=1, transaction_type="INVALID_TYPE", amount=10)
     except Exception as e:
-        logger.error(f"Error creating AccountTransactionCreate: {e}")
+        print(f"Помилка валідації AccountTransactionBaseSchema (очікувано): {e}")
 
-    # AccountTransactionResponse Example
-    account_info_data = {"id": 1, "currencyName": "Merits", "userId": 101, "groupId": 1}
-    admin_user_info_data = {"id": 5, "name": "Super Admin"}
-
-    response_data = {
-        "id": 1001, # ID of the AccountTransaction record
-        "createdAt": (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat(),
-        "updatedAt": (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat(),
-        "account": account_info_data,
-        "transactionType": TransactionTypeEnum.CREDIT_MANUAL_BONUS, # Pass Enum member
-        "amount": Decimal("100.00"),
-        "balanceAfterTransaction": Decimal("550.75"),
-        "description": "Discretionary bonus for outstanding contribution.",
-        "performedBy": admin_user_info_data, # camelCase for performed_by
-        "relatedEntityType": "manual_bonus_award",
-        "relatedEntityId": 32
+    print("\nAccountTransactionCreateSchema (приклад для створення):")
+    create_tx_data = {
+        "account_id": 2,
+        "transaction_type": TransactionType.DEBIT.value,
+        "amount": Decimal("15.00"),
+        "description": "Списання за використання сервісу 'X'.",  # TODO i18n
+        "related_reward_id": 5
     }
-    try:
-        response_schema = AccountTransactionResponse(**response_data) # type: ignore[call-arg]
-        logger.info(f"AccountTransactionResponse: {response_schema.model_dump_json(by_alias=True, indent=2)}")
-        if response_schema.account and response_schema.performed_by:
-            logger.info(f"  Transaction for Account ID: {response_schema.account.id}, Performed by: {response_schema.performed_by.name}")
-    except Exception as e:
-        logger.error(f"Error creating AccountTransactionResponse: {e}")
+    create_tx_instance = AccountTransactionCreateSchema(**create_tx_data)
+    print(create_tx_instance.model_dump_json(indent=2))
+
+    print("\nAccountTransactionSchema (приклад відповіді API):")
+    tx_response_data = {
+        "id": 1001,
+        "account_id": 1,
+        "transaction_type": TransactionType.CREDIT.value,
+        "amount": Decimal("75.00"),
+        "description": "Щомісячний бонус лояльності.",  # TODO i18n
+        "created_at": datetime.now(),
+        "updated_at": datetime.now(),
+        "created_by_user_id": None,  # Системна транзакція
+        # "created_by": None # Приклад UserPublicProfileSchema
+    }
+    tx_response_instance = AccountTransactionSchema(**tx_response_data)
+    print(tx_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних транзакцій.")
+    print(
+        f"Використовується TransactionType Enum для поля 'transaction_type', наприклад: TransactionType.REFUND = '{TransactionType.REFUND.value}'")

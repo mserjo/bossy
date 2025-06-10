@@ -1,130 +1,130 @@
 # backend/app/src/models/files/file.py
-
 """
-SQLAlchemy model for File Records, storing metadata about uploaded files.
+Модель SQLAlchemy для сутності "Запис Файлу" (FileRecord).
+
+Цей модуль визначає модель `FileRecord`, яка зберігає метадані
+про завантажені файли в системі Kudos, такі як ім'я файлу, шлях,
+тип MIME, розмір та інформацію про завантажувача.
 """
+from datetime import datetime  # Необхідно для TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional, Dict, Any
 
-import logging
-from typing import Optional, TYPE_CHECKING, List # Added List for UserAvatar back_populates
-from datetime import datetime, timezone # Added timezone for __main__
-from enum import Enum as PythonEnum # For native Python Enum if used in SQLAlchemyEnum
-
-from sqlalchemy import String, Integer, Boolean, ForeignKey, BigInteger, Enum as SQLAlchemyEnum, Text # Added BigInteger for size, Integer for FK, Text
+from sqlalchemy import String, ForeignKey, Integer, JSON, func  # Integer для file_size, JSON для metadata
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-# from sqlalchemy.sql import func # Not strictly needed here as created_at from BaseModel has server_default
 
-from backend.app.src.models.base import BaseModel
-
-# Configure logger for this module
-logger = logging.getLogger(__name__)
-
-class FileStorageTypeEnum(PythonEnum): # Changed to inherit from PythonEnum
-    """ Defines where the file is physically stored. Using native Python Enum for SQLAlchemyEnum. """
-    LOCAL = "local"         # Stored on the local filesystem of the server.
-    S3 = "s3"             # Stored in an AWS S3 bucket or compatible service.
-    # AZURE_BLOB = "azure_blob" # Example for Azure Blob Storage
-    # GOOGLE_CLOUD_STORAGE = "google_cloud_storage" # Example for GCS
-    OTHER = "other"         # Other storage mechanism.
+# Абсолютний імпорт базових класів та Enum
+from backend.app.src.models.base import Base
+from backend.app.src.models.mixins import TimestampedMixin
+from backend.app.src.core.dicts import FileType as FileTypeEnum  # Enum для поля purpose
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
-    from backend.app.src.models.files.avatar import UserAvatar # For relationship
 
-class FileRecord(BaseModel):
+
+class FileRecord(Base, TimestampedMixin):
     """
-    Represents a record of an uploaded file, storing its metadata.
-    The actual file is stored elsewhere (e.g., local filesystem, S3).
+    Модель Запису Файлу.
 
-    Attributes:
-        uploader_user_id (Optional[int]): Foreign key to the user who uploaded the file.
-                                       Null if uploaded by an anonymous user or system process.
-        original_filename (str): The original name of the file as uploaded by the user.
-        stored_filename (str): The name used to store the file on the server/storage (e.g., a UUID-based name to avoid collisions).
-        filepath_or_url (str): The absolute local path or the full URL to access the file.
-        mime_type (str): The MIME type of the file (e.g., 'image/jpeg', 'application/pdf').
-        size_bytes (int): The size of the file in bytes.
-        storage_type (FileStorageTypeEnum): Indicates where the file is stored (e.g., local, S3).
-        is_public (bool): Whether the file is publicly accessible or requires authentication/authorization.
-        # `id`, `created_at` (upload_timestamp), `updated_at` from BaseModel.
-        # `created_at` can serve as the upload_timestamp.
+    Зберігає метадані про кожен завантажений файл.
+
+    Атрибути:
+        id (Mapped[int]): Унікальний ідентифікатор запису файлу.
+        file_name (Mapped[str]): Оригінальне ім'я файлу, надане користувачем або згенероване.
+        file_path (Mapped[str]): Унікальний шлях до файлу на сервері або ключ в об'єктному сховищі.
+        mime_type (Mapped[str]): MIME-тип файлу (наприклад, "image/jpeg", "application/pdf").
+        file_size (Mapped[int]): Розмір файлу в байтах.
+        uploader_user_id (Mapped[Optional[int]]): ID користувача, який завантажив файл.
+        purpose (Mapped[Optional[str]]): Призначення файлу (наприклад, "avatar", "task_attachment").
+                                         Використовує значення з `core.dicts.FileType`.
+        metadata (Mapped[Optional[Dict[str, Any]]]): Додаткові метадані у форматі JSON (наприклад, розміри зображення).
+
+        uploader (Mapped[Optional["User"]]): Зв'язок з користувачем, який завантажив файл.
+        created_at, updated_at: Успадковано від `TimestampedMixin`.
     """
     __tablename__ = "file_records"
 
-    uploader_user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, index=True, comment="FK to the user who uploaded the file (if any)")
-
-    original_filename: Mapped[str] = mapped_column(String(512), nullable=False, comment="Original name of the file as uploaded")
-    stored_filename: Mapped[str] = mapped_column(String(512), unique=True, nullable=False, index=True, comment="Filename used for storage (e.g., UUID-based to prevent collisions)")
-
-    filepath_or_url: Mapped[str] = mapped_column(Text, nullable=False, comment="Local path or full URL to the file") # Changed to Text for potentially very long URLs/paths
-
-    mime_type: Mapped[str] = mapped_column(String(255), nullable=False, comment="MIME type of the file (e.g., 'image/jpeg')")
-    size_bytes: Mapped[int] = mapped_column(BigInteger, nullable=False, comment="Size of the file in bytes") # BigInteger for potentially large files
-
-    storage_type: Mapped[FileStorageTypeEnum] = mapped_column(
-        SQLAlchemyEnum(FileStorageTypeEnum, name="filestoragetypeenum", native_enum=False, create_constraint=True),
-        nullable=False,
-        default=FileStorageTypeEnum.LOCAL,
-        comment="Indicates where the file is physically stored (e.g., local, s3)"
+    id: Mapped[int] = mapped_column(
+        primary_key=True, index=True, autoincrement=True, comment="Унікальний ідентифікатор запису файлу"
+    )
+    file_name: Mapped[str] = mapped_column(
+        String(255), nullable=False, comment="Оригінальне або згенероване ім'я файлу"
+    )
+    file_path: Mapped[str] = mapped_column(
+        String(1024), nullable=False, unique=True, index=True, comment="Шлях до файлу на сервері або ключ в сховищі"
+    )
+    mime_type: Mapped[str] = mapped_column(
+        String(100), nullable=False, comment="MIME-тип файлу (наприклад, image/png)"
+    )
+    file_size: Mapped[int] = mapped_column(
+        Integer, nullable=False, comment="Розмір файлу в байтах"
+    )
+    uploader_user_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey('users.id', name='fk_file_record_uploader_id', ondelete="SET NULL"),
+        nullable=True,  # Може бути NULL, якщо файл системний або завантажувач видалений
+        index=True,
+        comment="ID користувача, який завантажив файл"
     )
 
-    is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, comment="Is this file publicly accessible without specific auth checks?")
-    # hash_sha256: Mapped[Optional[str]] = mapped_column(String(64), nullable=True, index=True, comment="SHA256 hash of the file content for integrity/deduplication")
+    # Використовуємо значення з Enum FileType
+    # TODO: Переконатися, що SQLEnum імпортовано та використовується, якщо тип колонки в БД є Enum.
+    # purpose: Mapped[Optional[FileTypeEnum]] = mapped_column(SQLEnum(FileTypeEnum), nullable=True, index=True)
+    purpose: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True, index=True, comment="Призначення файлу (avatar, task_attachment тощо)"
+    )
 
-    # --- Relationships ---
-    uploader: Mapped[Optional["User"]] = relationship(foreign_keys=[uploader_user_id]) # One-way or add back_populates to User
+    metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+        JSON, nullable=True, comment="Додаткові метадані файлу (наприклад, розміри зображення)"
+    )
 
-    # This defines the one-to-one relationship from FileRecord to UserAvatar
-    # UserAvatar will have a file_record_id that points back here.
-    user_avatar_association: Mapped[Optional["UserAvatar"]] = relationship(back_populates="file_record")
+    # --- Зв'язки (Relationships) ---
+    uploader: Mapped[Optional["User"]] = relationship(foreign_keys=[uploader_user_id], lazy="selectin")
+    # Зв'язок з UserAvatar (якщо потрібно знати, чи є цей файл аватаром)
+    # user_avatar_link: Mapped[Optional["UserAvatar"]] = relationship(back_populates="file_record", lazy="selectin") # Якщо UserAvatar має back_populates
 
+    # Поля для __repr__
+    _repr_fields = ["id", "file_name", "mime_type", "file_size", "uploader_user_id", "purpose"]
 
-    def __repr__(self) -> str:
-        id_val = getattr(self, 'id', 'N/A')
-        return f"<FileRecord(id={id_val}, name='{self.original_filename}', stored_as='{self.stored_filename}', type='{self.mime_type}')>"
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для моделі FileRecord.
+    print("--- Модель Запису Файлу (FileRecord) ---")
+    print(f"Назва таблиці: {FileRecord.__tablename__}")
 
-    logger.info("--- FileRecord Model --- Demonstration")
+    print("\nОчікувані поля:")
+    expected_fields = [
+        'id', 'file_name', 'file_path', 'mime_type', 'file_size',
+        'uploader_user_id', 'purpose', 'metadata',
+        'created_at', 'updated_at'
+    ]
+    for field in expected_fields:
+        print(f"  - {field}")
 
-    # Example FileRecord instance
-    # Assume User id=1 exists
-    file_rec1 = FileRecord(
-        uploader_user_id=1,
-        original_filename="profile_picture.jpg",
-        stored_filename="f47ac10b-58cc-4372-a567-0e02b2c3d479.jpg",
-        filepath_or_url="/uploads/avatars/f47ac10b-58cc-4372-a567-0e02b2c3d479.jpg",
+    print("\nОчікувані зв'язки (relationships):")
+    expected_relationships = ['uploader']  # , 'user_avatar_link' (якщо додано)
+    for rel in expected_relationships:
+        print(f"  - {rel}")
+
+    # Приклад створення екземпляра (без взаємодії з БД)
+    from datetime import timezone
+
+    example_file = FileRecord(
+        id=1,
+        file_name="profile_pic.jpg",
+        file_path="/uploads/avatars/user1/profile_pic.jpg",
         mime_type="image/jpeg",
-        size_bytes=1024 * 120, # 120KB
-        storage_type=FileStorageTypeEnum.LOCAL,
-        is_public=False
+        file_size=102400,  # 100 KB
+        uploader_user_id=101,
+        purpose=FileTypeEnum.AVATAR.value,  # Використання значення Enum
+        metadata={"width": 500, "height": 500}
     )
-    file_rec1.id = 1 # Simulate ORM-set ID
-    file_rec1.created_at = datetime.now(timezone.utc)
-    file_rec1.updated_at = datetime.now(timezone.utc)
+    # Імітуємо часові мітки
+    example_file.created_at = datetime.now(tz=timezone.utc)
+    example_file.updated_at = datetime.now(tz=timezone.utc)
 
-    logger.info(f"Example FileRecord: {file_rec1!r}")
-    logger.info(f"  Original Name: {file_rec1.original_filename}")
-    logger.info(f"  Storage Type: {file_rec1.storage_type.value if isinstance(file_rec1.storage_type, PythonEnum) else file_rec1.storage_type}") # Check against PythonEnum
-    logger.info(f"  Size: {file_rec1.size_bytes / 1024:.2f} KB")
-    logger.info(f"  Is Public: {file_rec1.is_public}")
-    logger.info(f"  Created At: {file_rec1.created_at.isoformat() if file_rec1.created_at else 'N/A'}")
+    print(f"\nПриклад екземпляра FileRecord (без сесії):\n  {example_file}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <FileRecord(id=1, file_name='profile_pic.jpg', mime_type='image/jpeg', file_size=102400, uploader_user_id=101, purpose='avatar', created_at=...)>
 
-
-    s3_file_rec = FileRecord(
-        original_filename="annual_report.pdf",
-        stored_filename="report_archive/2023_annual_report_final.pdf",
-        filepath_or_url="s3://my-kudos-bucket/report_archive/2023_annual_report_final.pdf",
-        mime_type="application/pdf",
-        size_bytes=1024 * 1024 * 5, # 5MB
-        storage_type=FileStorageTypeEnum.S3,
-        is_public=False
-    )
-    s3_file_rec.id = 2
-    logger.info(f"Example S3 FileRecord: {s3_file_rec!r}")
-    logger.info(f"  File Path/URL: {s3_file_rec.filepath_or_url}")
-
-    # The following line would error if run directly without SQLAlchemy engine and metadata setup for all related tables.
-    # logger.info(f"FileRecord attributes (conceptual table columns): {[c.name for c in FileRecord.__table__.columns if not c.name.startswith('_')]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    print(
+        f"Використовується FileType Enum для поля 'purpose', наприклад: FileTypeEnum.TASK_ATTACHMENT = '{FileTypeEnum.TASK_ATTACHMENT.value}'")

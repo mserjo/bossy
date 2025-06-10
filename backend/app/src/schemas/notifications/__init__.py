@@ -1,45 +1,48 @@
 # backend/app/src/schemas/notifications/__init__.py
-import logging
+"""
+Pydantic схеми для сутностей, пов'язаних зі "Сповіщеннями".
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+Цей пакет містить схеми Pydantic, що використовуються для валідації
+даних запитів та формування відповідей API, які стосуються шаблонів сповіщень,
+самих сповіщень та спроб їх доставки в програмі Kudos.
+"""
 
-logger.info("Notification schemas package initialized.")
-
-# Import all schemas from this package to make them easily accessible
-from .notification import (
-    NotificationBase,
-    NotificationCreateInternal,
-    NotificationUpdate,
-    NotificationResponse,
-)
+# Схеми, пов'язані з Шаблонами Сповіщень
 from .template import (
-    NotificationTemplateBase,
-    NotificationTemplateCreate,
-    NotificationTemplateUpdate,
-    NotificationTemplateResponse,
+    NotificationTemplateBaseSchema,
+    NotificationTemplateCreateSchema,
+    NotificationTemplateUpdateSchema,
+    NotificationTemplateSchema
 )
+
+# Схеми, пов'язані зі Сповіщеннями
+from .notification import (
+    NotificationBaseSchema,
+    NotificationCreateSchema,
+    NotificationUpdateSchema,
+    NotificationSchema
+)
+
+# Схеми, пов'язані зі Спробами Доставки Сповіщень
 from .delivery import (
-    NotificationDeliveryAttemptBase,
-    NotificationDeliveryAttemptCreate,
-    NotificationDeliveryAttemptResponse,
+    NotificationDeliveryAttemptBaseSchema,
+    NotificationDeliveryAttemptCreateSchema,
+    NotificationDeliveryAttemptSchema
 )
 
 __all__ = [
-    # Notification schemas
-    "NotificationBase",
-    "NotificationCreateInternal",
-    "NotificationUpdate",
-    "NotificationResponse",
     # NotificationTemplate schemas
-    "NotificationTemplateBase",
-    "NotificationTemplateCreate",
-    "NotificationTemplateUpdate",
-    "NotificationTemplateResponse",
+    "NotificationTemplateBaseSchema",
+    "NotificationTemplateCreateSchema",
+    "NotificationTemplateUpdateSchema",
+    "NotificationTemplateSchema",
+    # Notification schemas
+    "NotificationBaseSchema",
+    "NotificationCreateSchema",
+    "NotificationUpdateSchema",
+    "NotificationSchema",
     # NotificationDeliveryAttempt schemas
-    "NotificationDeliveryAttemptBase",
-    "NotificationDeliveryAttemptCreate",
-    "NotificationDeliveryAttemptResponse",
+    "NotificationDeliveryAttemptBaseSchema",
+    "NotificationDeliveryAttemptCreateSchema",
+    "NotificationDeliveryAttemptSchema",
 ]
-
-logger.info(f"Successfully imported notification schemas: {__all__}")

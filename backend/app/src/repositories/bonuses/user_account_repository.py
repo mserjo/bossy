@@ -1,141 +1,159 @@
 # backend/app/src/repositories/bonuses/user_account_repository.py
-
 """
-Repository for UserAccount entities.
-Provides CRUD operations and specific methods for managing user point/currency accounts.
+Репозиторій для моделі "Рахунок Користувача" (UserAccount).
+
+Цей модуль визначає клас `UserAccountRepository`, який успадковує `BaseRepository`
+та надає специфічні методи для роботи з рахунками користувачів, такі як
+отримання рахунку за парою користувач-група та оновлення балансу.
 """
 
-import logging
-from typing import Optional, List
-from datetime import datetime, timezone # Added timezone
-from decimal import Decimal # For balance type
+from typing import List, Optional, Tuple, Any
+from decimal import Decimal
 
+from sqlalchemy import select, func, update as sqlalchemy_update  # update для атомарного оновлення
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update # Added update
+# from sqlalchemy.orm import selectinload
 
-from backend.app.src.models.bonuses.account import UserAccount
-from backend.app.src.schemas.bonuses.account import UserAccountCreate, UserAccountUpdate
+# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+# Абсолютний імпорт моделі та схем
+from backend.app.src.models.bonuses.account import UserAccount
+from backend.app.src.schemas.bonuses.account import UserAccountCreateSchema, UserAccountUpdateSchema
 
-logger = logging.getLogger(__name__)
 
-class UserAccountRepository(BaseRepository[UserAccount, UserAccountCreate, UserAccountUpdate]):
+# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
+
+# logger = get_logger(__name__)
+
+class UserAccountRepository(BaseRepository[UserAccount, UserAccountCreateSchema, UserAccountUpdateSchema]):
     """
-    Repository for managing UserAccount records.
+    Репозиторій для управління рахунками користувачів (`UserAccount`).
+
+    Успадковує базові CRUD-методи від `BaseRepository` та надає
+    додаткові методи для роботи з рахунками.
     """
 
-    def __init__(self):
-        super().__init__(UserAccount)
-
-    async def get_by_user_and_group(self, db: AsyncSession, *, user_id: int, group_id: int) -> Optional[UserAccount]:
+    def __init__(self, db_session: AsyncSession):
         """
-        Retrieves a user's account for a specific group.
-        Relies on the UniqueConstraint('user_id', 'group_id') on the model.
+        Ініціалізує репозиторій для моделі `UserAccount`.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            user_id: The ID of the user.
-            group_id: The ID of the group.
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
+        """
+        super().__init__(db_session=db_session, model=UserAccount)
+
+    async def get_by_user_and_group(self, user_id: int, group_id: int) -> Optional[UserAccount]:
+        """
+        Отримує запис рахунку за ID користувача та ID групи.
+
+        Args:
+            user_id (int): ID користувача.
+            group_id (int): ID групи.
 
         Returns:
-            The UserAccount object if found, otherwise None.
+            Optional[UserAccount]: Екземпляр моделі `UserAccount`, якщо знайдено, інакше None.
         """
-        statement = select(self.model).where(
-            self.model.user_id == user_id, # type: ignore[attr-defined]
-            self.model.group_id == group_id # type: ignore[attr-defined]
+        stmt = select(self.model).where(
+            self.model.user_id == user_id,
+            self.model.group_id == group_id
         )
-        result = await db.execute(statement)
+        result = await self.db_session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_accounts_for_user(self, db: AsyncSession, *, user_id: int, skip: int = 0, limit: int = 100) -> List[UserAccount]:
+    async def get_accounts_for_user(self, user_id: int, skip: int = 0, limit: int = 100) -> Tuple[
+        List[UserAccount], int]:
         """
-        Retrieves all accounts for a specific user across different groups.
+        Отримує список всіх рахунків для вказаного користувача з пагінацією.
+        (Користувач може мати рахунки в різних групах).
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            user_id: The ID of the user.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            user_id (int): ID користувача.
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            A list of UserAccount objects.
+            Tuple[List[UserAccount], int]: Кортеж зі списком рахунків та їх загальною кількістю.
         """
-        statement = (
-            select(self.model)
-            .where(self.model.user_id == user_id) # type: ignore[attr-defined]
-            .order_by(self.model.group_id) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
+        filters = [self.model.user_id == user_id]
+        # options = [selectinload(self.model.group)] # Жадібне завантаження групи
+        return await self.get_multi(skip=skip, limit=limit, filters=filters)  # , options=options)
+
+    async def get_accounts_for_group(self, group_id: int, skip: int = 0, limit: int = 100) -> Tuple[
+        List[UserAccount], int]:
+        """
+        Отримує список всіх рахунків у вказаній групі з пагінацією.
+
+        Args:
+            group_id (int): ID групи.
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
+
+        Returns:
+            Tuple[List[UserAccount], int]: Кортеж зі списком рахунків та їх загальною кількістю.
+        """
+        filters = [self.model.group_id == group_id]
+        # options = [selectinload(self.model.user)] # Жадібне завантаження користувача
+        return await self.get_multi(skip=skip, limit=limit, filters=filters)  # , options=options)
+
+    async def update_balance(self, account_id: int, amount_change: Decimal) -> Optional[UserAccount]:
+        """
+        Атомарно оновлює баланс рахунку на вказану суму (може бути позитивною або від'ємною).
+
+        Примітка: Цей метод виконує пряме оновлення в БД. Для складніших операцій,
+        що вимагають створення транзакційних записів, логіка має бути на сервісному рівні.
+
+        Args:
+            account_id (int): ID рахунку для оновлення.
+            amount_change (Decimal): Сума, на яку потрібно змінити баланс.
+                                     Позитивна для збільшення, від'ємна для зменшення.
+
+        Returns:
+            Optional[UserAccount]: Оновлений екземпляр UserAccount, якщо операція успішна і запис знайдено,
+                                   інакше None (якщо запис не знайдено або оновлення не відбулося).
+        """
+        # TODO: Розглянути можливість використання select(for_update=True) для блокування рядка,
+        #       якщо очікується висока конкуренція за оновлення одного рахунку.
+        #       Однак, це може бути надмірним і краще обробляється на рівні транзакцій сервісу.
+
+        stmt = (
+            sqlalchemy_update(self.model)
+            .where(self.model.id == account_id)
+            .values(balance=self.model.balance + amount_change)
+            .returning(self.model)  # Повертає оновлений запис
+            .execution_options(synchronize_session="fetch")  # Або "evaluate", або False з подальшим refresh
         )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
 
-    async def get_accounts_for_group(self, db: AsyncSession, *, group_id: int, skip: int = 0, limit: int = 100) -> List[UserAccount]:
-        """
-        Retrieves all user accounts within a specific group.
+        result = await self.db_session.execute(stmt)
+        await self.db_session.commit()  # Потрібен commit для persist змін від update
 
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            group_id: The ID of the group.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+        updated_obj = result.scalar_one_or_none()
 
-        Returns:
-            A list of UserAccount objects.
-        """
-        statement = (
-            select(self.model)
-            .where(self.model.group_id == group_id) # type: ignore[attr-defined]
-            .order_by(self.model.user_id) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
+        if updated_obj:
+            # Якщо потрібно оновити екземпляр в поточній сесії (наприклад, якщо він вже завантажений)
+            # await self.db_session.refresh(updated_obj) # Не завжди потрібно, якщо synchronize_session="fetch"
+            # logger.info(f"Баланс рахунку ID {account_id} оновлено на {amount_change}. Новий баланс: {updated_obj.balance}")
+            pass
+        # else:
+        # logger.warning(f"Спроба оновити баланс для неіснуючого рахунку ID {account_id}")
 
-    async def update_balance(
-        self, db: AsyncSession, *, account_id: int, change_amount: Decimal, last_transaction_at: Optional[datetime] = None
-    ) -> Optional[UserAccount]:
-        """
-        Atomically updates the balance of a user account by a specified amount.
-        This method uses a select-then-update pattern. For true atomicity under high concurrency,
-        consider database-level locks (e.g., SELECT FOR UPDATE) or direct SQL UPDATE statements
-        managed carefully by the service layer alongside transaction creation.
-        This repository method is provided for direct balance adjustments but should be
-        used with caution, ideally within a service-layer transaction that also records
-        an AccountTransaction.
-
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            account_id: The ID of the UserAccount to update.
-            change_amount: The amount to add (positive) or subtract (negative) from the balance.
-            last_transaction_at: Optional. Timestamp for `last_transaction_at`. Defaults to now(UTC).
-
-        Returns:
-            The updated UserAccount object if found and updated, otherwise None.
-        """
-        user_account = await self.get(db, id=account_id) # Consider with_for_update here if needed
-        if not user_account:
-            return None
-
-        user_account.balance += change_amount # type: ignore[union-attr]
-        user_account.last_transaction_at = last_transaction_at if last_transaction_at else datetime.now(timezone.utc) # type: ignore[union-attr]
-        # updated_at will be handled by TimestampedMixin if BaseRepository.update calls db.add(user_account)
-        # or if SQLAlchemy event listeners are correctly configured for "before_flush".
-        # For this direct manipulation, explicitly setting it is safer if not relying on super().update
-        user_account.updated_at = datetime.now(timezone.utc) # type: ignore[union-attr]
+        return updated_obj
 
 
-        try:
-            db.add(user_account) # Mark as dirty
-            await db.commit()
-            await db.refresh(user_account)
-            return user_account
-        except Exception as e:
-            logger.error(f"Error updating balance for account {account_id}: {e}")
-            await db.rollback()
-            raise
+if __name__ == "__main__":
+    # Демонстраційний блок для UserAccountRepository.
+    print("--- Репозиторій Рахунків Користувачів (UserAccountRepository) ---")
 
-    # BaseRepository methods create, get, update (generic), remove are inherited.
-    # `create` uses UserAccountCreate. `user_id` and `group_id` must be provided.
-    # The generic `update` (using UserAccountUpdate) is for fields like `currency_name`.
+    print("Для тестування UserAccountRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    print(f"Він успадковує методи від BaseRepository для моделі {UserAccount.__name__}.")
+    # UserAccountUpdateSchema зараз дозволяє оновлювати лише баланс.
+    print(f"  Очікує схему створення: {UserAccountCreateSchema.__name__}")
+    print(f"  Очікує схему оновлення: {UserAccountUpdateSchema.__name__}")
+
+    print("\nСпецифічні методи:")
+    print("  - get_by_user_and_group(user_id: int, group_id: int)")
+    print("  - get_accounts_for_user(user_id: int, skip: int = 0, limit: int = 100)")
+    print("  - get_accounts_for_group(group_id: int, skip: int = 0, limit: int = 100)")
+    print("  - update_balance(account_id: int, amount_change: Decimal)")
+
+    print("\nПримітка: Метод `update_balance` виконує атомарне оновлення. Створення запису AccountTransaction")
+    print("має відбуватися на сервісному рівні для забезпечення цілісності даних.")

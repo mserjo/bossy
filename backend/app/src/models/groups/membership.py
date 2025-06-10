@@ -1,113 +1,118 @@
 # backend/app/src/models/groups/membership.py
-
 """
-SQLAlchemy model for GroupMembership, representing the association between Users and Groups.
-This is an association object for a many-to-many relationship.
+Модель SQLAlchemy для сутності "Членство в Групі" (GroupMembership).
+
+Цей модуль визначає модель `GroupMembership`, яка представляє зв'язок
+багато-до-багатьох між користувачами (`User`) та групами (`Group`).
+Вона також зберігає роль користувача в конкретній групі.
 """
+from datetime import datetime  # Необхідно для TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
-import logging
-from typing import Optional, TYPE_CHECKING
-from datetime import datetime, timezone # Added timezone for __main__
-
-from sqlalchemy import ForeignKey, DateTime, UniqueConstraint, Integer, Boolean, Text # Added Boolean, Text
+from sqlalchemy import String, ForeignKey, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func # For server_default=func.now()
 
-from backend.app.src.models.base import BaseModel # Memberships are simpler entities
-
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт базових класів та Enum
+from backend.app.src.models.base import Base
+from backend.app.src.models.mixins import TimestampedMixin  # Для відстеження часу приєднання
+from backend.app.src.core.dicts import GroupRole  # Enum для ролей в групі
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
     from backend.app.src.models.groups.group import Group
-    from backend.app.src.models.dictionaries.user_roles import UserRole # For role relationship
 
-class GroupMembership(BaseModel):
+
+class GroupMembership(Base, TimestampedMixin):
     """
-    Represents the membership of a User in a Group.
-    This acts as an association table for the many-to-many relationship
-    between Users and Groups, and can hold additional data about the membership (e.g., role in group, join date).
+    Модель членства користувача в групі.
 
-    The `id` field from BaseModel serves as the surrogate primary key for this association record.
-    A unique constraint on (user_id, group_id) ensures a user cannot have multiple membership records for the same group.
+    Ця модель реалізує зв'язок багато-до-багатьох між користувачами та групами,
+    дозволяючи користувачам бути членами кількох груп з різними ролями в кожній.
+    Поле `created_at` з `TimestampedMixin` може використовуватися як час приєднання до групи.
 
-    Attributes:
-        user_id (int): Foreign key to the user.
-        group_id (int): Foreign key to the group.
-        role_id (int): Foreign key to `dict_user_roles.id`, defining the user's role specifically within this group.
-        join_date (datetime): Timestamp when the user joined the group.
-        is_active (bool): Whether this membership is currently active.
-        notes (Optional[str]): Any specific notes about this membership.
+    Атрибути:
+        user_id (Mapped[int]): ID користувача (частина складеного первинного ключа, зовнішній ключ до `users.id`).
+        group_id (Mapped[int]): ID групи (частина складеного первинного ключа, зовнішній ключ до `groups.id`).
+        role (Mapped[str]): Роль користувача в цій групі (наприклад, "admin", "member").
+                            Значення беруться з `GroupRole` Enum.
+        user (Mapped["User"]): Зв'язок з моделлю `User`.
+        group (Mapped["Group"]): Зв'язок з моделлю `Group`.
+        created_at, updated_at: Часові мітки (успадковано). `created_at` позначає час приєднання.
     """
     __tablename__ = "group_memberships"
 
-    # `id` from BaseModel is the surrogate PK.
-    # user_id and group_id are indexed FKs and part of a unique constraint.
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True, comment="FK to the user who is a member")
-    group_id: Mapped[int] = mapped_column(Integer, ForeignKey("groups.id"), nullable=False, index=True, comment="FK to the group the user is a member of")
-
-    role_id: Mapped[int] = mapped_column(Integer, ForeignKey("dict_user_roles.id"), nullable=False, index=True, comment="FK to user_roles dictionary, defining the user's role within this group")
-
-    join_date: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-        comment="Timestamp when the user joined the group (UTC)"
+    # Складений первинний ключ (user_id, group_id)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey('users.id', name='fk_group_membership_user_id', ondelete="CASCADE"),
+        primary_key=True,
+        comment="ID користувача, що є членом групи"
     )
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, comment="Is this membership currently active? (e.g., for suspensions)")
-    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="Optional notes specific to this membership")
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey('groups.id', name='fk_group_membership_group_id', ondelete="CASCADE"),
+        primary_key=True,
+        comment="ID групи, до якої належить користувач"
+    )
 
-    # --- Relationships ---
-    user: Mapped["User"] = relationship(back_populates="group_memberships")
-    group: Mapped["Group"] = relationship(back_populates="memberships")
-    role: Mapped["UserRole"] = relationship(foreign_keys=[role_id]) # Relationship to dict_user_roles
+    # Роль користувача в групі
+    role: Mapped[str] = mapped_column(
+        String(50),  # Довжина відповідає можливим значенням з GroupRole
+        nullable=False,
+        default=GroupRole.MEMBER.value,  # Роль за замовчуванням - "учасник"
+        comment="Роль користувача в цій групі (напр., admin, member)"
+    )
 
-    # --- Table Arguments ---
-    # Enforce that a user can only have one membership record per group.
-    __table_args__ = (UniqueConstraint('user_id', 'group_id', name='uq_user_group_membership'),)
+    # Обмеження унікальності для пари user_id та group_id, щоб користувач не міг бути
+    # членом однієї групи двічі (хоча це вже забезпечується складеним первинним ключем).
+    # Явне визначення `UniqueConstraint` тут може бути зайвим, якщо `primary_key=True`
+    # вже встановлено для обох колонок, оскільки це автоматично створює унікальний індекс.
+    # Однак, для ясності та можливості надання імені обмеженню, його можна залишити.
+    # __table_args__ = (
+    #     UniqueConstraint('user_id', 'group_id', name='uq_user_group_membership'),
+    # )
+    # Примітка: SQLAlchemy автоматично створює індекс для первинних ключів.
+    # Якщо user_id та group_id є складеним первинним ключем, вони вже унікальні разом.
 
-    def __repr__(self) -> str:
-        id_val = getattr(self, 'id', 'N/A') # Use surrogate PK from BaseModel for repr
-        return f"<GroupMembership(id={id_val}, user_id={self.user_id}, group_id={self.group_id}, role_id={self.role_id})>"
+    # --- Зв'язки (Relationships) ---
+    user: Mapped["User"] = relationship(back_populates="memberships", lazy="selectin")
+    group: Mapped["Group"] = relationship(back_populates="memberships", lazy="selectin")
+
+    # Поля для __repr__
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
+    _repr_fields = ["user_id", "group_id", "role"]
+
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для моделі GroupMembership.
+    print("--- Модель Членства в Групі (GroupMembership) ---")
+    print(f"Назва таблиці: {GroupMembership.__tablename__}")
 
-    logger.info("--- GroupMembership Model --- Demonstration")
+    print("\nОчікувані поля:")
+    expected_fields = ['user_id', 'group_id', 'role', 'created_at', 'updated_at']
+    for field in expected_fields:
+        print(f"  - {field}")
 
-    # Example GroupMembership instance
-    # Assume User with id=1, Group with id=1, and UserRole with id=3 (e.g., 'MEMBER') exist
-    membership1 = GroupMembership(
-        user_id=1,
-        group_id=1,
-        role_id=3, # Member role
-        is_active=True,
-        notes="First member of the group."
+    print("\nОчікувані зв'язки (relationships):")
+    expected_relationships = ['user', 'group']
+    for rel in expected_relationships:
+        print(f"  - {rel}")
+
+    # Приклад створення екземпляра (без взаємодії з БД)
+    # У реальному коді це робиться через сесію SQLAlchemy.
+
+    # Для демонстрації __repr__ потрібні фіктивні User та Group, якщо __repr__ їх використовує.
+    # Наш __repr__ з Base використовує лише mapped_column поля.
+
+    example_membership = GroupMembership(
+        user_id=101,
+        group_id=202,
+        role=GroupRole.ADMIN.value  # Використання значення Enum
     )
-    membership1.id = 1 # Simulate ORM-set surrogate ID from BaseModel
-    membership1.join_date = datetime.now(timezone.utc) # Simulate (server_default handles this in DB)
-    membership1.created_at = datetime.now(timezone.utc)
-    membership1.updated_at = datetime.now(timezone.utc)
+    # Імітуємо часові мітки
+    example_membership.created_at = datetime.now(tz=timezone.utc)
+    example_membership.updated_at = datetime.now(tz=timezone.utc)
 
-    logger.info(f"Example GroupMembership: {membership1!r}")
-    logger.info(f"  User ID: {membership1.user_id}, Group ID: {membership1.group_id}, Role ID: {membership1.role_id}")
-    logger.info(f"  Join Date: {membership1.join_date.isoformat() if membership1.join_date else 'N/A'}")
-    logger.info(f"  Is Active: {membership1.is_active}")
-    logger.info(f"  Notes: {membership1.notes}")
-    logger.info(f"  Surrogate PK (id): {membership1.id}")
-    logger.info(f"  Created At: {membership1.created_at.isoformat() if membership1.created_at else 'N/A'}")
+    print(f"\nПриклад екземпляра GroupMembership (без сесії):\n  {example_membership}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <GroupMembership(user_id=101, group_id=202, role='admin', created_at=...)>
 
-
-    admin_membership = GroupMembership(
-        user_id=2, # User 2
-        group_id=1, # Same Group 1
-        role_id=2,  # Admin role (assuming UserRole with id=2 is 'GROUP_ADMIN')
-    )
-    admin_membership.id = 2
-    logger.info(f"Example Admin GroupMembership: {admin_membership!r}")
-
-    # The following line would error if run directly without SQLAlchemy engine and metadata setup for all related tables.
-    # logger.info(f"GroupMembership attributes (conceptual table columns): {[c.name for c in GroupMembership.__table__.columns if not c.name.startswith('_')]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

@@ -1,109 +1,95 @@
 # backend/app/src/schemas/dictionaries/calendars.py
-
 """
-Pydantic schemas for CalendarProvider dictionary entries.
+Pydantic схеми для довідника "Постачальники Календарів".
+
+Цей модуль визначає схеми для представлення, створення та оновлення
+записів у довіднику постачальників календарів (наприклад, Google Calendar, Outlook Calendar).
 """
 
-import logging
-from typing import Optional # For optional custom fields if any
-from datetime import datetime, timezone # For example values in __main__ and BaseResponseSchema
+from typing import Optional
 
-from pydantic import Field
+# Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    DictionaryBase,
-    # DictionaryCreate as BaseDictionaryCreate, # Not directly used if CalendarProviderCreate inherits CalendarProviderBase
-    # DictionaryUpdate as BaseDictionaryUpdate, # Not directly used if CalendarProviderUpdate inherits CalendarProviderBase
-    DictionaryResponse as BaseDictionaryResponse
+    BaseDictionarySchema,
+    DictionaryCreateSchema,
+    DictionaryUpdateSchema
 )
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
 
-# --- CalendarProvider Schemas ---
+# from pydantic import Field
 
-class CalendarProviderBase(DictionaryBase):
-    """Base schema for CalendarProvider, inherits all fields from DictionaryBase."""
-    # Example of custom fields if CalendarProvider model had them:
-    # icon_url: Optional[str] = Field(None, max_length=512, description="URL to an icon for the provider.", example="https://example.com/icons/google_calendar.png")
-    # integration_docs_url: Optional[str] = Field(None, max_length=512, description="Link to integration documentation.")
+# Схема для представлення запису Постачальника Календаря (у відповідях API)
+class CalendarProviderSchema(BaseDictionarySchema):
+    """
+    Pydantic схема для представлення запису довідника "Постачальник Календаря".
+    Успадковує всі поля від `BaseDictionarySchema`.
+    """
+    # Специфічні поля для CalendarProviderSchema, якщо є, додаються тут.
+    # Наприклад:
+    # api_integration_url: Optional[AnyHttpUrl] = Field(None, description="URL для інтеграції з API календаря.")
     pass
 
-class CalendarProviderCreate(CalendarProviderBase):
+
+# Схема для створення нового запису Постачальника Календаря
+class CalendarProviderCreateSchema(DictionaryCreateSchema):
     """
-    Schema for creating a new CalendarProvider.
-    Inherits fields from CalendarProviderBase. 'code' and 'name' are effectively required.
+    Pydantic схема для створення нового запису в довіднику "Постачальник Календаря".
+    Успадковує всі поля від `DictionaryCreateSchema`.
     """
+    # Специфічні поля для створення CalendarProvider, якщо є, додаються тут.
     pass
 
-class CalendarProviderUpdate(CalendarProviderBase):
-    """
-    Schema for updating an existing CalendarProvider.
-    All fields from CalendarProviderBase are made optional here for partial updates.
-    """
-    code: Optional[str] = Field(None, min_length=1, max_length=100, description="Unique code or short identifier.")
-    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Human-readable name.")
-    description: Optional[str] = Field(None)
-    state: Optional[str] = Field(None, max_length=50)
-    is_default: Optional[bool] = Field(None)
-    display_order: Optional[int] = Field(None)
-    notes: Optional[str] = Field(None)
-    # If custom fields were in CalendarProviderBase:
-    # icon_url: Optional[str] = Field(None)
-    # integration_docs_url: Optional[str] = Field(None)
 
-
-class CalendarProviderResponse(BaseDictionaryResponse):
+# Схема для оновлення існуючого запису Постачальника Календаря
+class CalendarProviderUpdateSchema(DictionaryUpdateSchema):
     """
-    Schema for representing a CalendarProvider in API responses.
-    Inherits all fields from BaseDictionaryResponse.
-    Add any CalendarProvider-specific response fields here if CalendarProviderBase had custom fields.
+    Pydantic схема для оновлення існуючого запису в довіднику "Постачальник Календаря".
+    Успадковує всі поля від `DictionaryUpdateSchema`.
     """
-    # If custom fields were in CalendarProviderBase and should be in response:
-    # icon_url: Optional[str] = Field(None, description="URL to an icon for the provider.")
-    # integration_docs_url: Optional[str] = Field(None, description="Link to integration documentation.")
+    # Специфічні поля для оновлення CalendarProvider, якщо є, додаються тут.
     pass
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем CalendarProvider.
+    print("--- Pydantic Схеми для Довідника: CalendarProvider ---")
 
-    logger.info("--- CalendarProvider Schemas (Dictionary) --- Demonstration")
-
-    # CalendarProviderCreate Example
-    provider_create_data = {
-        "code": "GOOGLE_CALENDAR",
-        "name": "Google Calendar",
-        "description": "Integration with Google Calendar services.",
-        "state": "active",
-        # "iconUrl": "https://static.googleusercontent.com/media/www.google.com/en//calendar/images/manifest/logo_2020q4_192.png" # camelCase alias if field existed
-    }
-    try:
-        provider_create_schema = CalendarProviderCreate(**provider_create_data)
-        logger.info(f"CalendarProviderCreate valid: {provider_create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating CalendarProviderCreate: {e}")
-
-    # CalendarProviderUpdate Example
-    provider_update_data = {"description": "Enhanced integration with Google Calendar services including event synchronization."}
-    provider_update_schema = CalendarProviderUpdate(**provider_update_data)
-    logger.info(f"CalendarProviderUpdate (partial): {provider_update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # CalendarProviderResponse Example
-    provider_response_data = {
+    print("\nCalendarProviderSchema (приклад для відповіді API):")
+    calendar_provider_data_from_db = {
         "id": 1,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "code": "OUTLOOK_CALENDAR",
-        "name": "Outlook Calendar",
-        "description": "Integration with Microsoft Outlook Calendar.",
+        "name": "Google Calendar",  # TODO i18n
+        "code": "GOOGLE_CALENDAR",
+        "description": "Інтеграція з сервісом Google Calendar.",  # TODO i18n
         "state": "active",
-        "isDefault": False,
-        "displayOrder": 2,
-        # "iconUrl": "https://example.com/icons/outlook_calendar.png" # If field existed
+        "created_at": "2023-07-01T10:00:00Z",
+        "updated_at": "2023-07-01T12:30:00Z",
     }
-    try:
-        provider_response_schema = CalendarProviderResponse(**provider_response_data) # type: ignore[call-arg]
-        logger.info(f"CalendarProviderResponse: {provider_response_schema.model_dump_json(by_alias=True, indent=2)}")
-    except Exception as e:
-        logger.error(f"Error creating CalendarProviderResponse: {e}")
+    from datetime import datetime  # Потрібно для конвертації рядків у datetime
+
+    # from pydantic import AnyHttpUrl # Для прикладу з api_integration_url
+    calendar_provider_data_from_db['created_at'] = datetime.fromisoformat(
+        calendar_provider_data_from_db['created_at'].replace('Z', '+00:00'))
+    calendar_provider_data_from_db['updated_at'] = datetime.fromisoformat(
+        calendar_provider_data_from_db['updated_at'].replace('Z', '+00:00'))
+
+    calendar_provider_schema_instance = CalendarProviderSchema(**calendar_provider_data_from_db)
+    print(calendar_provider_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nCalendarProviderCreateSchema (приклад для створення):")
+    create_data = {
+        "name": "Outlook Calendar",  # TODO i18n
+        "code": "OUTLOOK_CALENDAR",
+        "description": "Інтеграція з сервісом Outlook Calendar."  # TODO i18n
+    }
+    create_schema_instance = CalendarProviderCreateSchema(**create_data)
+    print(create_schema_instance.model_dump_json(indent=2))
+
+    print("\nCalendarProviderUpdateSchema (приклад для оновлення):")
+    update_data = {
+        "description": "Оновлений опис для інтеграції з Outlook Calendar.",  # TODO i18n
+        "state": "beta"  # TODO i18n
+    }
+    update_schema_instance = CalendarProviderUpdateSchema(**update_data)
+    print(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")

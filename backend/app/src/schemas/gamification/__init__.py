@@ -1,38 +1,75 @@
 # backend/app/src/schemas/gamification/__init__.py
-import logging
+"""
+Pydantic схеми для сутностей, пов'язаних з "Гейміфікацією".
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+Цей пакет містить схеми Pydantic, що використовуються для валідації
+даних запитів та формування відповідей API, які стосуються елементів
+гейміфікації в програмі Kudos, таких як рівні, бейджі (досягнення)
+та рейтинги користувачів.
+"""
 
-logger.info("Gamification schemas package initialized.")
+# Схеми, пов'язані з Рівнями
+from .level import (
+    LevelBaseSchema,
+    LevelCreateSchema,
+    LevelUpdateSchema,
+    LevelSchema
+)
 
-# Import all schemas from this package to make them easily accessible
-from .level import LevelBase, LevelCreate, LevelUpdate, LevelResponse
-from .user_level import UserLevelBase, UserLevelResponse
-from .badge import BadgeBase, BadgeCreate, BadgeUpdate, BadgeResponse
-from .achievement import UserAchievementBase, UserAchievementResponse
-from .rating import UserGroupRatingBase, UserGroupRatingResponse
+# Схеми, пов'язані з Рівнями Користувачів
+from .user_level import (
+    UserLevelBaseSchema,
+    UserLevelCreateSchema,
+    UserLevelSchema
+)
+
+# Схеми, пов'язані з Бейджами
+from .badge import (
+    BadgeBaseSchema,
+    BadgeCreateSchema,
+    BadgeUpdateSchema,
+    BadgeSchema
+)
+
+# Схеми, пов'язані з Досягненнями Користувачів (отриманням бейджів)
+# Файл називається achievement.py, але схеми стосуються UserAchievement
+from .achievement import (
+    UserAchievementBaseSchema,
+    UserAchievementCreateSchema,
+    UserAchievementSchema
+)
+
+# Схеми, пов'язані з Рейтингами Користувачів у Групах
+from .rating import (
+    UserGroupRatingBaseSchema,
+    UserGroupRatingCreateSchema,
+    UserGroupRatingUpdateSchema,
+    UserGroupRatingSchema
+)
+
 
 __all__ = [
     # Level schemas
-    "LevelBase",
-    "LevelCreate",
-    "LevelUpdate",
-    "LevelResponse",
+    "LevelBaseSchema",
+    "LevelCreateSchema",
+    "LevelUpdateSchema",
+    "LevelSchema",
     # UserLevel schemas
-    "UserLevelBase",
-    "UserLevelResponse",
+    "UserLevelBaseSchema",
+    "UserLevelCreateSchema",
+    "UserLevelSchema",
     # Badge schemas
-    "BadgeBase",
-    "BadgeCreate",
-    "BadgeUpdate",
-    "BadgeResponse",
+    "BadgeBaseSchema",
+    "BadgeCreateSchema",
+    "BadgeUpdateSchema",
+    "BadgeSchema",
     # UserAchievement schemas
-    "UserAchievementBase",
-    "UserAchievementResponse",
+    "UserAchievementBaseSchema",
+    "UserAchievementCreateSchema",
+    "UserAchievementSchema",
     # UserGroupRating schemas
-    "UserGroupRatingBase",
-    "UserGroupRatingResponse",
+    "UserGroupRatingBaseSchema",
+    "UserGroupRatingCreateSchema",
+    "UserGroupRatingUpdateSchema",
+    "UserGroupRatingSchema",
 ]
-
-logger.info(f"Successfully imported gamification schemas: {__all__}")

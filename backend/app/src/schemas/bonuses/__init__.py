@@ -1,25 +1,66 @@
 # backend/app/src/schemas/bonuses/__init__.py
-
 """
-This package contains Pydantic schemas related to bonus rules, user point/currency accounts,
-account transactions, and redeemable rewards.
+Pydantic схеми для сутностей, пов'язаних з "Бонусами".
+
+Цей пакет містить схеми Pydantic, що використовуються для валідації
+даних запитів та формування відповідей API, які стосуються правил нарахування бонусів,
+рахунків користувачів, транзакцій по цих рахунках та нагород в програмі Kudos.
 """
 
-import logging
+# Схеми, пов'язані з Правилами Нарахування Бонусів
+from .bonus_rule import (
+    BonusRuleBaseSchema,
+    BonusRuleCreateSchema,
+    BonusRuleUpdateSchema,
+    BonusRuleSchema
+)
 
-logger = logging.getLogger(__name__)
-logger.debug("Bonus schemas package initialized.")
+# Схеми, пов'язані з Рахунками Користувачів
+from .account import (
+    UserAccountBaseSchema,
+    UserAccountCreateSchema,
+    UserAccountUpdateSchema,
+    UserAccountSchema,
+    UserAccountTransactionHistorySchema
+)
 
-# Example of re-exporting for easier access:
-# from .bonus_rule import BonusRuleResponse, BonusRuleCreate
-# from .account import UserAccountResponse
-# from .transaction import AccountTransactionResponse
-# from .reward import RewardResponse, RewardCreate
+# Схеми, пов'язані з Транзакціями по Рахунках
+from .transaction import (
+    AccountTransactionBaseSchema,
+    AccountTransactionCreateSchema,
+    AccountTransactionSchema
+)
 
-# __all__ = [
-#     "BonusRuleResponse", "BonusRuleCreate",
-#     "UserAccountResponse",
-#     "AccountTransactionResponse",
-#     "RewardResponse", "RewardCreate",
-#     # ... other bonus-related schemas
-# ]
+# Схеми, пов'язані з Нагородами
+from .reward import (
+    RewardBaseSchema,
+    RewardCreateSchema,
+    RewardUpdateSchema,
+    RewardSchema,
+    RedeemRewardRequestSchema
+)
+
+
+__all__ = [
+    # BonusRule schemas
+    "BonusRuleBaseSchema",
+    "BonusRuleCreateSchema",
+    "BonusRuleUpdateSchema",
+    "BonusRuleSchema",
+    # UserAccount schemas
+    "UserAccountBaseSchema",
+    "UserAccountCreateSchema",
+    "UserAccountUpdateSchema",
+    "UserAccountSchema",
+    "UserAccountTransactionHistorySchema",
+    # AccountTransaction schemas
+    "AccountTransactionBaseSchema",
+    "AccountTransactionCreateSchema",
+    "AccountTransactionSchema",
+    # Reward schemas
+    "RewardBaseSchema",
+    "RewardCreateSchema",
+    "RewardUpdateSchema",
+    "RewardSchema",
+    "RedeemRewardRequestSchema",
+]

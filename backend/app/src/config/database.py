@@ -22,8 +22,9 @@ from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession
 from sqlalchemy.orm import sessionmaker, DeclarativeBase
 from typing import AsyncGenerator
 
+# Абсолютний імпорт налаштувань
 from backend.app.src.config.settings import settings
-from backend.app.src.config.logging import get_logger
+from backend.app.src.config.logging import get_logger # Імпорт логера
 
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
@@ -34,7 +35,7 @@ logger = get_logger(__name__)
 # `create_async_engine` використовується для забезпечення асинхронної роботи, сумісної з `asyncio`.
 engine = create_async_engine(
     str(settings.DATABASE_URL),  # DATABASE_URL з settings.py, перетворений на рядок.
-    pool_pre_ping=True,        # Вмикає тестування з'єднань перед їх використанням з пулу. Допомагає уникнути проблем з "мертвими" з'єднаннями.
+    pool_pre_ping=True,      # Вмикає тестування з'єднань перед їх використанням з пулу. Допомагає уникнути проблем з "мертвими" з'єднаннями.
     echo=settings.DEBUG,       # Якщо DEBUG=True в налаштуваннях, SQLAlchemy логуватиме всі SQL-запити. Корисно для налагодження.
     # Додаткові параметри пулу з'єднань (розкоментуйте та налаштуйте за потреби):
     # pool_size=10,            # Кількість з'єднань, які тримаються відкритими в пулі.

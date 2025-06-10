@@ -1,132 +1,160 @@
 # backend/app/src/schemas/tasks/completion.py
-
 """
-Pydantic schemas for Task Completions.
-"""
+Pydantic схеми для сутності "Виконання Завдання" (TaskCompletion).
 
-import logging
+Цей модуль визначає схеми для:
+- Базового представлення виконання завдання (`TaskCompletionBaseSchema`).
+- Створення нового запису про виконання (`TaskCompletionCreateSchema`).
+- Оновлення існуючого запису про виконання (наприклад, адміністратором) (`TaskCompletionUpdateSchema`).
+- Представлення даних про виконання у відповідях API (`TaskCompletionSchema`).
+"""
+from datetime import datetime
 from typing import Optional
-from datetime import datetime, timezone, timedelta # For examples and BaseResponseSchema
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
-from backend.app.src.schemas.base import BaseSchema, BaseResponseSchema
-
-# Configure logger for this module
-logger = logging.getLogger(__name__)
-
-# --- Locally defined Basic Info schemas for demonstration ---
-class UserBasicInfo(BaseSchema): # Inherit BaseSchema for consistent config (e.g. camelCase)
-    id: int = Field(..., example=101)
-    name: Optional[str] = Field(None, example="Alice")
-
-class TaskBasicInfo(BaseSchema): # Inherit BaseSchema
-    id: int = Field(..., example=1)
-    name: str = Field(..., example="Generate Q1 Report")
-# --- End of local Basic Info schemas ---
+# Абсолютний імпорт базових схем та Enum
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача та верифікатора
+from backend.app.src.core.dicts import TaskStatus  # Enum для статусів виконання
 
 
-# --- TaskCompletion Schemas ---
-
-class TaskCompletionBase(BaseSchema):
+class TaskCompletionBaseSchema(BaseSchema):
     """
-    Base schema for task completion data.
-    `task_id` and `user_id` (completer) are usually context-derived or path parameters.
+    Базова схема для полів виконання завдання.
+    `task_id` та `user_id` зазвичай визначаються з контексту (шлях, поточний користувач).
     """
-    # completed_at is often server-set when the user submits the completion.
-    # If user can backdate, then it can be in a Create schema.
-    # For now, assuming server sets completed_at on creation of the record.
-    verification_notes: Optional[str] = Field(None, description="Notes from the user submitting the completion.", example="All steps completed as per instructions.")
-    # awarded_points: Optional[int] = Field(None, ge=0, description="Points to request or suggest for this completion. Final points set by verifier.") # User typically doesn't set awarded_points
+    # task_id: int = Field(description="Ідентифікатор завдання, що виконується.") # Зазвичай з URL
+    # user_id: int = Field(description="Ідентифікатор користувача, який виконав завдання.") # Зазвичай поточний користувач
 
-class TaskCompletionCreate(TaskCompletionBase):
+    completed_at: Optional[datetime] = Field(
+        default_factory=datetime.now,  # Встановлює поточний час, якщо не надано
+        description="Фактичний час завершення завдання користувачем (або час подання на перевірку)."
+    )
+    # TODO: Додати валідатор для status на основі TaskStatus Enum
+    status: str = Field(
+        default=TaskStatus.PENDING_REVIEW.value,
+        description=f"Статус виконання завдання. Допустимі значення: {', '.join([ts.value for ts in TaskStatus])}."
+    )
+    notes: Optional[str] = Field(None, description="Нотатки користувача щодо виконання завдання.")
+
+    @field_validator('status')
+    @classmethod
+    def validate_status(cls, value: str) -> str:
+        """Перевіряє, чи надане значення статусу є допустимим членом Enum TaskStatus."""
+        allowed_statuses = {s.value for s in TaskStatus}
+        if value not in allowed_statuses:
+            # TODO i18n: Translatable error message
+            raise ValueError(f"Недопустимий статус '{value}'. Дозволені статуси: {', '.join(allowed_statuses)}")
+        return value
+
+    # model_config успадковується з BaseSchema (from_attributes=True)
+
+
+class TaskCompletionCreateSchema(TaskCompletionBaseSchema):
     """
-    Schema for a user to mark a task as completed.
-    `task_id` from path, `user_id` from authenticated user.
-    May include minimal fields like notes from the user.
+    Схема для створення нового запису про виконання завдання користувачем.
+    `task_id` зазвичай з параметра шляху, `user_id` - поточний користувач.
     """
-    # verification_notes can be used by the user to add comments upon completion.
+    # Успадковує completed_at, status, notes.
+    # task_id та user_id не включаються сюди, бо очікуються з контексту запиту (шлях, автентифікація).
     pass
 
-class TaskCompletionVerify(BaseSchema):
-    """
-    Schema for an admin/verifier to verify or reject a task completion.
-    `task_completion_id` is typically a path parameter.
-    """
-    is_verified: bool = Field(..., description="Set to true to verify, false to reject (or use a separate 'reject' endpoint/status).")
-    awarded_points: Optional[int] = Field(None, ge=0, description="Actual points awarded for this completion. Can override task's default points.")
-    verification_notes: Optional[str] = Field(None, description="Notes from the verifier regarding the approval or rejection.")
 
-class TaskCompletionResponse(BaseResponseSchema):
+class TaskCompletionUpdateSchema(
+    BaseSchema):  # Не успадковує TaskCompletionBaseSchema, щоб уникнути успадкування полів, які не можна змінювати
     """
-    Schema for representing a task completion in API responses.
-    Includes 'id' (of the completion record), 'created_at', 'updated_at'.
+    Схема для оновлення запису про виконання завдання (зазвичай адміністратором).
+    Дозволяє оновлювати статус, час верифікації та нотатки.
     """
-    task: TaskBasicInfo = Field(..., description="Basic information about the completed task.")
-    user: UserBasicInfo = Field(..., description="Basic information about the user who completed the task.")
+    # completed_at: Optional[datetime] = None # Зазвичай не змінюється після подання
+    verified_at: Optional[datetime] = Field(None, description="Час перевірки виконання адміністратором.")
+    # verifier_id: Optional[int] = None # Встановлюється сервісом на основі поточного адміністратора
 
-    completed_at: datetime = Field(..., description="Timestamp when the user marked the task as completed (UTC).")
-    is_verified: bool = Field(..., description="Whether the completion has been verified.")
-    verified_at: Optional[datetime] = Field(None, description="Timestamp when the verification occurred (UTC).")
-    verifier: Optional[UserBasicInfo] = Field(None, description="Basic information about the user who verified the completion (if verified).")
-    verification_notes: Optional[str] = Field(None, description="Notes from the verifier or user upon completion.")
-    awarded_points: Optional[int] = Field(None, description="Points actually awarded for this completion.")
+    # TODO: Додати валідатор для status на основі TaskStatus Enum
+    status: Optional[str] = Field(None,
+                                  description=f"Новий статус виконання. Допустимі значення: {', '.join([ts.value for ts in TaskStatus])}.")
+    notes: Optional[str] = Field(None, description="Додаткові нотатки (наприклад, від адміністратора при перевірці).")
+
+    @field_validator('status')
+    @classmethod
+    def validate_status_on_update(cls, value: Optional[str]) -> Optional[str]:
+        """Перевіряє статус при оновленні, якщо він наданий."""
+        if value is None:
+            return value
+        allowed_statuses = {s.value for s in TaskStatus}
+        if value not in allowed_statuses:
+            # TODO i18n: Translatable error message
+            raise ValueError(f"Недопустимий статус '{value}'. Дозволені статуси: {', '.join(allowed_statuses)}")
+        return value
+
+
+class TaskCompletionSchema(TaskCompletionBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+    """
+    Схема для представлення даних про виконання завдання у відповідях API.
+    `created_at` з TimestampedSchemaMixin може позначати час подання запису про виконання.
+    `updated_at` - час останнього оновлення запису (наприклад, зміни статусу).
+    """
+    # id, created_at, updated_at успадковані.
+    # task_id, user_id, completed_at, status, notes успадковані з TaskCompletionBaseSchema.
+    # Однак, task_id та user_id потрібно явно додати, бо вони не в TaskCompletionBaseSchema
+    task_id: int = Field(description="Ідентифікатор виконаного завдання.")
+    user_id: int = Field(description="Ідентифікатор користувача, який виконав завдання.")
+
+    verified_at: Optional[datetime] = Field(None, description="Час перевірки виконання (якщо було перевірено).")
+
+    user: Optional[UserPublicProfileSchema] = Field(None,
+                                                    description="Публічний профіль користувача, який виконав завдання.")
+    verifier: Optional[UserPublicProfileSchema] = Field(None,
+                                                        description="Публічний профіль користувача (адміністратора), який перевірив виконання.")
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем виконань завдань.
+    print("--- Pydantic Схеми для Виконань Завдань (TaskCompletion) ---")
 
-    logger.info("--- TaskCompletion Schemas --- Demonstration")
-
-    # TaskCompletionCreate Example
-    # Assume task_id=1, user_id=1 (completer) from context
-    completion_create_data = {
-        "verificationNotes": "Finished the report generation and sent to stakeholders." # camelCase for verification_notes
+    print("\nTaskCompletionCreateSchema (приклад для створення):")
+    create_completion_data = {
+        "completed_at": datetime.now(),
+        "status": TaskStatus.PENDING_REVIEW.value,
+        "notes": "Завдання виконано, очікую на перевірку."  # TODO i18n
     }
-    try:
-        create_schema = TaskCompletionCreate(**completion_create_data) # type: ignore[call-arg]
-        logger.info(f"TaskCompletionCreate valid: {create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating TaskCompletionCreate: {e}")
+    create_completion_instance = TaskCompletionCreateSchema(**create_completion_data)
+    print(create_completion_instance.model_dump_json(indent=2))
 
-    # TaskCompletionVerify Example
-    # Assume task_completion_id=1 from path
-    completion_verify_data = {
-        "isVerified": True,
-        "awardedPoints": 75, # Overriding default task points
-        "verificationNotes": "Excellent work, above and beyond!"
+    print("\nTaskCompletionUpdateSchema (приклад для оновлення адміністратором):")
+    update_completion_data = {
+        "verified_at": datetime.now(),
+        "status": TaskStatus.COMPLETED.value,
+        "notes": "Чудова робота!"  # TODO i18n
     }
+    update_completion_instance = TaskCompletionUpdateSchema(**update_completion_data)
+    print(update_completion_instance.model_dump_json(indent=2, exclude_none=True))
     try:
-        verify_schema = TaskCompletionVerify(**completion_verify_data) # type: ignore[call-arg]
-        logger.info(f"TaskCompletionVerify valid: {verify_schema.model_dump(by_alias=True)}")
+        TaskCompletionUpdateSchema(status="невірний_статус")  # Невірний статус
     except Exception as e:
-        logger.error(f"Error creating TaskCompletionVerify: {e}")
+        print(f"Помилка валідації TaskCompletionUpdateSchema (очікувано): {e}")
 
-    # TaskCompletionResponse Example
-    task_info_data = {"id": 1, "name": "Generate Q1 Report"}
-    completer_info_data = {"id": 101, "name": "Alice"}
-    verifier_info_data = {"id": 10, "name": "Admin Bob"}
-
-    response_data = {
-        "id": 501, # ID of the TaskCompletion record
-        "createdAt": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
-        "updatedAt": (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat(),
-        "task": task_info_data,
-        "user": completer_info_data,
-        "completedAt": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(), # camelCase
-        "isVerified": True,
-        "verifiedAt": (datetime.now(timezone.utc) - timedelta(minutes=10)).isoformat(), # camelCase
-        "verifier": verifier_info_data,
-        "verificationNotes": "Approved. Great job!", # camelCase
-        "awardedPoints": 50 # camelCase
+    print("\nTaskCompletionSchema (приклад відповіді API):")
+    completion_response_data = {
+        "id": 1,
+        "task_id": 10,
+        "user_id": 101,
+        "completed_at": datetime.now() - timedelta(hours=1),
+        "status": TaskStatus.COMPLETED.value,
+        "notes": "Завдання виконано успішно.",  # TODO i18n
+        "created_at": datetime.now() - timedelta(hours=2),  # Час подання
+        "updated_at": datetime.now(),  # Час останнього оновлення (напр. верифікації)
+        "verified_at": datetime.now(),
+        "user": {"id": 101, "name": "Виконавець Завдання"},  # TODO i18n
+        "verifier": {"id": 2, "name": "Адмін Перевіряючий"}  # TODO i18n
     }
-    try:
-        response_schema = TaskCompletionResponse(**response_data) # type: ignore[call-arg]
-        logger.info(f"TaskCompletionResponse: {response_schema.model_dump_json(by_alias=True, indent=2)}")
-        if response_schema.task and response_schema.user:
-            logger.info(f"  Task '{response_schema.task.name}' completed by '{response_schema.user.name}'")
-        if response_schema.verifier:
-            logger.info(f"  Verified by: {response_schema.verifier.name}")
-    except Exception as e:
-        logger.error(f"Error creating TaskCompletionResponse: {e}")
+    completion_response_instance = TaskCompletionSchema(**completion_response_data)
+    print(completion_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних виконань завдань.")
+    print(
+        f"Використовується TaskStatus Enum для поля 'status', наприклад: TaskStatus.REJECTED = '{TaskStatus.REJECTED.value}'")
+
+# Потрібно для timedelta в __main__
+from datetime import timedelta

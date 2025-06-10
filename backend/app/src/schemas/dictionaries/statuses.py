@@ -1,116 +1,106 @@
 # backend/app/src/schemas/dictionaries/statuses.py
-
 """
-Pydantic schemas for Status dictionary entries.
+Pydantic схеми для довідника "Статуси".
+
+Цей модуль визначає схеми для представлення, створення та оновлення
+записів у довіднику статусів.
 """
 
-import logging
-from typing import Optional # For optional custom fields if any
-from datetime import datetime, timezone # For example values in __main__ and BaseResponseSchema
+from typing import Optional  # Необхідно для опціональних полів в Update схемі
 
-from pydantic import Field
+# Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    DictionaryBase,
-    DictionaryCreate as BaseDictionaryCreate, # Used if StatusCreate doesn't add/override fields from StatusBase specific to create
-    DictionaryUpdate as BaseDictionaryUpdate, # Used if StatusUpdate doesn't add/override fields from StatusBase specific to update
-    DictionaryResponse as BaseDictionaryResponse
+    BaseDictionarySchema,
+    DictionaryCreateSchema,
+    DictionaryUpdateSchema
 )
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
 
-# --- Status Schemas ---
+# from pydantic import Field # Може знадобитися, якщо додаватимуться специфічні поля з валідацією
 
-# If Status model has specific fields not in BaseDictionaryModel,
-# define them in StatusBaseSchema.
-class StatusBase(DictionaryBase):
-    """Base schema for Status, inherits all fields from DictionaryBase."""
-    # Example of a custom field if Status model had one:
-    # color_hex: Optional[str] = Field(None, max_length=7, pattern=r"^#[0-9a-fA-F]{6}$",
-    #                                  description="Hex color code for UI representation (e.g., #FF0000)",
-    #                                  example="#4CAF50")
+# Схема для представлення запису Статусу (наприклад, у відповідях API)
+class StatusSchema(BaseDictionarySchema):
+    """
+    Pydantic схема для представлення запису довідника "Статус".
+    Успадковує всі поля від `BaseDictionarySchema`.
+    """
+    # Якщо для статусів потрібні специфічні додаткові поля у відповідях API,
+    # їх можна визначити тут. Наприклад:
+    # is_final_status: bool = Field(description="Чи є цей статус кінцевим (не можна змінити далі).")
+
+    # model_config успадковується з BaseDictionarySchema -> BaseMainSchema -> BaseSchema
     pass
 
-class StatusCreate(StatusBase): # Inherit from StatusBase. DictionaryBase requirements (code, name) are met via StatusBase.
+
+# Схема для створення нового запису Статусу
+class StatusCreateSchema(DictionaryCreateSchema):
     """
-    Schema for creating a new Status.
-    Inherits fields from StatusBase. 'code' and 'name' are effectively required
-    as they are non-optional in DictionaryBase (which StatusBase inherits).
+    Pydantic схема для створення нового запису в довіднику "Статус".
+    Успадковує всі поля від `DictionaryCreateSchema` (name, code, description, state, notes).
     """
-    # If StatusBase added new non-optional fields, they'd be required here too.
-    # If 'color_hex' was added to StatusBase and should be optional during creation:
-    # color_hex: Optional[str] = Field(None, max_length=7, pattern=r"^#[0-9a-fA-F]{6}$", example="#4CAF50")
+    # Тут можна перевизначити поля з DictionaryCreateSchema, якщо потрібні інші
+    # обмеження або значення за замовчуванням саме для Статусів.
+    # Або додати нові поля, специфічні для створення Статусу.
     pass
 
-class StatusUpdate(StatusBase): # Inherit from StatusBase, then make all fields optional in the body of this class
-    """
-    Schema for updating an existing Status.
-    All fields from StatusBase are made optional here for partial updates.
-    """
-    code: Optional[str] = Field(None, min_length=1, max_length=100, description="Unique code or short identifier.")
-    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Human-readable name.")
-    description: Optional[str] = Field(None) # Already optional in DictionaryBase/StatusBase
-    state: Optional[str] = Field(None, max_length=50) # Already optional
-    is_default: Optional[bool] = Field(None) # Already optional
-    display_order: Optional[int] = Field(None) # Already optional
-    notes: Optional[str] = Field(None) # Already optional
-    # If 'color_hex' was added to StatusBase and is updatable:
-    # color_hex: Optional[str] = Field(None, max_length=7, pattern=r"^#[0-9a-fA-F]{6}$", example="#FFC107")
 
-
-class StatusResponse(BaseDictionaryResponse):
+# Схема для оновлення існуючого запису Статусу
+class StatusUpdateSchema(DictionaryUpdateSchema):
     """
-    Schema for representing a Status in API responses.
-    Inherits all fields from BaseDictionaryResponse (which includes id, timestamps, code, name etc.).
-    Add any Status-specific response fields here if StatusBase had custom fields.
+    Pydantic схема для оновлення існуючого запису в довіднику "Статус".
+    Успадковує всі поля від `DictionaryUpdateSchema` (всі поля опціональні).
     """
-    # If 'color_hex' was added to StatusBase and should be in the response:
-    # color_hex: Optional[str] = Field(None, description="Hex color code for UI representation.", example="#4CAF50")
+    # Тут можна перевизначити поля з DictionaryUpdateSchema або додати нові,
+    # специфічні для оновлення Статусу.
     pass
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем Статусів.
+    print("--- Pydantic Схеми для Довідника: Status ---")
 
-    logger.info("--- Status Schemas (Dictionary) --- Demonstration")
-
-    # StatusCreate Example
-    status_create_data = {
-        "code": "ACTIVE_TASK",
-        "name": "Active Task",
-        "description": "Task is currently active and in progress.",
-        "state": "open",
-        # "colorHex": "#2196F3" # Example if color_hex alias was used and field existed
-    }
-    try:
-        status_create_schema = StatusCreate(**status_create_data)
-        logger.info(f"StatusCreate valid: {status_create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating StatusCreate: {e}")
-
-    # StatusUpdate Example
-    status_update_data = {"description": "Task is active and assigned.", "state": "in_progress"}
-    status_update_schema = StatusUpdate(**status_update_data)
-    logger.info(f"StatusUpdate (partial): {status_update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-    logger.info(f"StatusUpdate (full, showing Nones for non-updated fields): {status_update_schema.model_dump(by_alias=True)}")
-
-
-    # StatusResponse Example
-    status_response_data = {
+    print("\nStatusSchema (приклад для відповіді API):")
+    status_data_from_db = {
         "id": 1,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "code": "COMPLETED",
-        "name": "Completed",
-        "description": "Task has been successfully completed.",
-        "state": "closed",
-        "isDefault": False,
-        "displayOrder": 10,
-        # "colorHex": "#4CAF50" # If field existed
+        "name": "Активний",
+        "code": "ACTIVE",
+        "description": "Запис активний і використовується.",
+        "state": "enabled",
+        "created_at": "2023-01-01T10:00:00Z",  # У реальності це буде datetime об'єкт
+        "updated_at": "2023-01-05T12:30:00Z",
+        # "is_final_status": False # Якщо б таке поле було додано
     }
+    # Для from_attributes=True, очікується datetime об'єкт, а не рядок
+    status_data_from_db['created_at'] = datetime.fromisoformat(status_data_from_db['created_at'].replace('Z', '+00:00'))
+    status_data_from_db['updated_at'] = datetime.fromisoformat(status_data_from_db['updated_at'].replace('Z', '+00:00'))
+
+    status_schema_instance = StatusSchema(**status_data_from_db)
+    print(status_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nStatusCreateSchema (приклад для створення):")
+    create_data = {
+        "name": "Новий Статус",
+        "code": "NEW_STATUS_01",
+        "description": "Опис для нового статусу, що створюється."
+    }
+    create_schema_instance = StatusCreateSchema(**create_data)
+    print(create_schema_instance.model_dump_json(indent=2))
+    # Перевірка валідації (приклад)
     try:
-        status_response_schema = StatusResponse(**status_response_data) # type: ignore[call-arg]
-        logger.info(f"StatusResponse: {status_response_schema.model_dump_json(by_alias=True, indent=2)}")
+        invalid_create_data = {"code": "INVALID"}  # Відсутнє обов'язкове поле 'name'
+        StatusCreateSchema(**invalid_create_data)
     except Exception as e:
-        logger.error(f"Error creating StatusResponse: {e}")
+        print(f"Помилка валідації StatusCreateSchema (очікувано): {e}")
+
+    print("\nStatusUpdateSchema (приклад для оновлення):")
+    update_data = {
+        "description": "Оновлений опис для існуючого статусу.",
+        "state": "deprecated"
+    }
+    update_schema_instance = StatusUpdateSchema(**update_data)
+    print(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")
+
+# Необхідно додати datetime для прикладу в __main__
+from datetime import datetime

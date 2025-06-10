@@ -1,26 +1,27 @@
 # backend/app/src/models/gamification/__init__.py
-
 """
-This package contains SQLAlchemy models related to gamification features,
-such as levels, badges, user achievements, and ratings.
+Пакет моделей SQLAlchemy для сутностей, пов'язаних з "Гейміфікацією".
+
+Цей пакет містить моделі для представлення елементів гейміфікації
+в програмі Kudos, таких як рівні, досягнення користувачів (бейджі),
+та рейтинги користувачів у групах.
+
+Моделі експортуються для зручного доступу з інших частин програми.
 """
 
-import logging
+from .level import Level
+from .user_level import UserLevel
+from .badge import Badge
+from .user_achievement import UserAchievement
+from .rating import UserGroupRating
 
-logger = logging.getLogger(__name__)
-logger.debug("Gamification models package initialized.")
+__all__ = [
+    "Level",
+    "UserLevel",
+    "Badge",
+    "UserAchievement",
+    "UserGroupRating",
+]
 
-# Example of re-exporting for easier access:
-# from .level import Level
-# from .user_level import UserLevel
-# from .badge import Badge
-# from .user_achievement import UserAchievement # Corrected from plan's 'achievement.py'
-# from .rating import UserGroupRating
-
-# __all__ = [
-#     "Level",
-#     "UserLevel",
-#     "Badge",
-#     "UserAchievement",
-#     "UserGroupRating",
-# ]
+# Майбутні моделі, пов'язані з гейміфікацією (наприклад, LeaderboardSnapshot),
+# також можуть бути додані сюди для експорту.

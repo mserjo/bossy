@@ -1,103 +1,121 @@
 # backend/app/src/models/gamification/user_level.py
-
 """
-SQLAlchemy model for UserLevel, representing the levels achieved by users.
-This acts as an association between Users and Levels, potentially storing when a level was achieved.
+Модель SQLAlchemy для сутності "Рівень Користувача" (UserLevel).
+
+Цей модуль визначає модель `UserLevel`, яка фіксує досягнення
+користувачем певного рівня гейміфікації в межах конкретної групи.
 """
+from datetime import datetime, timezone  # timezone для __main__
+from typing import TYPE_CHECKING
 
-import logging
-from typing import Optional, TYPE_CHECKING
-from datetime import datetime, timezone # Added timezone for __main__
-
-from sqlalchemy import ForeignKey, DateTime, UniqueConstraint, Integer # Added Integer for FKs
+from sqlalchemy import ForeignKey, UniqueConstraint, Index, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func # For server_default on achieved_at
 
-from backend.app.src.models.base import BaseModel # UserLevel records are simpler entities
-
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт базових класів та міксинів
+from backend.app.src.models.base import Base
+from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час досягнення рівня
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
     from backend.app.src.models.gamification.level import Level
-    from backend.app.src.models.groups.group import Group # If user's level is tracked per group
+    from backend.app.src.models.groups.group import Group
 
-class UserLevel(BaseModel):
+
+class UserLevel(Base, TimestampedMixin):
     """
-    Represents a user achieving a specific gamification level, potentially within a group context.
-    If a user can have different levels in different groups, group_id is crucial.
-    If levels are global, group_id might be omitted or nullable.
+    Модель Рівня Користувача.
 
-    Attributes:
-        user_id (int): Foreign key to the user who achieved the level.
-        level_id (int): Foreign key to the gamification level achieved.
-        group_id (int): Foreign key to the group in which this level was achieved.
-        achieved_at (datetime): Timestamp when the user achieved this level.
-        # `id`, `created_at`, `updated_at` from BaseModel.
+    Зберігає інформацію про те, якого рівня досяг користувач у конкретній групі
+    та коли це сталося. Поле `created_at` з `TimestampedMixin` використовується
+    як дата та час досягнення рівня (`achieved_at`).
+
+    Атрибути:
+        id (Mapped[int]): Унікальний ідентифікатор запису про досягнення рівня.
+        user_id (Mapped[int]): ID користувача, який досяг рівня.
+        level_id (Mapped[int]): ID досягнутого рівня.
+        group_id (Mapped[int]): ID групи, в межах якої досягнуто рівень.
+
+        user (Mapped["User"]): Зв'язок з моделлю `User`.
+        level (Mapped["Level"]): Зв'язок з моделлю `Level`.
+        group (Mapped["Group"]): Зв'язок з моделлю `Group`.
+        created_at (Mapped[datetime]): Час досягнення рівня (успадковано).
+        updated_at (Mapped[datetime]): Час оновлення запису (успадковано, менш релевантне тут).
     """
     __tablename__ = "gamification_user_levels"
 
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True, comment="FK to the user")
-    level_id: Mapped[int] = mapped_column(Integer, ForeignKey("gamification_levels.id"), nullable=False, index=True, comment="FK to the achieved level")
-    group_id: Mapped[int] = mapped_column(Integer, ForeignKey("groups.id"), nullable=False, index=True, comment="FK to the group where this level was achieved")
-
-    achieved_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
+    id: Mapped[int] = mapped_column(
+        primary_key=True, index=True, autoincrement=True,
+        comment="Унікальний ідентифікатор запису про рівень користувача"
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey('users.id', name='fk_user_level_user_id', ondelete="CASCADE"),
         nullable=False,
-        comment="Timestamp when the user achieved this level (UTC)"
+        comment="ID користувача, який досяг рівня"
     )
-    # is_current_level: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True, comment="Is this the user's current highest level in this group? Might need logic to maintain.")
+    level_id: Mapped[int] = mapped_column(
+        ForeignKey('gamification_levels.id', name='fk_user_level_level_id', ondelete="CASCADE"),
+        # Якщо рівень видаляється, цей запис теж
+        nullable=False,
+        comment="ID досягнутого рівня гейміфікації"
+    )
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey('groups.id', name='fk_user_level_group_id', ondelete="CASCADE"),
+        nullable=False,
+        comment="ID групи, в якій досягнуто рівень"
+    )
+    # `created_at` з TimestampedMixin використовується як `achieved_at` (час досягнення)
 
-    # --- Relationships ---
-    user: Mapped["User"] = relationship() # One-way or add back_populates="achieved_levels" to User
-    level: Mapped["Level"] = relationship() # One-way or add back_populates="user_level_achievements" to Level
-    group: Mapped["Group"] = relationship() # One-way or add back_populates="user_levels_in_group" to Group
-
-    # --- Table Arguments ---
-    # A user should typically only achieve a specific level within a specific group once.
-    # Or, if levels are progressive, this table might only store the *current* level.
-    # If it stores history, then (user_id, level_id, group_id) might not be unique if re-achievable.
-    # For now, assume it's the record of achieving a level.
-    # If only current level is stored per user per group, then (user_id, group_id) should be unique.
-    # If UserLevel stores each level progression, then (user_id, level_id, group_id) could be unique.
+    # Обмеження та індекси
+    # Користувач може досягти кожного рівня в групі лише один раз.
+    # Або, якщо це таблиця для зберігання *поточного* рівня, то пара (user_id, group_id) має бути унікальною.
+    # Поточна назва `UserLevel` (Рівень користувача) більше схожа на запис про досягнення певного рівня.
+    # Якщо це історія досягнень, то `UniqueConstraint('user_id', 'level_id', 'group_id', ...)` є коректним.
+    # Якщо це поточний рівень, то `UniqueConstraint('user_id', 'group_id', ...)` і поле level_id оновлюється.
+    # Припускаємо, що це запис про досягнення конкретного рівня.
     __table_args__ = (
-        UniqueConstraint('user_id', 'group_id', 'level_id', name='uq_user_group_level_achievement'),
-        # If storing only the current level per user per group:
-        # UniqueConstraint('user_id', 'group_id', name='uq_user_current_level_in_group'),
+        UniqueConstraint('user_id', 'level_id', 'group_id', name='uq_user_level_in_group_achievement'),
+        Index('ix_user_levels_user_group', 'user_id', 'group_id'),  # Для швидкого пошуку рівнів користувача в групі
     )
 
-    def __repr__(self) -> str:
-        id_val = getattr(self, 'id', 'N/A')
-        return f"<UserLevel(id={id_val}, user_id={self.user_id}, group_id={self.group_id}, level_id={self.level_id})>"
+    # --- Зв'язки (Relationships) ---
+    user: Mapped["User"] = relationship(lazy="selectin")  # back_populates="achieved_levels" можна додати до User
+    level: Mapped["Level"] = relationship(lazy="selectin")  # back_populates="user_levels" можна додати до Level
+    group: Mapped["Group"] = relationship(
+        lazy="selectin")  # back_populates="user_levels_achieved" можна додати до Group
+
+    # Поля для __repr__
+    # `created_at` (як achieved_at) та `updated_at` успадковуються з TimestampedMixin._repr_fields
+    _repr_fields = ["id", "user_id", "level_id", "group_id"]
+
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для моделі UserLevel.
+    print("--- Модель Рівня Користувача (UserLevel) ---")
+    print(f"Назва таблиці: {UserLevel.__tablename__}")
 
-    logger.info("--- UserLevel Model (Gamification) --- Demonstration")
+    print("\nОчікувані поля:")
+    expected_fields = ['id', 'user_id', 'level_id', 'group_id', 'created_at', 'updated_at']
+    for field in expected_fields:
+        print(f"  - {field}")
 
-    # Example UserLevel instance
-    # Assume User id=1, Level id=1 (Apprentice), Group id=1 exist
-    user_achieved_level1 = UserLevel(
-        user_id=1,
-        level_id=1,
-        group_id=1
-        # achieved_at is auto-set by server_default
+    print("\nОчікувані зв'язки (relationships):")
+    expected_relationships = ['user', 'level', 'group']
+    for rel in expected_relationships:
+        print(f"  - {rel}")
+
+    # Приклад створення екземпляра (без взаємодії з БД)
+    example_user_level = UserLevel(
+        id=1,
+        user_id=101,
+        level_id=1,  # ID рівня "Новачок"
+        group_id=202
     )
-    user_achieved_level1.id = 1 # Simulate ORM-set ID
-    user_achieved_level1.created_at = datetime.now(timezone.utc) # Simulate BaseModel field
-    user_achieved_level1.updated_at = datetime.now(timezone.utc) # Simulate BaseModel field
-    if not getattr(user_achieved_level1, 'achieved_at', None): # For demo if server_default not active
-        user_achieved_level1.achieved_at = datetime.now(timezone.utc)
+    # Імітуємо часові мітки (created_at - час досягнення)
+    example_user_level.created_at = datetime.now(tz=timezone.utc)
+    example_user_level.updated_at = datetime.now(tz=timezone.utc)
 
-    logger.info(f"Example UserLevel: {user_achieved_level1!r}")
-    logger.info(f"  User ID: {user_achieved_level1.user_id}, Group ID: {user_achieved_level1.group_id}, Level ID: {user_achieved_level1.level_id}")
-    logger.info(f"  Achieved At: {user_achieved_level1.achieved_at.isoformat() if user_achieved_level1.achieved_at else 'N/A'}")
-    logger.info(f"  Created At: {user_achieved_level1.created_at.isoformat() if user_achieved_level1.created_at else 'N/A'}")
+    print(f"\nПриклад екземпляра UserLevel (без сесії):\n  {example_user_level}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <UserLevel(id=1, user_id=101, level_id=1, group_id=202, created_at=...)>
 
-
-    # The following line would error if run directly without SQLAlchemy engine and metadata setup for all related tables.
-    # logger.info(f"UserLevel attributes (conceptual table columns): {[c.name for c in UserLevel.__table__.columns if not c.name.startswith('_')]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

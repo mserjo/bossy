@@ -1,19 +1,26 @@
 # backend/app/src/models/base.py
-
 """
-Цей модуль визначає базові класи моделей для програми.
-- `Base` імпортується з `config.database` і є декларативною базою для всіх моделей.
-- `BaseModel` надає загальні поля, такі як `id` та часові мітки.
-- `BaseMainModel` розширює `BaseModel` додатковими загальними полями для основних бізнес-сутностей.
+Базові класи для моделей SQLAlchemy програми Kudos.
+
+Цей модуль визначає:
+- `Base`: Декларативний базовий клас для всіх моделей SQLAlchemy, що дозволяє SQLAlchemy
+           автоматично відображати класи Python на таблиці бази даних.
+- `BaseMainModel`: Основний базовий клас для більшості моделей предметної області,
+                   який успадковує `Base` та включає набір стандартних полів
+                   через міксини (ID, часові мітки, м'яке видалення, назва, опис,
+                   стан, приналежність до групи, нотатки).
+
+Використання міксинів та спільного базового класу `BaseMainModel` сприяє
+узгодженості між моделями та зменшує дублювання коду.
 """
+from datetime import datetime
+from typing import Optional, List, Any
 
-import logging
-from typing import Optional, TypeVar
+from sqlalchemy import Text, func, ForeignKey
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column  # removed declared_attr as it's used in mixins
 
-from sqlalchemy.orm import Mapped, mapped_column, declared_attr
-from sqlalchemy import Integer
-
-from backend.app.src.config.database import Base # Декларативна база з налаштувань SQLAlchemy
+# Імпорт міксинів з локального файлу mixins.py
+# Використовуємо абсолютний шлях для надійності
 from backend.app.src.models.mixins import (
     TimestampedMixin,
     SoftDeleteMixin,
@@ -23,113 +30,177 @@ from backend.app.src.models.mixins import (
     NotesMixin
 )
 
-# Налаштувати логер для цього модуля
-logger = logging.getLogger(__name__)
 
-# Загальний TypeVariable, який можна використовувати для моделей ORM у сервісах/репозиторіях
-ModelT = TypeVar("ModelT", bound="BaseModel")
-
-class BaseModel(Base, TimestampedMixin):
+class Base(DeclarativeBase):
     """
-    Базовий клас для всіх моделей SQLAlchemy у програмі.
-    Успадковує від глобального `Base` (declarative_base()) та `TimestampedMixin`.
-
-    Включає:
-        - id: Первинний ключ, цілочисельний стовпець.
-        - created_at: Часова мітка створення (з TimestampedMixin).
-        - updated_at: Часова мітка останнього оновлення (з TimestampedMixin).
+    Декларативний базовий клас для всіх моделей SQLAlchemy.
+    Надає функціональність для визначення метаданих таблиць.
+    Також може містити спільну логіку для всіх моделей, наприклад, кастомний `__repr__`.
     """
-    __abstract__ = True  # Вказує, що цей клас не повинен зіставлятися з таблицею бази даних сам по собі
 
-    @declared_attr
-    def __tablename__(cls) -> str:
-        # Автоматично генерувати назву таблиці з назви класу (наприклад, UserProfile -> user_profiles)
-        # Це поширена конвенція, але її можна перевизначити в підкласах, якщо потрібно.
-        import re
-        name_parts = re.findall(r'[A-Z][^A-Z]*', cls.__name__)
-        # Обробка випадку, коли назва класу може бути повністю у верхньому регістрі, наприклад "URLShortener" -> "url_shorteners"
-        if not name_parts: # Якщо назва класу повністю у верхньому регістрі або одне слово
-            return cls.__name__.lower() + "s"
-        return "_".join(part.lower() for part in name_parts) + "s" # Просте утворення множини додаванням 's'
+    # Кастомний __repr__ для кращого налагодження
+    def __repr__(self) -> str:
+        """Генерує рядкове представлення екземпляра моделі для налагодження."""
+        # Збираємо поля з поточного класу та всіх батьківських міксинів/класів
+        repr_fields_collected = set()
 
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True, autoincrement=True, comment="Унікальний ідентифікатор запису")
+        # Додамо 'id', якщо він є у __mapper__.columns (тобто це реальна колонка)
+        # і не вказаний у _repr_fields (щоб уникнути дублювання, якщо міксин вже його додав)
+        # або якщо _repr_fields взагалі не визначено на класі.
+        # Це також гарантує, що 'id' буде першим, якщо він є.
+        if hasattr(self, 'id') and 'id' in self.__mapper__.columns:
+            is_id_in_custom_repr_fields = False
+            for base_cls_for_check in self.__class__.__mro__:
+                if 'id' in getattr(base_cls_for_check, '_repr_fields', []):
+                    is_id_in_custom_repr_fields = True
+                    break
+            if not is_id_in_custom_repr_fields:
+                repr_fields_collected.add('id')
 
-class BaseMainModel(BaseModel, NameDescriptionMixin, StateMixin, SoftDeleteMixin, NotesMixin):
+        for base_cls in self.__class__.__mro__:
+            # Шукаємо атрибут _repr_fields у класі та його предках
+            # Це дозволяє міксинам визначати, які з їхніх полів включати в repr
+            for field_name in getattr(base_cls, '_repr_fields', []):
+                # Перевіряємо, чи це поле є реальною колонкою SQLAlchemy, а не, наприклад, relationship
+                if field_name in self.__mapper__.columns:
+                    repr_fields_collected.add(field_name)
+
+        field_values_str = []
+        # Сортуємо для узгодженого порядку, 'id' завжди перший, якщо він був зібраний
+        sorted_fields = []
+        if 'id' in repr_fields_collected:
+            sorted_fields.append('id')
+            repr_fields_collected.remove('id')  # Видаляємо, щоб не дублювати при сортуванні решти
+
+        sorted_fields.extend(sorted(list(repr_fields_collected)))
+
+        for field_name in sorted_fields:
+            # hasattr перевіряє, чи існує атрибут на екземплярі (може бути ще не завантажений з БД)
+            if hasattr(self, field_name):
+                field_values_str.append(f"{field_name}={getattr(self, field_name)!r}")
+            else:  # Якщо атрибута немає, але він є в repr_fields (наприклад, deferred)
+                field_values_str.append(f"{field_name}=<не завантажено>")
+
+        return f"<{self.__class__.__name__}({', '.join(field_values_str)})>"
+
+
+class BaseMainModel(
+    Base,
+    TimestampedMixin,
+    SoftDeleteMixin,
+    NameDescriptionMixin,
+    StateMixin,
+    GroupAffiliationMixin,
+    NotesMixin
+):
     """
-    Базовий клас для основних бізнес-сутностей у програмі.
-    Успадковує від `BaseModel` та включає інші загальні міксини.
+    Основний базовий клас для моделей предметної області.
 
-    Включає (на додаток до полів BaseModel):
-        - name: Назва сутності (з NameDescriptionMixin).
-        - description: Опціональний детальний опис (з NameDescriptionMixin).
-        - state: Поточний стан або статус (зі StateMixin).
-        - deleted_at: Часова мітка для м'якого видалення (з SoftDeleteMixin).
-        - is_deleted: Гібридна властивість для статусу м'якого видалення (з SoftDeleteMixin).
-        - notes: Внутрішні нотатки або загальні зауваження (з NotesMixin).
+    Успадковує від `Base` та включає набір стандартних полів і функціональностей
+    через міксини:
+    - `id`: Унікальний ідентифікатор (первинний ключ).
+    - `TimestampedMixin`: Поля `created_at` та `updated_at`.
+    - `SoftDeleteMixin`: Поле `deleted_at` для м'якого видалення.
+    - `NameDescriptionMixin`: Поля `name` та `description`.
+    - `StateMixin`: Поле `state` для відстеження стану сутності.
+    - `GroupAffiliationMixin`: Поле `group_id` для зв'язку з групою.
+    - `NotesMixin`: Поле `notes` для додаткових нотаток.
 
-    `GroupAffiliationMixin` тут навмисно пропущено, щоб зробити цю базову модель
-    більш загальнозастосовною. Моделі, які пов'язані з групами, можуть включати
-    `GroupAffiliationMixin` явно.
-    Альтернативно, можна створити інший базовий клас, наприклад `BaseGroupAffiliatedMainModel`.
+    Моделі, що представляють основні сутності програми (наприклад, Користувачі,
+    Групи, Завдання), повинні успадковувати цей клас.
     """
-    __abstract__ = True
+    __abstract__ = True  # Вказує SQLAlchemy, що це не таблиця, а базовий клас для інших таблиць.
 
-    # Тут безпосередньо не визначено додаткових полів, вони надходять з успадкованих міксинів.
-    # Специфічні моделі, що успадковують від цього, додаватимуть власні унікальні поля та зв'язки.
+    # Первинний ключ, спільний для всіх основних моделей.
+    # UUID може бути альтернативою, якщо потрібні глобально унікальні ID без залежності від БД.
+    # Наразі використовується автоінкрементний Integer.
+    id: Mapped[int] = mapped_column(
+        primary_key=True,
+        index=True,
+        autoincrement=True,
+        comment="Унікальний ідентифікатор запису"
+    )
+    # Поле 'id' автоматично додається до __repr__ через логіку в Base.__repr__
 
-# Приклад більш специфічної базової моделі, яка включає приналежність до групи
-class BaseGroupAffiliatedMainModel(BaseMainModel, GroupAffiliationMixin):
-    """
-    Базовий клас для основних бізнес-сутностей, які безпосередньо пов'язані з групою.
-    Успадковує від `BaseMainModel` та додає `GroupAffiliationMixin`.
-    """
-    __abstract__ = True
 
-
+# Для демонстрації, якщо цей файл запускається окремо
 if __name__ == "__main__":
-    # Цей блок призначений для демонстрації структури базової моделі.
-    # Він не взаємодіє з базою даних безпосередньо тут.
+    print("--- Базові класи моделей SQLAlchemy ---")
+    print(f"Клас Base: {Base}")
+    print(f"Клас BaseMainModel: {BaseMainModel}")
 
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    logger.info("--- Базові моделі SQLAlchemy --- демонстрація структури")
+    # Створення прикладу моделі, що успадковує BaseMainModel, для демонстрації
+    # Це лише для тестування структури; реальні моделі будуть в інших файлах.
+    # Для реального тестування потрібна engine та сесія.
 
-    logger.info(f"BaseModel успадковує від: {BaseModel.__mro__}")
-    logger.info(f"BaseMainModel успадковує від: {BaseMainModel.__mro__}")
-    logger.info(f"BaseGroupAffiliatedMainModel успадковує від: {BaseGroupAffiliatedMainModel.__mro__}")
+    class ExampleEntity(BaseMainModel):
+        __tablename__ = "example_entities"
+        # Додаткові специфічні поля для ExampleEntity
+        extra_data: Mapped[Optional[str]]
 
-    # Показати згенеровані назви таблиць (концептуально)
-    class User(BaseModel):
-        __tablename__ = "users" # Явно встановлено для цього поширеного випадку
-        username: Mapped[str]
+        # Додаємо 'extra_data' до списку полів для __repr__ цього конкретного класу
+        _repr_fields = ["extra_data"]  # Це поле буде додано до тих, що збираються з міксинів
 
-    class ProductOffering(BaseModel):
-        # Назва таблиці буде 'product_offerings' за замовчуванням
-        pass
 
-    class URLShortener(BaseModel):
-        # Назва таблиці буде 'url_shorteners' за замовчуванням
-        pass
+    print(f"\nСтворено демонстраційну модель ExampleEntity, що успадковує BaseMainModel.")
+    print(f"Очікувані атрибути в ExampleEntity (включаючи успадковані):")
+    # Приблизний список атрибутів, які мають бути в ExampleEntity
+    # Реальний introspection краще робити через SQLAlchemy Inspector після створення таблиць.
+    expected_attrs = ['id', 'created_at', 'updated_at', 'deleted_at', 'name',
+                      'description', 'state', 'group_id', 'notes', 'extra_data']
+    print(f"  Очікувані атрибути: {', '.join(expected_attrs)}")
 
-    class SomeGroupedItem(BaseGroupAffiliatedMainModel):
-        # Назва таблиці буде 'some_grouped_items' за замовчуванням
-        # Матиме id, created_at, updated_at, name, description, state, deleted_at, notes, group_id
-        specific_field: Mapped[Optional[str]]
+    print("\nДемонстрація __repr__:")
+    # Створюємо фіктивний екземпляр. Для реального __repr__ з усіма полями,
+    # особливо тими, що з @declared_attr, потрібна ініціалізація через SQLAlchemy.
+    # Ця демонстрація буде обмеженою без реальної сесії.
 
-    logger.debug(f"Приклад назви таблиці User (явно): {User.__tablename__}")
-    logger.debug(f"Приклад назви таблиці ProductOffering (згенеровано): {ProductOffering.__tablename__}")
-    logger.debug(f"Приклад назви таблиці URLShortener (згенеровано): {URLShortener.__tablename__}")
-    logger.debug(f"Приклад назви таблиці SomeGroupedItem (згенеровано): {SomeGroupedItem.__tablename__}")
+    # Імітуємо, як SQLAlchemy міг би створити екземпляр (дуже спрощено)
+    # У реальному випадку __mapper__ та інші атрибути SQLAlchemy будуть заповнені.
+    # Для цілей __repr__ тут, ми можемо створити простий об'єкт з потрібними полями.
 
-    # Щоб перевірити фактичні стовпці, вам потрібно було б ініціалізувати Base.metadata за допомогою engine
-    # а потім отримати доступ до SomeGroupedItem.__table__.columns
-    # Наприклад:
-    # from sqlalchemy import create_engine
-    # engine = create_engine("sqlite:///:memory:")
-    # Base.metadata.create_all(engine) # Це вимагало б визначення всіх таблиць, на які є посилання (наприклад, 'groups' для SomeGroupedItem).
-    # logger.info(f"Стовпці в SomeGroupedItem: {[c.name for c in SomeGroupedItem.__table__.columns]}")
+    # Створимо фіктивний mapper для демонстрації __repr__
+    mock_mapper_columns = {
+        'id': None, 'created_at': None, 'updated_at': None, 'deleted_at': None,
+        'name': None, 'description': None, 'state': None, 'group_id': None,
+        'notes': None, 'extra_data': None
+    }
 
-    logger.info("BaseModel надає 'id', 'created_at', 'updated_at'.")
-    logger.info("BaseMainModel додає 'name', 'description', 'state', 'deleted_at', 'is_deleted' (гібрид), 'notes'.")
-    logger.info("BaseGroupAffiliatedMainModel далі додає 'group_id'.")
+    # Динамічно створюємо клас для тесту, щоб не конфліктувати з ExampleEntity вище,
+    # якщо __name__ == "__main__" запускається кілька разів або в іншому контексті.
+    TestReprEntity = type(
+        "TestReprEntity",
+        (BaseMainModel,),
+        {
+            "__tablename__": "test_repr_entities",  # Потрібно для @declared_attr в міксинах
+            "extra_data": mapped_column(Text, nullable=True),  # Приклад поля
+            "_repr_fields": ["extra_data"],  # Додаємо специфічне поле до repr
+            # Імітація __mapper__ для __repr__
+            "__mapper__": type('Mapper', (), {'columns': mock_mapper_columns})()
+        }
+    )
+
+    # Важливо: _repr_fields з міксинів повинні бути доступні класу TestReprEntity.
+    # Наша реалізація __repr__ в Base збирає їх через MRO.
+
+    test_instance = TestReprEntity()
+    test_instance.id = 1
+    test_instance.name = "Тестовий Запис"
+    test_instance.state = "активний"
+    test_instance.created_at = datetime(2023, 1, 1, 10, 0, 0)
+    test_instance.extra_data = "Це додаткові дані"
+    # updated_at, deleted_at, description, group_id, notes - залишаться None або значеннями за замовчуванням
+
+    print(f"  Екземпляр TestReprEntity: {test_instance}")
+    # Очікуваний вивід буде приблизно:
+    # <TestReprEntity(id=1, name='Тестовий Запис', state='активний', created_at=datetime.datetime(2023, 1, 1, 10, 0), extra_data='Це додаткові дані')>
+    # (порядок може трохи відрізнятися через сортування set, крім id)
+
+    test_instance_minimal = TestReprEntity()
+    test_instance_minimal.id = 2
+    test_instance_minimal.name = "Мінімальний"
+    print(f"  Екземпляр TestReprEntity (мінімальний): {test_instance_minimal}")
+
+    print("\nПримітка: Повноцінне тестування SQLAlchemy моделей та їх __repr__")
+    print("зазвичай включає створення тестової бази даних та взаємодію з сесіями.")

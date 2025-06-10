@@ -1,20 +1,21 @@
 # backend/app/src/models/files/__init__.py
-
 """
-This package contains SQLAlchemy models related to file uploads, storage records,
-and associations like user avatars.
+Пакет моделей SQLAlchemy для сутностей, пов'язаних з "Файлами".
+
+Цей пакет містить моделі для представлення записів про файли,
+завантажені в систему, та їх специфічне використання, наприклад,
+як аватари користувачів.
+
+Моделі експортуються для зручного доступу з інших частин програми.
 """
 
-import logging
+from .file import FileRecord
+from .avatar import UserAvatar
+# В майбутньому тут можуть бути інші моделі, пов'язані з файлами,
+# наприклад, GroupIconRecord, RewardIconRecord, якщо вони матимуть
+# власні таблиці та логіку, відмінну від загального FileRecord.
 
-logger = logging.getLogger(__name__)
-logger.debug("File models package initialized.")
-
-# Example of re-exporting for easier access:
-# from .file import FileRecord
-# from .avatar import UserAvatar
-
-# __all__ = [
-#     "FileRecord",
-#     "UserAvatar",
-# ]
+__all__ = [
+    "FileRecord",
+    "UserAvatar",
+]

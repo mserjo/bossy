@@ -1,139 +1,116 @@
 # backend/app/src/repositories/bonuses/bonus_rule_repository.py
-
 """
-Repository for BonusRule entities.
-Provides CRUD operations and specific methods for managing bonus rules.
+Репозиторій для моделі "Правило Нарахування Бонусів" (BonusRule).
+
+Цей модуль визначає клас `BonusRuleRepository`, який успадковує `BaseRepository`
+та надає специфічні методи для роботи з правилами нарахування бонусів,
+наприклад, отримання активних правил для конкретного завдання або події.
 """
 
-import logging
-from typing import Optional, List
+from typing import List, Optional, Tuple, Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+# from sqlalchemy.orm import selectinload
 
-from backend.app.src.models.bonuses.bonus_rule import BonusRule
-from backend.app.src.schemas.bonuses.bonus_rule import BonusRuleCreate, BonusRuleUpdate
+# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+# Абсолютний імпорт моделі та схем
+from backend.app.src.models.bonuses.bonus_rule import BonusRule
+from backend.app.src.schemas.bonuses.bonus_rule import BonusRuleCreateSchema, BonusRuleUpdateSchema
 
-logger = logging.getLogger(__name__)
 
-class BonusRuleRepository(BaseRepository[BonusRule, BonusRuleCreate, BonusRuleUpdate]):
+# from backend.app.src.core.dicts import SomeStateEnum # Якщо поле state використовує Enum
+# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
+
+# logger = get_logger(__name__)
+
+class BonusRuleRepository(BaseRepository[BonusRule, BonusRuleCreateSchema, BonusRuleUpdateSchema]):
     """
-    Repository for managing BonusRule records.
+    Репозиторій для управління правилами нарахування бонусів (`BonusRule`).
+
+    Успадковує базові CRUD-методи від `BaseRepository` та може містити
+    додаткові методи для специфічного пошуку та фільтрації правил.
     """
 
-    def __init__(self):
-        super().__init__(BonusRule)
-
-    async def get_rules_for_group(
-        self,
-        db: AsyncSession,
-        *,
-        group_id: int,
-        is_active: Optional[bool] = True,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[BonusRule]:
+    def __init__(self, db_session: AsyncSession):
         """
-        Retrieves bonus rules for a specific group, optionally filtered by active status.
+        Ініціалізує репозиторій для моделі `BonusRule`.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            group_id: The ID of the group.
-            is_active: Optional. If True, only active rules are returned.
-                               If False, only inactive. If None, all rules.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
-
-        Returns:
-            A list of BonusRule objects.
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        conditions = [self.model.group_id == group_id] # type: ignore[attr-defined]
-        if is_active is not None:
-            conditions.append(self.model.is_active == is_active) # type: ignore[attr-defined]
+        super().__init__(db_session=db_session, model=BonusRule)
 
-        if hasattr(self.model, "deleted_at"):
-            conditions.append(self.model.deleted_at.is_(None)) # type: ignore[attr-defined]
-
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.name) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
-
-    async def get_rules_by_bonus_type(
-        self,
-        db: AsyncSession,
-        *,
-        bonus_type_id: int,
-        group_id: Optional[int] = None,
-        is_active: Optional[bool] = True,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[BonusRule]:
+    async def get_rules_for_task(self, task_id: int, active_only: bool = True) -> List[BonusRule]:
         """
-        Retrieves bonus rules by bonus type, optionally filtered by group and active status.
+        Отримує список правил нарахування бонусів, пов'язаних із конкретним завданням.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            bonus_type_id: The ID of the bonus type.
-            group_id: Optional. Filter by a specific group ID.
-            is_active: Optional. Filter by active status (True, False, or None for all).
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            task_id (int): ID завдання.
+            active_only (bool): Якщо True, повертає лише активні правила.
+                                Припускає, що модель BonusRule має поле `state` (успадковане від StateMixin).
 
         Returns:
-            A list of BonusRule objects.
+            List[BonusRule]: Список правил нарахування бонусів.
         """
-        conditions = [self.model.bonus_type_id == bonus_type_id] # type: ignore[attr-defined]
-        if group_id is not None:
-            conditions.append(self.model.group_id == group_id) # type: ignore[attr-defined]
-        if is_active is not None:
-            conditions.append(self.model.is_active == is_active) # type: ignore[attr-defined]
+        filters = [self.model.task_id == task_id]
+        if active_only:
+            # Припускаємо, що активний стан позначається як "active".
+            # Це може потребувати узгодження з Enum або конкретними значеннями стану.
+            if hasattr(self.model, "state"):
+                filters.append(self.model.state == "active")
+                # Або, якщо є поле is_active:
+            # elif hasattr(self.model, "is_active"):
+            #     filters.append(self.model.is_active == True)
+            # else:
+            #     logger.warning(f"Модель {self.model.__name__} не має поля 'state' або 'is_active' для фільтрації активних правил.")
 
-        if hasattr(self.model, "deleted_at"):
-            conditions.append(self.model.deleted_at.is_(None)) # type: ignore[attr-defined]
+        # Використовуємо get_multi з дуже великим лімітом для отримання всіх відповідних записів.
+        # Краще було б, якби get_multi міг приймати limit=None для відсутності ліміту.
+        # Альтернатива: прямий запит select.
+        items, _ = await self.get_multi(filters=filters, limit=1_000_000)  # Умовно великий ліміт
+        return items
 
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.group_id, self.model.name) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
-
-    async def get_rule_by_name_and_group(
-        self, db: AsyncSession, *, name: str, group_id: int
-    ) -> Optional[BonusRule]:
+    async def get_rules_for_event_task(self, event_task_id: int, active_only: bool = True) -> List[BonusRule]:
         """
-        Retrieves a specific bonus rule by its name within a specific group.
-        Assumes name is unique within a group for bonus rules.
+        Отримує список правил нарахування бонусів, пов'язаних із конкретною подією (завданням типу "подія").
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            name: The name of the bonus rule.
-            group_id: The ID of the group.
+            event_task_id (int): ID завдання (події).
+            active_only (bool): Якщо True, повертає лише активні правила.
 
         Returns:
-            The BonusRule object if found, otherwise None.
+            List[BonusRule]: Список правил нарахування бонусів.
         """
-        conditions = [
-            self.model.name == name, # type: ignore[attr-defined]
-            self.model.group_id == group_id # type: ignore[attr-defined]
-        ]
-        if hasattr(self.model, "deleted_at"):
-            conditions.append(self.model.deleted_at.is_(None)) # type: ignore[attr-defined]
+        # TODO: Уточнити, чи поле event_id в BonusRule є окремим, чи це task_id для завдання з типом "подія".
+        # Поточна реалізація моделі BonusRule має обидва поля: task_id та event_id.
+        # Якщо події - це завдання з певним типом, то цей метод може бути схожим на get_rules_for_task,
+        # але з додатковою перевіркою типу завдання, або ж використовувати поле event_id.
+        filters = [self.model.event_id == event_task_id]
+        if active_only:
+            if hasattr(self.model, "state"):
+                filters.append(self.model.state == "active")
+            # elif hasattr(self.model, "is_active"):
+            #     filters.append(self.model.is_active == True)
 
-        statement = select(self.model).where(*conditions)
-        result = await db.execute(statement)
-        return result.scalar_one_or_none()
+        items, _ = await self.get_multi(filters=filters, limit=1_000_000)
+        return items
 
-    # BaseRepository methods create, get, update, remove are inherited.
-    # `group_id` for creation will be handled by the service layer.
-    # `BonusRuleCreate` and `BonusRuleUpdate` schemas are used.
+
+if __name__ == "__main__":
+    # Демонстраційний блок для BonusRuleRepository.
+    print("--- Репозиторій Правил Нарахування Бонусів (BonusRuleRepository) ---")
+
+    print("Для тестування BonusRuleRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    print(f"Він успадковує методи від BaseRepository для моделі {BonusRule.__name__}.")
+    print(f"  Очікує схему створення: {BonusRuleCreateSchema.__name__}")
+    print(f"  Очікує схему оновлення: {BonusRuleUpdateSchema.__name__}")
+
+    print("\nСпецифічні методи:")
+    print("  - get_rules_for_task(task_id: int, active_only: bool = True)")
+    print("  - get_rules_for_event_task(event_task_id: int, active_only: bool = True)")
+
+    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    print("TODO: Узгодити логіку фільтрації 'active_only' з реальним полем стану в моделі BonusRule.")
+    print("TODO: Уточнити використання `event_id` у `get_rules_for_event_task`.")

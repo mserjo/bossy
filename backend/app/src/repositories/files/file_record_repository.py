@@ -1,112 +1,126 @@
 # backend/app/src/repositories/files/file_record_repository.py
-
 """
-Repository for FileRecord entities.
-Provides CRUD operations and specific methods for managing file metadata.
+Репозиторій для моделі "Запис Файлу" (FileRecord).
+
+Цей модуль визначає клас `FileRecordRepository`, який успадковує `BaseRepository`
+та надає специфічні методи для роботи з записами про завантажені файли.
 """
 
-import logging
-from typing import Optional, List
+from typing import List, Optional, Tuple, Any
 
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from pydantic import BaseModel as PydanticBaseModel  # Для UpdateSchemaType
 
-from backend.app.src.models.files.file import FileRecord
-from backend.app.src.schemas.files.file import FileRecordCreate
-from pydantic import BaseModel as PydanticBaseModel
+# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+# Абсолютний імпорт моделі та схем
+from backend.app.src.models.files.file import FileRecord
+from backend.app.src.schemas.files.file import FileRecordCreateSchema
 
-logger = logging.getLogger(__name__)
 
+# from backend.app.src.core.dicts import FileType as FileTypeEnum # Для фільтрації за purpose
+# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
+
+# logger = get_logger(__name__)
+
+# Записи файлів зазвичай не оновлюються після створення (окрім, можливо, metadata або purpose).
+# Якщо потрібне оновлення, можна створити більш конкретну схему.
 class FileRecordUpdateSchema(PydanticBaseModel):
-    original_filename: Optional[str] = None
-    is_public: Optional[bool] = None
+    # Наприклад, якщо дозволено оновлювати лише metadata або purpose:
+    # metadata: Optional[Dict[str, Any]] = None
+    # purpose: Optional[str] = None # TODO: Використати FileTypeEnum.value
+    pass
 
-class FileRecordRepository(BaseRepository[FileRecord, FileRecordCreate, FileRecordUpdateSchema]):
+
+class FileRecordRepository(BaseRepository[FileRecord, FileRecordCreateSchema, FileRecordUpdateSchema]):
     """
-    Repository for managing FileRecord metadata.
+    Репозиторій для управління записами файлів (`FileRecord`).
+
+    Успадковує базові CRUD-методи від `BaseRepository` та надає
+    додаткові методи для отримання файлів за шляхом, завантажувачем або призначенням.
     """
 
-    def __init__(self):
-        super().__init__(FileRecord)
-
-    async def get_by_stored_filename(self, db: AsyncSession, *, stored_filename: str) -> Optional[FileRecord]:
+    def __init__(self, db_session: AsyncSession):
         """
-        Retrieves a file record by its unique stored filename.
+        Ініціалізує репозиторій для моделі `FileRecord`.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            stored_filename: The filename used for storage (e.g., UUID-based name).
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
+        """
+        super().__init__(db_session=db_session, model=FileRecord)
+
+    async def get_by_file_path(self, file_path: str) -> Optional[FileRecord]:
+        """
+        Отримує запис файлу за його унікальним шляхом/ключем.
+
+        Args:
+            file_path (str): Шлях до файлу або ключ в об'єктному сховищі.
 
         Returns:
-            The FileRecord object if found, otherwise None.
+            Optional[FileRecord]: Екземпляр моделі `FileRecord`, якщо знайдено, інакше None.
         """
-        statement = select(self.model).where(self.model.stored_filename == stored_filename) # type: ignore[attr-defined]
-        result = await db.execute(statement)
+        stmt = select(self.model).where(self.model.file_path == file_path)
+        result = await self.db_session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_files_for_uploader(
-        self, db: AsyncSession, *, uploader_user_id: int, skip: int = 0, limit: int = 100
-    ) -> List[FileRecord]:
+    async def get_files_by_uploader(
+            self,
+            uploader_user_id: int,
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[FileRecord], int]:
         """
-        Retrieves all file records uploaded by a specific user.
+        Отримує список файлів, завантажених вказаним користувачем, з пагінацією.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            uploader_user_id: The ID of the user who uploaded the files.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            uploader_user_id (int): ID користувача, який завантажив файли.
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            A list of FileRecord objects.
+            Tuple[List[FileRecord], int]: Кортеж зі списком записів файлів та їх загальною кількістю.
         """
-        statement = (
-            select(self.model)
-            .where(self.model.uploader_user_id == uploader_user_id) # type: ignore[attr-defined]
-            .order_by(self.model.created_at.desc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
+        filters = [self.model.uploader_user_id == uploader_user_id]
+        order_by = [self.model.created_at.desc()]  # Новіші файли першими
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
 
-    async def get_files_by_visibility(
-        self, db: AsyncSession, *, is_public: bool, skip: int = 0, limit: int = 100
-    ) -> List[FileRecord]:
+    async def get_files_by_purpose(
+            self,
+            purpose: str,  # Очікується значення з FileTypeEnum
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[FileRecord], int]:
         """
-        Retrieves file records based on their public visibility status.
+        Отримує список файлів за вказаним призначенням з пагінацією.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            is_public: Boolean flag to filter by public (True) or private (False) files.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            purpose (str): Призначення файлу (значення з `core.dicts.FileType`).
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            A list of FileRecord objects.
+            Tuple[List[FileRecord], int]: Кортеж зі списком записів файлів та їх загальною кількістю.
         """
-        statement = (
-            select(self.model)
-            .where(self.model.is_public == is_public) # type: ignore[attr-defined]
-            .order_by(self.model.created_at.desc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
+        # TODO: Переконатися, що 'purpose' передається як Enum.value або валідується відповідно.
+        filters = [self.model.purpose == purpose]
+        order_by = [self.model.created_at.desc()]
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
 
-    async def get_by_filepath_or_url(self, db: AsyncSession, *, filepath_or_url: str) -> Optional[FileRecord]:
-        """
-        Retrieves a file record by its unique filepath_or_url.
-        This assumes filepath_or_url is unique if used as a lookup key.
 
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            filepath_or_url: The path or URL of the file.
+if __name__ == "__main__":
+    # Демонстраційний блок для FileRecordRepository.
+    print("--- Репозиторій Записів Файлів (FileRecordRepository) ---")
 
-        Returns:
-            The FileRecord object if found, otherwise None.
-        """
-        statement = select(self.model).where(self.model.filepath_or_url == filepath_or_url) # type: ignore[attr-defined]
-        result = await db.execute(statement)
-        return result.scalar_one_or_none()
+    print("Для тестування FileRecordRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    print(f"Він успадковує методи від BaseRepository для моделі {FileRecord.__name__}.")
+    print(f"  Очікує схему створення: {FileRecordCreateSchema.__name__}")
+    print(f"  Очікує схему оновлення: {FileRecordUpdateSchema.__name__} (зараз порожня)")
+
+    print("\nСпецифічні методи:")
+    print("  - get_by_file_path(file_path: str)")
+    print("  - get_files_by_uploader(uploader_user_id: int, skip: int = 0, limit: int = 100)")
+    print("  - get_files_by_purpose(purpose: str, skip: int = 0, limit: int = 100)")
+
+    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    print("TODO: Інтегрувати Enum 'FileType' для аргументу `purpose` в get_files_by_purpose.")

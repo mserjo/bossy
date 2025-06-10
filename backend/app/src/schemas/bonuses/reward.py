@@ -1,148 +1,186 @@
 # backend/app/src/schemas/bonuses/reward.py
-
 """
-Pydantic schemas for Rewards that users can redeem with points.
+Pydantic схеми для сутності "Нагорода" (Reward).
+
+Цей модуль визначає схеми для:
+- Базового представлення нагороди (`RewardBaseSchema`).
+- Створення нової нагороди (`RewardCreateSchema`).
+- Оновлення існуючої нагороди (`RewardUpdateSchema`).
+- Представлення даних про нагороду у відповідях API (`RewardSchema`).
+- Запиту на отримання нагороди користувачем (`RedeemRewardRequestSchema`).
 """
+from datetime import datetime
+from typing import Optional, Any  # Any для тимчасових полів
+from decimal import Decimal
 
-import logging
-from typing import Optional, Dict, Any # Added Dict, Any for RedeemRewardRequest
-from datetime import datetime, timezone, timedelta # For examples and BaseResponseSchema
+from pydantic import Field
 
-from pydantic import Field, HttpUrl
+# Абсолютний імпорт базових схем та міксинів
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin, BaseMainSchema
 
-from backend.app.src.schemas.base import BaseSchema, BaseMainResponseSchema
-# Assuming Reward model inherits from BaseGroupAffiliatedMainModel
+# BaseMainSchema не успадковується напряму RewardBaseSchema, бо group_id там опціональний,
+# а для створення нагороди group_id зазвичай обов'язковий (або з контексту).
+# RewardSchema успадкує BaseMainSchema.
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+# TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
+# from backend.app.src.schemas.groups.group import GroupSchema # Або GroupBriefSchema
+GroupSchema = Any  # Тимчасовий заповнювач
 
-# --- Locally defined Basic Info schemas for demonstration ---
-class GroupBasicInfo(BaseSchema): # Inherit BaseSchema for consistent config (e.g. camelCase)
-    id: int = Field(..., example=1)
-    name: str = Field(..., example="Company Rewards Program")
-# --- End of local Basic Info schemas ---
+REWARD_NAME_MAX_LENGTH = 255
+REWARD_ICON_URL_MAX_LENGTH = 512
 
 
-# --- Reward Schemas ---
-
-class RewardBase(BaseSchema):
-    """Base schema for reward data."""
-    name: str = Field(..., min_length=3, max_length=255, description="Name of the reward.", example="Free Coffee Coupon")
-    description: Optional[str] = Field(None, description="Detailed description of the reward.", example="Redeemable for one large coffee at the cafeteria.")
-    # group_id is often a path parameter or set by service for group-specific rewards.
-    # If it can be global (None) or set in payload, include it here.
-    # group_id: Optional[int] = Field(None, description="ID of the group this reward belongs to. Null if global.")
-    cost_in_points: int = Field(..., gt=0, description="Number of points/currency required to redeem this reward.", example=100)
-    icon_url: Optional[HttpUrl] = Field(None, description="Optional URL or path to an icon representing the reward.", example="https://example.com/icons/coffee_reward.png")
-    is_active: Optional[bool] = Field(True, description="Is this reward currently available for redemption?")
-    stock_quantity: Optional[int] = Field(None, ge=0, description="Available stock for this reward. Null if unlimited.", example=50)
-    state: Optional[str] = Field("available", max_length=50, description="Lifecycle state of the reward (e.g., 'available', 'unavailable', 'archived').", example="available") # From BaseMainModel
-    notes: Optional[str] = Field(None, description="Internal notes for the reward.") # From BaseMainModel
-
-class RewardCreate(RewardBase):
+class RewardBaseSchema(BaseSchema):
     """
-    Schema for creating a new reward.
-    `group_id` is assumed to be part of API path or context if reward is group-specific.
+    Базова схема для полів нагороди, спільних для створення та оновлення.
     """
-    # name and cost_in_points are mandatory from RewardBase.
-    # group_id: int # If it must be in payload for group-specific reward creation.
+    name: str = Field(
+        ...,
+        max_length=REWARD_NAME_MAX_LENGTH,
+        description="Назва нагороди.",
+        examples=["Безкоштовна кава", "Сертифікат на знижку"]
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Детальний опис нагороди."
+    )
+    # group_id тут не вказується, оскільки для Create він часто береться з URL або контексту,
+    # а для Update не змінюється або змінюється окремим ендпоінтом.
+    # RewardSchema отримає group_id з BaseMainSchema.
+
+    cost: Decimal = Field(
+        ...,
+        ge=Decimal("0.00"),  # Вартість не може бути від'ємною
+        description="\"Вартість\" нагороди в одиницях бонусів групи.",
+        examples=[Decimal("50.00"), Decimal("1000.00")]
+    )
+    quantity_available: Optional[int] = Field(
+        None,  # None означає необмежену кількість
+        ge=0,  # Кількість не може бути від'ємною
+        description="Доступна кількість екземплярів цієї нагороди (NULL для необмеженої)."
+    )
+    icon_url: Optional[str] = Field(
+        None,
+        max_length=REWARD_ICON_URL_MAX_LENGTH,
+        description="URL або шлях до іконки нагороди.",
+        examples=["https://example.com/icons/coffee_cup.png"]
+    )
+    # TODO: Розглянути використання Enum RewardState з core.dicts, якщо стани нагород фіксовані.
+    state: Optional[str] = Field(
+        None,  # Або default="active"
+        max_length=50,
+        description="Стан нагороди (наприклад, 'active', 'archived', 'out_of_stock').",
+        examples=["active"]
+    )
+    notes: Optional[str] = Field(
+        None,
+        description="Додаткові нотатки щодо нагороди."
+    )
+    # model_config успадковується з BaseSchema (from_attributes=True)
+
+
+class RewardCreateSchema(RewardBaseSchema):
+    """
+    Схема для створення нової нагороди.
+    `group_id` має бути наданий (зазвичай з контексту URL або тіла запиту, якщо потрібно).
+    """
+    group_id: int = Field(description="Ідентифікатор групи, до якої належить ця нагорода.")
+    # Успадковує всі поля від RewardBaseSchema.
     pass
 
-class RewardUpdate(BaseSchema): # Does not inherit RewardBase to make all fields truly optional
-    """
-    Schema for updating an existing reward. All fields are optional.
-    """
-    name: Optional[str] = Field(None, min_length=3, max_length=255, description="New name of the reward.")
-    description: Optional[str] = Field(None, description="New detailed description of the reward.")
-    cost_in_points: Optional[int] = Field(None, gt=0, description="New cost in points for this reward.")
-    icon_url: Optional[HttpUrl] = Field(None, description="New URL or path to an icon for the reward.")
-    is_active: Optional[bool] = Field(None, description="Update active status of this reward.")
-    stock_quantity: Optional[int] = Field(None, ge=0, description="Update available stock. Null if unlimited.")
-    state: Optional[str] = Field(None, max_length=50, description="Update lifecycle state of the reward.")
-    notes: Optional[str] = Field(None, description="Update internal notes for the reward.")
-    # group_id is typically not changed.
 
-class RewardResponse(BaseMainResponseSchema):
+class RewardUpdateSchema(RewardBaseSchema):
     """
-    Schema for representing a reward in API responses.
-    Inherits common fields from BaseMainResponseSchema (id, created_at, updated_at, deleted_at, name, description, state, notes).
+    Схема для оновлення існуючої нагороди.
+    Всі поля, успадковані з `RewardBaseSchema`, стають опціональними.
+    `group_id` зазвичай не оновлюється для існуючої нагороди.
     """
-    # name, description, state, notes are from BaseMainResponseSchema.
-    name: str = Field(..., description="Name of the reward.", example="Free Coffee Coupon")
+    name: Optional[str] = Field(None, max_length=REWARD_NAME_MAX_LENGTH)
+    description: Optional[str] = None
+    cost: Optional[Decimal] = Field(None, ge=Decimal("0.00"))
+    quantity_available: Optional[int] = Field(None, ge=0)  # Можна встановити в 0, щоб позначити "немає в наявності"
+    icon_url: Optional[str] = Field(None, max_length=REWARD_ICON_URL_MAX_LENGTH)
+    state: Optional[str] = Field(None, max_length=50)
+    notes: Optional[str] = None
+    # group_id зазвичай не змінюється при оновленні. Якщо це потрібно, його можна додати сюди.
 
-    group: Optional[GroupBasicInfo] = Field(None, description="Basic information about the group this reward belongs to (if group-specific).") # Populated by service
 
-    cost_in_points: int = Field(..., description="Points required to redeem.", example=100)
-    icon_url: Optional[HttpUrl] = Field(None, description="Icon URL for the reward.", example="https://example.com/icons/coffee_reward.png")
-    is_active: bool = Field(..., description="Is the reward currently active?", example=True)
-    stock_quantity: Optional[int] = Field(None, description="Available stock. Null if unlimited.", example=50)
-
-class RedeemRewardRequest(BaseSchema):
+class RewardSchema(BaseMainSchema):  # Успадковує id, name, description, state, notes, group_id, timestamps
     """
-    Schema for a user request to redeem a specific reward.
-    `reward_id` is typically a path parameter.
-    `user_id` is from the authenticated user context.
+    Схема для представлення даних про нагороду у відповідях API.
+    Успадковує більшість полів від `BaseMainSchema`.
     """
-    quantity: Optional[int] = Field(1, ge=1, description="Number of this reward item to redeem.", example=1)
-    # Any other specific details needed for redemption, e.g., delivery address if physical good.
-    delivery_details: Optional[Dict[str, Any]] = Field(None, description="Details for reward delivery, if applicable.", example={"address_line_1": "123 Main St", "city": "Anytown"})
+    # id, name, description, state, notes, group_id, created_at, updated_at, deleted_at - успадковані
 
-# RedeemRewardResponse could be a MessageResponse or include details of the transaction/updated balance.
-# For example, it could be an AccountTransactionResponse or a wrapper around it.
+    # Специфічні поля моделі Reward, що не входять до BaseMainSchema або потребують іншого представлення
+    cost: Decimal = Field(description="Вартість нагороди в бонусах.")
+    quantity_available: Optional[int] = Field(description="Доступна кількість (NULL для необмеженої).")
+    icon_url: Optional[str] = Field(None, max_length=REWARD_ICON_URL_MAX_LENGTH, description="URL іконки нагороди.")
+
+    # Пов'язані об'єкти (якщо потрібно)
+    # group: Optional[GroupSchema] = Field(None, description="Інформація про групу, до якої належить нагорода.")
+    # `group_id` вже є, `group` об'єкт можна додавати за потреби розширення.
+    # Наразі `BaseMainSchema` не має поля `group`, лише `group_id`.
+    # Якщо модель Reward має зв'язок `group`, то тут можна його відобразити.
+
+
+class RedeemRewardRequestSchema(BaseSchema):
+    """
+    Схема запиту на отримання (покупку) нагороди користувачем.
+    """
+    reward_id: int = Field(description="Ідентифікатор нагороди, яку користувач хоче отримати.")
+    # user_id зазвичай береться з поточного автентифікованого користувача (сервісом).
+    # group_id також може бути отриманий з контексту, наприклад, якщо користувач діє в рамках активної групи.
+    # Якщо потрібно явно, їх можна додати сюди.
+    quantity: int = Field(default=1, gt=0,
+                          description="Кількість екземплярів нагороди для отримання (за замовчуванням 1).")
+
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем нагород.
+    print("--- Pydantic Схеми для Нагород (Reward) ---")
 
-    logger.info("--- Reward Schemas --- Demonstration")
-
-    # RewardCreate Example
-    # Assume group_id=1 is context
-    reward_create_data = {
-        "name": "Premium Feature Access (1 Month)",
-        "description": "Unlock all premium features for one month.",
-        # "groupId": 1, # If needed in payload
-        "costInPoints": 500, # camelCase for cost_in_points
-        "isActive": True,
-        "stockQuantity": None, # Unlimited
-        "state": "available"
+    print("\nRewardCreateSchema (приклад для створення):")
+    create_reward_data = {
+        "name": "Подарунковий сертифікат на 200 грн",  # TODO i18n
+        "description": "Сертифікат на покупки в магазині-партнері.",  # TODO i18n
+        "group_id": 1,
+        "cost": Decimal("2000.00"),  # Вартість у бонусах
+        "quantity_available": 100,
+        "icon_url": "https://example.com/certs/cert200.png",
+        "state": "active"
     }
-    try:
-        create_schema = RewardCreate(**reward_create_data) # type: ignore[call-arg]
-        logger.info(f"RewardCreate valid: {create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating RewardCreate: {e}")
+    create_reward_instance = RewardCreateSchema(**create_reward_data)
+    print(create_reward_instance.model_dump_json(indent=2, exclude_none=True))
 
-    # RewardUpdate Example
-    reward_update_data = {"costInPoints": 450, "description": "Special offer: Unlock premium features for one month at a reduced price!"}
-    update_schema = RewardUpdate(**reward_update_data) # type: ignore[call-arg]
-    logger.info(f"RewardUpdate (partial): {update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # RewardResponse Example
-    group_info_data = {"id": 1, "name": "Global Rewards Catalog"}
-    response_data = {
-        "id": 77,
-        "createdAt": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "deletedAt": None,
-        "name": "Premium Feature Access (1 Month)",
-        "description": "Special offer: Unlock premium features for one month at a reduced price!",
-        "state": "available",
-        "notes": "Popular item.",
-        "group": group_info_data, # Or null if truly global and not group-affiliated via BaseGroupAffiliatedMainModel
-        "costInPoints": 450,
-        "isActive": True,
-        "stockQuantity": None
+    print("\nRewardUpdateSchema (приклад для оновлення):")
+    update_reward_data = {
+        "description": "Сертифікат на покупки в магазині-партнері 'СуперМаркет'.",  # TODO i18n
+        "quantity_available": 50
     }
-    try:
-        response_schema = RewardResponse(**response_data) # type: ignore[call-arg]
-        logger.info(f"RewardResponse: {response_schema.model_dump_json(by_alias=True, indent=2)}")
-        if response_schema.group:
-            logger.info(f"  Reward Group: {response_schema.group.name}")
-    except Exception as e:
-        logger.error(f"Error creating RewardResponse: {e}")
+    update_reward_instance = RewardUpdateSchema(**update_reward_data)
+    print(update_reward_instance.model_dump_json(indent=2, exclude_none=True))
 
-    # RedeemRewardRequest Example
-    redeem_request_data = {"quantity": 2, "deliveryDetails": {"address_line_1": "123 Main St"}}
-    redeem_schema = RedeemRewardRequest(**redeem_request_data) # type: ignore[call-arg]
-    logger.info(f"RedeemRewardRequest: {redeem_schema.model_dump(by_alias=True)}")
+    print("\nRewardSchema (приклад відповіді API):")
+    reward_response_data = {
+        "id": 1,
+        "name": "Ексклюзивна Футболка",  # TODO i18n
+        "description": "Футболка з унікальним дизайном Kudos.",  # TODO i18n
+        "group_id": 1,  # Або може бути None, якщо нагорода глобальна
+        "cost": Decimal("500.00"),
+        "quantity_available": 25,
+        "icon_url": "https://example.com/swag/kudos_tshirt.png",
+        "state": "active",
+        "created_at": datetime.now(),
+        "updated_at": datetime.now()
+    }
+    reward_response_instance = RewardSchema(**reward_response_data)
+    print(reward_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nRedeemRewardRequestSchema (приклад запиту на отримання):")
+    redeem_data = {"reward_id": 1, "quantity": 1}
+    redeem_instance = RedeemRewardRequestSchema(**redeem_data)
+    print(redeem_instance.model_dump_json(indent=2))
+
+    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних нагород.")
+    print("Поле 'state' для нагород може використовувати значення з довідника статусів або спеціального Enum.")

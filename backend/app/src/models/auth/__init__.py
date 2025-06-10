@@ -1,22 +1,32 @@
 # backend/app/src/models/auth/__init__.py
-
 """
-This package contains SQLAlchemy models related to authentication, authorization,
-user accounts, sessions, and tokens.
+Пакет моделей SQLAlchemy для автентифікації та авторизації.
+
+Цей пакет містить моделі, пов'язані з користувачами, їх сесіями,
+токенами оновлення та іншими аспектами системи безпеки програми Kudos.
+
+Моделі експортуються для зручного доступу з інших частин програми,
+наприклад, при визначенні залежностей FastAPI, у сервісах або репозиторіях.
 """
 
-import logging
+from .user import User
+from .token import RefreshToken
+from .session import Session
+# UserAvatar буде імпортовано, коли файл files/avatar.py буде створено/рефакторено.
+# from ..files.avatar import UserAvatar # Розкоментувати після створення UserAvatar
 
-logger = logging.getLogger(__name__)
-logger.debug("Authentication models package initialized.")
+__all__ = [
+    "User",
+    "RefreshToken",
+    "Session",
+    # "UserAvatar", # Розкоментувати після створення UserAvatar
+]
 
-# Example of re-exporting for easier access from other modules:
-# from .user import User
-# from .token import RefreshToken
-# from .session import UserSession
-
-# __all__ = [
-#     "User",
-#     "RefreshToken",
-#     "UserSession",
-# ]
+# Примітка: Модель UserAvatar, хоч і пов'язана з користувачем,
+# може бути визначена в модулі, що стосується файлів (наприклад, models/files/avatar.py),
+# а потім імпортована сюди для централізованого експорту або просто імпортуватися
+# напряму там, де вона потрібна (наприклад, у моделі User для визначення relationship).
+# Для чистоти структури, якщо UserAvatar є окремою таблицею, вона може бути
+# в models/files/, а тут лише використовуватися для type hinting у User.
+# Якщо ж UserAvatar - це просте посилання на файл і не має своєї таблиці,
+# то воно може бути полем у User. Поточний план передбачає UserAvatar як окрему модель.

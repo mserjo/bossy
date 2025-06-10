@@ -1,143 +1,138 @@
 # backend/app/src/schemas/groups/membership.py
-
 """
-Pydantic schemas for Group Memberships.
-"""
+Pydantic схеми для сутності "Членство в Групі" (GroupMembership).
 
-import logging
+Цей модуль визначає схеми для:
+- Базового представлення членства (`GroupMembershipBaseSchema`).
+- Створення нового запису про членство (`GroupMembershipCreateSchema`).
+- Оновлення ролі в існуючому членстві (`GroupMembershipUpdateSchema`).
+- Представлення даних про членство у відповідях API (`GroupMembershipSchema`).
+"""
+from datetime import datetime
 from typing import Optional
-from datetime import datetime, timezone, timedelta # Added timezone, timedelta for __main__
 
-from pydantic import Field
+from pydantic import Field, field_validator  # field_validator для валідації ролі
 
-from backend.app.src.schemas.base import BaseSchema, BaseResponseSchema
-# For nested user/group/role info in responses, import their respective minimal response schemas
-# from backend.app.src.schemas.auth.user import UserPublicProfileResponse # Or a more minimal UserBasicInfo
-# from backend.app.src.schemas.groups.group import GroupResponse # Usually too verbose, create GroupBasicInfo
-# from backend.app.src.schemas.dictionaries.user_roles import UserRoleResponse # Or UserRoleBasicInfo
+# Абсолютний імпорт базових схем та Enum
+from backend.app.src.schemas.base import BaseSchema, TimestampedSchemaMixin
+from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача
+from backend.app.src.core.dicts import GroupRole  # Enum для ролей в групі
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
 
-# --- Minimal Sub-schemas for nested responses (examples) ---
-# These should ideally be defined in their respective modules or a common 'shared_schemas.py'
-# For now, defining them here for clarity of GroupMembershipResponse structure.
-
-class UserBasicInfo(BaseSchema):
-    """Minimal user info for membership responses."""
-    id: int = Field(..., example=101)
-    name: Optional[str] = Field(None, example="Alice Wonderland")
-    # avatar_url: Optional[str] = None # Example: Field(None, example="https://example.com/avatar.png")
-
-class GroupBasicInfo(BaseSchema):
-    """Minimal group info for membership responses."""
-    id: int = Field(..., example=1)
-    name: str = Field(..., example="Project Alpha Team")
-
-class RoleBasicInfo(BaseSchema):
-    """Minimal role info for membership responses."""
-    id: int = Field(..., example=2)
-    code: str = Field(..., example="ADMIN")
-    name: str = Field(..., example="Administrator")
-
-# --- GroupMembership Schemas ---
-
-class GroupMembershipBase(BaseSchema):
+class GroupMembershipBaseSchema(BaseSchema):
     """
-    Base schema for group membership data.
-    `group_id` is typically a path parameter for API endpoints managing memberships of a specific group.
-    `user_id` might be in the path for specific user's membership, or in the body for adding new members.
+    Базова схема для полів членства в групі.
     """
-    # user_id: int = Field(..., description="ID of the user for this membership.") # Usually in Create or path
-    role_id: int = Field(..., description="ID of the user's role within this group (from dict_user_roles).", example=2)
-    is_active: Optional[bool] = Field(True, description="Whether this membership is currently active.", example=True)
-    notes: Optional[str] = Field(None, description="Optional notes specific to this membership.", example="Founding member")
-    # join_date is usually set by the server on creation.
+    user_id: int = Field(description="Ідентифікатор користувача.")
+    group_id: int = Field(description="Ідентифікатор групи.")
+    role: str = Field(
+        default=GroupRole.MEMBER.value,
+        description=f"Роль користувача в групі. Допустимі значення: {', '.join([r.value for r in GroupRole])}."
+    )
 
-class GroupMembershipCreate(BaseSchema): # Not inheriting GroupMembershipBase to explicitly define fields for create
-    """
-    Schema for adding a user to a group (creating a membership).
-    `group_id` is assumed to be part of the API path (e.g., /groups/{group_id}/members).
-    """
-    user_id: int = Field(..., description="ID of the user to add to the group.", example=101)
-    role_id: int = Field(..., description="ID of the role to assign to the user in this group.", example=3) # e.g., 'member' role ID
-    notes: Optional[str] = Field(None, description="Optional notes for this new membership.")
+    @field_validator('role')
+    @classmethod
+    def validate_role(cls, value: str) -> str:
+        """Перевіряє, чи надане значення ролі є допустимим членом Enum GroupRole."""
+        allowed_roles = {r.value for r in GroupRole}
+        if value not in allowed_roles:
+            # TODO i18n: Translatable error message
+            raise ValueError(f"Недопустима роль '{value}'. Дозволені ролі: {', '.join(allowed_roles)}")
+        return value
 
-class GroupMembershipUpdate(BaseSchema): # Not inheriting GroupMembershipBase to explicitly define fields for update
-    """
-    Schema for updating an existing group membership.
-    `group_id` and `user_id` are typically path parameters.
-    Only role, active status, and notes are usually updatable.
-    """
-    role_id: Optional[int] = Field(None, description="New role ID for the user in this group.")
-    is_active: Optional[bool] = Field(None, description="Update active status of the membership (e.g., for suspension/reactivation).")
-    notes: Optional[str] = Field(None, description="Updated notes for this membership.")
+    # model_config успадковується з BaseSchema (from_attributes=True)
 
-class GroupMembershipResponse(BaseResponseSchema):
-    """
-    Schema for representing a group membership in API responses.
-    Includes 'id' (surrogate PK of the membership record), 'created_at', 'updated_at'.
-    """
-    # user_id: int # Direct FK, but often we want the nested User object
-    # group_id: int # Direct FK, often we want the nested Group object
-    # role_id: int # Direct FK, often we want the nested Role object
 
-    user: UserBasicInfo = Field(..., description="Information about the member.")
-    group: GroupBasicInfo = Field(..., description="Information about the group.")
-    role: RoleBasicInfo = Field(..., description="User's role within the group.")
+class GroupMembershipCreateSchema(
+    BaseSchema):  # Не успадковує GroupMembershipBaseSchema напряму, щоб group_id не був у тілі запиту
+    """
+    Схема для створення нового запису про членство в групі.
+    `group_id` зазвичай передається як параметр шляху (path parameter),
+    `user_id` може бути в тілі запиту або визначатися інакше (наприклад, для запрошення).
+    """
+    user_id: int = Field(description="Ідентифікатор користувача, якого додають до групи.")
+    role: str = Field(
+        default=GroupRole.MEMBER.value,
+        description=f"Роль, що призначається користувачеві в групі. За замовчуванням: '{GroupRole.MEMBER.value}'. Допустимі значення: {', '.join([r.value for r in GroupRole])}."
+    )
 
-    join_date: datetime = Field(..., description="Timestamp when the user joined the group (UTC).")
-    is_active: bool = Field(..., description="Is this membership currently active?")
-    notes: Optional[str] = Field(None, description="Notes specific to this membership.")
+    @field_validator('role')
+    @classmethod
+    def validate_role_on_create(cls, value: str) -> str:
+        """Перевіряє роль при створенні (аналогічно до базової перевірки)."""
+        allowed_roles = {r.value for r in GroupRole}
+        if value not in allowed_roles:
+            # TODO i18n: Translatable error message
+            raise ValueError(f"Недопустима роль '{value}'. Дозволені ролі: {', '.join(allowed_roles)}")
+        return value
+
+
+class GroupMembershipUpdateSchema(BaseSchema):
+    """
+    Схема для оновлення ролі користувача в групі.
+    Дозволяє оновлювати лише поле `role`.
+    """
+    role: str = Field(
+        description=f"Нова роль користувача в групі. Допустимі значення: {', '.join([r.value for r in GroupRole])}.")
+
+    @field_validator('role')
+    @classmethod
+    def validate_role_on_update(cls, value: str) -> str:
+        """Перевіряє роль при оновленні."""
+        allowed_roles = {r.value for r in GroupRole}
+        if value not in allowed_roles:
+            # TODO i18n: Translatable error message
+            raise ValueError(f"Недопустима роль '{value}'. Дозволені ролі: {', '.join(allowed_roles)}")
+        return value
+
+
+class GroupMembershipSchema(GroupMembershipBaseSchema, TimestampedSchemaMixin):
+    """
+    Схема для представлення даних про членство у відповідях API.
+    Включає інформацію про користувача та часові мітки.
+    """
+    # user_id, group_id, role успадковані з GroupMembershipBaseSchema
+    # created_at, updated_at успадковані з TimestampedSchemaMixin
+
+    user: Optional[UserPublicProfileSchema] = Field(None,
+                                                    description="Публічний профіль користувача, що є членом групи.")
+    # group: Optional[GroupSchema] = Field(None, description="Інформація про групу.") # Якщо потрібно показувати деталі групи
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем членства в групах.
+    print("--- Pydantic Схеми для Членства в Групах (GroupMembership) ---")
 
-    logger.info("--- GroupMembership Schemas --- Demonstration")
-
-    # GroupMembershipCreate Example
-    # Assume group_id is from path, e.g., POST /groups/1/members
-    membership_create_data = {
-        "userId": 101, # camelCase for user_id
-        "roleId": 3,   # camelCase for role_id
-        "notes": "Invited by team lead."
-    }
+    print("\nGroupMembershipBaseSchema (приклад):")
+    base_data = {"user_id": 1, "group_id": 10, "role": GroupRole.ADMIN.value}
+    base_instance = GroupMembershipBaseSchema(**base_data)
+    print(base_instance.model_dump_json(indent=2))
     try:
-        create_schema = GroupMembershipCreate(**membership_create_data) # type: ignore[call-arg]
-        logger.info(f"GroupMembershipCreate valid: {create_schema.model_dump(by_alias=True)}")
+        GroupMembershipBaseSchema(user_id=1, group_id=10, role="invalid_role")
     except Exception as e:
-        logger.error(f"Error creating GroupMembershipCreate: {e}")
+        print(f"Помилка валідації GroupMembershipBaseSchema (очікувано): {e}")
 
-    # GroupMembershipUpdate Example
-    # Assume group_id and user_id are from path, e.g., PUT /groups/1/members/101
-    membership_update_data = {"roleId": 2, "isActive": False} # Promote to role_id 2 (e.g. admin), and deactivate
-    update_schema = GroupMembershipUpdate(**membership_update_data) # type: ignore[call-arg]
-    logger.info(f"GroupMembershipUpdate (partial): {update_schema.model_dump(exclude_unset=True, by_alias=True)}")
+    print("\nGroupMembershipCreateSchema (приклад для створення):")
+    create_data = {"user_id": 2, "role": GroupRole.MEMBER.value}
+    create_instance = GroupMembershipCreateSchema(**create_data)
+    print(create_instance.model_dump_json(indent=2))
 
-    # GroupMembershipResponse Example
-    user_info_data = {"id": 101, "name": "Alice Wonderland"}
-    group_info_data = {"id": 1, "name": "Project Alpha Team"}
-    role_info_data = {"id": 2, "code": "ADMIN", "name": "Administrator"}
+    print("\nGroupMembershipUpdateSchema (приклад для оновлення):")
+    update_data = {"role": GroupRole.ADMIN.value}
+    update_instance = GroupMembershipUpdateSchema(**update_data)
+    print(update_instance.model_dump_json(indent=2))
 
-    response_data = {
-        "id": 50, # ID of the GroupMembership record itself
-        "createdAt": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "user": user_info_data,
-        "group": group_info_data,
-        "role": role_info_data,
-        "joinDate": (datetime.now(timezone.utc) - timedelta(days=10)).isoformat(), # camelCase for join_date
-        "isActive": True,
-        "notes": "Key contributor"
+    print("\nGroupMembershipSchema (приклад відповіді API):")
+    membership_response_data = {
+        "user_id": 1,
+        "group_id": 10,
+        "role": GroupRole.ADMIN.value,
+        "created_at": datetime.now(),
+        "updated_at": datetime.now(),
+        "user": {"id": 1, "name": "Адміністратор Групи"}  # TODO i18n (UserPublicProfileSchema)
     }
-    try:
-        response_schema = GroupMembershipResponse(**response_data) # type: ignore[call-arg]
-        logger.info(f"GroupMembershipResponse: {response_schema.model_dump_json(by_alias=True, indent=2)}")
-        if response_schema.user:
-            logger.info(f"  Member Name (from nested schema): {response_schema.user.name}")
-        if response_schema.role:
-            logger.info(f"  Member Role Name (from nested schema): {response_schema.role.name}")
-    except Exception as e:
-        logger.error(f"Error creating GroupMembershipResponse: {e}")
+    membership_response_instance = GroupMembershipSchema(**membership_response_data)
+    print(membership_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних членства в групах.")
+    print(f"Використовується GroupRole Enum для поля 'role', наприклад: GroupRole.MEMBER = '{GroupRole.MEMBER.value}'")

@@ -1,104 +1,69 @@
 # backend/app/src/models/dictionaries/bonus_types.py
-
 """
-Модель SQLAlchemy для таблиці-довідника 'BonusType'.
-Ця таблиця зберігає різні типи або категорії бонусів чи штрафів
-(наприклад, БонусЗаВиконанняЗавдання, БонусЗаЗавчаснеВиконання, ШтрафЗаПізнєПодання).
+Модель SQLAlchemy для довідника "Типи бонусів".
+
+Цей модуль визначає модель `BonusType`, яка представляє записи в довіднику
+типів бонусів (наприклад, "Нагорода", "Штраф"
+відповідно до `core.dicts.BonusType` або технічного завдання).
+Ці типи визначають характер бонусної транзакції.
 """
 
-import logging
-from typing import Optional # Якщо додаються специфічні опціональні поля
-from datetime import datetime, timezone # Для прикладу в __main__
-
-from sqlalchemy.orm import Mapped, mapped_column # Якщо додаються специфічні поля
-from sqlalchemy import Boolean, Integer # Якщо додаються специфічні поля
-
+# Абсолютний імпорт базової моделі для довідників
 from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
 
-# Налаштувати логер для цього модуля
-logger = logging.getLogger(__name__)
+
+# Можливо, знадобляться додаткові імпорти, якщо будуть специфічні поля.
+# from sqlalchemy.orm import Mapped, mapped_column
+# from sqlalchemy import Float
 
 class BonusType(BaseDictionaryModel):
     """
-    Представляє тип бонусу або штрафу в таблиці-довіднику.
-    Приклади: Завершення завдання, Бонус за серію, Штраф за запізнення, Реферальний бонус.
-    Успадковує загальні поля від BaseDictionaryModel.
+    Модель SQLAlchemy для довідника "Типи бонусів".
 
-    Поле 'code' буде важливим (наприклад, 'TASK_COMPLETION', 'STREAK_7_DAYS', 'LATE_PENALTY').
+    Успадковує всі поля від `BaseDictionaryModel` (включаючи `id`, `name`, `description`, `code`,
+    часові мітки, м'яке видалення, стан, нотатки та опціональний `group_id`).
+    `group_id` для системних типів бонусів, ймовірно, буде NULL.
+
+    Атрибути:
+        __tablename__ (str): Назва таблиці в базі даних (`dict_bonus_types`).
     """
     __tablename__ = "dict_bonus_types"
 
-    # Додайте будь-які поля, специфічні для 'BonusType', яких немає в BaseDictionaryModel.
-    # Наприклад, чи є цей тип зазвичай бонусом (позитивні бали) чи штрафом (негативні бали).
-    # is_penalty_type: Mapped[bool] = mapped_column(
-    #     Boolean,
-    #     default=False,
-    #     nullable=False,
-    #     comment="True, якщо цей тип зазвичай призводить до негативних балів (штраф)."
-    # )
-    # default_point_impact: Mapped[Optional[int]] = mapped_column(
-    #     Integer,
-    #     nullable=True,
-    #     comment="Кількість балів за замовчуванням, що нараховуються або знімаються для цього типу бонусу. Може бути перевизначено конкретним BonusRule."
-    # )
+    # Якщо для типів бонусів потрібні специфічні додаткові поля,
+    # наприклад, множник за замовчуванням для цього типу бонусу,
+    # їх можна визначити тут.
+    # Наприклад:
+    # default_multiplier: Mapped[Optional[float]] = mapped_column(Float, nullable=True, comment="Множник за замовчуванням (наприклад, -1 для штрафів)")
 
-    def __repr__(self) -> str:
-        return super().__repr__() # BaseDictionaryModel надає хороший стандартний __repr__
+    # _repr_fields успадковуються та збираються автоматично.
+    # Додавання специфічних полів до __repr__:
+    # _repr_fields = ["default_multiplier"]
+
 
 if __name__ == "__main__":
-    # Цей блок призначений для демонстрації структури моделі BonusType.
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для моделі BonusType.
+    print("--- Модель Довідника: BonusType ---")
+    print(f"Назва таблиці: {BonusType.__tablename__}")
 
-    logger.info("--- Модель довідника BonusType --- Демонстрація")
+    print("\nОчікувані поля (успадковані та власні):")
+    expected_fields = ['id', 'name', 'description', 'code', 'created_at', 'updated_at', 'deleted_at', 'state',
+                       'group_id', 'notes']
+    # Якщо додано кастомні поля:
+    # expected_fields.append('default_multiplier')
+    for field in expected_fields:
+        print(f"  - {field}")
 
-    # Приклади екземплярів BonusType
-    task_completion_bonus = BonusType(
-        code="TASK_COMPLETION",
-        name="Бонус за виконання завдання",
-        description="Стандартний бонус, що нараховується за успішне виконання завдання.",
-        state="active",
-        display_order=1
-        # is_penalty_type=False, # Якби поле було додано
-        # default_point_impact=20 # Якби поле було додано
+    # Приклад створення екземпляра (без взаємодії з БД)
+    example_bonus_type = BonusType(
+        id=1,
+        name="Нагорода за завдання",
+        description="Стандартний тип бонусу за виконання завдання.",
+        code="REWARD",  # Може відповідати значенням з core.dicts.BonusType
+        state="active"
     )
-    task_completion_bonus.id = 1 # Імітація ID, встановленого ORM
-    task_completion_bonus.created_at = datetime.now(timezone.utc) # Імітація часової мітки
-    task_completion_bonus.updated_at = datetime.now(timezone.utc) # Імітація часової мітки
-    logger.info(f"Приклад BonusType: {task_completion_bonus!r}, Опис: {task_completion_bonus.description}")
-    # if hasattr(task_completion_bonus, 'is_penalty_type'):
-    #     logger.info(f"  Чи є типом штрафу: {task_completion_bonus.is_penalty_type}")
 
-    late_penalty = BonusType(
-        code="LATE_SUBMISSION_PENALTY",
-        name="Штраф за пізнє подання",
-        description="Штраф, що застосовується за подання завдання після встановленого терміну.",
-        state="active",
-        display_order=10
-        # is_penalty_type=True, # Якби поле було додано
-        # default_point_impact=-5 # Якби поле було додано
-    )
-    late_penalty.id = 2
-    late_penalty.created_at = datetime.now(timezone.utc)
-    late_penalty.updated_at = datetime.now(timezone.utc)
-    logger.info(f"Приклад BonusType: {late_penalty!r}, Назва: {late_penalty.name}")
+    print(f"\nПриклад екземпляра BonusType (без сесії):\n  {example_bonus_type}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <BonusType(id=1, name='Нагорода за завдання', code='REWARD', state='active')>
 
-    streak_bonus = BonusType(
-        code="STREAK_BONUS_7_DAY",
-        name="Бонус за 7-денну серію",
-        description="Бонус за послідовне виконання завдань протягом 7 днів.",
-        state="active",
-        display_order=3
-    )
-    streak_bonus.id = 3
-    streak_bonus.created_at = datetime.now(timezone.utc)
-    streak_bonus.updated_at = datetime.now(timezone.utc)
-    logger.info(f"Приклад BonusType: {streak_bonus!r}, За замовчуванням: {streak_bonus.is_default}") # is_default за замовчуванням False
-
-    # Показати успадковані та специфічні атрибути (якщо такі були додані)
-    # from sqlalchemy import create_engine
-    # from backend.app.src.config.database import Base # Переконайтеся, що Base правильно імпортовано
-    # engine = create_engine("sqlite:///:memory:")
-    # Base.metadata.create_all(engine) # Це створить усі таблиці, визначені за допомогою цього Base
-    # logger.info(f"Стовпці в BonusType ({BonusType.__tablename__}): {[c.name for c in BonusType.__table__.columns]}")
-    logger.info("Щоб побачити фактичні стовпці таблиці, метадані SQLAlchemy потрібно ініціалізувати за допомогою engine (наприклад, Base.metadata.create_all(engine)).")
+    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

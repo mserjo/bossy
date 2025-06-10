@@ -1,167 +1,162 @@
 # backend/app/src/schemas/groups/invitation.py
-
 """
-Pydantic schemas for Group Invitations.
-"""
+Pydantic схеми для сутності "Запрошення до Групи" (GroupInvitation).
 
-import logging
+Цей модуль визначає схеми для:
+- Базового представлення запрошення (`GroupInvitationBaseSchema`).
+- Створення нового запрошення (`GroupInvitationCreateSchema`).
+- Оновлення статусу запрошення (`GroupInvitationUpdateSchema`).
+- Представлення даних про запрошення у відповідях API (`GroupInvitationSchema`).
+- Прийняття запрошення за кодом (`GroupInvitationAcceptSchema`).
+"""
+from datetime import datetime
 from typing import Optional
-from datetime import datetime, timezone, timedelta # Added timezone, timedelta for __main__
 
-from pydantic import Field, EmailStr, field_validator, model_validator # Added model_validator
+from pydantic import Field, EmailStr, field_validator
 
-from backend.app.src.schemas.base import BaseSchema, BaseResponseSchema
-from backend.app.src.models.groups.invitation import InvitationStatusEnum # Import Enum from model
-# For nested inviter/group info in responses
-# from backend.app.src.schemas.auth.user import UserPublicProfileResponse # Or a more minimal UserBasicInfo
-# from backend.app.src.schemas.groups.group import GroupResponse # Or GroupBasicInfo
+# Абсолютний імпорт базових схем та Enum
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.core.dicts import GroupRole  # Enum для ролей в групі
 
-# Using locally defined Basic Info schemas for now, similar to membership.py
-class UserBasicInfo(BaseSchema): # Inherit BaseSchema for consistent config (e.g. camelCase)
-    id: int = Field(..., example=10)
-    name: Optional[str] = Field(None, example="Alice")
 
-class GroupBasicInfo(BaseSchema): # Inherit BaseSchema
-    id: int = Field(..., example=1)
-    name: str = Field(..., example="Book Club Readers")
+# TODO: Імпортувати InvitationStatus Enum з core.dicts, коли він буде визначений.
+# from backend.app.src.core.dicts import InvitationStatus
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
-
-# --- GroupInvitation Schemas ---
-
-class GroupInvitationBase(BaseSchema):
+class GroupInvitationBaseSchema(BaseSchema):
     """
-    Base schema for group invitation data.
-    `group_id` is typically a path parameter for API endpoints managing invitations of a specific group.
-    `invited_by_user_id` is usually set by the system based on the current authenticated user.
+    Базова схема для полів запрошення до групи.
     """
-    email_invited: Optional[EmailStr] = Field(None, description="Email address of the invitee (if not an existing user or for direct email invite).", example="new.member@example.com")
-    phone_invited: Optional[str] = Field(None, max_length=30, description="Phone number of the invitee (if not an existing user).", example="+15551230000")
-    target_user_id: Optional[int] = Field(None, description="ID of an existing system user to invite directly.", example=102)
-    # expires_at: Optional[datetime] = Field(None, description="Optional custom expiry for the invitation. Defaults to system setting (e.g., 7 days).") # Default is handled by model
-    # status is usually managed by the system, not set directly on create by user.
+    email: Optional[EmailStr] = Field(None,
+                                      description="Електронна пошта запрошеного користувача (якщо запрошення по email).")
+    # TODO: Додати валідацію номера телефону, коли буде доступний валідатор.
+    phone_number: Optional[str] = Field(None, max_length=30,
+                                        description="Номер телефону запрошеного (якщо запрошення по SMS).")
+    role_to_assign: str = Field(
+        default=GroupRole.MEMBER.value,
+        description=f"Роль, яка буде призначена користувачеві при прийнятті запрошення. Допустимі значення: {', '.join([r.value for r in GroupRole])}."
+    )
 
-    # Using model_validator for Pydantic v2 to check cross-field dependencies
-    @model_validator(mode='before')
+    @field_validator('role_to_assign')
     @classmethod
-    def check_invitee_details_provided(cls, data: Any) -> Any:
-        if isinstance(data, dict): # Ensure data is a dict before using .get()
-            # Check if at least one of the invitee identification fields is present
-            if not (data.get('email_invited') or data.get('phone_invited') or data.get('target_user_id') or \
-                    data.get('emailInvited') or data.get('phoneInvited') or data.get('targetUserId')): # Check aliases too
-                raise ValueError("At least one of email_invited, phone_invited, or target_user_id must be provided.")
-        # Could add checks for mutual exclusivity if desired (e.g., target_user_id XOR (email or phone))
-        # but often this logic is better in the service layer.
-        return data
+    def validate_role_to_assign(cls, value: str) -> str:
+        """Перевіряє, чи надане значення ролі є допустимим членом Enum GroupRole."""
+        allowed_roles = {r.value for r in GroupRole}
+        if value not in allowed_roles:
+            # TODO i18n: Translatable error message
+            raise ValueError(f"Недопустима роль для призначення '{value}'. Дозволені ролі: {', '.join(allowed_roles)}")
+        return value
 
-class GroupInvitationCreate(GroupInvitationBase):
+    # model_config успадковується з BaseSchema (from_attributes=True)
+
+
+class GroupInvitationCreateSchema(GroupInvitationBaseSchema):
     """
-    Schema for creating a new group invitation.
-    Requires at least one invitee identifier (email, phone, or target_user_id), checked by GroupInvitationBase validator.
-    `group_id` and `invited_by_user_id` are assumed from context/path/authenticated user.
+    Схема для створення нового запрошення до групи.
+    `group_id` зазвичай передається як параметр шляху.
+    `expires_at` може бути встановлено сервісом за замовчуванням (наприклад, +7 днів).
     """
+    # email або phone_number мають бути надані, або це має бути "загальне" запрошення з кодом.
+    # Ця логіка валідації (хоча б одне з полів) може бути додана за допомогою root_validator.
+    # Наразі поля опціональні, але це може бути посилено.
+    expires_at: Optional[datetime] = Field(None,
+                                           description="Час закінчення терміну дії запрошення (необов'язково, може встановлюватися сервером).")
+
+    # @root_validator(pre=True) # Pydantic v1 style, for v2 use model_validator
+    # @model_validator(mode='before') # Pydantic v2 style
+    # def check_email_or_phone_present(cls, values):
+    #     if not values.get('email') and not values.get('phone_number'):
+    #         # TODO i18n: Translatable error message
+    #         raise ValueError('Має бути надано email або номер телефону для запрошення.')
+    #     return values
     pass
 
-class GroupInvitationUpdate(BaseSchema):
-    """
-    Schema for updating an existing group invitation (e.g., revoking it).
-    Typically, only status might be updatable by an admin or the inviter.
-    """
-    status: InvitationStatusEnum = Field(..., description="New status for the invitation (e.g., 'revoked').")
-    # Example: Allow extending expiry, but this is less common for updates.
-    # expires_at: Optional[datetime] = Field(None, description="New expiry date/time for the invitation.")
 
-class GroupInvitationResponse(BaseResponseSchema):
+class GroupInvitationUpdateSchema(BaseSchema):
     """
-    Schema for representing a group invitation in API responses.
-    Includes 'id', 'created_at', 'updated_at' from BaseResponseSchema.
+    Схема для оновлення статусу запрошення (наприклад, скасування).
     """
-    group: GroupBasicInfo = Field(..., description="Basic information about the group for which the invitation was made.")
-    invited_by: Optional[UserBasicInfo] = Field(None, description="Basic information about the user who sent the invitation.")
+    # TODO: Замінити str на InvitationStatus Enum, коли він буде визначений.
+    status: str = Field(description="Новий статус запрошення (наприклад, 'cancelled', 'expired').")
+    # TODO: Додати валідатор для поля status на основі Enum InvitationStatus.
 
-    email_invited: Optional[EmailStr] = Field(None)
-    phone_invited: Optional[str] = Field(None)
-    target_user: Optional[UserBasicInfo] = Field(None, description="Basic information about the targeted existing user (if any).")
 
-    invitation_code: str = Field(..., description="Unique code for this invitation.")
-    status: InvitationStatusEnum = Field(..., description="Current status of the invitation.")
-    expires_at: datetime = Field(..., description="Timestamp when the invitation expires (UTC).")
-    accepted_at: Optional[datetime] = Field(None, description="Timestamp when the invitation was accepted (UTC).")
-    revoked_at: Optional[datetime] = Field(None, description="Timestamp when the invitation was revoked (UTC).")
+class GroupInvitationSchema(GroupInvitationBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+    """
+    Схема для представлення даних про запрошення у відповідях API.
+    """
+    # id, created_at, updated_at успадковані з міксинів.
+    # email, phone_number, role_to_assign успадковані з GroupInvitationBaseSchema.
 
-class GroupInvitationAccept(BaseSchema):
+    group_id: int = Field(description="Ідентифікатор групи, до якої створено запрошення.")
+    invitation_code: str = Field(description="Унікальний код запрошення.")
+    expires_at: datetime = Field(description="Час закінчення терміну дії запрошення.")
+    # TODO: Замінити str на InvitationStatus Enum, коли він буде визначений.
+    status: str = Field(description="Поточний статус запрошення.")
+    created_by_user_id: Optional[int] = Field(None, description="Ідентифікатор користувача, який створив запрошення.")
+    # Можна додати інформацію про користувача, що створив, якщо потрібно:
+    # created_by: Optional[UserPublicProfileSchema] = None
+
+
+class GroupInvitationAcceptSchema(BaseSchema):
     """
-    Schema for accepting a group invitation.
-    The `invitation_code` is typically part of the URL path for an accept endpoint.
-    This schema is for any additional payload if needed, or can be empty if not.
+    Схема для прийняття запрошення до групи за допомогою коду.
     """
-    # user_id: Optional[int] = Field(None, description="ID of the user accepting, if not implicit from auth. Usually implicit.")
-    # No specific fields needed if only code in path is used.
-    # Could include a custom message or similar if the feature existed.
-    pass
+    invitation_code: str = Field(description="Унікальний код запрошення для приєднання до групи.")
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем запрошень до груп.
+    print("--- Pydantic Схеми для Запрошень до Груп (GroupInvitation) ---")
 
-    logger.info("--- GroupInvitation Schemas --- Demonstration")
-
-    # GroupInvitationCreate Example
-    inv_create_email_data = {"emailInvited": "invitee@example.com"}
+    print("\nGroupInvitationBaseSchema (приклад):")
+    base_invite_data = {"email": "invitee@example.com", "role_to_assign": GroupRole.MEMBER.value}
+    base_invite_instance = GroupInvitationBaseSchema(**base_invite_data)
+    print(base_invite_instance.model_dump_json(indent=2))
     try:
-        create_email_schema = GroupInvitationCreate(**inv_create_email_data) # type: ignore[call-arg]
-        logger.info(f"GroupInvitationCreate (email) valid: {create_email_schema.model_dump(by_alias=True)}")
+        GroupInvitationBaseSchema(email="test@test.com", role_to_assign="invalid_role")
     except Exception as e:
-        logger.error(f"Error creating GroupInvitationCreate (email): {e}")
+        print(f"Помилка валідації GroupInvitationBaseSchema (очікувано): {e}")
 
-    inv_create_user_data = {"targetUserId": 201}
-    try:
-        create_user_schema = GroupInvitationCreate(**inv_create_user_data) # type: ignore[call-arg]
-        logger.info(f"GroupInvitationCreate (user_id) valid: {create_user_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating GroupInvitationCreate (user_id): {e}")
-
-    inv_create_fail_data = {"notes": "This should fail"} # No invitee identifier
-    try:
-        GroupInvitationCreate(**inv_create_fail_data) # type: ignore[call-arg]
-    except ValueError as e:
-        logger.info(f"GroupInvitationCreate caught expected validation error: {e}")
-
-
-    # GroupInvitationUpdate Example
-    inv_update_data = {"status": InvitationStatusEnum.REVOKED}
-    update_schema = GroupInvitationUpdate(**inv_update_data)
-    logger.info(f"GroupInvitationUpdate (partial): {update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # GroupInvitationResponse Example
-    group_info_data = {"id": 1, "name": "Book Club Readers"}
-    inviter_info_data = {"id": 10, "name": "Alice"}
-    target_user_info_data = {"id": 25, "name": "Bob (Invited User)"}
-    response_data = {
-        "id": 123,
-        "createdAt": (datetime.now(timezone.utc) - timedelta(days=2)).isoformat(),
-        "updatedAt": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
-        "group": group_info_data,
-        "invitedBy": inviter_info_data, # camelCase for invited_by
-        "targetUser": target_user_info_data, # camelCase for target_user
-        "invitationCode": "ABC123XYZ",
-        "status": InvitationStatusEnum.PENDING,
-        "expiresAt": (datetime.now(timezone.utc) + timedelta(days=5)).isoformat(),
-        "acceptedAt": None,
-        "revokedAt": None,
+    print("\nGroupInvitationCreateSchema (приклад для створення):")
+    create_invite_data = {
+        "email": "new_invite@example.com",
+        "role_to_assign": GroupRole.ADMIN.value,
+        "expires_at": datetime.now() + timedelta(days=3)
     }
-    try:
-        response_schema = GroupInvitationResponse(**response_data) # type: ignore[call-arg]
-        logger.info(f"GroupInvitationResponse: {response_schema.model_dump_json(by_alias=True, indent=2)}")
-        if response_schema.group:
-             logger.info(f"  Invited to Group: {response_schema.group.name}")
-        if response_schema.invited_by:
-             logger.info(f"  Invited By: {response_schema.invited_by.name}") # Access with Python name
-    except Exception as e:
-        logger.error(f"Error creating GroupInvitationResponse: {e}")
+    create_invite_instance = GroupInvitationCreateSchema(**create_invite_data)
+    print(create_invite_instance.model_dump_json(indent=2))
 
-    # GroupInvitationAccept Example (empty schema for now)
-    accept_schema = GroupInvitationAccept()
-    logger.info(f"GroupInvitationAccept (empty): {accept_schema.model_dump()}")
+    print("\nGroupInvitationUpdateSchema (приклад для оновлення статусу):")
+    update_invite_data = {"status": "cancelled"}  # TODO: Замінити на InvitationStatus.CANCELLED.value
+    update_invite_instance = GroupInvitationUpdateSchema(**update_invite_data)
+    print(update_invite_instance.model_dump_json(indent=2))
+
+    print("\nGroupInvitationSchema (приклад відповіді API):")
+    invitation_response_data = {
+        "id": 1,
+        "group_id": 10,
+        "email": "invited.user@example.com",
+        "invitation_code": "XYZ123ABC",
+        "role_to_assign": GroupRole.MEMBER.value,
+        "expires_at": datetime.now() + timedelta(days=1),
+        "status": "pending",  # TODO: Замінити на InvitationStatus.PENDING.value
+        "created_by_user_id": 101,
+        "created_at": datetime.now() - timedelta(hours=1),
+        "updated_at": datetime.now() - timedelta(minutes=30)
+    }
+    invitation_response_instance = GroupInvitationSchema(**invitation_response_data)
+    print(invitation_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nGroupInvitationAcceptSchema (приклад для прийняття запрошення):")
+    accept_data = {"invitation_code": "VALIDCODE789"}
+    accept_instance = GroupInvitationAcceptSchema(**accept_data)
+    print(accept_instance.model_dump_json(indent=2))
+
+    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних запрошень до груп.")
+    print("TODO: Інтегрувати Enum 'InvitationStatus' та валідацію 'phone_number'.")
+    print(
+        "TODO: Розглянути `model_validator` в `GroupInvitationCreateSchema` для перевірки наявності email або phone_number.")
+
+# Потрібно для timedelta в __main__
+from datetime import timedelta
+# from pydantic import model_validator # Для Pydantic v2, якщо використовується root_validator

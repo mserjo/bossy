@@ -1,107 +1,109 @@
 # backend/app/src/models/bonuses/reward.py
-
 """
-SQLAlchemy model for Rewards that users can redeem with their points/currency.
+Модель SQLAlchemy для сутності "Нагорода" (Reward).
+
+Цей модуль визначає модель `Reward`, яка представляє нагороди,
+які користувачі можуть "купувати" або отримувати за накопичені бонуси
+в межах групи.
 """
+from datetime import datetime, timezone  # timezone для __main__
+from typing import TYPE_CHECKING, Optional
+from decimal import Decimal
 
-import logging
-from typing import Optional, TYPE_CHECKING # For Mapped type hints
-from datetime import datetime, timezone # Added timezone for __main__
-
-from sqlalchemy import String, Text, Boolean, ForeignKey, Integer # Added Integer for FKs
+from sqlalchemy import String, ForeignKey, Text, Numeric, Integer  # Integer для quantity_available
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.src.models.base import BaseGroupAffiliatedMainModel # Rewards are often group-specific main entities
-
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт базової моделі
+from backend.app.src.models.base import BaseMainModel  # Нагороди мають назву, опис, стан, group_id тощо.
 
 if TYPE_CHECKING:
-    # from backend.app.src.models.groups.group import Group # Handled by BaseGroupAffiliatedMainModel
-    # from backend.app.src.models.files.file import FileRecord # If icon_url is a FK to a FileRecord
-    pass
+    from backend.app.src.models.groups.group import Group
+    # Потенційно, зв'язок з AccountTransaction, якщо потрібно відстежувати, які транзакції пов'язані з отриманням нагород
+    # from backend.app.src.models.bonuses.transaction import AccountTransaction
 
-class Reward(BaseGroupAffiliatedMainModel): # Inherits id, name, description, state, notes, group_id, created_at, updated_at, deleted_at
+
+class Reward(BaseMainModel):
     """
-    Represents a reward that users can redeem using their accumulated points/currency.
-    Examples: 'Coffee Coupon', 'Day Off Pass', 'Gift Card'.
+    Модель Нагороди.
+
+    Успадковує `BaseMainModel` (id, name, description, state, group_id, notes, timestamps, soft_delete).
+    Поле `name` - назва нагороди.
+    Поле `description` - детальний опис нагороди.
+    Поле `state` - чи активна нагорода для отримання (наприклад, "active", "archived").
+    Поле `group_id` - група, в якій доступна ця нагорода.
+
+    Атрибути:
+        cost (Mapped[Decimal]): "Вартість" нагороди в одиницях бонусів групи.
+        quantity_available (Mapped[Optional[int]]): Кількість доступних екземплярів цієї нагороди.
+                                                    NULL означає необмежену кількість.
+        icon_url (Mapped[Optional[str]]): URL або шлях до іконки нагороди.
+
+        group (Mapped["Group"]): Зв'язок з групою, до якої належить нагорода.
     """
     __tablename__ = "rewards"
 
-    # 'name', 'description', 'state', 'notes', 'group_id' are inherited.
-    # 'state' can be 'available', 'unavailable', 'archived'.
+    # --- Специфічні поля для Нагороди ---
+    cost: Mapped[Decimal] = mapped_column(
+        Numeric(10, 2), nullable=False, comment="Вартість нагороди в одиницях бонусів"
+    )
+    quantity_available: Mapped[Optional[int]] = mapped_column(
+        Integer, nullable=True, comment="Доступна кількість (NULL для необмеженої)"
+    )  # Якщо <= 0 і не NULL, то недоступна
+    icon_url: Mapped[Optional[str]] = mapped_column(
+        String(512), nullable=True, comment="URL або шлях до іконки нагороди"
+    )
 
-    cost_in_points: Mapped[int] = mapped_column(Integer, nullable=False, comment="Number of points/currency required to redeem this reward")
-    icon_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, comment="URL or path to an icon representing the reward")
-    # Alternatively, icon_file_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("file_records.id"), nullable=True)
+    # Поле 'state' (успадковане) використовується для активності нагороди.
 
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True, comment="Is this reward currently available for redemption?")
-    stock_quantity: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="Available stock for this reward. Null if unlimited.")
-    # redemption_limit_per_user: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="Max times a single user can redeem this reward. Null if unlimited.")
-    # valid_from: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, comment="Date from which this reward is available")
-    # valid_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, comment="Date until which this reward is available")
+    # --- Зв'язки (Relationships) ---
+    # group_id успадковано з BaseMainModel (через GroupAffiliationMixin)
+    group: Mapped["Group"] = relationship(
+        foreign_keys=[BaseMainModel.group_id],  # Явно вказуємо foreign_keys
+        back_populates="rewards",
+        lazy="selectin"
+    )
 
-    # --- Relationships ---
-    # Group relationship is inherited via BaseGroupAffiliatedMainModel if that base defines the relationship object.
-    # If not, and group_id is just an FK from a mixin, define it here:
-    # from backend.app.src.models.groups.group import Group # Ensure Group is imported
-    # group: Mapped["Group"] = relationship(foreign_keys="Reward.group_id") # Assuming group_id is on Reward (it is via BaseGroupAffiliatedMainModel)
+    # Можливий зв'язок з транзакціями, якщо потрібно відстежувати покупки нагород
+    # transactions: Mapped[List["AccountTransaction"]] = relationship(back_populates="reward", lazy="selectin")
 
+    # _repr_fields успадковуються та збираються з BaseMainModel та його міксинів.
+    # Додаємо специфічні для Reward поля.
+    _repr_fields = ["cost", "quantity_available"]
 
-    # If icon is a FileRecord:
-    # icon_file: Mapped[Optional["FileRecord"]] = relationship(foreign_keys=[icon_file_id])
-
-    # Transactions related to redemption of this reward could be found by querying AccountTransaction.related_entity_id == Reward.id
-    # and AccountTransaction.related_entity_type == 'reward'. No direct ORM relationship needed here typically.
-
-    def __repr__(self) -> str:
-        id_val = getattr(self, 'id', 'N/A')
-        group_id_val = getattr(self, 'group_id', 'N/A')
-        return f"<Reward(id={id_val}, name='{self.name}', group_id={group_id_val}, cost={self.cost_in_points})>"
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для моделі Reward.
+    print("--- Модель Нагороди (Reward) ---")
+    print(f"Назва таблиці: {Reward.__tablename__}")
 
-    logger.info("--- Reward Model --- Demonstration")
+    print("\nОчікувані поля (успадковані та власні):")
+    expected_fields = [
+        'id', 'name', 'description', 'state', 'group_id', 'notes',
+        'created_at', 'updated_at', 'deleted_at',
+        'cost', 'quantity_available', 'icon_url'
+    ]
+    for field in expected_fields:
+        print(f"  - {field}")
 
-    # Example Reward instance
-    # Assume Group id=1 exists
-    coffee_coupon = Reward(
-        name="Free Coffee Coupon",
-        description="Redeem for one free coffee at the office cafeteria.",
-        group_id=1,
-        cost_in_points=100,
-        icon_url="/static/icons/rewards/coffee_coupon.png",
-        is_active=True,
-        stock_quantity=50, # Limited stock
-        state="available" # from BaseGroupAffiliatedMainModel
+    print("\nОчікувані зв'язки (relationships):")
+    expected_relationships = ['group']  # , 'transactions' (якщо додано)
+    for rel in expected_relationships:
+        print(f"  - {rel}")
+
+    # Приклад створення екземпляра (без взаємодії з БД)
+    example_reward = Reward(
+        id=1,
+        name="Чашка з логотипом",  # TODO i18n
+        description="Фірмова чашка Kudos як чудова нагорода за активність.",  # TODO i18n
+        group_id=202,
+        cost=Decimal("150.00"),
+        quantity_available=50,
+        state="active"  # Успадковане поле
     )
-    coffee_coupon.id = 1 # Simulate ORM-set ID
-    coffee_coupon.created_at = datetime.now(timezone.utc) # Simulate timestamp
-    coffee_coupon.updated_at = datetime.now(timezone.utc) # Simulate timestamp
+    example_reward.created_at = datetime.now(tz=timezone.utc)
 
-    logger.info(f"Example Reward: {coffee_coupon!r}")
-    logger.info(f"  Name: {coffee_coupon.name}")
-    logger.info(f"  Cost: {coffee_coupon.cost_in_points} points")
-    logger.info(f"  Stock: {coffee_coupon.stock_quantity}")
-    logger.info(f"  Is Active: {coffee_coupon.is_active}")
-    logger.info(f"  State: {coffee_coupon.state}")
-    logger.info(f"  Created At: {coffee_coupon.created_at.isoformat() if coffee_coupon.created_at else 'N/A'}")
+    print(f"\nПриклад екземпляра Reward (без сесії):\n  {example_reward}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <Reward(id=1, name='Чашка з логотипом', state='active', cost=Decimal('150.00'), quantity_available=50, created_at=...)>
 
-
-    day_off_pass = Reward(
-        name="Half-Day Off Pass",
-        group_id=1,
-        cost_in_points=1000,
-        is_active=True,
-        stock_quantity=None, # Unlimited stock
-        state="available"
-    )
-    day_off_pass.id = 2
-    logger.info(f"Example Reward (unlimited stock): {day_off_pass!r}")
-    logger.info(f"  Stock: {day_off_pass.stock_quantity if day_off_pass.stock_quantity is not None else 'Unlimited'}")
-
-    # The following line would error if run directly without SQLAlchemy engine and metadata setup for all related tables.
-    # logger.info(f"Reward attributes (conceptual table columns): {[c.name for c in Reward.__table__.columns if not c.name.startswith('_')]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

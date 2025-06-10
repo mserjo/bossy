@@ -1,131 +1,126 @@
 # backend/app/src/schemas/system/health.py
-
 """
-Pydantic schemas for Service Health Status.
-"""
+Pydantic схеми для сутностей, пов'язаних зі станом здоров'я системи.
 
-import logging
-from typing import Optional, Dict, Any, List # Added List for OverallSystemHealthResponse
-from datetime import datetime, timezone # Added timezone for default_factory and examples
+Цей модуль визначає схеми для:
+- `ServiceHealthStatusSchema`: Представлення стану здоров'я окремого сервісу.
+- `OverallHealthStatusSchema`: Представлення загального стану здоров'я системи,
+                                включаючи стан залежних сервісів.
+"""
+from datetime import datetime
+from typing import Optional, List, Any  # Any може не знадобитися, якщо всі типи конкретні
 
 from pydantic import Field
 
-from backend.app.src.schemas.base import BaseSchema, BaseResponseSchema
-from backend.app.src.models.system.health import HealthStatusEnum # Import Enum from model
+# Абсолютний імпорт базових схем та міксинів
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
 
-# --- ServiceHealthStatus Schemas ---
+# TODO: Визначити та імпортувати Enum HealthStatusType з core.dicts
+# from backend.app.src.core.dicts import HealthStatusType
 
-class ServiceHealthStatusBase(BaseSchema):
-    """Base schema for service health status entries."""
-    service_name: str = Field(..., max_length=255, description="Unique name identifying the service or component.", example="Database Main Cluster")
-    status: HealthStatusEnum = Field(..., description="Current health status of the service.", example=HealthStatusEnum.OK)
-    details: Optional[str] = Field(None, description="Human-readable message providing more details about the status.", example="All systems operational.")
-    last_checked_at: datetime = Field(..., description="Timestamp of when this health status was last checked/updated (UTC).", example=datetime.now(timezone.utc))
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional structured information about the check (JSON).", example={"response_time_ms": 55, "active_connections": 120})
+# Заглушка для HealthStatusType Enum
+class TempHealthStatusType:  # TODO: Видалити після імпорту Enum
+    HEALTHY = "healthy"
+    UNHEALTHY = "unhealthy"
+    DEGRADED = "degraded"
+    UNKNOWN = "unknown"
 
-class ServiceHealthStatusCreate(ServiceHealthStatusBase):
+
+SERVICE_NAME_MAX_LENGTH = 100
+HEALTH_STATUS_MAX_LENGTH = 50
+
+
+class ServiceHealthStatusBaseSchema(BaseSchema):
     """
-    Schema for creating a new service health status entry.
-    Typically used by monitoring services or health check endpoints.
+    Базова схема для полів стану здоров'я окремого сервісу.
     """
-    # All fields from ServiceHealthStatusBase are typically required on creation,
-    # though some might have defaults if appropriate (e.g., details, metadata).
-    pass
-
-class ServiceHealthStatusUpdate(BaseSchema):
-    """
-    Schema for updating an existing service health status entry.
-    All fields are optional for partial updates. `service_name` is usually not updatable.
-    """
-    status: Optional[HealthStatusEnum] = Field(None, description="Current health status of the service.")
-    details: Optional[str] = Field(None, description="Human-readable message providing more details about the status.")
-    last_checked_at: Optional[datetime] = Field(None, description="Timestamp of when this health status was last checked/updated (UTC).")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional structured information about the check (JSON).")
-
-class ServiceHealthStatusResponse(BaseResponseSchema, ServiceHealthStatusBase):
-    """
-    Schema for representing a service health status in API responses.
-    Includes 'id', 'created_at', 'updated_at' from BaseResponseSchema.
-    """
-    # `created_at` from BaseResponseSchema indicates when the health record was first logged.
-    # `updated_at` indicates when this record (e.g. its status or details) was last modified.
-    # `last_checked_at` is specific to when the service itself was probed.
-    pass
+    service_name: str = Field(
+        ...,
+        max_length=SERVICE_NAME_MAX_LENGTH,
+        description="Унікальна назва сервісу (наприклад, 'database', 'redis_cache', 'payment_gateway')."
+    )
+    # TODO: Замінити str на HealthStatusType та додати валідатор.
+    status: str = Field(
+        max_length=HEALTH_STATUS_MAX_LENGTH,
+        description=f"Поточний статус сервісу (наприклад, '{TempHealthStatusType.HEALTHY}', '{TempHealthStatusType.UNHEALTHY}')."
+    )
+    details: Optional[str] = Field(
+        None,
+        description="Додаткові деталі про стан сервісу (наприклад, повідомлення про помилку або час відповіді)."
+    )
+    # model_config успадковується з BaseSchema (from_attributes=True)
 
 
-# --- Overall System Health Schema (Example for a /health endpoint) ---
-
-class ComponentHealth(BaseSchema):
-    """Individual component health status for the overall system health response."""
-    service_name: str = Field(..., description="Name of the service/component")
-    status: HealthStatusEnum = Field(..., description="Health status of this component")
-    details: Optional[str] = Field(None, description="Optional details about the component's status")
-
-class OverallSystemHealthResponse(BaseSchema):
+class ServiceHealthStatusSchema(ServiceHealthStatusBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
     """
-    Schema for an API endpoint that reports the overall system health,
-    possibly including the status of critical components.
+    Схема для представлення даних про стан здоров'я окремого сервісу у відповідях API.
+    Поле `updated_at` (з `TimestampedSchemaMixin`) позначає час останньої перевірки стану.
     """
-    overall_status: HealthStatusEnum = Field(..., description="Overall health status of the system (e.g., OK if all critical components are OK)")
-    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Timestamp when the health check was performed (UTC)")
-    components: List[ComponentHealth] = Field(default_factory=list, description="Health status of individual critical components")
-    # Can add more fields like system version, uptime, etc.
+    # id, created_at, updated_at успадковані.
+    # service_name, status, details успадковані.
+
+    # `updated_at` тут інтерпретується як `last_checked_at`
+
+
+class OverallHealthStatusSchema(BaseSchema):
+    """
+    Схема для представлення загального стану здоров'я системи.
+    Включає загальний статус та список станів окремих залежних сервісів.
+    """
+    # TODO: Замінити str на HealthStatusType та додати валідатор.
+    overall_status: str = Field(
+        description=f"Загальний агрегований статус здоров'я системи (наприклад, '{TempHealthStatusType.HEALTHY}')."
+    )
+    timestamp: datetime = Field(description="Час генерації звіту про стан здоров'я.")
+    services: List[ServiceHealthStatusSchema] = Field(
+        default_factory=list,
+        description="Список станів здоров'я окремих залежних сервісів."
+    )
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-    from datetime import timedelta # For example datetimes
+    # Демонстраційний блок для схем стану здоров'я системи.
+    print("--- Pydantic Схеми для Стану Здоров'я Системи ---")
 
-    logger.info("--- ServiceHealthStatus Schemas --- Demonstration")
-
-    # Create
-    health_create_data = {
-        "serviceName": "Payment Gateway API", # camelCase alias for service_name
-        "status": HealthStatusEnum.WARNING,
-        "details": "Experiencing intermittent timeouts, but operational.",
-        "lastCheckedAt": datetime.now(timezone.utc).isoformat(),
-        "metadata": {"avg_timeout_rate_percent": 5, "error_codes": ["P-504"]}
+    print("\nServiceHealthStatusSchema (приклад відповіді API для окремого сервісу):")
+    db_health_data = {
+        "id": 1,
+        "service_name": "PostgreSQL Database",  # TODO i18n
+        "status": TempHealthStatusType.HEALTHY,  # TODO: Замінити на Enum.value
+        "details": "Підключення успішне, середній час запиту 15мс.",  # TODO i18n
+        "created_at": datetime.now() - timedelta(hours=1),
+        "updated_at": datetime.now()  # Час останньої перевірки
     }
-    try:
-        health_create_schema = ServiceHealthStatusCreate(**health_create_data) # type: ignore[call-arg]
-        logger.info(f"ServiceHealthStatusCreate valid: {health_create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating ServiceHealthStatusCreate: {e}")
+    db_health_instance = ServiceHealthStatusSchema(**db_health_data)
+    print(db_health_instance.model_dump_json(indent=2, exclude_none=True))
 
-    # Update
-    health_update_data = {"status": HealthStatusEnum.OK, "details": "Service fully recovered."}
-    health_update_schema = ServiceHealthStatusUpdate(**health_update_data)
-    logger.info(f"ServiceHealthStatusUpdate: {health_update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # Response
-    health_response_data = {
-        "id": 303,
-        "createdAt": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "serviceName": "Redis Cache",
-        "status": "ok", # Can pass string value of enum for Pydantic to coerce
-        "details": "Running smoothly.",
-        "lastCheckedAt": datetime.now(timezone.utc).isoformat(),
-        "metadata": {"connected_clients": 55}
+    redis_health_data = {
+        "id": 2,
+        "service_name": "Redis Cache",  # TODO i18n
+        "status": TempHealthStatusType.UNHEALTHY,  # TODO: Замінити на Enum.value
+        "details": "Не вдалося підключитися до сервера Redis: Connection refused.",  # TODO i18n
+        "created_at": datetime.now() - timedelta(minutes=30),
+        "updated_at": datetime.now() - timedelta(minutes=5)
     }
-    try:
-        health_response_schema = ServiceHealthStatusResponse(**health_response_data) # type: ignore[call-arg]
-        logger.info(f"ServiceHealthStatusResponse: {health_response_schema.model_dump_json(by_alias=True, indent=2)}")
-    except Exception as e:
-        logger.error(f"Error creating ServiceHealthStatusResponse: {e}")
+    redis_health_instance = ServiceHealthStatusSchema(**redis_health_data)
+    print(redis_health_instance.model_dump_json(indent=2, exclude_none=True))
 
-
-    logger.info("\n--- OverallSystemHealthResponse Schema --- Demonstration")
-    overall_health = OverallSystemHealthResponse(
-        overall_status=HealthStatusEnum.OK,
-        components=[
-            ComponentHealth(service_name="Database", status=HealthStatusEnum.OK),
-            ComponentHealth(service_name="BackgroundWorker", status=HealthStatusEnum.OK),
-            ComponentHealth(service_name="ExternalEmailAPI", status=HealthStatusEnum.WARNING, details="Slight delay in email sending")
+    print("\nOverallHealthStatusSchema (приклад загального звіту про стан здоров'я):")
+    overall_status_data = {
+        "overall_status": TempHealthStatusType.DEGRADED,
+        # TODO: Замінити на Enum.value (розраховується на основі станів сервісів)
+        "timestamp": datetime.now(),
+        "services": [
+            db_health_instance.model_dump(),  # Використовуємо .model_dump() для отримання dict
+            redis_health_instance.model_dump()
         ]
-    )
-    logger.info(f"OverallSystemHealthResponse: {overall_health.model_dump_json(by_alias=True, indent=2)}")
+    }
+    overall_status_instance = OverallHealthStatusSchema(**overall_status_data)
+    print(overall_status_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nПримітка: Ці схеми використовуються для представлення стану здоров'я системи та її компонентів.")
+    print("TODO: Інтегрувати Enum 'HealthStatusType' з core.dicts для полів 'status' та 'overall_status'.")
+
+# Потрібно для timedelta в __main__
+from datetime import timedelta

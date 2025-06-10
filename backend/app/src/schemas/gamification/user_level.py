@@ -1,99 +1,97 @@
 # backend/app/src/schemas/gamification/user_level.py
-import logging
-from uuid import UUID
+"""
+Pydantic схеми для сутності "Рівень Користувача" (UserLevel).
+
+Цей модуль визначає схеми для:
+- Базового представлення запису про рівень користувача (`UserLevelBaseSchema`).
+- Створення нового запису про досягнення рівня (зазвичай виконується сервісом) (`UserLevelCreateSchema`).
+- Представлення даних про рівень користувача у відповідях API (`UserLevelSchema`).
+"""
 from datetime import datetime
-from typing import Optional # Added Optional for LevelResponse and UserResponse
+from typing import Optional, Any  # Any для тимчасових полів
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from app.src.schemas.base import BaseDBRead  # Common DB fields
-from app.src.schemas.gamification.level import LevelResponse # To nest level details
-# Assuming user schema for nesting, replace with actual path if different
-# from app.src.schemas.auth.user import UserResponse
+# Абсолютний імпорт базових схем та міксинів
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
+# from backend.app.src.schemas.auth.user import UserPublicProfileSchema
+# from backend.app.src.schemas.gamification.level import LevelSchema
+# from backend.app.src.schemas.groups.group import GroupBriefSchema
 
-# --- UserLevel Schemas ---
+UserPublicProfileSchema = Any  # Тимчасовий заповнювач
+LevelSchema = Any  # Тимчасовий заповнювач
+GroupBriefSchema = Any  # Тимчасовий заповнювач
 
-class UserLevelBase(BaseModel):
+
+class UserLevelBaseSchema(BaseSchema):
     """
-    Base schema for the relationship between a user and a level.
-    This typically represents a user achieving a certain level.
+    Базова схема для полів запису про рівень користувача.
     """
-    user_id: UUID = Field(..., description="The unique identifier of the user.")
-    level_id: UUID = Field(..., description="The unique identifier of the level achieved by the user.")
-    achieved_at: datetime = Field(
-        default_factory=datetime.utcnow,
-        description="Timestamp when the user achieved this level."
-    )
+    user_id: int = Field(description="Ідентифікатор користувача, який досяг рівня.")
+    level_id: int = Field(description="Ідентифікатор досягнутого рівня гейміфікації.")
+    group_id: int = Field(description="Ідентифікатор групи, в межах якої досягнуто рівень.")
+    # `created_at` з TimestampedSchemaMixin буде використовуватися як `achieved_at` у UserLevelSchema.
 
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        anystr_strip_whitespace = True
-        title = "UserLevel"
-        json_schema_extra = {
-            "example": {
-                "user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                "level_id": "b2c3d4e5-f6a7-8901-2345-67890abcdef01",
-                "achieved_at": "2023-03-15T10:00:00Z"
-            }
-        }
+    # model_config успадковується з BaseSchema (from_attributes=True)
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"UserLevelBase instance created with data: {data}")
 
-# No UserLevelCreate or UserLevelUpdate schemas are typically needed if this is purely a link table record created by business logic.
-# If direct creation/update via API is intended, they would be defined similarly to other schemas.
-# For now, we assume it's managed internally.
-
-class UserLevelResponse(UserLevelBase, BaseDBRead):
+class UserLevelCreateSchema(UserLevelBaseSchema):
     """
-    Schema for representing a user's achieved level in API responses.
-    Includes all fields from UserLevelBase and common DB read fields.
-    It can also include nested information about the level and user.
+    Схема для створення нового запису про досягнення рівня користувачем.
+    Зазвичай цей запис створюється автоматично сервісом гейміфікації.
     """
-    # id: UUID # From BaseDBRead
-    # created_at: datetime # From BaseDBRead
-    # updated_at: datetime # From BaseDBRead
-
-    level: Optional[LevelResponse] = Field(None, description="Detailed information about the achieved level.")
-    # user: Optional[UserResponse] = Field(None, description="Detailed information about the user. Be cautious about exposing sensitive user data.")
+    # Успадковує user_id, level_id, group_id.
+    # Час досягнення (created_at) буде встановлено автоматично.
+    pass
 
 
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        title = "UserLevelResponse"
-        json_schema_extra = {
-            "example": {
-                "id": "c3d4e5f6-a7b8-9012-3456-7890abcdef012",
-                "user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                "level_id": "b2c3d4e5-f6a7-8901-2345-67890abcdef01",
-                "achieved_at": "2023-03-15T10:00:00Z",
-                "created_at": "2023-03-15T10:00:05Z",
-                "updated_at": "2023-03-15T10:00:05Z",
-                "level": {
-                    "id": "b2c3d4e5-f6a7-8901-2345-67890abcdef01",
-                    "name": "Novice",
-                    "description": "Achieved by earning the first 100 points.",
-                    "min_points": 100,
-                    "created_at": "2023-01-01T12:00:00Z",
-                    "updated_at": "2023-01-01T12:00:00Z"
-                }
-                # User details example (if UserResponse is defined and included)
-                # "user": {
-                #     "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                #     "username": "john_doe",
-                #     "email": "john.doe@example.com"
-                # }
-            }
-        }
+class UserLevelSchema(UserLevelBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+    """
+    Схема для представлення даних про досягнутий користувачем рівень у відповідях API.
+    Поле `created_at` (з `TimestampedSchemaMixin`) позначає час досягнення рівня.
+    """
+    # id, created_at, updated_at успадковані.
+    # user_id, level_id, group_id успадковані.
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"UserLevelResponse instance created for UserLevel ID '{self.id}'.")
+    # TODO: Замінити Any на відповідні схеми.
+    user: Optional[UserPublicProfileSchema] = Field(None, description="Публічний профіль користувача.")
+    level: Optional[LevelSchema] = Field(None, description="Інформація про досягнутий рівень.")
+    group: Optional[GroupBriefSchema] = Field(None,
+                                              description="Коротка інформація про групу, в якій досягнуто рівень.")
 
-logger.info("UserLevel schemas (UserLevelBase, UserLevelResponse) defined successfully.")
+
+if __name__ == "__main__":
+    # Демонстраційний блок для схем рівнів користувача.
+    print("--- Pydantic Схеми для Рівнів Користувача (UserLevel) ---")
+
+    print("\nUserLevelCreateSchema (приклад для створення сервісом):")
+    create_user_level_data = {
+        "user_id": 101,
+        "level_id": 5,  # ID рівня "Золотий Рівень"
+        "group_id": 1  # ID групи
+    }
+    create_user_level_instance = UserLevelCreateSchema(**create_user_level_data)
+    print(create_user_level_instance.model_dump_json(indent=2))
+
+    print("\nUserLevelSchema (приклад відповіді API):")
+    user_level_response_data = {
+        "id": 1,
+        "user_id": 101,
+        "level_id": 5,
+        "group_id": 1,
+        "created_at": datetime.now() - timedelta(days=1),  # Час досягнення
+        "updated_at": datetime.now() - timedelta(days=1),
+        # "user": {"id": 101, "name": "Гравець Один"}, # Приклад UserPublicProfileSchema
+        # "level": {"id": 5, "name": "Золотий Рівень", "required_points": 10000}, # Приклад LevelSchema
+        # "group": {"id": 1, "name": "Ігрова Група"} # Приклад GroupBriefSchema
+    }
+    user_level_response_instance = UserLevelSchema(**user_level_response_data)
+    print(user_level_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, LevelSchema, GroupBriefSchema)")
+    print("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
+
+# Потрібно для timedelta в __main__
+from datetime import timedelta

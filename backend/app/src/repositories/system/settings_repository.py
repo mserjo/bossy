@@ -1,151 +1,86 @@
 # backend/app/src/repositories/system/settings_repository.py
-
 """
-Repository for SystemSetting entities.
-Provides CRUD operations and specific methods for managing system settings.
+Репозиторій для моделі "Системне Налаштування" (SystemSetting).
+
+Цей модуль визначає клас `SystemSettingRepository`, який успадковує `BaseRepository`
+та надає специфічні методи для роботи з системними налаштуваннями,
+наприклад, отримання налаштування за його унікальним ключем.
 """
 
-import logging
-from typing import Optional, Any, Dict, Union # Added Union
+from typing import List, Optional, Tuple, Any
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select # Added select
 
-from backend.app.src.models.system.settings import SystemSetting, ValueTypeEnum
-from backend.app.src.schemas.system.settings import SystemSettingCreate, SystemSettingUpdate
+# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+# Абсолютний імпорт моделі та схем
+from backend.app.src.models.system.settings import SystemSetting
+from backend.app.src.schemas.system.settings import SystemSettingCreateSchema, SystemSettingUpdateSchema
 
-logger = logging.getLogger(__name__)
 
-class SystemSettingRepository(BaseRepository[SystemSetting, SystemSettingCreate, SystemSettingUpdate]):
+# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
+
+# logger = get_logger(__name__)
+
+class SystemSettingRepository(BaseRepository[SystemSetting, SystemSettingCreateSchema, SystemSettingUpdateSchema]):
     """
-    Repository for managing SystemSetting records.
+    Репозиторій для управління системними налаштуваннями (`SystemSetting`).
+
+    Успадковує базові CRUD-методи від `BaseRepository` та надає
+    додаткові методи для отримання налаштувань за ключем та тих, що можна редагувати.
     """
 
-    def __init__(self):
-        super().__init__(SystemSetting)
-
-    async def get_by_key(self, db: AsyncSession, *, key: str) -> Optional[SystemSetting]:
+    def __init__(self, db_session: AsyncSession):
         """
-        Retrieves a system setting by its unique key.
+        Ініціалізує репозиторій для моделі `SystemSetting`.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            key: The unique key of the system setting.
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
+        """
+        super().__init__(db_session=db_session, model=SystemSetting)
+
+    async def get_by_key(self, key: str) -> Optional[SystemSetting]:
+        """
+        Отримує запис системного налаштування за його унікальним програмним ключем.
+
+        Args:
+            key (str): Унікальний ключ налаштування.
 
         Returns:
-            The SystemSetting object if found, otherwise None.
+            Optional[SystemSetting]: Екземпляр моделі `SystemSetting`, якщо знайдено, інакше None.
         """
-        statement = select(self.model).where(self.model.key == key)
-        result = await db.execute(statement)
+        stmt = select(self.model).where(self.model.key == key)
+        result = await self.db_session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def create(self, db: AsyncSession, *, obj_in: SystemSettingCreate) -> SystemSetting:
+    async def get_editable_settings(self, skip: int = 0, limit: int = 100) -> Tuple[List[SystemSetting], int]:
         """
-        Creates a new system setting.
-        The 'value' from the schema (which can be of a specific type) will be
-        converted to its string representation for storage using the model's
-        `set_typed_value` method.
+        Отримує список системних налаштувань, які позначені як редаговані, з пагінацією.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            obj_in: The Pydantic schema containing data for the new system setting.
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            The newly created SystemSetting object.
+            Tuple[List[SystemSetting], int]: Кортеж зі списком налаштувань та їх загальною кількістю.
         """
-        db_obj = self.model(
-            key=obj_in.key,
-            value_type=obj_in.value_type,
-            name=obj_in.name,
-            description=obj_in.description,
-            is_editable=obj_in.is_editable,
-            group_name=obj_in.group_name
-        )
+        filters = [self.model.is_editable == True]
+        order_by = [self.model.name.asc()]  # Сортувати за людиночитаною назвою
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
 
-        try:
-            db_obj.set_typed_value(obj_in.value)
-        except (ValueError, TypeError) as e:
-            logger.error(f"Error setting typed value for setting '{obj_in.key}': {e}")
-            raise
 
-        db.add(db_obj)
-        await db.commit()
-        await db.refresh(db_obj)
-        return db_obj
+if __name__ == "__main__":
+    # Демонстраційний блок для SystemSettingRepository.
+    print("--- Репозиторій Системних Налаштувань (SystemSettingRepository) ---")
 
-    async def update(
-        self,
-        db: AsyncSession,
-        *,
-        db_obj: SystemSetting,
-        obj_in: Union[SystemSettingUpdate, Dict[str, Any]]
-    ) -> SystemSetting:
-        """
-        Updates an existing system setting.
-        If 'value' or 'value_type' is part of the update, it ensures the
-        stored string 'value' is correctly updated.
+    print("Для тестування SystemSettingRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    print(f"Він успадковує методи від BaseRepository для моделі {SystemSetting.__name__}.")
+    print(f"  Очікує схему створення: {SystemSettingCreateSchema.__name__}")
+    print(f"  Очікує схему оновлення: {SystemSettingUpdateSchema.__name__}")
 
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            db_obj: The current SystemSetting object to update.
-            obj_in: The Pydantic schema or dictionary containing update data.
+    print("\nСпецифічні методи:")
+    print("  - get_by_key(key: str)")
+    print("  - get_editable_settings(skip: int = 0, limit: int = 100)")
 
-        Returns:
-            The updated SystemSetting object.
-        """
-        update_data: Dict[str, Any]
-        if isinstance(obj_in, dict):
-            update_data = obj_in
-        else:
-            update_data = obj_in.model_dump(exclude_unset=True)
-
-        if "value_type" in update_data:
-            new_value_type_str = update_data["value_type"]
-            try:
-                new_value_type_enum = ValueTypeEnum(new_value_type_str) if isinstance(new_value_type_str, str) else new_value_type_str
-                if isinstance(new_value_type_enum, ValueTypeEnum):
-                     setattr(db_obj, "value_type", new_value_type_enum)
-                else:
-                    raise ValueError(f"Invalid value_type provided: {new_value_type_str}")
-            except ValueError as e:
-                logger.error(f"Invalid value_type '{new_value_type_str}' for setting '{db_obj.key}': {e}")
-                raise
-
-        if "value" in update_data:
-            new_value = update_data["value"]
-            try:
-                db_obj.set_typed_value(new_value)
-            except (ValueError, TypeError) as e:
-                logger.error(f"Error setting typed value during update for setting '{db_obj.key}': {e}")
-                raise
-
-        for field, value in update_data.items():
-            if field not in ["value", "value_type"] and hasattr(db_obj, field):
-                setattr(db_obj, field, value)
-
-        db.add(db_obj)
-        await db.commit()
-        await db.refresh(db_obj)
-        return db_obj
-
-    async def get_typed_value_by_key(self, db: AsyncSession, *, key: str) -> Optional[Any]:
-        """
-        Retrieves a system setting by its key and returns its value cast to the
-        appropriate type.
-
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            key: The unique key of the system setting.
-
-        Returns:
-            The typed value of the setting if found, otherwise None.
-        """
-        setting = await self.get_by_key(db, key=key)
-        if setting:
-            try:
-                return setting.get_typed_value()
-            except Exception as e:
-                logger.error(f"Error getting typed value for key '{key}' from DB object: {e}. Raw value: '{setting.value}'")
-                return setting.value
-        return None
+    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

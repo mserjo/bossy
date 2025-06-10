@@ -22,6 +22,7 @@
 Після ініціалізації, екземпляр `settings` цього модуля містить усі
 доступні налаштування і може бути імпортований в інші частини програми.
 """
+# import os # Видалено, оскільки os не використовується безпосередньо; pathlib використовується для шляхів.
 from pathlib import Path
 from typing import List, Optional, Union, Any
 from pydantic import PostgresDsn, RedisDsn, field_validator, AnyHttpUrl, EmailStr, ValidationInfo

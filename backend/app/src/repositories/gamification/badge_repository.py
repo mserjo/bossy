@@ -1,148 +1,92 @@
 # backend/app/src/repositories/gamification/badge_repository.py
-
 """
-Repository for Badge (gamification) entities.
-Provides CRUD operations and specific methods for managing badges.
+Репозиторій для моделі "Бейдж" (Badge) в системі гейміфікації.
+
+Цей модуль визначає клас `BadgeRepository`, який успадковує `BaseRepository`
+та надає специфічні методи для роботи з бейджами (значками досягнень).
 """
 
-import logging
-from typing import Optional, List
+from typing import List, Optional, Tuple
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
 
-from backend.app.src.models.gamification.badge import Badge
-from backend.app.src.schemas.gamification.badge import BadgeCreate, BadgeUpdate # Assuming these are the correct schema names
+# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+# Абсолютний імпорт моделі та схем
+from backend.app.src.models.gamification.badge import Badge
+from backend.app.src.schemas.gamification.badge import BadgeCreateSchema, BadgeUpdateSchema
 
-logger = logging.getLogger(__name__)
 
-class BadgeRepository(BaseRepository[Badge, BadgeCreate, BadgeUpdate]):
+# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
+
+# logger = get_logger(__name__)
+
+class BadgeRepository(BaseRepository[Badge, BadgeCreateSchema, BadgeUpdateSchema]):
     """
-    Repository for managing Badge records in the gamification system.
-    Badges can be group-specific or global (if group_id is nullable).
+    Репозиторій для управління бейджами (`Badge`).
+
+    Успадковує базові CRUD-методи від `BaseRepository` та може містити
+    додаткові методи для отримання бейджів за ID групи або іншими критеріями.
     """
 
-    def __init__(self):
-        super().__init__(Badge)
-
-    async def get_badges_for_group(
-        self,
-        db: AsyncSession,
-        *,
-        group_id: int,
-        is_active_state: Optional[bool] = True,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[Badge]:
+    def __init__(self, db_session: AsyncSession):
         """
-        Retrieves badges for a specific group, optionally filtered by 'state'.
-        If is_active_state is True, filters for state='active'.
-        If is_active_state is False, filters for state!='active'.
-        If is_active_state is None, no state filter is applied.
+        Ініціалізує репозиторій для моделі `Badge`.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            group_id: The ID of the group.
-            is_active_state: Optional. Filter by the 'state' field.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
-
-        Returns:
-            A list of Badge objects.
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        conditions = [self.model.group_id == group_id] # type: ignore[attr-defined]
+        super().__init__(db_session=db_session, model=Badge)
 
-        if hasattr(self.model, "state") and is_active_state is not None:
-            if is_active_state:
-                conditions.append(self.model.state == "active") # type: ignore[attr-defined]
-            else:
-                conditions.append(self.model.state != "active") # type: ignore[attr-defined]
-
-        if hasattr(self.model, "deleted_at"):
-            conditions.append(self.model.deleted_at.is_(None)) # type: ignore[attr-defined]
-
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.name.asc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
-
-    async def get_global_badges(
-        self,
-        db: AsyncSession,
-        *,
-        is_active_state: Optional[bool] = True,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[Badge]:
+    async def get_badges_by_group_id(
+            self,
+            group_id: Optional[int],  # None для глобальних бейджів
+            active_only: bool = True,
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[Badge], int]:
         """
-        Retrieves global badges (where group_id is NULL).
-        Optionally filters by 'state'.
+        Отримує список бейджів для вказаної групи (або глобальні, якщо group_id=None) з пагінацією.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            is_active_state: Optional. Filter by the 'state' field.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            group_id (Optional[int]): ID групи або None для глобальних/системних бейджів.
+            active_only (bool): Якщо True, повертає лише активні бейджі (state='active').
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            A list of global Badge objects.
+            Tuple[List[Badge], int]: Кортеж зі списком бейджів та їх загальною кількістю.
         """
-        conditions = [self.model.group_id.is_(None)] # type: ignore[attr-defined]
+        filters = [self.model.group_id == group_id]
+        if active_only:
+            # Модель Badge успадковує BaseMainModel, яке має поле 'state' через StateMixin.
+            # Припускаємо, що активний стан позначається як "active".
+            # TODO: Узгодити значення "active" з можливим Enum для станів.
+            if hasattr(self.model, "state"):
+                filters.append(self.model.state == "active")
+            # else:
+            # logger.warning(f"Модель {self.model.__name__} не має поля 'state' для фільтрації активних бейджів.")
 
-        if hasattr(self.model, "state") and is_active_state is not None:
-            if is_active_state:
-                conditions.append(self.model.state == "active") # type: ignore[attr-defined]
-            else:
-                conditions.append(self.model.state != "active") # type: ignore[attr-defined]
+        order_by = [self.model.name.asc()]  # Сортувати за назвою
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
 
-        if hasattr(self.model, "deleted_at"):
-            conditions.append(self.model.deleted_at.is_(None)) # type: ignore[attr-defined]
+    # Тут можна додати інші специфічні методи, наприклад, пошук бейджів за тегами,
+    # якщо б модель Badge мала поле для тегів.
 
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.name.asc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
 
-    async def get_badge_by_name_and_group(
-        self, db: AsyncSession, *, name: str, group_id: Optional[int]
-    ) -> Optional[Badge]:
-        """
-        Retrieves a badge by its name within a specific group, or globally if group_id is None.
-        Assumes name is unique within its scope (group or global).
+if __name__ == "__main__":
+    # Демонстраційний блок для BadgeRepository.
+    print("--- Репозиторій Бейджів Гейміфікації (BadgeRepository) ---")
 
-        Args:
-            db: AsyncSession instance.
-            name: Name of the badge.
-            group_id: ID of the group, or None for a global badge.
+    print("Для тестування BadgeRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    print(f"Він успадковує методи від BaseRepository для моделі {Badge.__name__}.")
+    print(f"  Очікує схему створення: {BadgeCreateSchema.__name__}")
+    print(f"  Очікує схему оновлення: {BadgeUpdateSchema.__name__}")
 
-        Returns:
-            Optional[Badge]
-        """
-        conditions = [self.model.name == name] # type: ignore[attr-defined]
-        if group_id is None:
-            conditions.append(self.model.group_id.is_(None)) # type: ignore[attr-defined]
-        else:
-            conditions.append(self.model.group_id == group_id) # type: ignore[attr-defined]
+    print("\nСпецифічні методи:")
+    print(
+        "  - get_badges_by_group_id(group_id: Optional[int], active_only: bool = True, skip: int = 0, limit: int = 100)")
 
-        if hasattr(self.model, "deleted_at"):
-            conditions.append(self.model.deleted_at.is_(None)) # type: ignore[attr-defined]
-
-        statement = select(self.model).where(*conditions)
-        result = await db.execute(statement)
-        return result.scalar_one_or_none()
-
-    # BaseRepository methods create, get, update, remove are inherited.
-    # `group_id` for creation (if group-specific) will be handled by the service layer.
-    # `BadgeCreate` and `BadgeUpdate` schemas from `schemas.gamification.badge` are used.
-    # Note: Schemas use UUID for ID examples, models use int. Repository assumes int IDs.
+    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    print("TODO: Узгодити логіку фільтрації 'active_only' з реальним полем/Enum стану в моделі Badge.")

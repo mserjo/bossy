@@ -1,27 +1,54 @@
 # backend/app/src/models/__init__.py
-
 """
-This file makes the 'models' directory a Python package.
-It can also be used to provide easier imports for commonly used models or the Base class, for example:
-# from .base import Base (if Base is defined or re-exported here)
-# from .auth.user import User
-# from .groups.group import Group
+Пакет моделей SQLAlchemy для програми Kudos.
+
+Цей пакет містить:
+- Базові класи для всіх моделей SQLAlchemy (`Base`, `BaseMainModel`) у модулі `base.py`.
+- Міксини для додавання спільної функціональності до моделей (`mixins.py`).
+- Підпакети для моделей конкретних предметних областей:
+    - `auth`: Моделі, пов'язані з автентифікацією та користувачами.
+    - `bonuses`: Моделі для бонусної системи (правила, рахунки, транзакції, нагороди).
+    - `dictionaries`: Моделі-довідники.
+    - `files`: Моделі для роботи з файлами (записи файлів, аватари).
+    - `gamification`: Моделі для елементів гейміфікації (рівні, бейджі, досягнення, рейтинги).
+    - `groups`: Моделі для груп, членства, налаштувань груп та запрошень.
+    - `notifications`: Моделі для сповіщень та їх шаблонів.
+    - `system`: Моделі для системних налаштувань, моніторингу та стану здоров'я.
+    - `tasks`: Моделі для завдань, призначень, виконань та відгуків.
+
+Експортує основні базові класи та всі підпакети моделей для зручного доступу.
 """
 
-# For now, keep it simple. Specific models will be imported directly from their modules.
+# Імпорт та експорт базових класів моделей для легкого доступу
+from .base import Base, BaseMainModel
+from . import mixins # Хоча міксини зазвичай не імпортуються напряму, а використовуються в успадкуванні
 
-# It's good practice to define what `from backend.app.src.models import *` would import,
-# though explicit imports are generally preferred.
-# __all__ = [
-#     # List model names here if you want to support `import *`
-# ]
+# Імпорт та експорт підпакетів моделей
+from . import auth
+from . import bonuses
+from . import dictionaries
+from . import files
+from . import gamification
+from . import groups
+from . import notifications
+from . import system
+from . import tasks
 
-import logging
+__all__ = [
+    "Base",
+    "BaseMainModel",
+    "mixins", # Експорт модуля міксинів, якщо потрібно (зазвичай ні)
+    "auth",
+    "bonuses",
+    "dictionaries",
+    "files",
+    "gamification",
+    "groups",
+    "notifications",
+    "system",
+    "tasks",
+]
 
-# Attempt to get a logger instance. If logging is not yet configured,
-# this will use the root logger's default settings (usually WARNING level to console).
-# Once `setup_logging()` from `config.logging` is called, this logger will adopt that configuration.
-logger = logging.getLogger(__name__)
-
-# This log message is to confirm the package is recognized/imported during development.
-logger.debug("Backend models package initialized.")
+# Примітка: Конкретні моделі сутностей (наприклад, User, Group, Task)
+# експортуються з відповідних `__init__.py` файлів у їхніх підпакетах.
+# Наприклад, `from backend.app.src.models.auth import User`.

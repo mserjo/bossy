@@ -1,211 +1,207 @@
 # backend/app/src/repositories/tasks/task_repository.py
-
 """
-Repository for Task entities.
-Provides CRUD operations and specific methods for managing tasks.
+Репозиторій для моделі "Завдання" (Task).
+
+Цей модуль визначає клас `TaskRepository`, який успадковує `BaseRepository`
+та надає специфічні методи для роботи із завданнями/подіями, такі як
+отримання завдань за ID групи, завдань, призначених користувачеві,
+та підзавдань.
 """
 
-import logging
-from typing import Optional, List
-from datetime import datetime, timezone # Added timezone
+from typing import List, Optional, Tuple, Any
 
+from sqlalchemy import select, func, join
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, and_ # Added and_ for combining conditions
+from sqlalchemy.orm import selectinload
 
-from backend.app.src.models.tasks.task import Task
-from backend.app.src.schemas.tasks.task import TaskCreate, TaskUpdate
+# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
-from backend.app.src.core.dicts import EventFrequency # For type hinting
+# Абсолютний імпорт моделей та схем
+from backend.app.src.models.tasks.task import Task
+from backend.app.src.models.tasks.assignment import TaskAssignment  # Для join в get_tasks_assigned_to_user
+from backend.app.src.models.dictionaries.task_types import TaskType  # Для фільтрації за task_type_code
+from backend.app.src.models.dictionaries.statuses import Status  # Для фільтрації за status_code
+from backend.app.src.schemas.tasks.task import TaskCreateSchema, TaskUpdateSchema
+from backend.app.src.core.dicts import TaskStatus as TaskStatusEnum  # Для active_only
 
-logger = logging.getLogger(__name__)
 
-class TaskRepository(BaseRepository[Task, TaskCreate, TaskUpdate]):
+# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
+
+# logger = get_logger(__name__)
+
+class TaskRepository(BaseRepository[Task, TaskCreateSchema, TaskUpdateSchema]):
     """
-    Repository for managing Task records.
+    Репозиторій для управління записами завдань/подій (`Task`).
+
+    Успадковує базові CRUD-методи від `BaseRepository` та надає
+    додаткові методи для специфічного пошуку та отримання завдань.
     """
 
-    def __init__(self):
-        super().__init__(Task)
-
-    async def get_tasks_for_group(
-        self,
-        db: AsyncSession,
-        *,
-        group_id: int,
-        status_id: Optional[int] = None,
-        task_type_id: Optional[int] = None,
-        include_deleted: bool = False, # If soft delete is used
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[Task]:
+    def __init__(self, db_session: AsyncSession):
         """
-        Retrieves tasks for a specific group, optionally filtered by status and task type.
+        Ініціалізує репозиторій для моделі `Task`.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            group_id: The ID of the group.
-            status_id: Optional. Filter by a specific status ID.
-            task_type_id: Optional. Filter by a specific task type ID.
-            include_deleted: Optional. If True, includes soft-deleted tasks.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
-
-        Returns:
-            A list of Task objects.
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        conditions = [self.model.group_id == group_id] # type: ignore[attr-defined]
-        if status_id is not None:
-            conditions.append(self.model.status_id == status_id) # type: ignore[attr-defined]
-        if task_type_id is not None:
-            conditions.append(self.model.task_type_id == task_type_id) # type: ignore[attr-defined]
+        super().__init__(db_session=db_session, model=Task)
 
-        if not include_deleted and hasattr(self.model, "deleted_at"):
-            conditions.append(self.model.deleted_at.is_(None)) # type: ignore[attr-defined]
-
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.due_date.asc().nulls_last(), self.model.name.asc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
-
-    async def get_tasks_by_parent_id(
-        self, db: AsyncSession, *, parent_task_id: int, skip: int = 0, limit: int = 100
-    ) -> List[Task]:
+    async def get_tasks_by_group_id(
+            self,
+            group_id: int,
+            skip: int = 0,
+            limit: int = 100,
+            *,
+            active_only: bool = False,  # Отримувати лише завдання, які не в фінальному/архівному статусі
+            task_type_code: Optional[str] = None,
+            status_code: Optional[str] = None  # Код статусу з довідника dict_statuses
+            # TODO: Узгодити з Task.state, яке може використовувати TaskStatusEnum
+    ) -> Tuple[List[Task], int]:
         """
-        Retrieves subtasks for a specific parent task.
+        Отримує список завдань для вказаної групи з пагінацією та фільтрами.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            parent_task_id: The ID of the parent task.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            group_id (int): ID групи.
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
+            active_only (bool): Якщо True, повертає лише завдання, які не є завершеними або скасованими.
+                                Потребує узгодження з тим, як зберігається статус (Task.state чи Task.status_id).
+            task_type_code (Optional[str]): Код типу завдання для фільтрації.
+            status_code (Optional[str]): Код статусу завдання для фільтрації.
 
         Returns:
-            A list of Task objects (subtasks).
+            Tuple[List[Task], int]: Кортеж зі списком завдань та їх загальною кількістю.
         """
-        statement = (
-            select(self.model)
-            .where(self.model.parent_task_id == parent_task_id) # type: ignore[attr-defined]
-            .order_by(self.model.created_at.asc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
+        filters = [self.model.group_id == group_id]
+        # Використовуємо Task.state, яке успадковане від BaseMainModel -> StateMixin
+        if active_only:
+            # Припускаємо, що "активні" - це ті, що не COMPLETED, CANCELLED, REJECTED, EXPIRED
+            # Це потрібно узгодити з фактичними значеннями TaskStatusEnum, які позначають неактивність.
+            inactive_statuses = [
+                TaskStatusEnum.COMPLETED.value,
+                TaskStatusEnum.CANCELLED.value,
+                TaskStatusEnum.REJECTED.value,
+                TaskStatusEnum.EXPIRED.value
+            ]
+            filters.append(self.model.state.notin_(inactive_statuses))
 
-    async def get_tasks_due_soon(
-        self, db: AsyncSession, *, due_before: datetime, group_id: Optional[int] = None, skip: int = 0, limit: int = 100
-    ) -> List[Task]:
+        # Формуємо запити для stmt та count_stmt
+        stmt = select(self.model)
+        count_stmt = select(func.count(self.model.id)).select_from(self.model)
+
+        if task_type_code:
+            # Приєднуємо таблицю типів завдань і фільтруємо за кодом
+            stmt = stmt.join(TaskType, self.model.task_type_id == TaskType.id)
+            count_stmt = count_stmt.join(TaskType, self.model.task_type_id == TaskType.id)
+            filters.append(TaskType.code == task_type_code)
+
+        if status_code:
+            # TODO: Якщо Task.status_id використовується для зв'язку з dict_statuses
+            if hasattr(self.model, 'status_id') and self.model.status_id is not None:
+                stmt = stmt.join(Status, self.model.status_id == Status.id)
+                count_stmt = count_stmt.join(Status, self.model.status_id == Status.id)
+                filters.append(Status.code == status_code)
+            # Або якщо Task.state напряму містить коди статусів (менш ймовірно для узгодженості)
+            # elif hasattr(self.model, 'state'):
+            #     filters.append(self.model.state == status_code)
+
+        if filters:
+            stmt = stmt.where(*filters)
+            count_stmt = count_stmt.where(*filters)
+
+        total = (await self.db_session.execute(count_stmt)).scalar_one()
+
+        stmt = stmt.offset(skip).limit(limit).order_by(self.model.created_at.desc())
+        # .options(selectinload(self.model.task_type), selectinload(self.model.status)) # Приклад жадібного завантаження
+
+        items_result = await self.db_session.execute(stmt)
+        items = list(items_result.scalars().all())
+
+        return items, total
+
+    async def get_tasks_assigned_to_user(
+            self,
+            user_id: int,
+            group_id: Optional[int] = None,
+            skip: int = 0,
+            limit: int = 100,
+            active_only: bool = False  # Чи повертати лише "активні" завдання
+    ) -> Tuple[List[Task], int]:
         """
-        Retrieves tasks that are due before a specific datetime.
-        Optionally filters by group_id. Excludes completed/archived tasks implicitly by status_id logic (not implemented here, assumes active statuses).
+        Отримує список завдань, призначених вказаному користувачеві, з пагінацією.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            due_before: The datetime threshold for due dates.
-            group_id: Optional. Filter by a specific group ID.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            user_id (int): ID користувача.
+            group_id (Optional[int]): ID групи для фільтрації (якщо потрібно).
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
+            active_only (bool): Якщо True, повертає лише завдання, які не є завершеними або скасованими.
 
         Returns:
-            A list of Task objects due soon.
+            Tuple[List[Task], int]: Кортеж зі списком завдань та їх загальною кількістю.
         """
-        now = datetime.now(timezone.utc)
-        conditions = [
-            self.model.due_date != None, # type: ignore[attr-defined]
-            self.model.due_date >= now, # type: ignore[attr-defined] # Due in the future
-            self.model.due_date <= due_before # type: ignore[attr-defined]
-        ]
+        base_join = self.model.join(TaskAssignment, self.model.id == TaskAssignment.task_id)
+
+        filters = [TaskAssignment.user_id == user_id]
         if group_id is not None:
-            conditions.append(self.model.group_id == group_id) # type: ignore[attr-defined]
+            filters.append(self.model.group_id == group_id)
 
-        # Add condition to exclude tasks that are already in a 'final' state (e.g., completed, cancelled)
-        # This requires knowledge of status codes or a 'is_final' flag on Status model.
-        # Example:
-        # from backend.app.src.models.dictionaries.statuses import Status # Assuming Status model can be queried
-        # final_status_codes = ["COMPLETED", "CANCELLED", "ARCHIVED"] # Example
-        # final_statuses_stmt = select(Status.id).where(Status.code.in_(final_status_codes))
-        # final_status_ids = list((await db.execute(final_statuses_stmt)).scalars().all())
-        # if final_status_ids:
-        #    conditions.append(self.model.status_id.notin_(final_status_ids))
+        if active_only:
+            inactive_statuses = [
+                TaskStatusEnum.COMPLETED.value, TaskStatusEnum.CANCELLED.value,
+                TaskStatusEnum.REJECTED.value, TaskStatusEnum.EXPIRED.value
+            ]
+            filters.append(self.model.state.notin_(inactive_statuses))
 
+        count_stmt = select(func.count(self.model.id)).select_from(base_join).where(*filters)
+        total = (await self.db_session.execute(count_stmt)).scalar_one()
 
-        statement = (
+        stmt = (
             select(self.model)
-            .where(*conditions)
-            .order_by(self.model.due_date.asc()) # type: ignore[attr-defined]
+            .select_from(base_join)
+            .where(*filters)
             .offset(skip)
             .limit(limit)
+            .order_by(self.model.due_date.asc().nulls_last(), self.model.created_at.desc())
+        # Пріоритет за терміном виконання
+            # .options(selectinload(self.model.task_type), selectinload(self.model.status))
         )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
 
-    async def get_recurring_tasks_to_instance(self, db: AsyncSession, *, current_time: Optional[datetime] = None) -> List[Task]:
+        items_result = await self.db_session.execute(stmt)
+        items = list(items_result.scalars().all())
+
+        return items, total
+
+    async def get_sub_tasks(self, parent_task_id: int, skip: int = 0, limit: int = 100) -> Tuple[List[Task], int]:
         """
-        Retrieves recurring task templates that may need new instances created.
-        Logic for determining if a new instance is needed (based on last_occurrence or similar)
-        would typically be in the service layer, but this method provides the raw recurring tasks.
+        Отримує список підзавдань для вказаного батьківського завдання з пагінацією.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            current_time: The current time to evaluate against. Defaults to now(UTC).
+            parent_task_id (int): ID батьківського завдання.
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            A list of Task objects that are marked as recurring.
+            Tuple[List[Task], int]: Кортеж зі списком підзавдань та їх загальною кількістю.
         """
-        conditions = [self.model.is_recurring == True] # type: ignore[attr-defined]
+        filters = [self.model.parent_task_id == parent_task_id]
+        order_by = [self.model.created_at.asc()]  # Або інше сортування, наприклад, за порядковим номером, якщо є
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
 
-        statement = select(self.model).where(*conditions)
-        result = await db.execute(statement)
-        return list(result.scalars().all())
 
-    async def search_tasks(
-        self,
-        db: AsyncSession,
-        *,
-        group_id: int,
-        search_term: str,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[Task]:
-        """
-        Searches for tasks within a specific group by a search term matching name or description.
+if __name__ == "__main__":
+    # Демонстраційний блок для TaskRepository.
+    print("--- Репозиторій Завдань/Подій (TaskRepository) ---")
 
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            group_id: The ID of the group to search within.
-            search_term: The term to search for.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+    print("Для тестування TaskRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    print(f"Він успадковує методи від BaseRepository для моделі {Task.__name__}.")
+    print(f"  Очікує схему створення: {TaskCreateSchema.__name__}")
+    print(f"  Очікує схему оновлення: {TaskUpdateSchema.__name__}")
 
-        Returns:
-            A list of Task objects matching the search criteria.
-        """
-        search_filter = f"%{search_term.lower()}%"
-        conditions = [
-            self.model.group_id == group_id, # type: ignore[attr-defined]
-            or_(
-                self.model.name.ilike(search_filter), # type: ignore[attr-defined]
-                self.model.description.ilike(search_filter) # type: ignore[attr-defined]
-            )
-        ]
-        if hasattr(self.model, "deleted_at"): # Exclude soft-deleted by default
-            conditions.append(self.model.deleted_at.is_(None)) # type: ignore[attr-defined]
+    print("\nСпецифічні методи:")
+    print("  - get_tasks_by_group_id(group_id, skip, limit, active_only, task_type_code, status_code)")
+    print("  - get_tasks_assigned_to_user(user_id, group_id, skip, limit, active_only)")
+    print("  - get_sub_tasks(parent_task_id, skip, limit)")
 
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.due_date.asc().nulls_last(), self.model.name.asc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
-
-    # BaseRepository methods create, get, update, remove are inherited.
-    # Task creation will need group_id, task_type_id, status_id, etc., handled by service.
-    # Task updates will use TaskUpdate schema.
+    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    print("TODO: Узгодити логіку фільтрації за статусом (Task.state vs Task.status_id) в get_tasks_by_group_id.")

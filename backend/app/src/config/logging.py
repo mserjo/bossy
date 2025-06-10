@@ -27,6 +27,7 @@ import sys
 from pathlib import Path # Використовується для роботи зі шляхами
 from typing import Optional # Для типізації аргументу name в get_logger
 
+# Абсолютний імпорт налаштувань
 from backend.app.src.config.settings import settings
 
 # --- Конфігурація логування ---

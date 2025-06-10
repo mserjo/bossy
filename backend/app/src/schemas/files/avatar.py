@@ -1,130 +1,103 @@
 # backend/app/src/schemas/files/avatar.py
-import logging
-from uuid import UUID
-from typing import Optional
+"""
+Pydantic схеми для сутності "Аватар Користувача" (UserAvatar).
 
-from pydantic import BaseModel, Field
+Цей модуль визначає схеми для:
+- Базового представлення зв'язку аватара з користувачем (`UserAvatarBaseSchema`).
+- Створення нового запису про аватар (зазвичай виконується сервісом) (`UserAvatarCreateSchema`).
+- Представлення даних про аватар користувача у відповідях API (`UserAvatarSchema`).
+"""
+from datetime import datetime
+from typing import Optional, Any  # Any для тимчасових полів
 
-from app.src.schemas.base import BaseDBRead # Common DB fields
-from app.src.schemas.files.file import FileRecordResponse # To nest avatar image details
+from pydantic import Field, AnyHttpUrl
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт базових схем та міксинів
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 
-# --- UserAvatar Schemas ---
+# TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
+# from backend.app.src.schemas.auth.user import UserPublicProfileSchema
+# from backend.app.src.schemas.files.file import FileRecordSchema
+UserPublicProfileSchema = Any  # Тимчасовий заповнювач
+FileRecordSchema = Any  # Тимчасовий заповнювач
 
-class UserAvatarBase(BaseModel):
+
+class UserAvatarBaseSchema(BaseSchema):
     """
-    Base schema for user avatars. Links a user to a file record representing their avatar.
+    Базова схема для полів зв'язку аватара користувача.
     """
-    user_id: UUID = Field(..., description="The unique identifier of the user to whom this avatar belongs.")
-    file_id: UUID = Field(..., description="The unique identifier of the file record used as the avatar image.")
-    is_active: bool = Field(
-        True,
-        description="Indicates if this is the currently active avatar for the user. Allows for multiple avatar uploads with one active."
-    )
-    # position: Optional[int] = Field(None, ge=0, description="Optional: If users can have multiple avatars, this could define display order.")
-
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        anystr_strip_whitespace = True
-        title = "UserAvatarBase"
-        json_schema_extra = {
-            "example": {
-                "user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                "file_id": "f0e1d2c3-b4a5-6789-0123-456789abcdef01",
-                "is_active": True
-            }
-        }
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"UserAvatarBase instance created with data: {data}")
+    user_id: int = Field(description="Ідентифікатор користувача, якому належить аватар.")
+    file_record_id: int = Field(description="Ідентифікатор запису файлу, що є аватаром.")
+    is_active: bool = Field(default=True, description="Чи є цей аватар поточним активним для користувача.")
+    # model_config успадковується з BaseSchema (from_attributes=True)
 
 
-class UserAvatarCreate(BaseModel): # Does not inherit BaseDBRead as it's for creation
+class UserAvatarCreateSchema(UserAvatarBaseSchema):
     """
-    Schema for creating a new user avatar link.
-    This would typically be used after an avatar image file has been uploaded and a FileRecord created.
-    Only `file_id` is needed, `user_id` usually comes from the authenticated user context.
+    Схема для створення нового запису про аватар користувача.
+    Зазвичай використовується внутрішніми сервісами при завантаженні нового аватара.
     """
-    file_id: UUID = Field(..., description="The unique identifier of the (newly uploaded) file record to be used as the avatar.")
-    # user_id will likely be injected by the service based on the current authenticated user.
-    # is_active might be set by the service (e.g., new uploads become active, others inactive).
+    # Успадковує user_id, file_record_id, is_active.
+    # `created_at` (як час встановлення) буде встановлено автоматично через TimestampedSchemaMixin у відповіді.
+    pass
 
-    class Config:
-        orm_mode = True # Useful if the service layer expects ORM-compatible data
-        # from_attributes = True # For Pydantic V2
-        title = "UserAvatarCreate"
-        json_schema_extra = {
-            "example": {
-                "file_id": "f0e1d2c3-b4a5-6789-0123-456789abcdef01"
-            }
-        }
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.info(f"UserAvatarCreate instance created for file_id '{self.file_id}'.")
-
-class UserAvatarUpdate(BaseModel):
+class UserAvatarSchema(UserAvatarBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
     """
-    Schema for updating user avatar properties, primarily for setting an existing avatar record as active/inactive.
+    Схема для представлення даних про аватар користувача у відповідях API.
+    Поле `created_at` (з `TimestampedSchemaMixin`) позначає час встановлення аватара.
     """
-    is_active: bool = Field(..., description="Set to true to make this avatar active, false to deactivate.")
+    # id, created_at, updated_at успадковані.
+    # user_id, file_record_id, is_active успадковані.
 
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        title = "UserAvatarUpdate"
-        json_schema_extra = {
-            "example": {
-                "is_active": True
-            }
-        }
+    # TODO: Поле `file_url` має заповнюватися сервісом, отримуючи URL з пов'язаного `FileRecord`.
+    #       Це може бути прямий URL або presigned URL.
+    file_url: Optional[AnyHttpUrl] = Field(None, description="URL для доступу до файлу аватара.")
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.info(f"UserAvatarUpdate instance created with data: {data}")
+    # TODO: Замінити Any на відповідні схеми.
+    user: Optional[UserPublicProfileSchema] = Field(None,
+                                                    description="Інформація про користувача (зазвичай не включається, якщо запит йде від цього ж користувача або аватар є частиною профілю користувача).")
+    file_record: Optional[FileRecordSchema] = Field(None, description="Детальна інформація про файл аватара.")
 
 
-class UserAvatarResponse(UserAvatarBase, BaseDBRead):
-    """
-    Schema for representing a user's avatar in API responses.
-    Includes all fields from UserAvatarBase, common DB read fields,
-    and nests the actual file record details.
-    """
-    # id: UUID # From BaseDBRead (ID of the UserAvatar link record)
-    # created_at: datetime # From BaseDBRead
-    # updated_at: datetime # From BaseDBRead
+if __name__ == "__main__":
+    # Демонстраційний блок для схем аватарів користувачів.
+    print("--- Pydantic Схеми для Аватарів Користувачів (UserAvatar) ---")
 
-    file: Optional[FileRecordResponse] = Field(None, description="Detailed information about the avatar image file.")
+    print("\nUserAvatarCreateSchema (приклад для створення сервісом):")
+    create_avatar_data = {
+        "user_id": 101,
+        "file_record_id": 205,
+        "is_active": True
+    }
+    create_avatar_instance = UserAvatarCreateSchema(**create_avatar_data)
+    print(create_avatar_instance.model_dump_json(indent=2))
 
-    class Config(UserAvatarBase.Config):
-        title = "UserAvatarResponse"
-        json_schema_extra = { # Override or extend example
-            "example": {
-                "id": "e5f6a7b8-c9d0-1234-5678-90abcdef01234", # ID of the UserAvatar record
-                "user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                "file_id": "f0e1d2c3-b4a5-6789-0123-456789abcdef01",
-                "is_active": True,
-                "created_at": "2023-07-15T10:30:00Z",
-                "updated_at": "2023-07-15T10:35:00Z",
-                "file": { # Nested FileRecordResponse example
-                    "id": "f0e1d2c3-b4a5-6789-0123-456789abcdef01",
-                    "file_name": "profile_picture.jpg",
-                    "mime_type": "image/jpeg",
-                    "size_bytes": 102400,
-                    "file_url": "https://kudos-cdn.example.com/files/f0e1d2c3-b4a5-6789-0123-456789abcdef01/profile_picture.jpg",
-                    "uploader_user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                    "created_at": "2023-07-15T09:30:00Z",
-                    "updated_at": "2023-07-15T09:30:00Z"
-                }
-            }
-        }
+    print("\nUserAvatarSchema (приклад відповіді API):")
+    avatar_response_data = {
+        "id": 1,
+        "user_id": 101,
+        "file_record_id": 205,
+        "is_active": True,
+        "created_at": datetime.now() - timedelta(days=1),  # Час встановлення
+        "updated_at": datetime.now() - timedelta(days=1),
+        "file_url": "https://cdn.example.com/avatars/user101/avatar_new.png",
+        # "user": {"id": 101, "name": "Користувач З Аватаром"}, # Приклад UserPublicProfileSchema
+        # "file_record": { # Приклад FileRecordSchema
+        #     "id": 205,
+        #     "file_name": "avatar_new.png",
+        #     "mime_type": "image/png",
+        #     "file_size": 12345,
+        #     "purpose": "avatar",
+        #     "created_at": datetime.now() - timedelta(days=1),
+        #     "updated_at": datetime.now() - timedelta(days=1)
+        # }
+    }
+    avatar_response_instance = UserAvatarSchema(**avatar_response_data)
+    print(avatar_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"UserAvatarResponse instance created for UserAvatar ID '{self.id}'.")
+    print("\nПримітка: Схеми для пов'язаних об'єктів (`user`, `file_record`) та поле `file_url`")
+    print("наразі є заповнювачами (Any) або потребують заповнення сервісом.")
 
-logger.info("UserAvatar schemas (UserAvatarBase, UserAvatarCreate, UserAvatarUpdate, UserAvatarResponse) defined successfully.")
+# Потрібно для timedelta в __main__
+from datetime import timedelta

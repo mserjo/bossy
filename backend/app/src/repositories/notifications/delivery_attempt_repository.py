@@ -1,101 +1,123 @@
 # backend/app/src/repositories/notifications/delivery_attempt_repository.py
-
 """
-Repository for NotificationDeliveryAttempt entities.
-Provides CRUD (mainly Create and Read) operations for notification delivery attempts.
+Репозиторій для моделі "Спроба Доставки Сповіщення" (NotificationDeliveryAttempt).
+
+Цей модуль визначає клас `NotificationDeliveryAttemptRepository`, який успадковує `BaseRepository`
+та надає специфічні методи для роботи зі спробами доставки сповіщень.
 """
 
-import logging
-from typing import Optional, List
+from typing import List, Optional, Tuple, Any
 
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+# from sqlalchemy.orm import selectinload
 
-from backend.app.src.models.notifications.delivery import NotificationDeliveryAttempt, DeliveryStatusEnum
-from backend.app.src.models.notifications.template import NotificationChannelEnum
-from backend.app.src.schemas.notifications.delivery import NotificationDeliveryAttemptCreate
+# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+# Абсолютний імпорт моделі та схем
+from backend.app.src.models.notifications.delivery import NotificationDeliveryAttempt
+from backend.app.src.schemas.notifications.delivery import (
+    NotificationDeliveryAttemptCreateSchema,
+    # NotificationDeliveryAttemptUpdateSchema зазвичай не потрібна
+)
+from pydantic import BaseModel as PydanticBaseModel  # Для "заглушки" UpdateSchema
 
-logger = logging.getLogger(__name__)
 
-class NotificationDeliveryAttemptRepository(BaseRepository[NotificationDeliveryAttempt, NotificationDeliveryAttemptCreate, NotificationDeliveryAttemptCreate]):
+# TODO: Імпортувати Enums NotificationChannelType та DeliveryStatusType з core.dicts
+# from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType
+
+# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
+# logger = get_logger(__name__)
+
+# Спроби доставки зазвичай не оновлюються, а створюються нові для кожної спроби.
+class NotificationDeliveryAttemptUpdateSchema(PydanticBaseModel):
+    pass
+
+
+class NotificationDeliveryAttemptRepository(
+    BaseRepository[
+        NotificationDeliveryAttempt,
+        NotificationDeliveryAttemptCreateSchema,
+        NotificationDeliveryAttemptUpdateSchema
+    ]
+):
     """
-    Repository for managing NotificationDeliveryAttempt records.
-    These records are typically append-only, logging each attempt to deliver a notification.
+    Репозиторій для управління записами про спроби доставки сповіщень (`NotificationDeliveryAttempt`).
+
+    Успадковує базові CRUD-методи від `BaseRepository` та надає
+    методи для отримання історії спроб для конкретного сповіщення або
+    невдалих спроб за певним каналом.
     """
 
-    def __init__(self):
-        super().__init__(NotificationDeliveryAttempt)
+    def __init__(self, db_session: AsyncSession):
+        """
+        Ініціалізує репозиторій для моделі `NotificationDeliveryAttempt`.
+
+        Args:
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
+        """
+        super().__init__(db_session=db_session, model=NotificationDeliveryAttempt)
 
     async def get_attempts_for_notification(
-        self,
-        db: AsyncSession,
-        *,
-        notification_id: int,
-        channel: Optional[NotificationChannelEnum] = None,
-        status: Optional[DeliveryStatusEnum] = None,
-        skip: int = 0,
-        limit: int = 10
-    ) -> List[NotificationDeliveryAttempt]:
+            self,
+            notification_id: int,
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[NotificationDeliveryAttempt], int]:
         """
-        Retrieves delivery attempts for a specific notification,
-        optionally filtered by channel and status.
+        Отримує список всіх спроб доставки для вказаного сповіщення з пагінацією.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            notification_id: The ID of the notification.
-            channel: Optional. Filter by the delivery channel.
-            status: Optional. Filter by the delivery status.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            notification_id (int): ID сповіщення.
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            A list of NotificationDeliveryAttempt objects, ordered by most recent attempt first.
+            Tuple[List[NotificationDeliveryAttempt], int]: Кортеж зі списком спроб доставки та їх загальною кількістю.
         """
-        conditions = [self.model.notification_id == notification_id] # type: ignore[attr-defined]
-        if channel:
-            conditions.append(self.model.channel == channel) # type: ignore[attr-defined]
-        if status:
-            conditions.append(self.model.status == status) # type: ignore[attr-defined]
+        filters = [self.model.notification_id == notification_id]
+        order_by = [self.model.created_at.desc()]  # Показувати останні спроби першими
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
 
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.attempted_at.desc(), self.model.created_at.desc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
-
-    async def get_latest_attempt_for_notification_channel(
-        self,
-        db: AsyncSession,
-        *,
-        notification_id: int,
-        channel: NotificationChannelEnum
-    ) -> Optional[NotificationDeliveryAttempt]:
+    async def get_failed_attempts_by_channel(
+            self,
+            channel: str,  # Очікується значення з NotificationChannelType Enum
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[NotificationDeliveryAttempt], int]:
         """
-        Retrieves the most recent delivery attempt for a specific notification on a specific channel.
+        Отримує список невдалих спроб доставки за вказаним каналом з пагінацією.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            notification_id: The ID of the notification.
-            channel: The specific NotificationChannelEnum member.
+            channel (str): Канал доставки (значення з `NotificationChannelType` Enum).
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            The most recent NotificationDeliveryAttempt object if found, otherwise None.
+            Tuple[List[NotificationDeliveryAttempt], int]: Кортеж зі списком невдалих спроб та їх загальною кількістю.
         """
-        statement = (
-            select(self.model)
-            .where(
-                self.model.notification_id == notification_id, # type: ignore[attr-defined]
-                self.model.channel == channel # type: ignore[attr-defined]
-            )
-            .order_by(self.model.attempted_at.desc(), self.model.created_at.desc()) # type: ignore[attr-defined]
-        )
-        result = await db.execute(statement)
-        return result.scalars().first()
+        # TODO: Замінити рядок "failed" на значення з Enum DeliveryStatusType.FAILED.value
+        filters = [
+            self.model.channel == channel,
+            self.model.status == "failed"
+        ]
+        order_by = [self.model.created_at.desc()]
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
 
-    # Create method is inherited from BaseRepository.
-    # Updates are rare; new attempts create new records.
+
+if __name__ == "__main__":
+    # Демонстраційний блок для NotificationDeliveryAttemptRepository.
+    print("--- Репозиторій Спроб Доставки Сповіщень (NotificationDeliveryAttemptRepository) ---")
+
+    print(
+        "Для тестування NotificationDeliveryAttemptRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    print(f"Він успадковує методи від BaseRepository для моделі {NotificationDeliveryAttempt.__name__}.")
+    print(f"  Очікує схему створення: {NotificationDeliveryAttemptCreateSchema.__name__}")
+    print(f"  Очікує схему оновлення: {NotificationDeliveryAttemptUpdateSchema.__name__} (зараз порожня)")
+
+    print("\nСпецифічні методи:")
+    print("  - get_attempts_for_notification(notification_id: int, skip: int = 0, limit: int = 100)")
+    print("  - get_failed_attempts_by_channel(channel: str, skip: int = 0, limit: int = 100)")
+
+    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    print("TODO: Інтегрувати Enums 'NotificationChannelType' та 'DeliveryStatusType' з core.dicts для фільтрації.")

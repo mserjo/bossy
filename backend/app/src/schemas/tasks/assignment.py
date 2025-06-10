@@ -1,122 +1,120 @@
 # backend/app/src/schemas/tasks/assignment.py
-
 """
-Pydantic schemas for Task Assignments.
-"""
+Pydantic схеми для сутності "Призначення Завдання" (TaskAssignment).
 
-import logging
+Цей модуль визначає схеми для:
+- Базового представлення призначення завдання (`TaskAssignmentBaseSchema`).
+- Створення нового запису про призначення (`TaskAssignmentCreateSchema`).
+- Представлення даних про призначення у відповідях API (`TaskAssignmentSchema`).
+"""
+from datetime import datetime
 from typing import Optional
-from datetime import datetime, timezone, timedelta # For examples and BaseResponseSchema
 
-from pydantic import Field
+from pydantic import Field, field_validator
 
-from backend.app.src.schemas.base import BaseSchema, BaseResponseSchema
-from backend.app.src.models.tasks.assignment import AssignmentStatusEnum # Import Enum from model
-
-# Configure logger for this module
-logger = logging.getLogger(__name__)
-
-# --- Locally defined Basic Info schemas for demonstration ---
-class UserBasicInfo(BaseSchema): # Inherit BaseSchema for consistent config (e.g. camelCase)
-    id: int = Field(..., example=101)
-    name: Optional[str] = Field(None, example="Charlie Brown")
-
-class TaskBasicInfo(BaseSchema): # Inherit BaseSchema
-    id: int = Field(..., example=1)
-    name: str = Field(..., example="Review Documentation")
-# --- End of local Basic Info schemas ---
+# Абсолютний імпорт базових схем та Enum
+from backend.app.src.schemas.base import BaseSchema, TimestampedSchemaMixin
+from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача
 
 
-# --- TaskAssignment Schemas ---
+# TODO: Визначити та імпортувати TaskAssignmentStatus Enum з core.dicts
+# from backend.app.src.core.dicts import TaskAssignmentStatus
 
-class TaskAssignmentBase(BaseSchema):
+# Заглушка для TaskAssignmentStatus, поки він не визначений в core.dicts
+class TempTaskAssignmentStatus:  # TODO: Видалити, коли буде реальний Enum
+    ASSIGNED = "assigned"
+    ACCEPTED = "accepted"
+    DECLINED = "declined"
+
+
+class TaskAssignmentBaseSchema(BaseSchema):
     """
-    Base schema for task assignment data.
-    `task_id` is typically a path parameter for API endpoints managing assignments for a specific task.
-    `user_id` is the user being assigned.
+    Базова схема для полів призначення завдання.
     """
-    user_id: int = Field(..., description="ID of the user to whom the task is assigned.", example=101)
-    status: Optional[AssignmentStatusEnum] = Field(AssignmentStatusEnum.PENDING, description="Current status of this assignment.", example=AssignmentStatusEnum.PENDING)
-    # assigned_by_user_id is usually set by the system (current authenticated user).
-    # assigned_at is usually set by the database on creation.
+    task_id: int = Field(description="Ідентифікатор завдання.")
+    user_id: int = Field(description="Ідентифікатор користувача, якому призначено завдання.")
+    # TODO: Замінити str на TaskAssignmentStatus, коли Enum буде доступний.
+    #       Додати валідатор на основі Enum.
+    status: Optional[str] = Field(
+        None,
+        description=f"Статус призначення (наприклад, '{TempTaskAssignmentStatus.ASSIGNED}', '{TempTaskAssignmentStatus.ACCEPTED}')."
+    )
 
-class TaskAssignmentCreate(TaskAssignmentBase):
-    """
-    Schema for creating a new task assignment.
-    `task_id` is assumed to be part of the API path (e.g., /tasks/{task_id}/assignments).
-    `assigned_by_user_id` is set by the service.
-    """
-    # user_id is mandatory from TaskAssignmentBase.
-    # status can have a default or be set explicitly.
-    pass
+    # model_config успадковується з BaseSchema (from_attributes=True)
 
-class TaskAssignmentUpdate(BaseSchema):
-    """
-    Schema for updating an existing task assignment, typically only its status.
-    `task_id` and `user_id` (or assignment `id`) are typically path parameters.
-    """
-    status: AssignmentStatusEnum = Field(..., description="New status for the assignment (e.g., 'accepted', 'in_progress').")
 
-class TaskAssignmentResponse(BaseResponseSchema):
+class TaskAssignmentCreateSchema(BaseSchema):
     """
-    Schema for representing a task assignment in API responses.
-    Includes 'id' (of the assignment record), 'created_at', 'updated_at'.
+    Схема для створення нового запису про призначення завдання.
+    `task_id` зазвичай передається як параметр шляху.
     """
-    task: TaskBasicInfo = Field(..., description="Basic information about the assigned task.")
-    user: UserBasicInfo = Field(..., description="Basic information about the assignee.")
-    assigned_by: Optional[UserBasicInfo] = Field(None, description="Basic information about the user who made the assignment (if applicable).")
+    user_id: int = Field(description="Ідентифікатор користувача, якому призначається завдання.")
+    # TODO: Замінити str на TaskAssignmentStatus. Додати валідатор.
+    status: Optional[str] = Field(
+        default=TempTaskAssignmentStatus.ASSIGNED,  # Статус за замовчуванням при створенні
+        description=f"Статус призначення. За замовчуванням: '{TempTaskAssignmentStatus.ASSIGNED}'."
+    )
 
-    status: AssignmentStatusEnum = Field(..., description="Current status of the assignment.")
-    assigned_at: datetime = Field(..., description="Timestamp when the assignment was made (UTC).")
-    # Note: `created_at` from BaseResponseSchema will be when the assignment record was created,
-    # which is typically the same or very close to `assigned_at`.
+
+class TaskAssignmentUpdateSchema(BaseSchema):
+    """
+    Схема для оновлення статусу призначення завдання.
+    Дозволяє оновлювати лише поле `status`.
+    """
+    # TODO: Замінити str на TaskAssignmentStatus. Додати валідатор.
+    status: str = Field(
+        description=f"Новий статус призначення (наприклад, '{TempTaskAssignmentStatus.ACCEPTED}', '{TempTaskAssignmentStatus.DECLINED}').")
+
+
+class TaskAssignmentSchema(TaskAssignmentBaseSchema, TimestampedSchemaMixin):
+    """
+    Схема для представлення даних про призначення завдання у відповідях API.
+    Включає інформацію про користувача та часові мітки (коли було створено/оновлено призначення).
+    `created_at` тут може трактуватися як `assigned_at`.
+    """
+    # task_id, user_id, status успадковані з TaskAssignmentBaseSchema
+    # created_at, updated_at успадковані з TimestampedSchemaMixin
+
+    user: Optional[UserPublicProfileSchema] = Field(None,
+                                                    description="Публічний профіль користувача, якому призначено завдання.")
+    # Можна додати поле `task: Optional[TaskBriefSchema] = None`, якщо потрібно коротко показувати деталі завдання.
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем призначень завдань.
+    print("--- Pydantic Схеми для Призначень Завдань (TaskAssignment) ---")
 
-    logger.info("--- TaskAssignment Schemas --- Demonstration")
+    print("\nTaskAssignmentBaseSchema (приклад):")
+    base_assign_data = {"task_id": 1, "user_id": 101, "status": TempTaskAssignmentStatus.ACCEPTED}
+    base_assign_instance = TaskAssignmentBaseSchema(**base_assign_data)
+    print(base_assign_instance.model_dump_json(indent=2))
 
-    # TaskAssignmentCreate Example
-    # Assume task_id=1 from path, assigned_by_user_id=current_user.id from service
-    assign_create_data = {
-        "userId": 205, # camelCase for user_id
-        "status": AssignmentStatusEnum.PENDING # Pass Enum member
+    print("\nTaskAssignmentCreateSchema (приклад для створення):")
+    create_assign_data = {"user_id": 102, "status": TempTaskAssignmentStatus.ASSIGNED}
+    create_assign_instance = TaskAssignmentCreateSchema(**create_assign_data)
+    print(create_assign_instance.model_dump_json(indent=2))
+    # Приклад з помилкою (якщо б був валідатор на Enum)
+    # try:
+    #     TaskAssignmentCreateSchema(user_id=103, status="невірний_статус")
+    # except Exception as e:
+    #     print(f"Помилка валідації TaskAssignmentCreateSchema (очікувано): {e}")
+
+    print("\nTaskAssignmentUpdateSchema (приклад для оновлення):")
+    update_assign_data = {"status": TempTaskAssignmentStatus.DECLINED}
+    update_assign_instance = TaskAssignmentUpdateSchema(**update_assign_data)
+    print(update_assign_instance.model_dump_json(indent=2))
+
+    print("\nTaskAssignmentSchema (приклад відповіді API):")
+    assignment_response_data = {
+        "task_id": 1,
+        "user_id": 101,
+        "status": TempTaskAssignmentStatus.ACCEPTED,
+        "created_at": datetime.now(),
+        "updated_at": datetime.now(),
+        "user": {"id": 101, "name": "Призначений Користувач"}  # TODO i18n (UserPublicProfileSchema)
     }
-    try:
-        create_schema = TaskAssignmentCreate(**assign_create_data) # type: ignore[call-arg]
-        logger.info(f"TaskAssignmentCreate valid: {create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating TaskAssignmentCreate: {e}")
+    assignment_response_instance = TaskAssignmentSchema(**assignment_response_data)
+    print(assignment_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    # TaskAssignmentUpdate Example
-    # Assume task_id and user_id/assignment_id are from path
-    assign_update_data = {"status": AssignmentStatusEnum.IN_PROGRESS} # Pass Enum member
-    update_schema = TaskAssignmentUpdate(**assign_update_data)
-    logger.info(f"TaskAssignmentUpdate (partial): {update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # TaskAssignmentResponse Example
-    task_info_data = {"id": 1, "name": "Review Documentation"}
-    assignee_info_data = {"id": 205, "name": "Charlie Brown"}
-    assigner_info_data = {"id": 10, "name": "Admin User"}
-
-    response_data = {
-        "id": 301, # ID of the TaskAssignment record
-        "createdAt": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "task": task_info_data,
-        "user": assignee_info_data,
-        "assignedBy": assigner_info_data, # camelCase for assigned_by
-        "status": AssignmentStatusEnum.IN_PROGRESS, # Pass Enum member
-        "assignedAt": (datetime.now(timezone.utc) - timedelta(hours=1)).isoformat() # camelCase for assigned_at
-    }
-    try:
-        response_schema = TaskAssignmentResponse(**response_data) # type: ignore[call-arg]
-        logger.info(f"TaskAssignmentResponse: {response_schema.model_dump_json(by_alias=True, indent=2)}")
-        if response_schema.task:
-            logger.info(f"  Assigned Task Name: {response_schema.task.name}")
-        if response_schema.user:
-            logger.info(f"  Assignee Name: {response_schema.user.name}")
-    except Exception as e:
-        logger.error(f"Error creating TaskAssignmentResponse: {e}")
+    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних призначень завдань.")
+    print("TODO: Інтегрувати Enum 'TaskAssignmentStatus' з core.dicts для поля 'status'.")

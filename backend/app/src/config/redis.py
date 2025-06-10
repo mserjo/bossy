@@ -20,6 +20,7 @@
 import redis.asyncio as aioredis
 from typing import Optional, AsyncGenerator
 
+# Абсолютний імпорт налаштувань та логера
 from backend.app.src.config.settings import settings
 from backend.app.src.config.logging import get_logger
 

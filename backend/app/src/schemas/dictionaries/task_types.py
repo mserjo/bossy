@@ -1,115 +1,91 @@
 # backend/app/src/schemas/dictionaries/task_types.py
-
 """
-Pydantic schemas for TaskType dictionary entries.
+Pydantic схеми для довідника "Типи Завдань".
+
+Цей модуль визначає схеми для представлення, створення та оновлення
+записів у довіднику типів завдань (наприклад, "Звичайне завдання", "Подія").
 """
 
-import logging
-from typing import Optional # For optional custom fields if any
-from datetime import datetime, timezone # For example values in __main__ and BaseResponseSchema
+from typing import Optional
 
-from pydantic import Field
+# Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    DictionaryBase,
-    # DictionaryCreate as BaseDictionaryCreate, # Not directly used if TaskTypeCreate inherits TaskTypeBase
-    # DictionaryUpdate as BaseDictionaryUpdate, # Not directly used if TaskTypeUpdate inherits TaskTypeBase
-    DictionaryResponse as BaseDictionaryResponse
+    BaseDictionarySchema,
+    DictionaryCreateSchema,
+    DictionaryUpdateSchema
 )
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
 
-# --- TaskType Schemas ---
+# from pydantic import Field
 
-class TaskTypeBase(DictionaryBase):
-    """Base schema for TaskType, inherits all fields from DictionaryBase."""
-    # Example of custom fields if TaskType model had them:
-    # awards_points_by_default: Optional[bool] = Field(None,
-    #                                                  description="Does this task type generally award points?",
-    #                                                  example=True)
-    # default_points_value: Optional[int] = Field(None,
-    #                                             description="Default points for tasks of this type.",
-    #                                             example=10)
+# Схема для представлення запису Типу Завдання (у відповідях API)
+class TaskTypeSchema(BaseDictionarySchema):
+    """
+    Pydantic схема для представлення запису довідника "Тип Завдання".
+    Успадковує всі поля від `BaseDictionarySchema`.
+    """
+    # Специфічні поля для TaskTypeSchema, якщо є, додаються тут.
     pass
 
-class TaskTypeCreate(TaskTypeBase):
+
+# Схема для створення нового запису Типу Завдання
+class TaskTypeCreateSchema(DictionaryCreateSchema):
     """
-    Schema for creating a new TaskType.
-    Inherits fields from TaskTypeBase. 'code' and 'name' are effectively required.
+    Pydantic схема для створення нового запису в довіднику "Тип Завдання".
+    Успадковує всі поля від `DictionaryCreateSchema`.
     """
+    # Специфічні поля для створення TaskType, якщо є, додаються тут.
     pass
 
-class TaskTypeUpdate(TaskTypeBase):
-    """
-    Schema for updating an existing TaskType.
-    All fields from TaskTypeBase are made optional here for partial updates.
-    """
-    code: Optional[str] = Field(None, min_length=1, max_length=100, description="Unique code or short identifier.")
-    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Human-readable name.")
-    description: Optional[str] = Field(None)
-    state: Optional[str] = Field(None, max_length=50)
-    is_default: Optional[bool] = Field(None)
-    display_order: Optional[int] = Field(None)
-    notes: Optional[str] = Field(None)
-    # If custom fields were in TaskTypeBase:
-    # awards_points_by_default: Optional[bool] = Field(None)
-    # default_points_value: Optional[int] = Field(None)
 
-
-class TaskTypeResponse(BaseDictionaryResponse):
+# Схема для оновлення існуючого запису Типу Завдання
+class TaskTypeUpdateSchema(DictionaryUpdateSchema):
     """
-    Schema for representing a TaskType in API responses.
-    Inherits all fields from BaseDictionaryResponse.
-    Add any TaskType-specific response fields here if TaskTypeBase had custom fields.
+    Pydantic схема для оновлення існуючого запису в довіднику "Тип Завдання".
+    Успадковує всі поля від `DictionaryUpdateSchema`.
     """
-    # If custom fields were in TaskTypeBase and should be in response:
-    # awards_points_by_default: Optional[bool] = Field(None, description="Awards points by default?")
-    # default_points_value: Optional[int] = Field(None, description="Default points value.")
+    # Специфічні поля для оновлення TaskType, якщо є, додаються тут.
     pass
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем TaskType.
+    print("--- Pydantic Схеми для Довідника: TaskType ---")
 
-    logger.info("--- TaskType Schemas (Dictionary) --- Demonstration")
-
-    # TaskTypeCreate Example
-    type_create_data = {
-        "code": "CHORE_DAILY",
-        "name": "Daily Chore",
-        "description": "A task that needs to be done daily.",
-        "state": "active",
-        # "awardsPointsByDefault": True, # camelCase alias example if field existed
-        # "defaultPointsValue": 5
-    }
-    try:
-        type_create_schema = TaskTypeCreate(**type_create_data)
-        logger.info(f"TaskTypeCreate valid: {type_create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating TaskTypeCreate: {e}")
-
-    # TaskTypeUpdate Example
-    type_update_data = {"description": "A recurring daily task for household members."}
-    type_update_schema = TaskTypeUpdate(**type_update_data)
-    logger.info(f"TaskTypeUpdate (partial): {type_update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # TaskTypeResponse Example
-    type_response_data = {
+    print("\nTaskTypeSchema (приклад для відповіді API):")
+    task_type_data_from_db = {
         "id": 1,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "code": "WORK_PROJECT_TASK",
-        "name": "Project Task",
-        "description": "A task related to a specific work project.",
+        "name": "Термінове Завдання",  # TODO i18n
+        "code": "URGENT_TASK",
+        "description": "Тип для завдань з високим пріоритетом.",  # TODO i18n
         "state": "active",
-        "isDefault": False,
-        "displayOrder": 1,
-        # "awardsPointsByDefault": True, # If field existed
-        # "defaultPointsValue": 25
+        "created_at": "2023-05-01T10:00:00Z",
+        "updated_at": "2023-05-01T12:30:00Z",
     }
-    try:
-        type_response_schema = TaskTypeResponse(**type_response_data) # type: ignore[call-arg]
-        logger.info(f"TaskTypeResponse: {type_response_schema.model_dump_json(by_alias=True, indent=2)}")
-    except Exception as e:
-        logger.error(f"Error creating TaskTypeResponse: {e}")
+    from datetime import datetime  # Потрібно для конвертації рядків у datetime
+
+    task_type_data_from_db['created_at'] = datetime.fromisoformat(
+        task_type_data_from_db['created_at'].replace('Z', '+00:00'))
+    task_type_data_from_db['updated_at'] = datetime.fromisoformat(
+        task_type_data_from_db['updated_at'].replace('Z', '+00:00'))
+
+    task_type_schema_instance = TaskTypeSchema(**task_type_data_from_db)
+    print(task_type_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nTaskTypeCreateSchema (приклад для створення):")
+    create_data = {
+        "name": "Подія",  # TODO i18n
+        "code": "EVENT",
+        "description": "Тип для відстеження подій."  # TODO i18n
+    }
+    create_schema_instance = TaskTypeCreateSchema(**create_data)
+    print(create_schema_instance.model_dump_json(indent=2))
+
+    print("\nTaskTypeUpdateSchema (приклад для оновлення):")
+    update_data = {
+        "description": "Оновлений опис для типу Подія."  # TODO i18n
+    }
+    update_schema_instance = TaskTypeUpdateSchema(**update_data)
+    print(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")

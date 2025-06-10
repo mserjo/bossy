@@ -1,193 +1,153 @@
 # backend/app/src/schemas/system/settings.py
-
 """
-Pydantic schemas for System Settings.
-"""
+Pydantic схеми для сутності "Системне Налаштування" (SystemSetting).
 
-import logging
+Цей модуль визначає схеми для:
+- Базового представлення системного налаштування (`SystemSettingBaseSchema`).
+- Створення нового системного налаштування (`SystemSettingCreateSchema`).
+- Оновлення значення існуючого системного налаштування (`SystemSettingUpdateSchema`).
+- Представлення даних про системне налаштування у відповідях API (`SystemSettingSchema`).
+"""
+from datetime import datetime  # Для TimestampedSchemaMixin
 from typing import Optional, Any, Dict
-from datetime import datetime, timezone # Added timezone for __main__
-import json # For model_validator example
 
-from pydantic import Field, field_validator, model_validator # Removed duplicate validator import
+from pydantic import Field
 
-from backend.app.src.schemas.base import BaseSchema, BaseResponseSchema
-from backend.app.src.models.system.settings import ValueTypeEnum # Import the Enum from the model
+# Абсолютний імпорт базових схем та міксинів
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
 
-# --- SystemSetting Schemas ---
+# TODO: Визначити та імпортувати Enum SettingValueType з core.dicts
+# from backend.app.src.core.dicts import SettingValueType
 
-class SystemSettingBase(BaseSchema):
-    """Base schema for system settings, containing all common fields."""
-    key: str = Field(..., min_length=3, max_length=255,
-                     description="Unique key identifying the setting (e.g., 'maintenance_mode', 'default_user_role').",
-                     example="maintenance_mode")
-    value: Optional[Any] = Field(None, description="The value of the setting. Type depends on 'value_type'. For creation/update, provide the actual type. For response, this might be the string representation from DB.", example="true")
-    value_type: ValueTypeEnum = Field(..., description="The intended data type of the value.", example=ValueTypeEnum.BOOLEAN)
-    name: Optional[str] = Field(None, max_length=255, description="Human-readable name or title for the setting.", example="Maintenance Mode")
-    description: Optional[str] = Field(None, description="Detailed description of what the setting controls.", example="Enable to put the site into maintenance mode.")
-    is_editable: bool = Field(True, description="Whether this setting can be modified by admins via an interface.", example=True)
-    group_name: Optional[str] = Field(None, max_length=100, description="Optional grouping for settings in an admin UI (e.g., 'General', 'Email').", example="General")
+# Заглушка для SettingValueType
+class TempSettingValueType:  # TODO: Видалити після імпорту Enum
+    STRING = "string"
+    INTEGER = "integer"
+    BOOLEAN = "boolean"
+    JSON = "json"
 
-    @model_validator(mode='before')
-    @classmethod
-    def validate_value_against_type(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
-            return data
 
-        value = data.get('value')
-        value_type_str = data.get('value_type') # This will be the string value of the enum member
+SETTING_KEY_MAX_LENGTH = 255
+SETTING_NAME_MAX_LENGTH = 255
+SETTING_VALUE_TYPE_MAX_LENGTH = 50
 
-        if value is None:
-            return data
 
-        try:
-            # Convert string representation of enum to actual enum member for comparison
-            value_type_enum = ValueTypeEnum(value_type_str) if value_type_str else None
-        except ValueError:
-            # Let Pydantic's field validation for `value_type` handle invalid enum strings.
-            return data
-
-        if value_type_enum:
-            try:
-                if value_type_enum == ValueTypeEnum.INTEGER:
-                    int(value)
-                elif value_type_enum == ValueTypeEnum.FLOAT:
-                    float(value)
-                elif value_type_enum == ValueTypeEnum.BOOLEAN:
-                    if not isinstance(value, (bool, int, str)) or (isinstance(value, str) and value.lower() not in ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off']):
-                         if isinstance(value, int) and value not in [0,1]: # only 0 and 1 for int->bool
-                            raise ValueError("Integer value for BOOLEAN must be 0 or 1.")
-                         elif isinstance(value, str): # if string, it must be a recognized boolean string
-                            pass # Pydantic will handle common boolean strings
-                         elif not isinstance(value, bool): # if not bool, int, or valid string
-                            raise ValueError("Boolean value must be a bool, int (0/1), or recognized string.")
-                elif value_type_enum == ValueTypeEnum.JSON:
-                    if isinstance(value, str): # If it's a string, try to parse it as JSON
-                        json.loads(value)
-                    elif not isinstance(value, (dict, list)): # If not a string, it should be dict or list
-                        raise ValueError("JSON value must be a valid JSON string, dict, or list.")
-            except (ValueError, TypeError, json.JSONDecodeError) as e:
-                # This is a pre-validation. Pydantic will do its own more specific validation per field.
-                # This validator is more about ensuring the 'value' is plausible for the 'value_type' before Pydantic's stricter checks.
-                # To make this error more specific to a field, you'd use field_validator, but that's harder with inter-field dependencies in Pydantic v2 < v2.7.
-                # For now, we'll log it and let Pydantic proceed. Or, you could raise a generic ValueError to fail fast.
-                logger.debug(f"Preliminary validation warning for key '{data.get('key', 'N/A')}': Value '{value}' might not be compatible with value_type '{value_type_enum.value if value_type_enum else 'N/A'}': {e}")
-        return data
-
-class SystemSettingCreate(SystemSettingBase):
-    """Schema for creating a new system setting."""
-    key: str = Field(..., min_length=3, max_length=255, description="Unique key for the setting.", example="new_feature_enabled")
-    value_type: ValueTypeEnum = Field(..., description="The data type of the value.", example=ValueTypeEnum.BOOLEAN)
-
-class SystemSettingUpdate(SystemSettingBase):
-    """Schema for updating an existing system setting. All fields are optional."""
-    key: Optional[str] = Field(None, min_length=3, max_length=255, description="Unique key for the setting.")
-    value: Optional[Any] = Field(None, description="The value of the setting. Type depends on 'value_type'.")
-    value_type: Optional[ValueTypeEnum] = Field(None, description="The data type of the value.")
-    name: Optional[str] = Field(None, max_length=255)
-    description: Optional[str] = Field(None)
-    is_editable: Optional[bool] = Field(None)
-    group_name: Optional[str] = Field(None, max_length=100)
-
-class SystemSettingResponse(BaseResponseSchema, SystemSettingBase):
+class SystemSettingBaseSchema(BaseSchema):
     """
-    Schema for representing a system setting in API responses.
-    Includes 'id', 'created_at', 'updated_at' from BaseResponseSchema.
-    The 'value' field here will represent the string value as stored in the database.
+    Базова схема для полів системного налаштування, спільних для створення та оновлення.
     """
-    value: Optional[str] = Field(None, description="The value of the setting as stored (usually string representation).", example="true")
-    # typed_value: Optional[Any] = Field(None, description="The value cast to its actual type. Populated at runtime by API if needed.", exclude=True) # Exclude from schema, populate in endpoint
+    key: str = Field(
+        ...,
+        max_length=SETTING_KEY_MAX_LENGTH,
+        description="Унікальний програмний ключ налаштування.",
+        examples=["site_name", "maintenance_mode"]
+    )
+    name: Optional[str] = Field(  # Людиночитана назва, успадкована з NameDescriptionMixin в моделі
+        None,
+        max_length=SETTING_NAME_MAX_LENGTH,
+        description="Людиночитана назва налаштування (для відображення в UI).",
+        examples=["Назва Сайту", "Режим Обслуговування"]
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Детальний опис призначення та використання налаштування."
+    )
+    # `value` тут не визначаємо, бо в Create воно обов'язкове, а в Update - опціональне.
+    # `value_type` також може відрізнятися.
 
-    # Example of a computed field if you want typed_value directly in the response schema (less common for direct DB model mapping)
-    # from pydantic import computed_field
-    # @computed_field
-    # @property
-    # def typed_value(self) -> Optional[Any]:
-    #     if self.value is None: return None
-    #     try:
-    #         if self.value_type == ValueTypeEnum.STRING: return str(self.value)
-    #         # ... (similar logic as model's get_typed_value)
-    #         else: return self.value
-    #     except: return self.value
+    # TODO: Замінити str на SettingValueType та додати валідатор на основі Enum.
+    value_type: str = Field(
+        default=TempSettingValueType.STRING,
+        max_length=SETTING_VALUE_TYPE_MAX_LENGTH,
+        description=f"Тип значення налаштування (наприклад, '{TempSettingValueType.STRING}', '{TempSettingValueType.BOOLEAN}')."
+    )
+    is_editable: bool = Field(
+        default=True,
+        description="Чи може суперкористувач редагувати це налаштування через UI/API."
+    )
+    is_sensitive: bool = Field(
+        default=False,
+        description="Чи є значення налаштування чутливим (наприклад, API ключ) і потребує маскування."
+    )
+    # model_config успадковується з BaseSchema (from_attributes=True)
+
+
+class SystemSettingCreateSchema(SystemSettingBaseSchema):
+    """
+    Схема для створення нового системного налаштування.
+    """
+    # Успадковує key, name, description, value_type, is_editable, is_sensitive.
+    value: Optional[Any] = Field(None,
+                                 description="Значення налаштування. Тип залежить від `value_type` (наприклад, str, int, bool, dict).")
+
+
+class SystemSettingUpdateSchema(BaseSchema):  # Не успадковує SystemSettingBaseSchema, щоб оновлювати лише value
+    """
+    Схема для оновлення значення існуючого системного налаштування.
+    Зазвичай оновлюється лише поле `value`. Інші поля (key, value_type) є системними.
+    Можна дозволити оновлення `name`, `description`, `is_editable`, `is_sensitive` за потреби.
+    """
+    value: Optional[Any] = Field(None, description="Нове значення налаштування. Тип має відповідати `value_type`.")
+    name: Optional[str] = Field(None, max_length=SETTING_NAME_MAX_LENGTH,
+                                description="Нова людиночитана назва налаштування.")
+    description: Optional[str] = Field(None, description="Новий опис налаштування.")
+    is_editable: Optional[bool] = Field(None, description="Новий статус можливості редагування.")
+    is_sensitive: Optional[bool] = Field(None, description="Новий статус чутливості значення.")
+    # value_type та key зазвичай не змінюються для існуючого налаштування.
+
+
+class SystemSettingSchema(SystemSettingBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+    """
+    Схема для представлення даних про системне налаштування у відповідях API.
+    Успадковує `id`, `created_at`, `updated_at` та поля з `SystemSettingBaseSchema`.
+    """
+    # id, created_at, updated_at - успадковані.
+    # key, name, description, value_type, is_editable, is_sensitive - успадковані.
+    value: Optional[Any] = Field(None,
+                                 description="Значення налаштування. Увага: чутливі значення можуть бути замасковані або відсутні.")
+    # Примітка: Фактичне маскування чутливих значень (`is_sensitive` = True)
+    # має відбуватися на рівні сервісу або при формуванні відповіді API,
+    # а не в самій схемі Pydantic (схема описує структуру даних).
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем системних налаштувань.
+    print("--- Pydantic Схеми для Системних Налаштувань (SystemSetting) ---")
 
-    logger.info("--- SystemSetting Schemas --- Demonstration")
-
-    # Create
-    setting_create_data = {
-        "key": "maintenance_mode",
-        "value": True,
-        "valueType": ValueTypeEnum.BOOLEAN, # Pass Enum member directly
-        "name": "Site Maintenance Mode",
-        "description": "Puts the site into read-only maintenance mode."
+    print("\nSystemSettingCreateSchema (приклад для створення):")
+    create_setting_data = {
+        "key": "max_users_per_group",
+        "name": "Макс. користувачів у групі",  # TODO i18n
+        "description": "Максимальна кількість користувачів, яку можна додати до однієї групи.",  # TODO i18n
+        "value": "100",  # Значення може бути рядком, потім конвертується відповідно до value_type
+        "value_type": TempSettingValueType.INTEGER,  # TODO: Замінити на Enum.value
+        "is_editable": True,
+        "is_sensitive": False
     }
-    try:
-        created_setting = SystemSettingCreate(**setting_create_data)
-        logger.info(f"SystemSettingCreate valid: {created_setting.model_dump(by_alias=True)}")
-        logger.info(f"  Value type: {type(created_setting.value)}, Value: {created_setting.value}")
-    except Exception as e:
-        logger.error(f"Error creating SystemSettingCreate: {e}")
+    create_setting_instance = SystemSettingCreateSchema(**create_setting_data)
+    print(create_setting_instance.model_dump_json(indent=2, exclude_none=True))
 
-    setting_create_json_data = {
-        "key": "feature_flags",
-        "value": {"new_dashboard": True, "beta_users": [1,2,3]},
-        "valueType": ValueTypeEnum.JSON,
-        "name": "Feature Flags"
-    }
-    try:
-        created_json_setting = SystemSettingCreate(**setting_create_json_data)
-        logger.info(f"SystemSettingCreate (JSON) valid: {created_json_setting.model_dump(by_alias=True)}")
-        logger.info(f"  Value type: {type(created_json_setting.value)}, Value: {created_json_setting.value}")
-    except Exception as e:
-        logger.error(f"Error creating SystemSettingCreate (JSON): {e}")
+    print("\nSystemSettingUpdateSchema (приклад для оновлення значення):")
+    update_setting_data = {"value": "150"}
+    update_setting_instance = SystemSettingUpdateSchema(**update_setting_data)
+    print(update_setting_instance.model_dump_json(indent=2, exclude_none=True))
 
-    # Example of a value that might be problematic if not handled carefully by service/model layer
-    # The schema validator here is basic and might pass this for string type.
-    setting_problematic_value = {
-        "key": "some_string_setting",
-        "value": {"complex": "object"}, # Passing a dict for a STRING type
-        "valueType": ValueTypeEnum.STRING,
-        "name": "Some String Setting"
-    }
-    try:
-        problem_setting = SystemSettingCreate(**setting_problematic_value)
-        logger.info(f"SystemSettingCreate with problematic value (for STRING type): {problem_setting.model_dump(by_alias=True)}")
-        # Service/model layer should ensure this dict is properly serialized to string if this is the intent.
-    except Exception as e:
-        logger.error(f"Error with problematic value: {e}")
-
-
-    # Update (all fields optional)
-    setting_update_data = {"value": "false", "description": "Site is fully operational."}
-    updated_setting = SystemSettingUpdate(**setting_update_data)
-    logger.info(f"SystemSettingUpdate: {updated_setting.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # Response
-    response_data = {
+    print("\nSystemSettingSchema (приклад відповіді API):")
+    setting_response_data = {
         "id": 1,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "key": "maintenance_mode",
-        "value": "true",
-        "valueType": ValueTypeEnum.BOOLEAN, # Pass Enum member
-        "name": "Site Maintenance Mode",
-        "isEditable": False
+        "key": "api_key_external_service",
+        "name": "API Ключ для Зовнішнього Сервісу X",  # TODO i18n
+        "value": "********",  # Приклад маскованого значення, якщо is_sensitive=True
+        "value_type": TempSettingValueType.STRING,  # TODO: Замінити на Enum.value
+        "is_editable": False,
+        "is_sensitive": True,
+        "created_at": datetime.now(),
+        "updated_at": datetime.now()
     }
-    response_setting = SystemSettingResponse(**response_data)
-    logger.info(f"SystemSettingResponse: {response_setting.model_dump_json(by_alias=True, indent=2)}")
-    logger.info(f"  Response value_type: {response_setting.value_type.value}")
+    setting_response_instance = SystemSettingSchema(**setting_response_data)
+    print(setting_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    # Example of response where value might be a JSON string
-    response_json_data = {
-        "id": 2, "createdAt": datetime.now(timezone.utc).isoformat(), "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "key": "feature_flags", "value": json.dumps({"new_dashboard": True}), "valueType": ValueTypeEnum.JSON
-    }
-    response_json_setting = SystemSettingResponse(**response_json_data)
-    logger.info(f"SystemSettingResponse (JSON value): {response_json_setting.model_dump_json(by_alias=True, indent=2)}")
+    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних системних налаштувань.")
+    print("TODO: Інтегрувати Enum 'SettingValueType' з core.dicts для поля 'value_type' та додати валідацію.")
+    print("Маскування чутливих значень (`is_sensitive`) має оброблятися на рівні сервісу/API.")

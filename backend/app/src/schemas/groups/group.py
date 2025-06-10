@@ -1,152 +1,187 @@
 # backend/app/src/schemas/groups/group.py
-
 """
-Pydantic schemas for Groups.
+Pydantic схеми для сутності "Група" (Group).
+
+Цей модуль визначає схеми для:
+- Базового представлення групи (`GroupBaseSchema`).
+- Створення нової групи (`GroupCreateSchema`).
+- Оновлення існуючої групи (`GroupUpdateSchema`).
+- Представлення групи у відповідях API (`GroupSchema`).
+- Деталізованого представлення групи (`GroupDetailSchema`), включаючи учасників та налаштування.
 """
+from datetime import datetime
+from typing import Optional, List, Any  # Any для тимчасових полів
 
-import logging
-from typing import Optional, List # For list of members in detailed response, if added
-from datetime import datetime, timezone # For BaseResponseSchema inheritance and examples
+from pydantic import Field, EmailStr  # EmailStr може знадобитися для UserPublicProfileSchema, якщо email там
 
-from pydantic import Field, HttpUrl
+# Абсолютний імпорт базових схем та міксинів
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+# BaseMainSchema не імпортуємо напряму, якщо GroupBaseSchema визначає поля самостійно
+# або якщо поля BaseMainSchema не повністю співпадають з тим, що потрібно для GroupBaseSchema.
+# Поточний план для GroupBaseSchema визначає поля, схожі на BaseMainSchema, але без group_id.
 
-from backend.app.src.schemas.base import BaseSchema, BaseMainResponseSchema
-# For OwnerBasicInfo and GroupTypeBasicInfo, we'd ideally have specific minimal schemas
-# from ..auth.user import UserPublicProfileResponse # Example for richer owner info
-# from ..dictionaries.group_types import GroupTypeResponse # Example for richer group_type info
+# TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
+from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для owner та members
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+# from backend.app.src.schemas.dictionaries.group_types import GroupTypeSchema # Для group_type
+# from backend.app.src.schemas.groups.settings import GroupSettingSchema # Для settings
+# from backend.app.src.schemas.groups.membership import GroupMembershipSchema # Для members, якщо потрібна роль
 
-# --- Sub-schemas for nested responses (examples) ---
-class OwnerBasicInfo(BaseSchema):
-    """Minimal info about a group owner for embedding in GroupResponse."""
-    id: int
-    name: Optional[str] = None # Or full_name, username etc.
-    # avatar_url: Optional[HttpUrl] = None
+GroupTypeSchema = Any  # Тимчасовий заповнювач
+GroupSettingSchema = Any  # Тимчасовий заповнювач
+GroupMembershipSchema = Any  # Тимчасовий заповнювач
 
-class GroupTypeBasicInfo(BaseSchema):
-    """Minimal info about a group type for embedding in GroupResponse."""
-    id: int
-    code: str
-    name: str
+# Максимальна довжина для поля 'name' може бути винесена в константи.
+GROUP_NAME_MAX_LENGTH = 255
 
-# --- Group Schemas ---
 
-class GroupBase(BaseSchema):
-    """Base schema for group data, common to create and update operations."""
-    name: str = Field(..., min_length=2, max_length=255, description="Name of the group.", example="The Avengers HQ")
-    description: Optional[str] = Field(None, description="Optional detailed description of the group.", example="A place for Earth's Mightiest Heroes to hang out.")
-    group_type_id: int = Field(..., description="ID of the group type (from dict_group_types).", example=1)
-    icon_url: Optional[HttpUrl] = Field(None, description="Optional URL to an icon for the group.", example="https://example.com/icons/avengers.png")
-    currency_name: Optional[str] = Field("points", max_length=50, description="Custom name for the group's currency/points.", example="Kudos Points")
-    state: Optional[str] = Field("active", max_length=50, description="State of the group (e.g., 'active', 'archived').", example="active")
-    # owner_id is usually set by the system based on the currently authenticated user during creation.
-    # It might be updatable by an admin via a specific endpoint/service method.
-
-class GroupCreate(GroupBase):
+class GroupBaseSchema(BaseSchema):
     """
-    Schema for creating a new group.
-    `owner_id` will be set by the backend service based on the current authenticated user.
+    Базова схема для полів групи.
+    Включає поля, спільні для створення, оновлення та представлення групи.
     """
-    # All fields from GroupBase are used. Name and group_type_id are mandatory.
-    pass
+    name: str = Field(
+        ...,  # Обов'язкове поле
+        max_length=GROUP_NAME_MAX_LENGTH,
+        description="Назва групи.",
+        examples=["Команда маркетингу", "Сімейний бюджет"]
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Детальний опис групи (необов'язково)."
+    )
+    # TODO: Валідувати group_type_code на основі існуючих кодів в довіднику GroupType
+    #       Це можна зробити за допомогою pydantic.validator або на рівні сервісу.
+    group_type_code: str = Field(
+        description="Код типу групи з довідника `dict_group_types` (наприклад, 'FAMILY', 'DEPARTMENT')."
+    )
+    # TODO: Розглянути використання Enum GroupState з core.dicts, якщо стани груп фіксовані.
+    state: Optional[str] = Field(
+        None,
+        max_length=50,
+        description="Стан групи (наприклад, 'active', 'archived', 'private'). Необов'язково.",
+        examples=["active"]
+    )
+    notes: Optional[str] = Field(
+        None,
+        description="Додаткові нотатки щодо групи (необов'язково)."
+    )
 
-class GroupUpdate(GroupBase):
+
+class GroupCreateSchema(GroupBaseSchema):
     """
-    Schema for updating an existing group.
-    All fields are optional for partial updates.
-    `group_type_id` and `owner_id` are typically not updatable or have specific service logic.
+    Схема для створення нової групи.
+    Успадковує базові поля групи. `owner_id` зазвичай встановлюється сервісом
+    на основі поточного автентифікованого користувача.
     """
-    name: Optional[str] = Field(None, min_length=2, max_length=255, description="Name of the group.")
-    description: Optional[str] = Field(None, description="Optional detailed description of the group.")
-    group_type_id: Optional[int] = Field(None, description="ID of the group type. Changing this might have significant implications.")
-    icon_url: Optional[HttpUrl] = Field(None, description="Optional URL to an icon for the group.")
-    currency_name: Optional[str] = Field(None, max_length=50, description="Custom name for the group's currency/points.")
-    state: Optional[str] = Field(None, max_length=50, description="State of the group.")
-    # owner_id: Optional[int] = Field(None, description="Transfer ownership. Requires special privileges.")
+    owner_id: Optional[int] = Field(
+        None,
+        description="ID користувача, який створює та стає власником групи. Встановлюється сервісом."
+    )
+    # При створенні групи можна також передавати початкові налаштування,
+    # але це може бути реалізовано і як окремий крок або значення за замовчуванням в моделі GroupSetting.
 
-class GroupResponse(BaseMainResponseSchema):
+
+class GroupUpdateSchema(GroupBaseSchema):
     """
-    Schema for representing a group in API responses.
-    Inherits id, created_at, updated_at, deleted_at, name, description, state, notes from BaseMainResponseSchema.
+    Схема для оновлення існуючої групи.
+    Всі поля, успадковані з `GroupBaseSchema`, стають опціональними.
+    Дозволяє оновлювати власника групи.
     """
-    # Override fields from BaseMainResponseSchema if their constraints/examples differ for Group
-    # name is already defined in BaseMainResponseSchema and is mandatory.
-    # description, state, notes are also from BaseMainResponseSchema and are Optional.
+    name: Optional[str] = Field(None, max_length=GROUP_NAME_MAX_LENGTH, description="Нова назва групи.")
+    description: Optional[str] = Field(None, description="Новий опис групи.")
+    group_type_code: Optional[str] = Field(None, description="Новий код типу групи.")
+    state: Optional[str] = Field(None, max_length=50, description="Новий стан групи.")
+    notes: Optional[str] = Field(None, description="Нові нотатки щодо групи.")
+    owner_id: Optional[int] = Field(None, description="Новий ID власника групи.")
 
-    # Group-specific fields from Group model
-    # owner_id: int = Field(..., description="ID of the group owner.") # Not usually exposed directly if owner object is present
-    # group_type_id: int = Field(..., description="ID of the group type.") # Not usually exposed directly if group_type object is present
-    icon_url: Optional[HttpUrl] = Field(None, description="URL to an icon for the group.")
-    currency_name: Optional[str] = Field(None, description="Custom name for the group's currency/points.")
 
-    # Enriched (nested) information - examples
-    owner: Optional[OwnerBasicInfo] = Field(None, description="Basic information about the group owner.")
-    group_type: Optional[GroupTypeBasicInfo] = Field(None, description="Basic information about the group type.")
+class GroupSchema(GroupBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+    """
+    Схема для представлення даних групи у відповідях API.
+    Включає `id`, часові мітки та розширену інформацію про власника та тип групи.
+    """
+    # id, created_at, updated_at успадковані з міксинів.
+    # name, description, group_type_code, state, notes успадковані з GroupBaseSchema.
 
-    # These fields are from BaseMainResponseSchema (which includes BaseResponseSchema -> IDSchemaMixin, TimestampSchemaMixin) and SoftDeleteSchemaMixin
-    # id: int
-    # created_at: datetime
-    # updated_at: datetime
-    # deleted_at: Optional[datetime]
+    owner: Optional[UserPublicProfileSchema] = Field(None, description="Публічний профіль власника групи.")
+    # TODO: Замінити Any на GroupTypeSchema, коли вона буде імпортована.
+    group_type: Optional[GroupTypeSchema] = Field(None, description="Об'єкт типу групи.")
 
-# For a more detailed response, e.g., including a list of members (paginated ideally)
-# from ..auth.user import UserPublicProfileResponse # Example for richer member info
-# class GroupMemberInfo(UserPublicProfileResponse):
-#     role_in_group: str = Field(..., description="User's role in this group")
+    members_count: Optional[int] = Field(None, description="Кількість учасників у групі (обчислюване поле).",
+                                         examples=[10])
+    # model_config успадковується з GroupBaseSchema -> BaseSchema (from_attributes=True)
 
-# class GroupDetailedResponse(GroupResponse):
-#     members: Optional[List[GroupMemberInfo]] = Field(None, description="List of group members (subset for detail view)")
-#     # tasks_summary: Optional[Any] = Field(None, description="Summary of tasks in the group")
+
+class GroupDetailSchema(GroupSchema):
+    """
+    Схема для деталізованого представлення групи.
+    Додає список учасників (або членства) та налаштування групи до базової схеми `GroupSchema`.
+    """
+    # TODO: Замінити List[UserPublicProfileSchema] на List[GroupMembershipSchema] для включення ролі користувача в групі.
+    #       Або створити спеціальну схему MemberSchema, що включає профіль користувача та його роль.
+    members: Optional[List[UserPublicProfileSchema]] = Field(default_factory=list,
+                                                             description="Список публічних профілів учасників групи.")
+
+    # TODO: Замінити Any на GroupSettingSchema, коли вона буде імпортована.
+    settings: Optional[GroupSettingSchema] = Field(None, description="Налаштування групи.")
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем груп.
+    print("--- Pydantic Схеми для Груп (Group) ---")
 
-    logger.info("--- Group Schemas --- Demonstration")
-
-    # GroupCreate Example
-    group_create_data = {
-        "name": "Kudos Champions Team",
-        "description": "A team dedicated to promoting kudos and recognition.",
-        "groupTypeId": 1, # camelCase for group_type_id
-        "iconUrl": "https://example.com/icon.png",
-        "currencyName": "Kudos"
+    print("\nGroupBaseSchema (приклад):")
+    base_data = {
+        "name": "Базова Група",  # TODO i18n
+        "group_type_code": "DEPARTMENT",
+        "description": "Опис базової групи."  # TODO i18n
     }
-    try:
-        group_create_schema = GroupCreate(**group_create_data) # type: ignore[call-arg]
-        logger.info(f"GroupCreate valid: {group_create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating GroupCreate: {e}")
+    base_instance = GroupBaseSchema(**base_data)
+    print(base_instance.model_dump_json(indent=2))
 
-    # GroupUpdate Example
-    group_update_data = {"description": "An awesome team for peer recognition and motivation!", "currencyName": "Super Kudos"}
-    group_update_schema = GroupUpdate(**group_update_data) # type: ignore[call-arg]
-    logger.info(f"GroupUpdate (partial): {group_update_schema.model_dump(exclude_unset=True, by_alias=True)}")
+    print("\nGroupCreateSchema (приклад):")
+    create_data = {
+        "name": "Нова Команда",  # TODO i18n
+        "group_type_code": "TEAM_PROJECT",
+        "description": "Команда для нового проекту X.",  # TODO i18n
+        # owner_id не вказується клієнтом, а встановлюється сервером
+    }
+    create_instance = GroupCreateSchema(**create_data)
+    print(create_instance.model_dump_json(indent=2))
 
-    # GroupResponse Example
-    owner_info_data = {"id": 101, "name": "Tony Stark"}
-    group_type_info_data = {"id": 1, "code": "PROJECT_TEAM", "name": "Project Team"}
+    print("\nGroupUpdateSchema (приклад):")
+    update_data = {"description": "Оновлений опис команди для проекту X.", "state": "archived"}  # TODO i18n
+    update_instance = GroupUpdateSchema(**update_data)
+    print(update_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nGroupSchema (приклад відповіді API):")
     group_response_data = {
         "id": 1,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "deletedAt": None,
-        "name": "Kudos Champions Team",
-        "description": "An awesome team for peer recognition and motivation!",
-        "state": "active",
-        "notes": "Initial setup phase.",
-        "iconUrl": "https://example.com/icon.png",
-        "currencyName": "Super Kudos",
-        "owner": owner_info_data,
-        "groupType": group_type_info_data
+        "name": "Основна Група",  # TODO i18n
+        "group_type_code": "GENERAL",
+        "created_at": datetime.now(),
+        "updated_at": datetime.now(),
+        "owner": {"id": 101, "name": "Власник Групи"},  # TODO i18n (UserPublicProfileSchema)
+        # "group_type": {"id": 1, "name": "Загальний", "code": "GENERAL"}, # Приклад GroupTypeSchema
+        "members_count": 5
     }
-    try:
-        group_response_schema = GroupResponse(**group_response_data) # type: ignore[call-arg]
-        logger.info(f"GroupResponse: {group_response_schema.model_dump_json(by_alias=True, indent=2)}")
-        if group_response_schema.owner:
-            logger.info(f"  Owner Name (from nested schema): {group_response_schema.owner.name}")
-    except Exception as e:
-        logger.error(f"Error creating GroupResponse: {e}")
+    group_response_instance = GroupSchema(**group_response_data)
+    print(group_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nGroupDetailSchema (приклад деталізованої відповіді API):")
+    group_detail_data = {
+        **group_response_data,  # Успадковує поля з GroupSchema
+        "members": [
+            {"id": 101, "name": "Власник Групи"},  # TODO i18n
+            {"id": 102, "name": "Учасник Один"}  # TODO i18n
+        ],
+        # "settings": {"currency_name": "бали", "allow_decimal_bonuses": False} # Приклад GroupSettingSchema
+    }
+    group_detail_instance = GroupDetailSchema(**group_detail_data)
+    print(group_detail_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nПримітка: Схеми `GroupTypeSchema`, `GroupSettingSchema` та представлення учасників (`members`)")
+    print("наразі використовують заповнювачі (Any або базові типи). Їх потрібно буде замінити")
+    print("на відповідні конкретні схеми після їх рефакторингу/визначення.")
+    print("Також, `group_type_code` потребує валідації на рівні сервісу або схеми.")

@@ -14,10 +14,12 @@
 беруться з `settings.py`.
 """
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Any
+from typing import Optional, Any # Union було видалено, оскільки воно не використовується в цьому файлі.
+# `jose.exceptions` імпортується для типізації конкретних помилок JWT
 from jose import jwt, JWTError, exceptions as jose_exceptions
 from passlib.context import CryptContext
 
+# Абсолютний імпорт налаштувань та логера
 from backend.app.src.config.settings import settings
 from backend.app.src.config.logging import get_logger
 

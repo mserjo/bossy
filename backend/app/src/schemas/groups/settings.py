@@ -1,139 +1,138 @@
 # backend/app/src/schemas/groups/settings.py
-
 """
-Pydantic schemas for Group Settings.
+Pydantic схеми для сутності "Налаштування Групи" (GroupSetting).
+
+Цей модуль визначає схеми для:
+- Базового представлення налаштувань групи (`GroupSettingBaseSchema`).
+- Оновлення налаштувань групи (`GroupSettingUpdateSchema`).
+- Представлення налаштувань групи у відповідях API (`GroupSettingSchema`).
 """
+from datetime import datetime
+from typing import Optional
+from decimal import Decimal
 
-import logging
-from typing import Optional, Any, Dict
-from datetime import datetime, timezone # Added timezone for __main__
-import json # For model_validator example
+from pydantic import Field
 
-from pydantic import Field, model_validator
+# Абсолютний імпорт базових схем та міксинів
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 
-from backend.app.src.schemas.base import BaseSchema, BaseResponseSchema
-# Assuming ValueTypeEnum is defined in system.settings or a central core.types/enums module
-# For this example, we'll re-import it from system.settings model path.
-# In a real app, ensure this enum is defined in a common accessible place (e.g., core.dicts or core.enums)
-# to avoid potential circular dependencies if schemas.system.settings needed to import something from schemas.groups.
-from backend.app.src.models.system.settings import ValueTypeEnum as SystemValueTypeEnum # Using the one from system settings model
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
-
-# --- GroupSetting Schemas ---
-
-class GroupSettingBase(BaseSchema):
-    """Base schema for group settings, common for create and update."""
-    key: str = Field(..., min_length=3, max_length=255,
-                     description="Unique key identifying the setting within the group (e.g., 'max_members', 'task_approval_required').",
-                     example="task_approval_required")
-    value: Optional[Any] = Field(None, description="The value of the setting. Type depends on 'value_type'.", example="true")
-    value_type: SystemValueTypeEnum = Field(..., description="The intended data type of the value.", example=SystemValueTypeEnum.BOOLEAN)
-    name: Optional[str] = Field(None, max_length=255, description="Human-readable name for the setting (for UI).", example="Task Approval Required")
-    description: Optional[str] = Field(None, description="Description of what this setting controls (for UI).", example="If true, task completions require admin approval.")
-    is_editable_by_group_admin: bool = Field(True, description="Can group admins modify this setting?", example=True)
-    # group_id is typically a path parameter in API calls, not part of request body for these operations.
-
-    @model_validator(mode='before')
-    @classmethod
-    def validate_value_against_type(cls, data: Any) -> Any:
-        if not isinstance(data, dict):
-            return data
-        value = data.get('value')
-        value_type_str = data.get('value_type') # This will be the string value of the enum member
-        if value is None: return data
-
-        try:
-            value_type_enum = SystemValueTypeEnum(value_type_str) if value_type_str else None
-        except ValueError:
-            return data
-
-        if value_type_enum:
-            try:
-                if value_type_enum == SystemValueTypeEnum.INTEGER: int(value)
-                elif value_type_enum == SystemValueTypeEnum.FLOAT: float(value)
-                elif value_type_enum == SystemValueTypeEnum.BOOLEAN:
-                    if not isinstance(value, (bool, int, str)) or (isinstance(value, str) and value.lower() not in ['true', 'false', '1', '0', 'yes', 'no', 'on', 'off']):
-                        if isinstance(value, int) and value not in [0,1]: raise ValueError("Int for BOOLEAN must be 0 or 1.")
-                        elif isinstance(value, str): pass
-                        elif not isinstance(value, bool): raise ValueError("Bool value must be bool, int (0/1), or recognized str.")
-                elif value_type_enum == SystemValueTypeEnum.JSON:
-                    if isinstance(value, str): json.loads(value)
-                    elif not isinstance(value, (dict, list)): raise ValueError("JSON value must be valid JSON str, dict, or list.")
-            except (ValueError, TypeError, json.JSONDecodeError) as e:
-                logger.debug(f"Preliminary validation warning for group setting key '{data.get('key', 'N/A')}': Value '{value}' might not be compatible with value_type '{value_type_enum.value if value_type_enum else 'N/A'}': {e}")
-        return data
-
-class GroupSettingCreate(GroupSettingBase):
-    """Schema for creating a new group setting for a specific group."""
-    # Key and value_type are mandatory from GroupSettingBase
-    value: Any = Field(..., description="The value for the setting.") # Make value mandatory for creation
-
-class GroupSettingUpdate(BaseSchema): # Changed to BaseSchema to define all fields as optional explicitly
+class GroupSettingBaseSchema(BaseSchema):
     """
-    Schema for updating an existing group setting.
-    All fields are optional for partial updates. Key is not updatable.
+    Базова схема для полів налаштувань групи.
+    Визначає налаштування, які можуть бути застосовані до групи.
     """
-    # key: Optional[str] = Field(None, description="Key is generally not updatable.", exclude=True) # Key is usually not part of update payload, identified in path
-    value: Optional[Any] = Field(None, description="The new value for the setting.")
-    value_type: Optional[SystemValueTypeEnum] = Field(None, description="The data type of the value (changing this might require value revalidation).")
-    name: Optional[str] = Field(None, max_length=255, description="Human-readable name for the setting.")
-    description: Optional[str] = Field(None, description="Description of what this setting controls.")
-    is_editable_by_group_admin: Optional[bool] = Field(None, description="Can group admins modify this setting?")
+    # TODO i18n: default value 'бали' for currency_name
+    currency_name: str = Field(
+        default='бали',
+        max_length=50,
+        description="Назва внутрішньої валюти/бонусів групи (наприклад, 'бали', 'очки', 'зірочки')."
+    )
+    allow_decimal_bonuses: bool = Field(
+        default=False,
+        description="Чи дозволені дробові значення для бонусів у групі."
+    )
+    max_debt_amount: Optional[Decimal] = Field(
+        None,
+        # ge=0, # TODO: Вирішити, чи борг має бути >=0, чи може бути від'ємним числом (що представляє ліміт боргу)
+        # Якщо це ліміт боргу, то він має бути від'ємним або нульовим, або додатнім для максимального боргу.
+        # Краще уточнити логіку. Поки що без обмеження ge=0.
+        description="Максимально допустима сума 'боргу' (від'ємного балансу) для учасника. NULL означає відсутність ліміту."
+    )
+    task_completion_requires_review: bool = Field(
+        default=True,
+        description="Чи потребує виконання завдання перевірки адміністратором перед нарахуванням бонусів."
+    )
+    allow_task_reviews: bool = Field(
+        default=True,
+        description="Чи дозволено користувачам залишати відгуки/рейтинги до завдань у групі."
+    )
+    allow_gamification_levels: bool = Field(
+        default=True,
+        description="Чи активна система рівнів гейміфікації в групі."
+    )
+    allow_gamification_badges: bool = Field(
+        default=True,
+        description="Чи активна система бейджів/досягнень гейміфікації в групі."
+    )
+    allow_gamification_ratings: bool = Field(
+        default=True,
+        description="Чи активна система рейтингів користувачів гейміфікації в групі."
+    )
+    # model_config успадковується з BaseSchema (from_attributes=True)
 
 
-class GroupSettingResponse(BaseResponseSchema, GroupSettingBase):
+class GroupSettingCreateSchema(GroupSettingBaseSchema):
     """
-    Schema for representing a group setting in API responses.
-    Includes 'id', 'created_at', 'updated_at' from BaseResponseSchema.
-    Also includes group_id.
+    Схема для створення налаштувань групи.
+    `group_id` є обов'язковим при створенні.
     """
-    group_id: int = Field(..., description="ID of the group this setting belongs to.", example=1)
-    value: Optional[str] = Field(None, description="The value of the setting as stored (string representation).", example="true")
-    # Similar to SystemSettingResponse, a 'typed_value: Any' could be added here, populated by API logic.
+    group_id: int = Field(description="Ідентифікатор групи, для якої створюються ці налаштування.")
+
+
+class GroupSettingUpdateSchema(GroupSettingBaseSchema):
+    """
+    Схема для оновлення налаштувань групи.
+    Всі поля є опціональними, оскільки оновлення може бути частковим.
+    """
+    currency_name: Optional[str] = Field(None, max_length=50, description="Нова назва валюти бонусів.")
+    allow_decimal_bonuses: Optional[bool] = Field(None, description="Нове значення дозволу дробових бонусів.")
+    max_debt_amount: Optional[Decimal] = Field(None, description="Нове значення максимального боргу.")
+    task_completion_requires_review: Optional[bool] = Field(None, description="Нове значення вимоги перевірки завдань.")
+    allow_task_reviews: Optional[bool] = Field(None, description="Нове значення дозволу відгуків на завдання.")
+    allow_gamification_levels: Optional[bool] = Field(None, description="Новий статус системи рівнів.")
+    allow_gamification_badges: Optional[bool] = Field(None, description="Новий статус системи бейджів.")
+    allow_gamification_ratings: Optional[bool] = Field(None, description="Новий статус системи рейтингів.")
+
+
+class GroupSettingSchema(GroupSettingBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+    """
+    Схема для представлення налаштувань групи у відповідях API.
+    Включає `id` групи, до якої належать налаштування, та часові мітки.
+    """
+    # id, created_at, updated_at успадковані з міксинів.
+    # Інші поля успадковані з GroupSettingBaseSchema.
+    group_id: int = Field(description="Ідентифікатор групи, до якої належать ці налаштування.")
+
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем налаштувань групи.
+    print("--- Pydantic Схеми для Налаштувань Групи (GroupSetting) ---")
 
-    logger.info("--- GroupSetting Schemas --- Demonstration")
-
-    # GroupSettingCreate Example
-    setting_create_data = {
-        "key": "allow_member_invite",
-        "value": False,
-        "valueType": SystemValueTypeEnum.BOOLEAN, # Pass Enum member
-        "name": "Allow Member Invitations",
-        "description": "If true, regular members can invite others to the group.",
-        "isEditableByGroupAdmin": True
+    print("\nGroupSettingBaseSchema (приклад):")
+    base_settings_data = {
+        "currency_name": "кристали",  # TODO i18n
+        "allow_decimal_bonuses": True,
+        "max_debt_amount": Decimal("50.00")
     }
-    try:
-        create_schema = GroupSettingCreate(**setting_create_data) # type: ignore[call-arg]
-        logger.info(f"GroupSettingCreate valid: {create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating GroupSettingCreate: {e}")
+    base_settings_instance = GroupSettingBaseSchema(**base_settings_data)
+    print(base_settings_instance.model_dump_json(indent=2))
 
-    # GroupSettingUpdate Example
-    setting_update_data = {"value": True, "description": "Regular members are now allowed to invite others."}
-    update_schema = GroupSettingUpdate(**setting_update_data)
-    logger.info(f"GroupSettingUpdate (partial): {update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # GroupSettingResponse Example
-    response_data = {
-        "id": 10,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "groupId": 1, # camelCase for group_id
-        "key": "daily_task_limit",
-        "value": "10", # Stored as string
-        "valueType": SystemValueTypeEnum.INTEGER, # Pass Enum member
-        "name": "Daily Task Creation Limit",
-        "isEditableByGroupAdmin": True
+    print("\nGroupSettingUpdateSchema (приклад для оновлення):")
+    update_settings_data = {
+        "currency_name": "золоті монети",  # TODO i18n
+        "allow_task_reviews": False
     }
-    try:
-        response_schema = GroupSettingResponse(**response_data) # type: ignore[call-arg]
-        logger.info(f"GroupSettingResponse: {response_schema.model_dump_json(by_alias=True, indent=2)}")
-        logger.info(f"  Response value_type: {response_schema.value_type.value}")
-    except Exception as e:
-        logger.error(f"Error creating GroupSettingResponse: {e}")
+    update_settings_instance = GroupSettingUpdateSchema(**update_settings_data)
+    print(update_settings_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nGroupSettingSchema (приклад відповіді API):")
+    setting_response_data = {
+        "id": 1,  # ID самого запису налаштувань
+        "group_id": 101,  # ID групи
+        "currency_name": "бали",  # TODO i18n
+        "allow_decimal_bonuses": False,
+        "max_debt_amount": None,
+        "task_completion_requires_review": True,
+        "allow_task_reviews": True,
+        "allow_gamification_levels": True,
+        "allow_gamification_badges": True,
+        "allow_gamification_ratings": True,
+        "created_at": datetime.now(),
+        "updated_at": datetime.now()
+    }
+    setting_response_instance = GroupSettingSchema(**setting_response_data)
+    print(setting_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    print("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних налаштувань групи.")
+    print("Поле 'max_debt_amount' може потребувати уточнення логіки (чи може бути від'ємним для позначення ліміту).")

@@ -1,159 +1,92 @@
 # backend/app/src/repositories/bonuses/reward_repository.py
-
 """
-Repository for Reward entities.
-Provides CRUD operations and specific methods for managing redeemable rewards.
+Репозиторій для моделі "Нагорода" (Reward).
+
+Цей модуль визначає клас `RewardRepository`, який успадковує `BaseRepository`
+та надає специфічні методи для роботи з нагородами, доступними в групах.
 """
 
-import logging
-from typing import Optional, List
-from datetime import datetime, timezone # Added timezone
+from typing import List, Optional, Tuple, Any
 
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update # Added update for stock management
+# from sqlalchemy.orm import selectinload
 
-from backend.app.src.models.bonuses.reward import Reward
-from backend.app.src.schemas.bonuses.reward import RewardCreate, RewardUpdate
+# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+# Абсолютний імпорт моделі та схем
+from backend.app.src.models.bonuses.reward import Reward
+from backend.app.src.schemas.bonuses.reward import RewardCreateSchema, RewardUpdateSchema
 
-logger = logging.getLogger(__name__)
 
-class RewardRepository(BaseRepository[Reward, RewardCreate, RewardUpdate]):
+# from backend.app.src.core.dicts import SomeStateEnum # Якщо поле state використовує Enum
+# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
+
+# logger = get_logger(__name__)
+
+class RewardRepository(BaseRepository[Reward, RewardCreateSchema, RewardUpdateSchema]):
     """
-    Repository for managing Reward records.
+    Репозиторій для управління нагородами (`Reward`).
+
+    Успадковує базові CRUD-методи від `BaseRepository` та надає
+    методи для отримання нагород, доступних у конкретній групі.
     """
 
-    def __init__(self):
-        super().__init__(Reward)
-
-    async def get_rewards_for_group(
-        self,
-        db: AsyncSession,
-        *,
-        group_id: int,
-        is_active: Optional[bool] = True, # Default to only active rewards
-        in_stock_only: bool = False, # Default to show all, even if stock is 0 but not null
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[Reward]:
+    def __init__(self, db_session: AsyncSession):
         """
-        Retrieves rewards for a specific group, optionally filtered by active status and stock.
+        Ініціалізує репозиторій для моделі `Reward`.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            group_id: The ID of the group.
-            is_active: Optional. If True, only active rewards. If False, only inactive. If None, all.
-            in_stock_only: If True, only returns rewards where stock_quantity > 0 or stock_quantity is NULL (unlimited).
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
-
-        Returns:
-            A list of Reward objects.
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        conditions = [self.model.group_id == group_id] # type: ignore[attr-defined]
-        if is_active is not None:
-            conditions.append(self.model.is_active == is_active) # type: ignore[attr-defined]
+        super().__init__(db_session=db_session, model=Reward)
 
-        if in_stock_only:
-            conditions.append(
-                (self.model.stock_quantity > 0) | (self.model.stock_quantity.is_(None)) # type: ignore[attr-defined]
-            )
-
-        if hasattr(self.model, "deleted_at"): # Exclude soft-deleted by default
-            conditions.append(self.model.deleted_at.is_(None)) # type: ignore[attr-defined]
-
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.cost_in_points.asc(), self.model.name.asc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
-
-    async def decrement_stock(self, db: AsyncSession, *, reward_id: int, quantity: int = 1) -> Optional[Reward]:
+    async def get_rewards_by_group_id(
+            self,
+            group_id: int,
+            active_only: bool = True,
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[Reward], int]:
         """
-        Decrements the stock_quantity of a specific reward.
-        This method should be used carefully, ideally within a transaction managed by a service
-        that also handles point deduction and records the redemption.
-        It does not decrement if stock_quantity is NULL (unlimited).
+        Отримує список нагород, доступних у вказаній групі, з пагінацією.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            reward_id: The ID of the Reward to update.
-            quantity: The amount to decrement the stock by (default is 1).
+            group_id (int): ID групи.
+            active_only (bool): Якщо True, повертає лише активні нагороди
+                                (де поле `state` має значення "active").
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            The updated Reward object if stock was sufficient and updated,
-            None if reward not found, or if stock is NULL (unlimited),
-            or if stock was insufficient (raises ValueError in that case).
-        Raises:
-            ValueError: If stock is insufficient or update fails due to concurrency.
+            Tuple[List[Reward], int]: Кортеж зі списком нагород та їх загальною кількістю.
         """
-        reward = await self.get(db, id=reward_id)
-        if not reward:
-            return None
+        filters = [self.model.group_id == group_id]
+        if active_only:
+            # Модель Reward успадковує BaseMainModel, який має поле 'state' через StateMixin.
+            # Припускаємо, що активний стан позначається як "active".
+            # TODO: Узгодити значення "active" з можливим Enum для станів, якщо такий буде використовуватися.
+            filters.append(self.model.state == "active")
+            # Додатково можна фільтрувати за quantity_available > 0, якщо це потрібно
+            # filters.append(or_(self.model.quantity_available > 0, self.model.quantity_available == None))
 
-        if reward.stock_quantity is not None:
-            if reward.stock_quantity < quantity:
-                raise ValueError(f"Insufficient stock for reward ID {reward_id}. Available: {reward.stock_quantity}, Requested: {quantity}")
+        order_by = [self.model.cost.asc(), self.model.name.asc()]  # Сортувати за вартістю, потім за назвою
+        # options = [selectinload(self.model.group)] # Якщо потрібно завантажувати групу
 
-            new_stock = reward.stock_quantity - quantity
-            stmt = (
-                update(self.model)
-                .where(self.model.id == reward_id) # type: ignore[attr-defined]
-                .where(self.model.stock_quantity >= quantity) # type: ignore[attr-defined]
-                .values(stock_quantity=new_stock, updated_at=datetime.now(timezone.utc))
-                .execution_options(synchronize_session="fetch")
-            )
-            result = await db.execute(stmt)
-            if result.rowcount == 0:
-                await db.rollback()
-                raise ValueError(f"Failed to decrement stock for reward ID {reward_id} due to concurrent update or insufficient stock.")
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)  # , options=options)
 
-            await db.commit()
-            # Refresh the object in the current session to reflect the changes
-            await db.refresh(reward)
-            # It's good practice to ensure the in-memory object also reflects the change directly
-            # if not relying solely on refresh or if synchronize_session='fetch' behavior is nuanced.
-            reward.stock_quantity = new_stock
-            reward.updated_at = stmt.compile().params['updated_at'] # Get actual timestamp used if needed from compiled statement
 
-        return reward
+if __name__ == "__main__":
+    # Демонстраційний блок для RewardRepository.
+    print("--- Репозиторій Нагород (RewardRepository) ---")
 
-    async def increment_stock(self, db: AsyncSession, *, reward_id: int, quantity: int = 1) -> Optional[Reward]:
-        """
-        Increments the stock_quantity of a specific reward.
-        Useful if a redemption is cancelled or stock is replenished.
-        Does not increment if stock_quantity is NULL (unlimited).
+    print("Для тестування RewardRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    print(f"Він успадковує методи від BaseRepository для моделі {Reward.__name__}.")
+    print(f"  Очікує схему створення: {RewardCreateSchema.__name__}")
+    print(f"  Очікує схему оновлення: {RewardUpdateSchema.__name__}")
 
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            reward_id: The ID of the Reward to update.
-            quantity: The amount to increment the stock by (default is 1).
+    print("\nСпецифічні методи:")
+    print("  - get_rewards_by_group_id(group_id: int, active_only: bool = True, skip: int = 0, limit: int = 100)")
 
-        Returns:
-            The updated Reward object if found and updated, None otherwise.
-        """
-        reward = await self.get(db, id=reward_id)
-        if not reward:
-            return None
-
-        if reward.stock_quantity is not None:
-            new_stock = reward.stock_quantity + quantity
-            stmt = (
-                update(self.model)
-                .where(self.model.id == reward_id) # type: ignore[attr-defined]
-                .values(stock_quantity=new_stock, updated_at=datetime.now(timezone.utc))
-                .execution_options(synchronize_session="fetch")
-            )
-            await db.execute(stmt)
-            await db.commit()
-            await db.refresh(reward)
-            reward.stock_quantity = new_stock
-            reward.updated_at = stmt.compile().params['updated_at']
-
-        return reward
-
-    # BaseRepository methods create, get, update, remove are inherited.
+    print("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    print("TODO: Узгодити значення 'active' для фільтра `active_only` з можливим Enum для станів.")

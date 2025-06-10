@@ -1,28 +1,73 @@
 # backend/app/src/repositories/dictionaries/status_repository.py
-
 """
-Repository for Status dictionary entries.
+Репозиторій для моделі "Статус" (Status).
+
+Цей модуль визначає клас `StatusRepository`, який успадковує `BaseDictionaryRepository`
+та надає специфічні методи для роботи з довідником статусів, якщо такі потрібні,
+окрім стандартних CRUD операцій та пошуку за кодом/назвою.
 """
 
-import logging
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.src.models.dictionaries.statuses import Status
-from backend.app.src.schemas.dictionaries.statuses import StatusCreate, StatusUpdate
+# Абсолютний імпорт базового репозиторію для довідників
 from backend.app.src.repositories.dictionaries.base_dict_repository import BaseDictionaryRepository
 
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт моделі та схем для Статусів
+from backend.app.src.models.dictionaries.statuses import Status
+from backend.app.src.schemas.dictionaries.statuses import StatusCreateSchema, StatusUpdateSchema
 
-class StatusRepository(BaseDictionaryRepository[Status, StatusCreate, StatusUpdate]):
-    """
-    Repository for managing Status dictionary records.
-    Inherits common dictionary operations from BaseDictionaryRepository.
-    """
-    def __init__(self):
-        super().__init__(Status)
 
-    # Add any Status-specific methods here if needed.
-    # For example, if Status model had a 'category' field:
-    # async def get_by_category(self, db: AsyncSession, *, category: str) -> List[Status]:
-    #     statement = select(self.model).where(self.model.category == category)
-    #     result = await db.execute(statement)
+# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
+
+# logger = get_logger(__name__)
+
+class StatusRepository(BaseDictionaryRepository[Status, StatusCreateSchema, StatusUpdateSchema]):
+    """
+    Репозиторій для управління записами довідника "Статус".
+
+    Успадковує всі базові методи CRUD та специфічні для довідників методи
+    (наприклад, `get_by_code`, `get_by_name`) від `BaseDictionaryRepository`.
+    Може бути розширений специфічними методами для роботи зі статусами, якщо це необхідно.
+    """
+
+    def __init__(self, db_session: AsyncSession):
+        """
+        Ініціалізує репозиторій для моделі `Status`.
+
+        Args:
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
+        """
+        super().__init__(db_session=db_session, model=Status)
+
+    # Приклад специфічного методу для цього репозиторію (якщо потрібно):
+    # async def get_active_statuses(self) -> List[Status]:
+    #     """Повертає список усіх активних статусів."""
+    #     stmt = select(self.model).where(self.model.state == "active") # Припускаючи, що є поле 'state'
+    #     result = await self.db_session.execute(stmt)
     #     return list(result.scalars().all())
+
+
+if __name__ == "__main__":
+    # Демонстраційний блок для StatusRepository.
+    # Для реального тестування потрібна активна сесія БД та налаштована база даних.
+    print("--- Репозиторій для Довідника Статусів (StatusRepository) ---")
+
+    # Концептуальна демонстрація створення екземпляра:
+    # async def demo():
+    #     # Потрібна асинхронна сесія (mock або реальна)
+    #     mock_session = None # Замініть на реальну або макет сесії
+    #     if mock_session:
+    #         repo = StatusRepository(mock_session)
+    #         print(f"Екземпляр StatusRepository створено: {repo}")
+    #         # Тут можна було б викликати методи, якби сесія була активною
+    #         # Наприклад:
+    #         # active_statuses = await repo.get_active_statuses()
+    #         # print(f"Активні статуси: {active_statuses}")
+    # import asyncio
+    # asyncio.run(demo())
+
+    print("Для тестування StatusRepository потрібна асинхронна сесія SQLAlchemy.")
+    print(f"Він успадковує методи від BaseDictionaryRepository для моделі {Status.__name__}.")
+    # Показати, які схеми він очікує (для інформації)
+    print(f"  Очікує схему створення: {StatusCreateSchema.__name__}")
+    print(f"  Очікує схему оновлення: {StatusUpdateSchema.__name__}")

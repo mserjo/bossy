@@ -1,104 +1,143 @@
 # backend/app/src/models/gamification/rating.py
-
 """
-SQLAlchemy model for UserGroupRating, storing user ratings or scores within groups for specific periods.
+Модель SQLAlchemy для сутності "Рейтинг Користувача в Групі" (UserGroupRating).
+
+Цей модуль визначає модель `UserGroupRating`, яка зберігає розрахований
+рейтинг або бали користувача в контексті конкретної групи за певний період
+або для певного типу рейтингу (наприклад, загальний, місячний).
 """
+from datetime import datetime, date, timezone  # date для period_*, timezone для __main__
+from typing import TYPE_CHECKING, Optional
 
-import logging
-from typing import Optional, TYPE_CHECKING
-from datetime import datetime, date, timezone # Added date for period_start/end and timezone for __main__
-from decimal import Decimal # For score, to maintain precision
-
-from sqlalchemy import ForeignKey, Date, Numeric, Integer, String, Index, UniqueConstraint # Added Integer, String, Index, UniqueConstraint
+from sqlalchemy import String, ForeignKey, UniqueConstraint, Index, Integer, func  # Integer для rating_score
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.src.models.base import BaseModel # Ratings are simpler records
+# Абсолютний імпорт базових класів та міксинів
+from backend.app.src.models.base import Base
+from backend.app.src.models.mixins import TimestampedMixin  # `updated_at` як час останнього розрахунку рейтингу
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+# TODO: Визначити Enum RatingType в core.dicts.py, наприклад:
+# class RatingType(str, Enum):
+#     OVERALL = "overall"    # Загальний рейтинг за весь час
+#     MONTHLY = "monthly"    # Місячний рейтинг
+#     WEEKLY = "weekly"      # Тижневий рейтинг
+#     CUSTOM_PERIOD = "custom_period" # Рейтинг за визначений період
+# Потім імпортувати: from backend.app.src.core.dicts import RatingType
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
     from backend.app.src.models.groups.group import Group
 
-class UserGroupRating(BaseModel):
-    """
-    Represents a user's rating or score within a specific group, often for a defined period (e.g., weekly, monthly leaderboard).
 
-    Attributes:
-        user_id (int): Foreign key to the user.
-        group_id (int): Foreign key to the group where the rating is applicable.
-        rating_period_identifier (str): A string identifier for the rating period (e.g., '2023-W52', '2023-12', 'overall').
-        score (Decimal): The calculated score or rating for the user in this group for this period.
-        rank (Optional[int]): The user's rank within the group for this period and score.
-        # `id`, `created_at`, `updated_at` from BaseModel.
-        # `created_at` can signify when the rating was calculated/recorded.
+class UserGroupRating(Base, TimestampedMixin):
+    """
+    Модель Рейтингу Користувача в Групі.
+
+    Зберігає розрахований рейтинг (або суму балів) для користувача в певній групі.
+    Може використовуватися для різних типів рейтингів (загальний, за період).
+    Поле `updated_at` з `TimestampedMixin` може використовуватися для позначення
+    часу останнього оновлення/перерахунку цього рейтингу.
+
+    Атрибути:
+        id (Mapped[int]): Унікальний ідентифікатор запису рейтингу.
+        user_id (Mapped[int]): ID користувача.
+        group_id (Mapped[int]): ID групи.
+        rating_score (Mapped[int]): Розрахований рейтинг або кількість балів.
+        period_start_date (Mapped[Optional[date]]): Дата початку періоду, за який розраховано рейтинг (якщо застосовно).
+        period_end_date (Mapped[Optional[date]]): Дата кінця періоду, за який розраховано рейтинг (якщо застосовно).
+        rating_type (Mapped[Optional[str]]): Тип рейтингу (наприклад, "monthly", "overall").
+                                             TODO: Використовувати Enum `RatingType`.
+
+        user (Mapped["User"]): Зв'язок з моделлю `User`.
+        group (Mapped["Group"]): Зв'язок з моделлю `Group`.
+        created_at, updated_at: Успадковано. `updated_at` - час останнього розрахунку.
     """
     __tablename__ = "gamification_user_group_ratings"
 
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True, comment="FK to the user being rated")
-    group_id: Mapped[int] = mapped_column(Integer, ForeignKey("groups.id"), nullable=False, index=True, comment="FK to the group context of the rating")
-
-    # Instead of separate start/end dates, a period identifier might be more flexible for various schemes (weekly, monthly, all-time)
-    # Or, define specific period tables if periods are complex entities themselves.
-    rating_period_identifier: Mapped[str] = mapped_column(String(100), nullable=False, index=True, comment="Identifier for the rating period (e.g., '2023-W52', '2023-12', 'SEASON_1')")
-    # rating_period_start: Mapped[date] = mapped_column(Date, nullable=False, index=True, comment="Start date of the rating period")
-    # rating_period_end: Mapped[date] = mapped_column(Date, nullable=False, index=True, comment="End date of the rating period")
-
-    score: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False, default=Decimal('0.00'), comment="Calculated score for the user in this group/period. Precision 12, 2 decimal places.")
-    rank: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="User's rank for this group/period based on the score")
-
-    # --- Relationships ---
-    user: Mapped["User"] = relationship() # One-way or add back_populates="group_ratings" to User
-    group: Mapped["Group"] = relationship() # One-way or add back_populates="user_ratings" to Group
-
-    # --- Table Arguments ---
-    # A user should have one rating entry per group per defined rating period.
-    __table_args__ = (
-        UniqueConstraint('user_id', 'group_id', 'rating_period_identifier', name='uq_user_group_period_rating'),
-        Index('ix_user_group_rating_score_rank', 'group_id', 'rating_period_identifier', 'score', 'rank'), # For leaderboards
+    id: Mapped[int] = mapped_column(
+        primary_key=True, index=True, autoincrement=True, comment="Унікальний ідентифікатор запису рейтингу"
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey('users.id', name='fk_user_group_rating_user_id', ondelete="CASCADE"),
+        nullable=False,
+        comment="ID користувача"
+    )
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey('groups.id', name='fk_user_group_rating_group_id', ondelete="CASCADE"),
+        nullable=False,
+        comment="ID групи"
+    )
+    rating_score: Mapped[int] = mapped_column(
+        Integer, default=0, nullable=False, comment="Розрахований рейтинг або кількість балів"
     )
 
-    def __repr__(self) -> str:
-        id_val = getattr(self, 'id', 'N/A')
-        return f"<UserGroupRating(id={id_val}, user_id={self.user_id}, group_id={self.group_id}, period='{self.rating_period_identifier}', score={self.score})>"
+    # Поля для визначення періоду рейтингу (якщо рейтинг не є загальним за весь час)
+    period_start_date: Mapped[Optional[date]] = mapped_column(
+        nullable=True, comment="Дата початку періоду рейтингу (якщо застосовно)"
+    )
+    period_end_date: Mapped[Optional[date]] = mapped_column(
+        nullable=True, index=True, comment="Дата кінця періоду рейтингу (якщо застосовно)"
+    )
+
+    # TODO: Замінити String на Enum RatingType, коли він буде визначений в core.dicts.py
+    # rating_type: Mapped[Optional[RatingType]] = mapped_column(SQLEnum(RatingType), nullable=True, index=True)
+    rating_type: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True, index=True, comment="Тип рейтингу (наприклад, 'monthly', 'overall')"
+    )
+
+    # Обмеження та індекси
+    # Унікальність для користувача, групи, типу рейтингу та дати кінця періоду.
+    # Це дозволяє мати, наприклад, місячний рейтинг для кожного місяця, загальний рейтинг тощо.
+    __table_args__ = (
+        UniqueConstraint('user_id', 'group_id', 'rating_type', 'period_end_date',
+                         name='uq_user_group_rating_period_type'),
+        Index('ix_user_group_ratings_user_group', 'user_id', 'group_id'),
+    # Для швидкого пошуку рейтингів користувача в групі
+    )
+
+    # --- Зв'язки (Relationships) ---
+    user: Mapped["User"] = relationship(lazy="selectin")  # back_populates="group_ratings" можна додати до User
+    group: Mapped["Group"] = relationship(lazy="selectin")  # back_populates="user_ratings" можна додати до Group
+
+    # Поля для __repr__
+    _repr_fields = ["id", "user_id", "group_id", "rating_score", "rating_type", "period_end_date"]
+
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для моделі UserGroupRating.
+    print("--- Модель Рейтингу Користувача в Групі (UserGroupRating) ---")
+    print(f"Назва таблиці: {UserGroupRating.__tablename__}")
 
-    logger.info("--- UserGroupRating Model (Gamification) --- Demonstration")
+    print("\nОчікувані поля:")
+    expected_fields = [
+        'id', 'user_id', 'group_id', 'rating_score',
+        'period_start_date', 'period_end_date', 'rating_type',
+        'created_at', 'updated_at'
+    ]
+    for field in expected_fields:
+        print(f"  - {field}")
 
-    # Example UserGroupRating instance
-    # Assume User id=1, Group id=1 exist
-    rating_current_month = UserGroupRating(
-        user_id=1,
-        group_id=1,
-        rating_period_identifier="2024-03", # March 2024 rating
-        score=Decimal("1250.75"),
-        rank=5
+    print("\nОчікувані зв'язки (relationships):")
+    expected_relationships = ['user', 'group']
+    for rel in expected_relationships:
+        print(f"  - {rel}")
+
+    # Приклад створення екземпляра (без взаємодії з БД)
+    example_rating = UserGroupRating(
+        id=1,
+        user_id=101,
+        group_id=202,
+        rating_score=1500,
+        rating_type="overall",  # TODO: Замінити на RatingType.OVERALL.value
+        period_end_date=None  # Для загального рейтингу може не бути дати кінця періоду
     )
-    rating_current_month.id = 1 # Simulate ORM-set ID
-    rating_current_month.created_at = datetime.now(timezone.utc) # Simulate BaseModel field
-    rating_current_month.updated_at = datetime.now(timezone.utc) # Simulate BaseModel field
+    # Імітуємо часові мітки
+    example_rating.created_at = datetime.now(tz=timezone.utc) - timedelta(days=30)  # Створено місяць тому
+    example_rating.updated_at = datetime.now(tz=timezone.utc)  # Оновлено сьогодні
 
-    logger.info(f"Example UserGroupRating: {rating_current_month!r}")
-    logger.info(f"  User ID: {rating_current_month.user_id}, Group ID: {rating_current_month.group_id}")
-    logger.info(f"  Period: {rating_current_month.rating_period_identifier}")
-    logger.info(f"  Score: {rating_current_month.score}, Rank: {rating_current_month.rank}")
-    logger.info(f"  Created At: {rating_current_month.created_at.isoformat() if rating_current_month.created_at else 'N/A'}")
+    print(f"\nПриклад екземпляра UserGroupRating (без сесії):\n  {example_rating}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <UserGroupRating(id=1, user_id=101, group_id=202, rating_score=1500, rating_type='overall', updated_at=...)>
 
-
-    rating_weekly = UserGroupRating(
-        user_id=2,
-        group_id=1,
-        rating_period_identifier="2024-W10", # Week 10 of 2024
-        score=Decimal("300.00"),
-        rank=1
-    )
-    rating_weekly.id = 2
-    logger.info(f"Example Weekly UserGroupRating: {rating_weekly!r}")
-
-    # The following line would error if run directly without SQLAlchemy engine and metadata setup for all related tables.
-    # logger.info(f"UserGroupRating attributes (conceptual table columns): {[c.name for c in UserGroupRating.__table__.columns if not c.name.startswith('_')]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    print("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    print("TODO: Не забудьте визначити Enum 'RatingType' в core.dicts.py та оновити поле 'rating_type'.")

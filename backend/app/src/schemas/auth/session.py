@@ -1,91 +1,66 @@
 # backend/app/src/schemas/auth/session.py
-
 """
-Pydantic schemas for User Session information, if exposed via API.
-"""
+Pydantic схеми для сутності "Сесія Користувача" (Session).
 
-import logging
+Цей модуль визначає схему `SessionSchema` для представлення даних
+про сесію користувача у відповідях API.
+"""
+from datetime import datetime
 from typing import Optional
-from datetime import datetime, timezone, timedelta # Added timezone, timedelta for __main__
 
-from pydantic import Field
+# Абсолютний імпорт базових схем та міксинів
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 
-from backend.app.src.schemas.base import BaseSchema, BaseResponseSchema # For UserSessionResponse
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+# from pydantic import Field # Може знадобитися для кастомних атрибутів Field
 
-# --- UserSession Schemas ---
-
-class UserSessionBase(BaseSchema):
+class SessionSchema(BaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
     """
-    Base schema for user session data. Contains fields that might be part of a response.
-    Does not include sensitive parts of the session like the full session_id if it's a secret.
-    """
-    # id: int # This would come from BaseResponseSchema if used for response
-    # user_id: int # Typically not exposed directly in a list of *my* sessions, but an admin might see it.
-    ip_address: Optional[str] = Field(None, description="IP address from which the session originated.", example="203.0.113.45")
-    user_agent: Optional[str] = Field(None, description="User agent string of the client for this session.", example="Chrome on Windows")
-    last_activity_at: datetime = Field(..., description="Timestamp of the last recorded activity for this session (UTC).", example=datetime.now(timezone.utc))
-    expires_at: datetime = Field(..., description="Timestamp when this session will/did expire (UTC).", example=datetime.now(timezone.utc) + timedelta(hours=1))
-    # created_at: datetime # From BaseResponseSchema
-    # updated_at: datetime # From BaseResponseSchema
-    is_current_session: Optional[bool] = Field(None, description="Indicates if this is the session making the current request (populated by endpoint logic).", example=True)
+    Pydantic схема для представлення даних сесії користувача.
 
-class UserSessionResponse(BaseResponseSchema, UserSessionBase):
+    Успадковує `id`, `created_at`, `updated_at` від базових схем/міксинів.
+    Призначена для використання у відповідях API, наприклад, при перегляді активних сесій.
     """
-    Schema for representing a user session in API responses (e.g., listing active sessions for a user).
-    Includes 'id', 'created_at', 'updated_at' from BaseResponseSchema.
-    """
-    # Fields inherited from UserSessionBase and BaseResponseSchema (id, created_at, updated_at)
-    # We might want to be more specific about which fields are included from UserSessionBase here.
-    # For example, if user_id should be part of an admin view of sessions:
-    # user_id: Optional[int] = Field(None, description="ID of the user this session belongs to (for admin views).")
-    pass
+    user_id: int = Field(description="Ідентифікатор користувача, якому належить сесія.")
+    session_key: str = Field(description="Унікальний ключ сесії.")
+    expires_at: datetime = Field(description="Час закінчення терміну дії сесії.")
+    user_agent: Optional[str] = Field(None, description="User-Agent клієнта, з якого створено сесію.")
+    ip_address: Optional[str] = Field(None, description="IP-адреса клієнта, з якого створено сесію.")
 
-# No Create or Update schemas are typically defined for UserSession from an API perspective,
-# as sessions are usually managed implicitly by login/logout and token mechanisms or server-side.
-# If an admin could manually invalidate a session, a SessionTerminateRequest might exist.
+    # model_config успадковується з BaseSchema (from_attributes=True)
+
+
+class SessionCreateSchema(BaseSchema):
+    """
+    Схема для створення нового запису сесії користувача.
+    Зазвичай використовується внутрішньо сервісом автентифікації при вході користувача.
+    """
+    user_id: int = Field(description="ID користувача, якому належить сесія.")
+    session_key: str = Field(description="Унікальний ключ сесії.")
+    expires_at: datetime = Field(description="Час закінчення терміну дії сесії.")
+    user_agent: Optional[str] = Field(None, description="User-Agent клієнта.")
+    ip_address: Optional[str] = Field(None, description="IP-адреса клієнта.")
+
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схеми SessionSchema.
+    print("--- Pydantic Схема для Сесії Користувача (SessionSchema) ---")
 
-    logger.info("--- UserSession Schemas --- Demonstration")
-
-    # UserSessionResponse Example
-    session_response_data = {
-        "id": 1001,
-        "createdAt": (datetime.now(timezone.utc) - timedelta(hours=2)).isoformat(),
-        "updatedAt": (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat(),
-        "ipAddress": "192.168.1.10", # camelCase for input if populate_by_name is True in BaseSchema
-        "userAgent": "Firefox on Linux",
-        "lastActivityAt": (datetime.now(timezone.utc) - timedelta(minutes=5)).isoformat(),
-        "expiresAt": (datetime.now(timezone.utc) + timedelta(days=1)).isoformat(),
-        "isCurrentSession": True
+    session_data_example = {
+        "id": 1,
+        "user_id": 101,
+        "session_key": "abcdef123456uvwxyz",
+        "expires_at": datetime.now() + timedelta(hours=2),
+        "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
+        "ip_address": "192.168.1.100",
+        "created_at": datetime.now() - timedelta(minutes=5),
+        "updated_at": datetime.now(),
     }
-    try:
-        session_resp_schema = UserSessionResponse(**session_response_data) # type: ignore[call-arg]
-        logger.info(f"UserSessionResponse: {session_resp_schema.model_dump_json(by_alias=True, indent=2)}")
-        logger.info(f"  IP Address (from alias 'ipAddress'): {session_resp_schema.ip_address}") # Access via Python name
-        logger.info(f"  Is Current Session (from alias 'isCurrentSession'): {session_resp_schema.is_current_session}")
-    except Exception as e:
-        logger.error(f"Error creating UserSessionResponse: {e}")
 
-    another_session_data = {
-        "id": 1002,
-        "created_at": (datetime.now(timezone.utc) - timedelta(days=5)).isoformat(), # Using pythonic name
-        "updated_at": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(), # Using pythonic name
-        "ip_address": "2001:db8::1", # IPv6 example, pythonic name
-        "user_agent": "Safari on macOS",
-        "last_activity_at": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
-        "expires_at": (datetime.now(timezone.utc) + timedelta(days=6)).isoformat(),
-        "is_current_session": False
-    }
-    try:
-        # Demonstrating with pythonic names, which also works.
-        # Pydantic's populate_by_name in BaseSchema allows either alias or field name if no conflict.
-        another_session_schema = UserSessionResponse(**another_session_data)
-        logger.info(f"Another UserSessionResponse (using pythonic names): {another_session_schema.model_dump_json(by_alias=True, indent=2)}")
-    except Exception as e:
-        logger.error(f"Error creating another UserSessionResponse: {e}")
+    session_instance = SessionSchema(**session_data_example)
+    print(f"\nПриклад екземпляра SessionSchema:\n{session_instance.model_dump_json(indent=2, exclude_none=True)}")
+
+    print("\nПримітка: Ця схема використовується для представлення даних сесій у відповідях API.")
+
+# Потрібно для timedelta в __main__
+from datetime import timedelta

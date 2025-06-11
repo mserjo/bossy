@@ -1,4 +1,5 @@
 # backend/app/src/core/permissions.py
+# -*- coding: utf-8 -*-
 """
 Модуль перевірки дозволів для FastAPI програми Kudos.
 

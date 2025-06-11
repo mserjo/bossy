@@ -1,19 +1,25 @@
 # backend/app/src/core/utils.py
+# -*- coding: utf-8 -*-
 """
-Допоміжні утиліти для програми Kudos.
+Допоміжні утиліти для ядра програми Kudos.
 
-Цей модуль містить набір загальновживаних функцій, які можуть бути корисними
-в різних частинах програми. Вони призначені для виконання простих,
-атомарних операцій, таких як генерація рядків, форматування даних,
-математичні операції з підвищеною точністю тощо.
+Цей модуль містить набір специфічних функцій, які використовуються
+в основних компонентах програми або є кандидатами на переміщення
+до більш загальних пакетів утиліт (`app.src.utils`).
+
+Поточні утиліти включають:
+- `slugify`: Створення URL-дружніх "слагів".
+- `truncate_string`: Обрізка рядків до максимальної довжини.
+- `human_readable_timedelta`: Форматування `timedelta` у людиночитаний рядок.
+- `round_decimal`: Точне округлення чисел.
+- `chunk_list`: Розбиття списків на частини.
+- `get_from_dict_or_object`: Безпечне отримання значень зі словників/об'єктів.
 """
-
-import random
-import string
 import re
-from datetime import datetime, timezone, timedelta
+from datetime import timedelta # datetime, timezone видалено, бо функції, що їх використовували, видалені
 from typing import Any, Optional, List, Dict, Union
 from decimal import Decimal, ROUND_HALF_UP
+# random, string видалено, бо функції, що їх використовували, видалені
 from backend.app.src.config.logging import get_logger
 
 # Отримання логера для цього модуля
@@ -21,36 +27,6 @@ logger = get_logger(__name__)
 
 
 # --- Утиліти для роботи з рядками ---
-
-def generate_random_string(length: int, chars: str = string.ascii_letters + string.digits) -> str:
-    """
-    Генерує випадковий рядок заданої довжини з вказаного набору символів.
-
-    Args:
-        length (int): Бажана довжина випадкового рядка.
-        chars (str): Рядок, що містить символи, з яких буде генеруватися рядок.
-                     За замовчуванням використовуються латинські літери (великі та малі) та цифри.
-
-    Returns:
-        str: Випадково згенерований рядок.
-    """
-    if length <= 0:
-        return ""
-    return "".join(random.choice(chars) for _ in range(length))
-
-
-def generate_random_numeric_string(length: int) -> str:
-    """
-    Генерує випадковий рядок, що складається виключно з цифр.
-
-    Args:
-        length (int): Бажана довжина числового рядка.
-
-    Returns:
-        str: Випадково згенерований числовий рядок.
-    """
-    return generate_random_string(length, string.digits)
-
 
 def slugify(text: str, separator: str = "-") -> str:
     """
@@ -107,30 +83,8 @@ def truncate_string(text: str, max_length: int, suffix: str = "...") -> str:
 
 # --- Утиліти для роботи з датою та часом ---
 
-def get_current_utc_timestamp() -> datetime:
-    """
-    Повертає поточний час та дату в UTC з інформацією про часовий пояс (timezone-aware).
-    """
-    return datetime.now(timezone.utc)
-
-
-def format_datetime_for_display(dt: datetime, fmt: str = "%Y-%m-%d %H:%M:%S %Z") -> str:
-    """
-    Форматує об'єкт `datetime` у рядок для відображення користувачу.
-    За замовчуванням використовується формат "РРРР-ММ-ДД ГГ:ХХ:СС НАЗВА_ЧАСОВОГО_ПОЯСУ".
-    Якщо об'єкт `datetime` не має інформації про часовий пояс (naive), %Z буде порожнім.
-
-    Args:
-        dt (datetime): Об'єкт `datetime` для форматування.
-        fmt (str): Рядок формату, що використовується функцією `strftime`.
-
-    Returns:
-        str: Відформатований рядок дати та часу, або порожній рядок, якщо `dt` не надано.
-    """
-    if not dt:
-        return ""
-    return dt.strftime(fmt)
-
+# Функції get_current_utc_timestamp та format_datetime_for_display видалені,
+# оскільки їх функціональність краще реалізована в backend/app/src/utils/helpers.py та formatters.py
 
 def _get_ukrainian_plural(number: int, one: str, few: str, many: str) -> str:
     """
@@ -282,16 +236,15 @@ def generate_unique_code(length: int = 6, prefix: str = "") -> str:
         str: Згенерований код у верхньому регістрі.
     """
     random_part = generate_random_string(length, string.ascii_uppercase + string.digits)
-    return f"{prefix}{random_part}".upper()
+    return f"{prefix}{random_part}".upper() # generate_random_string видалено, ця функція теж видаляється
 
 
 # Блок для демонстрації та базового тестування утиліт при прямому запуску модуля.
 if __name__ == "__main__":
-    logger.info("--- Демонстрація Основних Допоміжних Утиліт ---")
+    logger.info("--- Демонстрація Допоміжних Утиліт Ядра ---")
 
     # Утиліти для рядків
-    logger.info(f"\nВипадковий рядок (12 символів): {generate_random_string(12)}")
-    logger.info(f"Випадковий числовий рядок (6 символів): {generate_random_numeric_string(6)}")
+    # Демонстрація generate_random_string та generate_random_numeric_string видалена
 
     test_slovak_text = "Тестування функції слагіфікації з українськими літерами: Привіт, Світ 123! Як справи?"
     logger.info(f"\nТест slugify для '{test_slovak_text}':\n  '{slugify(test_slovak_text)}'")
@@ -309,9 +262,7 @@ if __name__ == "__main__":
         f"Обрізати рядок 'Текст' (макс 2, суфікс '...'): '{truncate_string('Текст', 2, '...')}'")  # Суфікс довший за ліміт
 
     # Утиліти для дати та часу
-    current_utc_time = get_current_utc_timestamp()
-    logger.info(f"\nПоточна мітка часу UTC: {current_utc_time}")
-    logger.info(f"Відформатована мітка часу UTC для відображення: {format_datetime_for_display(current_utc_time)}")
+    # Демонстрація get_current_utc_timestamp та format_datetime_for_display видалена
 
     logger.info("\nТести для human_readable_timedelta:")
     test_deltas = [
@@ -368,5 +319,5 @@ if __name__ == "__main__":
         f"Отримання з об'єкта 'author' (за замовчуванням 'Невідомий'): {get_from_dict_or_object(demo_instance, 'author', 'Невідомий')}")
 
     # Інші утиліти
-    logger.info(f"\nЗгенерований унікальний код (префікс 'ЗАПИС-'): {generate_unique_code(8, 'ЗАПИС-')}")
-    logger.info(f"Згенерований унікальний код (без префіксу, довжина 4): {generate_unique_code(4)}")
+    # Демонстрація generate_unique_code видалена
+    logger.info("\nДемонстрацію завершено для функцій, що залишилися.")

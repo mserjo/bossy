@@ -1,0 +1,4 @@
+# This file ensures the uploads directory (within static) is tracked by Git.
+# This directory is intended for user-uploaded files, as configured in settings.py.
+# Ensure this path is correctly handled by .gitignore if uploaded content should not be committed.
+# (The main backend/.gitignore already has /uploads/ and /app/uploads/ which should cover this if it's relative to app root or backend root)

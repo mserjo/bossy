@@ -1,0 +1,2 @@
+# This file ensures the static directory is tracked by Git.
+# Add actual static assets like CSS, JS, images here (e.g., in subdirectories like css/, js/, img/).

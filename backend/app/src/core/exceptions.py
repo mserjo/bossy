@@ -1,4 +1,5 @@
 # backend/app/src/core/exceptions.py
+# -*- coding: utf-8 -*-
 """
 Модуль власних винятків для програми Kudos.
 

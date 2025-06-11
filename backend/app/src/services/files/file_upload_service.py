@@ -1,238 +1,297 @@
 # backend/app/src/services/files/file_upload_service.py
-import logging
+# import logging # Замінено на централізований логер
 import os
-import aiofiles # For async file operations if storing locally
-import shutil # For moving files if storing locally
+import aiofiles  # Для асинхронних файлових операцій
+import shutil  # Для переміщення файлів
 from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
-from datetime import datetime, timezone, timedelta # Not directly used but good for general availability
+from datetime import datetime, timezone  # timedelta не використовується, можна прибрати
 from pathlib import Path
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import \
+    AsyncSession  # Не використовується прямо в цьому сервісі, але BaseService може вимагати
+from werkzeug.utils import secure_filename  # Для очищення імен файлів
 
-from app.src.services.base import BaseService
-from app.src.config.settings import settings
-from app.src.schemas.files.upload import (
+from backend.app.src.services.base import BaseService  # Повний шлях
+from backend.app.src.config.settings import settings  # Повний шлях
+from backend.app.src.schemas.files.upload import (  # Повні шляхи
     FileUploadInitiateRequest,
     FileUploadInitiateResponse,
-    PresignedUrlRequest,
-    PresignedUrlResponse,
+    # PresignedUrlRequest, # Не використовується для локального сховища
+    # PresignedUrlResponse, # Не використовується для локального сховища
     FileUploadCompleteRequest,
     FileUploadResponse
 )
-from app.src.schemas.files.file import FileRecordCreate
-# from app.src.services.files.file_record_service import FileRecordService
+from backend.app.src.schemas.files.file import FileRecordCreate, FileRecordResponse  # Повні шляхи
+from backend.app.src.services.files.file_record_service import FileRecordService  # Повний шлях
+from backend.app.src.config.logging import logger  # Централізований логер
 
-logger = logging.getLogger(__name__)
 
 class FileUploadService(BaseService):
     """
-    Service for handling the file upload process.
-    This includes initiating uploads, potentially generating presigned URLs (for cloud storage),
-    processing uploaded files (moving from temp to permanent storage), and coordinating
-    with FileRecordService to save metadata.
-    Actual file I/O for local storage is placeholder. S3/Cloud integration is conceptual.
+    Сервіс для обробки процесу завантаження файлів.
+    Включає ініціалізацію завантажень, обробку завантажених файлів (переміщення з тимчасового
+    в постійне сховище) та координацію з FileRecordService для збереження метаданих.
+    Зберігання файлів відбувається локально.
     """
 
-    def __init__(self, db_session: AsyncSession):
-        super().__init__(db_session)
+    def __init__(self, db_session: Optional[
+        AsyncSession] = None):  # db_session опціональний, якщо не використовується BaseService для DB операцій
+        super().__init__(db_session)  # db_session може бути None, якщо BaseService це дозволяє
+        self.local_storage_base_path: Path
+        self.temp_upload_dir: Path
+        self.permanent_storage_dir: Path
+        self.max_file_size_bytes: int
+        self.allowed_mime_types: Set[str]
         self._setup_local_storage_paths()
-        logger.info("FileUploadService initialized.")
-
+        logger.info("FileUploadService ініціалізовано.")
 
     def _setup_local_storage_paths(self):
-        """Sets up local storage paths from settings and ensures directories exist."""
-        # Ensure settings attributes are accessed safely with defaults if not present
-        _base_path_str = getattr(settings, 'LOCAL_FILE_STORAGE_PATH', "./uploads")
-        self.local_storage_base_path = Path(_base_path_str)
+        """
+        Налаштовує шляхи локального сховища з конфігурації та забезпечує існування директорій.
+        """
+        _base_path_str = getattr(settings, 'LOCAL_FILE_STORAGE_PATH',
+                                 "./static_uploads")  # Змінено шлях за замовчуванням
+        self.local_storage_base_path = Path(_base_path_str).resolve()  # Робимо шлях абсолютним
         self.temp_upload_dir = self.local_storage_base_path / "temp"
         self.permanent_storage_dir = self.local_storage_base_path / "permanent"
 
         _max_size_setting = getattr(settings, 'MAX_FILE_SIZE_BYTES', None)
-        self.max_file_size_bytes = _max_size_setting if isinstance(_max_size_setting, int) else (10 * 1024 * 1024) # 10MB default
+        self.max_file_size_bytes = _max_size_setting if isinstance(_max_size_setting, int) else (
+                    10 * 1024 * 1024)  # 10MB за замовчуванням
 
         _allowed_mimes_setting = getattr(settings, 'ALLOWED_MIME_TYPES', None)
-        self.allowed_mime_types = _allowed_mimes_setting if isinstance(_allowed_mimes_setting, set) else {"image/jpeg", "image/png", "application/pdf"}
-
+        # TODO: Завантажувати ALLOWED_MIME_TYPES з конфігурації, де вони визначені як множина рядків.
+        self.allowed_mime_types = _allowed_mimes_setting if isinstance(_allowed_mimes_setting, set) else \
+            {"image/jpeg", "image/png", "image/gif", "application/pdf", "video/mp4"}
 
         try:
             self.temp_upload_dir.mkdir(parents=True, exist_ok=True)
             self.permanent_storage_dir.mkdir(parents=True, exist_ok=True)
-            logger.info(f"Local storage paths initialized: TEMP='{self.temp_upload_dir}', PERMANENT='{self.permanent_storage_dir}'")
+            logger.info(
+                f"Шляхи локального сховища ініціалізовано: TEMP='{self.temp_upload_dir}', PERMANENT='{self.permanent_storage_dir}'")
         except Exception as e:
-            logger.error(f"Failed to create local storage directories: {e}", exc_info=True)
-
+            logger.error(f"Не вдалося створити директорії локального сховища: {e}", exc_info=True)
+            # Якщо директорії не створено, сервіс не зможе працювати. Можливо, варто кинути виняток.
+            # i18n
+            raise RuntimeError(f"Критична помилка: не вдалося налаштувати директорії сховища файлів. {e}")
 
     async def initiate_upload(
-        self,
-        initiate_data: FileUploadInitiateRequest,
-        uploader_user_id: UUID # Added uploader_user_id based on usage in complete_upload
+            self,
+            initiate_data: FileUploadInitiateRequest,
+            uploader_user_id: UUID
     ) -> FileUploadInitiateResponse:
-        logger.info(f"Initiating upload for file '{initiate_data.file_name}' by user '{uploader_user_id}'.")
+        """Ініціює процес завантаження файлу."""
+        logger.info(f"Ініціація завантаження для файлу '{initiate_data.file_name}' користувачем '{uploader_user_id}'.")
 
+        if initiate_data.size_bytes <= 0:
+            # i18n
+            raise ValueError("Розмір файлу має бути більше нуля.")
         if initiate_data.size_bytes > self.max_file_size_bytes:
-            raise ValueError(f"File size {initiate_data.size_bytes} bytes exceeds maximum of {self.max_file_size_bytes} bytes.")
+            # i18n
+            raise ValueError(
+                f"Розмір файлу {initiate_data.size_bytes} байт перевищує максимум у {self.max_file_size_bytes} байт.")
 
         if initiate_data.mime_type not in self.allowed_mime_types:
-            logger.warning(f"MIME type '{initiate_data.mime_type}' not in allowed list: {self.allowed_mime_types}. Proceeding with caution.")
-            # For now, just a warning. Could be a ValueError in stricter implementations.
+            logger.error(f"MIME тип '{initiate_data.mime_type}' не дозволено. Дозволені: {self.allowed_mime_types}.")
+            # i18n
+            raise ValueError(f"Тип файлу '{initiate_data.mime_type}' не дозволено для завантаження.")
 
         upload_id = uuid4()
-
-        temp_file_path_dir = self.temp_upload_dir / str(upload_id)
-        # No file created yet, just an ID to track. Client will send data to an endpoint using this ID.
-        logger.info(f"Upload ID '{upload_id}' generated for local storage. Expected temp dir: {temp_file_path_dir}")
-
-        # In a real S3 scenario, presigned URL would be generated here.
-        # For local, this response indicates server is ready for data associated with upload_id.
-        return FileUploadInitiateResponse(upload_id=upload_id, message="Upload initiated. Send file data.")
-
+        # Для локального сховища, upload_id просто ідентифікує сесію завантаження.
+        # Тимчасова директорія для частин файлу (якщо будуть чанки) або для цілого файлу.
+        # (Наразі handle_file_data_upload створює цю директорію).
+        logger.info(f"ID завантаження '{upload_id}' згенеровано. Очікується надсилання даних.")
+        # i18n
+        return FileUploadInitiateResponse(upload_id=upload_id,
+                                          message="Завантаження ініційовано. Надсилайте дані файлу.")
 
     async def handle_file_data_upload(
-        self,
-        upload_id: UUID,
-        file_name: str,
-        file_data_chunk: bytes,
-        is_last_chunk: bool = True,
-        chunk_number: Optional[int] = None
+            self, upload_id: UUID, file_name: str, file_data_chunk: bytes,
+            is_last_chunk: bool = True, chunk_number: Optional[int] = None
     ) -> Dict[str, Any]:
-        logger.info(f"Handling file data for upload ID '{upload_id}', file '{file_name}', chunk: {chunk_number if chunk_number is not None else 'N/A'}, is_last: {is_last_chunk}.")
+        """Обробляє отримані дані (або частину даних) файлу."""
+        # TODO: Додати перевірку загального розміру файлу при завантаженні частинами.
+        logger.info(
+            f"Обробка даних для ID завантаження '{upload_id}', файл '{file_name}', чанк: {chunk_number if chunk_number is not None else 'N/A'}, останній: {is_last_chunk}.")
+
+        # Очищення імені файлу для безпеки
+        safe_file_name = secure_filename(file_name)
+        if not safe_file_name:
+            # i18n
+            raise ValueError("Надано недійсне ім'я файлу.")
 
         temp_dir_for_upload = self.temp_upload_dir / str(upload_id)
         try:
             temp_dir_for_upload.mkdir(parents=True, exist_ok=True)
         except Exception as e:
-            logger.error(f"Could not create temp directory {temp_dir_for_upload} for upload {upload_id}: {e}")
-            raise ValueError(f"Upload preparation failed for {upload_id}")
+            logger.error(f"Не вдалося створити тимчасову директорію {temp_dir_for_upload} для ID {upload_id}: {e}",
+                         exc_info=True)
+            # i18n
+            raise ValueError(f"Помилка підготовки до завантаження для ID {upload_id}.")
 
-        temp_file_path = temp_dir_for_upload / file_name
+        temp_file_path = temp_dir_for_upload / safe_file_name
 
         try:
+            # 'wb' для першого чанку або якщо файл цілий, 'ab' для наступних чанків
             mode = 'wb' if (chunk_number == 1 or chunk_number is None) else 'ab'
             async with aiofiles.open(temp_file_path, mode) as f:
                 await f.write(file_data_chunk)
-            logger.info(f"Data written to temporary file: {temp_file_path} (mode: {mode})")
+            logger.info(f"Дані записано до тимчасового файлу: {temp_file_path} (режим: {mode})")
 
             if is_last_chunk:
-                return {"status": "success", "message": "File data received. Ready for completion.", "temp_path": str(temp_file_path)}
+                # i18n
+                return {"status": "success", "message": "Дані файлу отримано. Готово до завершення.",
+                        "temp_path": str(temp_file_path)}
             else:
-                return {"status": "chunk_received", "message": f"Chunk {chunk_number} received. Awaiting next.", "next_chunk_expected": (chunk_number or 0) + 1}
-
+                # i18n
+                return {"status": "chunk_received", "message": f"Частину {chunk_number} отримано. Очікується наступна.",
+                        "next_chunk_expected": (chunk_number or 0) + 1}
         except Exception as e:
-            logger.error(f"Error writing file data for upload ID '{upload_id}' to {temp_file_path}: {e}", exc_info=True)
-            if temp_file_path.exists():
-                try: os.remove(temp_file_path)
-                except Exception as e_del: logger.error(f"Failed to cleanup partial temp file {temp_file_path}: {e_del}")
-            raise ValueError(f"Failed to save uploaded file data for {upload_id}.")
-
+            logger.error(f"Помилка запису даних для ID '{upload_id}' у {temp_file_path}: {e}", exc_info=True)
+            if temp_file_path.exists():  # Спроба очищення, якщо файл було частково створено
+                try:
+                    os.remove(temp_file_path)
+                except Exception as e_del:
+                    logger.error(f"Не вдалося очистити частковий тимчасовий файл {temp_file_path}: {e_del}")
+            # i18n
+            raise ValueError(f"Не вдалося зберегти завантажені дані файлу для ID {upload_id}.")
 
     async def complete_upload(
-        self,
-        upload_id: UUID,
-        completion_data: FileUploadCompleteRequest,
-        uploader_user_id: UUID
+            self, upload_id: UUID, completion_data: FileUploadCompleteRequest, uploader_user_id: UUID
     ) -> FileUploadResponse:
-        logger.info(f"Completing upload for ID '{upload_id}', file '{completion_data.file_name}' by user '{uploader_user_id}'.")
+        """Завершує процес завантаження, переміщує файл та створює запис в БД."""
+        logger.info(
+            f"Завершення завантаження для ID '{upload_id}', файл '{completion_data.file_name}' користувачем '{uploader_user_id}'.")
 
-        temp_file_path = self.temp_upload_dir / str(upload_id) / completion_data.file_name
+        safe_original_filename = secure_filename(completion_data.file_name)
+        if not safe_original_filename:
+            # i18n
+            raise ValueError("Надано недійсне ім'я файлу для завершення.")
 
+        temp_file_path = self.temp_upload_dir / str(upload_id) / safe_original_filename
         if not temp_file_path.exists() or not temp_file_path.is_file():
-            logger.error(f"Temporary file for upload ID '{upload_id}' at {temp_file_path} not found or is not a file.")
-            raise ValueError(f"Uploaded file data not found for session {upload_id}.")
+            logger.error(f"Тимчасовий файл для ID '{upload_id}' за шляхом {temp_file_path} не знайдено.")
+            # i18n
+            raise ValueError(f"Завантажені дані файлу не знайдено для сесії {upload_id}.")
 
         actual_size = temp_file_path.stat().st_size
         if actual_size != completion_data.size_bytes:
-            logger.warning(f"File size mismatch for upload ID '{upload_id}'. Client: {completion_data.size_bytes}, Actual: {actual_size}. Using actual size.")
+            logger.warning(
+                f"Невідповідність розміру файлу для ID '{upload_id}'. Клієнт: {completion_data.size_bytes}, Факт: {actual_size}. Використовується фактичний розмір.")
 
-        permanent_file_dir_name = str(uuid4())
-        permanent_file_storage_dir = self.permanent_storage_dir / permanent_file_dir_name
-        permanent_file_storage_dir.mkdir(parents=True, exist_ok=True)
-        permanent_file_path = permanent_file_storage_dir / completion_data.file_name # Use original client-provided filename
+        # Генерація унікального підкаталогу для постійного зберігання
+        permanent_file_subdir_name = str(uuid4())  # Унікальний підкаталог
+        permanent_file_target_dir = self.permanent_storage_dir / permanent_file_subdir_name
+        permanent_file_target_dir.mkdir(parents=True, exist_ok=True)
+        permanent_file_path = permanent_file_target_dir / safe_original_filename
 
-        temp_dir_for_upload = self.temp_upload_dir / str(upload_id) # Define for finally block
+        temp_parent_dir_to_clean = self.temp_upload_dir / str(upload_id)
 
         try:
+            # Використовуємо shutil.move, оскільки він краще працює між різними файловими системами (якщо temp на іншому розділі)
             shutil.move(str(temp_file_path), str(permanent_file_path))
-            logger.info(f"File moved from '{temp_file_path}' to permanent storage: '{permanent_file_path}'.")
+            logger.info(f"Файл переміщено з '{temp_file_path}' до постійного сховища: '{permanent_file_path}'.")
         except Exception as e:
-            logger.error(f"Failed to move file from temp to permanent storage for upload ID '{upload_id}': {e}", exc_info=True)
-            raise ValueError("Failed to finalize file storage.")
-        finally:
-            if temp_dir_for_upload.exists():
-                try: shutil.rmtree(temp_dir_for_upload)
-                except Exception as e_rm: logger.error(f"Failed to cleanup temp dir {temp_dir_for_upload}: {e_rm}")
+            logger.error(f"Не вдалося перемістити файл з тимчасового до постійного сховища для ID '{upload_id}': {e}",
+                         exc_info=True)
+            # i18n
+            raise ValueError("Не вдалося завершити збереження файлу.")
+        finally:  # Очищення тимчасової директорії для цього завантаження
+            if temp_parent_dir_to_clean.exists():
+                try:
+                    shutil.rmtree(temp_parent_dir_to_clean)
+                    logger.debug(f"Тимчасову директорію {temp_parent_dir_to_clean} очищено.")
+                except Exception as e_rm:
+                    logger.error(f"Не вдалося очистити тимчасову директорію {temp_parent_dir_to_clean}: {e_rm}")
 
-        storage_path_for_record = str(permanent_file_path.relative_to(self.local_storage_base_path))
-        file_url_for_record = f"/static/{storage_path_for_record}" # Example if /static serves local_storage_base_path
+        # storage_path відносно permanent_storage_dir
+        storage_path_for_record = Path(permanent_file_subdir_name) / safe_original_filename
+        # file_url відносно STATIC_URL_PATH, який вказує на local_storage_base_path
+        # Наприклад, якщо STATIC_URL_PATH = /static/uploads, а local_storage_base_path = ./static_uploads
+        # тоді file_url буде /static/uploads/permanent/<UUID_SUBDIR>/<filename>
+        # TODO: Перевірити, чи settings.STATIC_URL_PATH визначено та використовується коректно.
+        static_url_prefix = getattr(settings, 'STATIC_URL_PATH', '/static').rstrip('/')
+        file_url_for_record = f"{static_url_prefix}/permanent/{storage_path_for_record}"
 
-        from app.src.services.files.file_record_service import FileRecordService
         file_record_service = FileRecordService(self.db_session)
-
         file_record_create_data = FileRecordCreate(
-            file_name=completion_data.file_name,
+            file_name=completion_data.file_name,  # Зберігаємо оригінальне ім'я, надане клієнтом (до secure_filename)
             mime_type=completion_data.mime_type,
             size_bytes=actual_size,
-            storage_path=storage_path_for_record,
+            storage_path=str(storage_path_for_record),  # Шлях відносно permanent_storage_dir
             file_url=file_url_for_record,
             uploader_user_id=uploader_user_id,
-            group_id=getattr(completion_data, 'group_id', None), # Safely access group_id
-            metadata=getattr(completion_data, 'metadata', None)  # Safely access metadata
+            group_id=getattr(completion_data, 'group_id', None),
+            entity_type=getattr(completion_data, 'entity_type', None),
+            entity_id=getattr(completion_data, 'entity_id', None),
+            metadata=getattr(completion_data, 'metadata', None)
         )
 
-        created_file_record_response: Optional[FileRecordResponse] = None
+        created_file_record_response: Optional[FileRecordResponse]
         try:
-            created_file_record_response = await file_record_service.create_file_record(file_record_create_data)
-            if not created_file_record_response: # Should not happen if create_file_record raises on failure
-                raise ValueError("File record creation returned None unexpectedly.")
-        except ValueError as ve:
-            logger.error(f"Failed to create file record after upload {upload_id}: {ve}", exc_info=True)
-            await self.delete_actual_file(str(permanent_file_path)) # Pass absolute path to ensure correct deletion
-            raise
+            created_file_record_response = await file_record_service.create_file_record(
+                file_record_create_data, uploader_user_id=uploader_user_id
+            )
+        except ValueError as ve:  # Якщо створення запису в БД не вдалося
+            logger.error(f"Не вдалося створити запис файлу після завантаження ID '{upload_id}': {ve}", exc_info=True)
+            # Спроба видалити вже збережений фізичний файл, оскільки запис в БД не створено
+            await self.delete_actual_file(str(permanent_file_path))  # Передаємо абсолютний шлях
+            raise  # Перекидаємо помилку далі
 
-        logger.info(f"Upload ID '{upload_id}' completed. FileRecord ID '{created_file_record_response.id}' created.")
+        logger.info(
+            f"Завантаження ID '{upload_id}' завершено. Створено Запис Файлу ID '{created_file_record_response.id}'.")
+        # i18n
         return FileUploadResponse(
-            message=f"File '{created_file_record_response.file_name}' uploaded successfully.",
+            message=f"Файл '{created_file_record_response.file_name}' успішно завантажено.",
             file_record=created_file_record_response
         )
 
-    async def delete_actual_file(self, storage_path_or_key: str) -> bool:
-        logger.info(f"Attempting to delete actual file from storage: '{storage_path_or_key}'")
+    async def delete_actual_file(self, storage_path: str) -> bool:
+        """Видаляє фактичний файл зі сховища."""
+        logger.info(f"Спроба видалення фактичного файлу зі сховища: '{storage_path}'")
 
-        try:
-            # Treat storage_path_or_key as potentially absolute if passed from complete_upload's error handling,
-            # or relative if passed from FileRecordService (where it's stored relative).
-            if os.path.isabs(storage_path_or_key):
-                abs_file_path = Path(storage_path_or_key)
-            else:
-                abs_file_path = (self.local_storage_base_path / storage_path_or_key).resolve()
+        abs_file_path: Path
+        # Визначаємо, чи шлях абсолютний чи відносний
+        if Path(storage_path).is_absolute():
+            abs_file_path = Path(storage_path)
+        else:  # Якщо відносний, то він відносно permanent_storage_dir
+            abs_file_path = (self.permanent_storage_dir / storage_path).resolve()
 
-            # Security check: ensure path is within permanent_storage_dir or local_storage_base_path
-            # This check is important to prevent directory traversal with relative paths.
-            # A file could be in permanent_storage_dir or potentially other subdirs of local_storage_base_path
-            # if storage_path_for_record was constructed differently.
-            # For now, let's assume it must be under local_storage_base_path.
-            if not str(abs_file_path).startswith(str(self.local_storage_base_path.resolve())):
-                 logger.error(f"Attempt to delete file outside designated storage area: '{storage_path_or_key}' resolved to '{abs_file_path}'. Deletion aborted.")
-                 return False
-
-            if abs_file_path.is_file():
-                os.remove(abs_file_path)
-                logger.info(f"Local file '{abs_file_path}' deleted successfully.")
-                parent_dir = abs_file_path.parent
-                # Only remove parent if it's within permanent_storage_dir and not permanent_storage_dir itself
-                if parent_dir != self.permanent_storage_dir and str(parent_dir).startswith(str(self.permanent_storage_dir.resolve())):
-                    if not any(parent_dir.iterdir()):
-                        try:
-                            parent_dir.rmdir()
-                            logger.info(f"Empty parent directory '{parent_dir}' deleted.")
-                        except OSError as e_rmdir:
-                            logger.warning(f"Could not remove empty parent directory '{parent_dir}': {e_rmdir}")
-                return True
-            else:
-                logger.warning(f"Local file not found at '{abs_file_path}' for deletion based on path '{storage_path_or_key}'.")
-                return False
-        except Exception as e:
-            logger.error(f"Error deleting local file '{storage_path_or_key}': {e}", exc_info=True)
+        # Безпекова перевірка: переконатися, що шлях знаходиться в межах permanent_storage_dir
+        if not str(abs_file_path).startswith(str(self.permanent_storage_dir.resolve())):
+            logger.error(
+                f"Спроба видалення файлу поза визначеною зоною сховища: '{storage_path}' (розв'язано як '{abs_file_path}'). Видалення скасовано.")
             return False
 
-logger.info("FileUploadService class defined.")
+        try:
+            if abs_file_path.is_file():
+                # Використовуємо aiofiles для асинхронного видалення, якщо це критично,
+                # але os.remove зазвичай швидкий. Для простоти поки os.remove.
+                # TODO: Розглянути `await aiofiles.os.remove(abs_file_path)` якщо є блокування.
+                os.remove(abs_file_path)
+                logger.info(f"Локальний файл '{abs_file_path}' успішно видалено.")
+
+                # Спроба видалити батьківську директорію (UUID_SUBDIR), якщо вона порожня
+                parent_dir = abs_file_path.parent
+                # Переконуємося, що батьківська директорія знаходиться в permanent_storage_dir і не є самою permanent_storage_dir
+                if parent_dir != self.permanent_storage_dir and str(parent_dir).startswith(
+                        str(self.permanent_storage_dir.resolve())):
+                    if not any(parent_dir.iterdir()):  # Перевірка, чи директорія порожня
+                        try:
+                            parent_dir.rmdir()
+                            logger.info(f"Порожню батьківську директорію '{parent_dir}' видалено.")
+                        except OSError as e_rmdir:  # Може бути помилка, якщо директорія не порожня (race condition)
+                            logger.warning(
+                                f"Не вдалося видалити порожню батьківську директорію '{parent_dir}': {e_rmdir}")
+                return True
+            else:
+                logger.warning(
+                    f"Локальний файл не знайдено за шляхом '{abs_file_path}' для видалення (оригінальний шлях: '{storage_path}').")
+                return False  # Файл не знайдено, вважаємо операцію неуспішною для видалення
+        except Exception as e:
+            logger.error(f"Помилка видалення локального файлу '{storage_path}': {e}", exc_info=True)
+            return False
+
+
+logger.debug(f"{FileUploadService.__name__} (сервіс завантаження файлів) успішно визначено.")

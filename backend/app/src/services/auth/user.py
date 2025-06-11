@@ -1,310 +1,362 @@
 # backend/app/src/services/auth/user.py
-import logging
-from typing import List, Optional, Any
+from datetime import datetime, timezone
+from typing import List, Optional, Any, Type, Set
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload # For eager loading relationships like roles
+from sqlalchemy.orm import selectinload, joinedload
 from sqlalchemy.exc import IntegrityError
 
-from app.src.services.base import BaseService
-from app.src.models.auth.user import User # SQLAlchemy User model
-from app.src.models.dictionaries.user_roles import UserRole # For assigning roles
-from app.src.models.dictionaries.user_types import UserType # For assigning user type
-from app.src.schemas.auth.user import ( # Pydantic User schemas
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.auth.user import User
+from backend.app.src.models.dictionaries.user_roles import UserRole
+from backend.app.src.models.dictionaries.user_types import UserType
+from backend.app.src.schemas.auth.user import (
     UserCreate,
     UserUpdate,
-    UserResponse, # Base response without roles, might be used internally or for specific endpoints
-    UserResponseWithRoles, # Assuming a schema that includes roles
-    # UserCreateSuperuser # Specific schema for superuser creation by admin - can be handled by create_user with flags
+    UserResponse,
+    UserResponseWithRoles,
 )
-# Assuming PasswordService will be available for hashing passwords
-# from .password import PasswordService # Circular dependency if PasswordService also imports UserService
-# For now, assume password hashing is done before calling user service or by a direct utility import
-from app.src.core.security import get_password_hash # Direct utility import
+from backend.app.src.core.security import get_password_hash
+from backend.app.src.config.logging import logger
+from backend.app.src.config import settings  # Для доступу до DEBUG тощо
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
 
 class UserService(BaseService):
     """
-    Service for managing users, including creation, profile updates,
-    role assignments, and administrative actions.
+    Сервіс для управління користувачами.
     """
 
-    def __init__(self, db_session: AsyncSession): # Add other dependent services if needed
+    def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        # self.password_service = PasswordService() # If PasswordService is stateless and needed
-        logger.info("UserService initialized.")
+        logger.info("UserService ініціалізовано.")
 
-    async def get_user_by_id(self, user_id: UUID, include_roles: bool = True) -> Optional[UserResponse]: # Returns base or with roles
-        """
-        Retrieves a user by their ID.
-        Optionally includes their roles based on include_roles flag.
-        """
-        logger.debug(f"Attempting to retrieve user by ID: {user_id}, include_roles: {include_roles}")
+    async def get_user_by_id(self, user_id: UUID, include_relations: bool = True) -> Optional[UserResponse]:
+        logger.debug(f"Спроба отримання користувача за ID: {user_id}, include_relations: {include_relations}")
         query = select(User)
-        if include_roles:
-            query = query.options(selectinload(User.roles))
+        if include_relations:
+            query = query.options(selectinload(User.roles), selectinload(User.user_type))
         stmt = query.where(User.id == user_id)
-
-        result = await self.db_session.execute(stmt)
-        user_db = result.scalar_one_or_none()
+        user_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
         if user_db:
-            logger.info(f"User with ID '{user_id}' found.")
-            if include_roles:
-                # return UserResponseWithRoles.model_validate(user_db) # Pydantic v2
-                return UserResponseWithRoles.from_orm(user_db) # Pydantic v1
-            # return UserResponse.model_validate(user_db) # Pydantic v2
-            return UserResponse.from_orm(user_db) # Pydantic v1
-
-        logger.info(f"User with ID '{user_id}' not found.")
+            logger.info(f"Користувача з ID '{user_id}' знайдено.")
+            return UserResponseWithRoles.model_validate(user_db) if include_relations else UserResponse.model_validate(
+                user_db)
+        logger.info(f"Користувача з ID '{user_id}' не знайдено.")
         return None
 
-    async def get_user_by_email(self, email: str, include_roles: bool = True) -> Optional[UserResponse]:
-        """
-        Retrieves a user by their email address.
-        Optionally includes their roles.
-        """
-        logger.debug(f"Attempting to retrieve user by email: {email}, include_roles: {include_roles}")
+    async def get_user_by_email(self, email: str, include_relations: bool = True) -> Optional[UserResponse]:
+        logger.debug(f"Спроба отримання користувача за email: {email}, include_relations: {include_relations}")
         query = select(User)
-        if include_roles:
-            query = query.options(selectinload(User.roles))
+        if include_relations:
+            query = query.options(selectinload(User.roles), selectinload(User.user_type))
         stmt = query.where(User.email == email.lower())
-
-        result = await self.db_session.execute(stmt)
-        user_db = result.scalar_one_or_none()
+        user_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
         if user_db:
-            logger.info(f"User with email '{email}' found.")
-            if include_roles:
-                # return UserResponseWithRoles.model_validate(user_db) # Pydantic v2
-                return UserResponseWithRoles.from_orm(user_db) # Pydantic v1
-            # return UserResponse.model_validate(user_db) # Pydantic v2
-            return UserResponse.from_orm(user_db) # Pydantic v1
-        logger.info(f"User with email '{email}' not found.")
+            logger.info(f"Користувача з email '{email}' знайдено.")
+            return UserResponseWithRoles.model_validate(user_db) if include_relations else UserResponse.model_validate(
+                user_db)
+        logger.info(f"Користувача з email '{email}' не знайдено.")
         return None
 
-    async def get_user_by_username(self, username: str, include_roles: bool = True) -> Optional[UserResponse]:
-        """
-        Retrieves a user by their username.
-        Optionally includes their roles.
-        """
-        logger.debug(f"Attempting to retrieve user by username: {username}, include_roles: {include_roles}")
+    async def get_user_by_username(self, username: str, include_relations: bool = True) -> Optional[UserResponse]:
+        logger.debug(f"Спроба отримання користувача за username: {username}, include_relations: {include_relations}")
         query = select(User)
-        if include_roles:
-            query = query.options(selectinload(User.roles))
+        if include_relations:
+            query = query.options(selectinload(User.roles), selectinload(User.user_type))
         stmt = query.where(User.username == username)
-
-        result = await self.db_session.execute(stmt)
-        user_db = result.scalar_one_or_none()
+        user_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
         if user_db:
-            logger.info(f"User with username '{username}' found.")
-            if include_roles:
-                # return UserResponseWithRoles.model_validate(user_db) # Pydantic v2
-                return UserResponseWithRoles.from_orm(user_db) # Pydantic v1
-            # return UserResponse.model_validate(user_db) # Pydantic v2
-            return UserResponse.from_orm(user_db) # Pydantic v1
-        logger.info(f"User with username '{username}' not found.")
+            logger.info(f"Користувача з username '{username}' знайдено.")
+            return UserResponseWithRoles.model_validate(user_db) if include_relations else UserResponse.model_validate(
+                user_db)
+        logger.info(f"Користувача з username '{username}' не знайдено.")
         return None
+
+    async def _check_existing_user(self, username: str, email: str) -> None:
+        """Оптимізована перевірка існування користувача за ім'ям або email."""
+        # Перевірка username
+        username_exists = (await self.db_session.execute(
+            select(User.id).where(User.username == username)
+        )).scalar_one_or_none()
+        if username_exists:
+            logger.warning(f"Ім'я користувача '{username}' вже існує.")
+            raise ValueError(f"Ім'я користувача '{username}' вже існує.")  # i18n
+
+        # Перевірка email
+        email_exists = (await self.db_session.execute(
+            select(User.id).where(User.email == email.lower())
+        )).scalar_one_or_none()
+        if email_exists:
+            logger.warning(f"Email '{email.lower()}' вже зареєстровано.")
+            raise ValueError(f"Email '{email.lower()}' вже зареєстровано.")  # i18n
 
     async def create_user(self, user_create_data: UserCreate,
-                          user_type_code: str = "USER_TYPE",
+                          user_type_code: str = "USER",
                           role_codes: Optional[List[str]] = None,
-                          is_superuser_creation: bool = False # Flag for superuser specific logic if any
-                         ) -> UserResponseWithRoles:
-        """
-        Creates a new user.
-        Handles password hashing and assignment of user type and roles.
-        """
-        logger.debug(f"Attempting to create new user: {user_create_data.username}, superuser_creation: {is_superuser_creation}")
+                          is_superuser_creation: bool = False
+                          ) -> UserResponseWithRoles:
+        logger.debug(
+            f"Спроба створення нового користувача: {user_create_data.username}, is_superuser: {is_superuser_creation}")
 
-        # Check for existing user by username or email
-        # Pass include_roles=False as roles are not needed for this existence check
-        if await self.get_user_by_username(user_create_data.username, include_roles=False):
-            logger.warning(f"Username '{user_create_data.username}' already exists.")
-            raise ValueError(f"Username '{user_create_data.username}' already exists.")
-        if await self.get_user_by_email(user_create_data.email, include_roles=False):
-            logger.warning(f"Email '{user_create_data.email}' already registered.")
-            raise ValueError(f"Email '{user_create_data.email}' already registered.")
+        await self._check_existing_user(user_create_data.username, user_create_data.email)
 
         hashed_password = get_password_hash(user_create_data.password)
 
         type_stmt = select(UserType).where(UserType.code == user_type_code)
         user_type_db = (await self.db_session.execute(type_stmt)).scalar_one_or_none()
         if not user_type_db:
-            logger.error(f"UserType with code '{user_type_code}' not found. Cannot create user '{user_create_data.username}'.")
-            raise ValueError(f"UserType '{user_type_code}' not found. User creation failed.")
+            logger.error(f"UserType з кодом '{user_type_code}' не знайдено.")
+            raise ValueError(f"Тип користувача '{user_type_code}' не знайдено.")  # i18n
 
-        # user_db_data = user_create_data.model_dump(exclude={"password"}) # Pydantic v2
-        user_db_data = user_create_data.dict(exclude={"password"}) # Pydantic v1
-
+        # Згідно technical_task.txt: is_active=True, is_verified=False за замовчуванням.
         new_user_db = User(
-            **user_db_data,
+            **user_create_data.model_dump(exclude={"password"}),
             hashed_password=hashed_password,
             user_type_id=user_type_db.id,
-            email=user_create_data.email.lower(), # Ensure email is stored in lowercase
-            is_superuser=is_superuser_creation
+            email=user_create_data.email.lower(),
+            is_superuser=is_superuser_creation,
+            is_active=True,
+            is_verified=False,
+            created_at=datetime.now(timezone.utc)  # Явно встановлюємо created_at
         )
 
         if role_codes:
             roles_stmt = select(UserRole).where(UserRole.code.in_(role_codes))
             user_roles_db = (await self.db_session.execute(roles_stmt)).scalars().all()
-            if user_roles_db:
-                new_user_db.roles = user_roles_db # Assign list of role objects
-            else:
-                logger.warning(f"Specified roles with codes {role_codes} not found for new user '{user_create_data.username}'. User will have no roles.")
+
+            if len(user_roles_db) != len(set(role_codes)):  # Використовуємо set для унікальності вхідних кодів
+                # Згідно technical_task.txt, створення користувача має завершитися помилкою, якщо ролі не знайдено.
+                found_role_codes = {role.code for role in user_roles_db}
+                missing_codes = set(role_codes) - found_role_codes
+                logger.error(
+                    f"Не знайдено ролі з кодами: {missing_codes} для нового користувача '{user_create_data.username}'.")
+                raise ValueError(
+                    f"Не вдалося створити користувача: не знайдено ролі з кодами: {missing_codes}.")  # i18n
+            new_user_db.roles = user_roles_db
 
         self.db_session.add(new_user_db)
         try:
-            await self.commit() # BaseService commit
-            await self.db_session.refresh(new_user_db)
-            # Eager load roles for the response, even if roles list was empty initially
-            await self.db_session.refresh(new_user_db, attribute_names=['roles'])
+            await self.commit()
+            await self.db_session.refresh(new_user_db, attribute_names=['roles', 'user_type'])
         except IntegrityError as e:
-            await self.rollback() # BaseService rollback
-            logger.error(f"Integrity error creating user '{user_create_data.username}': {e}", exc_info=True)
-            # Convert IntegrityError to a more specific ValueError for the client
-            # Check for common unique constraint violation texts (adapt to your DB if needed)
-            err_str = str(e).lower()
-            if "users_username_key" in err_str or "unique_username" in err_str or "constraint failed: users.username" in err_str :
-                 raise ValueError(f"Username '{user_create_data.username}' already exists.")
-            if "users_email_key" in err_str or "unique_email" in err_str or "constraint failed: users.email" in err_str:
-                 raise ValueError(f"Email '{user_create_data.email}' already registered.")
-            raise ValueError(f"Could not create user due to a data conflict: {e}") # Generic conflict
+            await self.rollback()
+            logger.error(f"Помилка цілісності: {e}", exc_info=settings.DEBUG)
+            # ... (попередня логіка обробки IntegrityError залишається)
+            err_detail = str(e.orig).lower() if hasattr(e, 'orig') and e.orig is not None else str(e).lower()
+            if "users_username_key" in err_detail or "unique_username" in err_detail or "constraint failed: users.username" in err_detail:
+                raise ValueError(f"Ім'я користувача '{user_create_data.username}' вже існує.")  # i18n
+            if "users_email_key" in err_detail or "unique_email" in err_detail or "constraint failed: users.email" in err_detail:
+                raise ValueError(f"Email '{user_create_data.email}' вже зареєстровано.")  # i18n
+            raise ValueError(f"Не вдалося створити користувача через конфлікт даних: {e}")  # i18n
 
-        logger.info(f"User '{new_user_db.username}' (ID: {new_user_db.id}) created successfully.")
-        # return UserResponseWithRoles.model_validate(new_user_db) # Pydantic v2
-        return UserResponseWithRoles.from_orm(new_user_db) # Pydantic v1
+        logger.info(f"Користувача '{new_user_db.username}' (ID: {new_user_db.id}) успішно створено.")
+        return UserResponseWithRoles.model_validate(new_user_db)
 
-    async def update_user(self, user_id: UUID, user_update_data: UserUpdate) -> Optional[UserResponseWithRoles]:
-        """Updates a user's profile information. Password updates should use a dedicated password service method."""
-        logger.debug(f"Attempting to update user ID: {user_id}")
-
-        user_db = await self._get_user_model_by_id(user_id) # This helper already loads roles
+    async def update_user(self, user_id: UUID, user_update_data: UserUpdate,
+                          # TODO: Розглянути передачу об'єкта поточного користувача (current_user) для перевірки прав на оновлення певних полів.
+                          is_admin_update: bool = False  # Тимчасовий прапорець для розрізнення оновлень
+                          ) -> Optional[UserResponseWithRoles]:
+        logger.debug(f"Спроба оновлення користувача ID: {user_id}")
+        user_db = await self._get_user_model_by_id(user_id)
         if not user_db:
-            logger.warning(f"User ID '{user_id}' not found for update.")
+            logger.warning(f"Користувача ID '{user_id}' не знайдено для оновлення.")
             return None
 
-        # update_data = user_update_data.model_dump(exclude_unset=True) # Pydantic v2
-        update_data = user_update_data.dict(exclude_unset=True) # Pydantic v1
+        update_data = user_update_data.model_dump(exclude_unset=True)
 
         if 'email' in update_data and update_data['email'].lower() != user_db.email:
             new_email = update_data['email'].lower()
-            # Check if new email is taken by another user
-            existing_email_user_stmt = select(User).where(User.email == new_email, User.id != user_id)
+            existing_email_user_stmt = select(User.id).where(User.email == new_email, User.id != user_id)
             if (await self.db_session.execute(existing_email_user_stmt)).scalar_one_or_none():
-                logger.warning(f"Cannot update email for user ID '{user_id}' to '{new_email}': email already in use.")
-                raise ValueError(f"Email '{new_email}' is already registered to another user.")
+                raise ValueError(f"Email '{new_email}' вже зареєстровано іншим користувачем.")  # i18n
             user_db.email = new_email
-            # Email change implies re-verification unless 'is_verified' is explicitly part of the update
-            if 'is_verified' not in update_data:
-                 user_db.is_verified = False
-                 logger.info(f"User ID '{user_id}' email changed. Marked as unverified pending re-verification.")
+            # Згідно technical_task.txt, зміна email завжди скидає верифікацію.
+            user_db.is_verified = False
+            user_db.verified_at = None  # Також скидаємо дату верифікації
+            logger.info(f"Email користувача ID '{user_id}' змінено. Статус верифікації скинуто.")
+
+        # Поля, які може оновлювати сам користувач:
+        user_allowed_fields: Set[str] = {"first_name", "last_name", "middle_name", "phone_number"}
+        # Поля, які може оновлювати адміністратор (додатково до user_allowed_fields):
+        admin_allowed_fields: Set[str] = {"username", "is_active", "is_verified", "is_superuser",
+                                          "user_type_id"}  # email вже оброблено
+
+        current_allowed_fields = user_allowed_fields
+        if is_admin_update:  # Тут має бути перевірка ролей/прав поточного користувача
+            current_allowed_fields = current_allowed_fields.union(admin_allowed_fields)
+
+        # `user_type_id` та `roles` оновлюються окремими методами, не тут.
+        # `is_superuser` теж має бути дуже захищеним полем.
 
         for field, value in update_data.items():
-            if field == 'email': continue # Already handled
-            if hasattr(user_db, field): # Check if the field exists on the model
+            if field == 'email': continue  # Вже оброблено
+
+            if field in current_allowed_fields:
+                if field == 'username' and value != user_db.username:  # Потрібна перевірка унікальності для username
+                    existing_username_stmt = select(User.id).where(User.username == value, User.id != user_id)
+                    if (await self.db_session.execute(existing_username_stmt)).scalar_one_or_none():
+                        raise ValueError(f"Ім'я користувача '{value}' вже використовується.")  # i18n
+
+                # Спеціальна обробка для is_verified, якщо воно є в update_data і is_admin_update
+                if field == 'is_verified' and is_admin_update:
+                    # Якщо адміністратор явно встановлює is_verified, оновлюємо verified_at
+                    user_db.is_verified = value
+                    user_db.verified_at = datetime.now(timezone.utc) if value else None
+                    logger.info(f"Адміністратор оновив is_verified на {value} для ID {user_id}. verified_at оновлено.")
+                    continue  # Переходимо до наступного поля
+
                 setattr(user_db, field, value)
             else:
-                logger.warning(f"Field '{field}' not found on User model during update of user ID '{user_id}'. Skipping field.")
+                logger.warning(f"Поле '{field}' не дозволено для оновлення або не існує для ID '{user_id}'. Пропуск.")
 
+        user_db.updated_at = datetime.now(timezone.utc)  # Явно оновлюємо updated_at
         self.db_session.add(user_db)
         await self.commit()
-        await self.db_session.refresh(user_db)
-        # Ensure roles are loaded for the response, _get_user_model_by_id should have done this
-        # but an explicit refresh here ensures it if the instance was modified in a way that detaches roles.
-        await self.db_session.refresh(user_db, attribute_names=['roles'])
-
-        logger.info(f"User ID '{user_id}' updated successfully.")
-        # return UserResponseWithRoles.model_validate(user_db) # Pydantic v2
-        return UserResponseWithRoles.from_orm(user_db) # Pydantic v1
+        await self.db_session.refresh(user_db, attribute_names=['roles', 'user_type'])
+        logger.info(f"Користувача ID '{user_id}' успішно оновлено.")
+        return UserResponseWithRoles.model_validate(user_db)
 
     async def _get_user_model_by_id(self, user_id: UUID) -> Optional[User]:
-        """Internal helper to fetch the User ORM model instance by ID, with roles eagerly loaded."""
-        stmt = select(User).options(selectinload(User.roles)).where(User.id == user_id)
+        stmt = select(User).options(selectinload(User.roles), selectinload(User.user_type)).where(User.id == user_id)
         return (await self.db_session.execute(stmt)).scalar_one_or_none()
 
-    async def assign_roles_to_user(self, user_id: UUID, role_codes: List[str], replace_existing: bool = False) -> Optional[UserResponseWithRoles]:
-        """Assigns one or more roles to a user by role codes."""
-        logger.debug(f"Assigning roles {role_codes} to user ID {user_id}. Replace existing: {replace_existing}")
+    async def _manage_user_roles(self, user_id: UUID, role_codes: List[str], action: str) -> Optional[
+        UserResponseWithRoles]:
+        # ... (попередня реалізація _manage_user_roles залишається)
         user_db = await self._get_user_model_by_id(user_id)
         if not user_db:
-            logger.warning(f"User ID '{user_id}' not found for role assignment.")
+            logger.warning(f"Користувача ID '{user_id}' не знайдено для оновлення ролей.")
             return None
 
-        roles_stmt = select(UserRole).where(UserRole.code.in_(role_codes))
-        roles_to_assign_db = (await self.db_session.execute(roles_stmt)).scalars().all()
-
-        if not roles_to_assign_db:
-            logger.warning(f"No valid roles found for codes {role_codes} for user ID '{user_id}'. No roles changed if replacing, or no new roles added.")
-            if not replace_existing and not user_db.roles: # If not replacing and user has no roles, effectively no change
-                 return UserResponseWithRoles.from_orm(user_db)
-            # If replacing and no valid roles found, roles list becomes empty
-            # If not replacing but some roles were expected, this path is fine, user_db.roles remains as is or gets non-found roles filtered out below.
-
-        if replace_existing:
-            user_db.roles = roles_to_assign_db
+        made_changes = False
+        if not role_codes:  # Якщо список кодів порожній
+            if action == "replace_add":  # Замінити всі ролі на порожній список
+                if user_db.roles:  # Якщо були ролі, то зміни відбулись
+                    made_changes = True
+                user_db.roles = []
+            else:  # Для "assign" або "remove" порожній список кодів не призводить до змін
+                logger.info(f"Список кодів ролей порожній для дії '{action}' для ID '{user_id}'. Змін не відбулося.")
+                return UserResponseWithRoles.model_validate(user_db)
         else:
-            # Add new roles, ensuring no duplicates based on object identity (if already loaded) or ID.
-            current_role_ids = {role.id for role in user_db.roles}
-            for role in roles_to_assign_db:
-                if role.id not in current_role_ids:
-                    user_db.roles.append(role)
+            roles_to_process_db: List[UserRole] = []
+            roles_stmt = select(UserRole).where(UserRole.code.in_(role_codes))
+            roles_to_process_db = (await self.db_session.execute(roles_stmt)).scalars().all()
 
-        self.db_session.add(user_db) # Mark user_db as dirty due to relationship change
-        await self.commit()
-        # Refresh to ensure the session has the latest state, especially for relationships
-        await self.db_session.refresh(user_db, attribute_names=['roles'])
-        logger.info(f"Roles updated for user ID '{user_id}'. Current roles: {[r.code for r in user_db.roles]}.")
-        # return UserResponseWithRoles.model_validate(user_db) # Pydantic v2
-        return UserResponseWithRoles.from_orm(user_db) # Pydantic v1
+            if len(roles_to_process_db) != len(set(role_codes)) and action != "remove":
+                # Якщо не всі вказані коди ролей знайдено (і це не операція видалення, де неіснуючі коди ігноруються)
+                found_codes = {r.code for r in roles_to_process_db}
+                missing_codes = set(role_codes) - found_codes
+                logger.error(f"Не знайдено ролі з кодами: {missing_codes} для ID '{user_id}'.")
+                raise ValueError(f"Не знайдено ролі: {missing_codes}.")  # i18n
+
+            current_role_ids = {role.id for role in user_db.roles}
+            if action == "assign":
+                for role in roles_to_process_db:
+                    if role.id not in current_role_ids:
+                        user_db.roles.append(role)
+                        made_changes = True
+            elif action == "remove":
+                ids_to_remove = {r.id for r in roles_to_process_db}
+                initial_len = len(user_db.roles)
+                user_db.roles = [role for role in user_db.roles if role.id not in ids_to_remove]
+                if len(user_db.roles) < initial_len:
+                    made_changes = True
+            elif action == "replace_add":
+                # Перевірка, чи новий набір ролей відрізняється від поточного
+                if set(r.id for r in roles_to_process_db) != current_role_ids:
+                    made_changes = True
+                user_db.roles = roles_to_process_db
+
+        if made_changes:
+            user_db.updated_at = datetime.now(timezone.utc)
+            self.db_session.add(user_db)
+            await self.commit()
+            await self.db_session.refresh(user_db, attribute_names=['roles', 'user_type'])
+            logger.info(f"Ролі для ID '{user_id}' оновлено ({action}). Поточні: {[r.code for r in user_db.roles]}.")
+        else:
+            logger.info(f"Змін у ролях для ID '{user_id}' не відбулося (дія: {action}).")
+
+        return UserResponseWithRoles.model_validate(user_db)
+
+    async def assign_roles_to_user(self, user_id: UUID, role_codes: List[str], replace_existing: bool = False) -> \
+    Optional[UserResponseWithRoles]:
+        logger.debug(f"Призначення ролей {role_codes} ID {user_id}. Заміна: {replace_existing}")
+        action = "replace_add" if replace_existing else "assign"
+        return await self._manage_user_roles(user_id, role_codes, action)
 
     async def remove_roles_from_user(self, user_id: UUID, role_codes: List[str]) -> Optional[UserResponseWithRoles]:
-        """Removes one or more roles from a user by role codes."""
-        logger.debug(f"Removing roles {role_codes} from user ID {user_id}")
+        logger.debug(f"Видалення ролей {role_codes} в ID {user_id}")
+        return await self._manage_user_roles(user_id, role_codes, "remove")
+
+    async def set_user_active_status(self, user_id: UUID, is_active: bool) -> Optional[UserResponseWithRoles]:
+        logger.info(f"Встановлення is_active={is_active} для ID: {user_id}")
         user_db = await self._get_user_model_by_id(user_id)
         if not user_db:
-            logger.warning(f"User ID '{user_id}' not found for role removal.")
+            logger.warning(f"Користувача ID '{user_id}' не знайдено.")
             return None
 
-        if not user_db.roles: # No roles to remove
-            logger.info(f"User ID '{user_id}' has no roles. No roles removed.")
-            # return UserResponseWithRoles.model_validate(user_db) # Pydantic v2
-            return UserResponseWithRoles.from_orm(user_db) # Pydantic v1
-
-        initial_role_count = len(user_db.roles)
-        # Filter out roles to be removed
-        user_db.roles = [role for role in user_db.roles if role.code not in role_codes]
-
-        if len(user_db.roles) < initial_role_count:
-            self.db_session.add(user_db) # Mark as dirty
+        if user_db.is_active != is_active:
+            user_db.is_active = is_active
+            user_db.updated_at = datetime.now(timezone.utc)
+            self.db_session.add(user_db)
             await self.commit()
-            await self.db_session.refresh(user_db, attribute_names=['roles'])
-            logger.info(f"Roles matching {role_codes} removed from user ID '{user_id}'.")
+            await self.db_session.refresh(user_db, attribute_names=['roles', 'user_type'])
+            logger.info(f"is_active для ID '{user_id}' змінено на {is_active}.")
         else:
-            logger.info(f"No roles matching codes {role_codes} found on user ID '{user_id}'. No changes made.")
+            logger.info(f"is_active для ID '{user_id}' вже {is_active}. Змін немає.")
+        return UserResponseWithRoles.model_validate(user_db)
 
-        # return UserResponseWithRoles.model_validate(user_db) # Pydantic v2
-        return UserResponseWithRoles.from_orm(user_db) # Pydantic v1
+    async def set_user_verification_status(self, user_id: UUID, is_verified: bool) -> Optional[UserResponseWithRoles]:
+        logger.info(f"Встановлення is_verified={is_verified} для ID: {user_id}")
+        user_db = await self._get_user_model_by_id(user_id)
+        if not user_db:
+            logger.warning(f"Користувача ID '{user_id}' не знайдено.")
+            return None
 
-    async def list_users(self, skip: int = 0, limit: int = 100, is_active: Optional[bool] = None) -> List[UserResponseWithRoles]:
-        """(Admin/Superuser) Lists users with pagination and optional active status filter."""
-        logger.debug(f"Listing users: skip={skip}, limit={limit}, is_active={is_active}")
-        stmt = select(User).options(selectinload(User.roles))
+        if user_db.is_verified != is_verified:
+            user_db.is_verified = is_verified
+            # Згідно technical_task.txt, оновлюємо verified_at
+            user_db.verified_at = datetime.now(timezone.utc) if is_verified else None
+            user_db.updated_at = datetime.now(timezone.utc)
+            self.db_session.add(user_db)
+            await self.commit()
+            await self.db_session.refresh(user_db, attribute_names=['roles', 'user_type'])
+            logger.info(f"is_verified для ID '{user_id}' змінено на {is_verified}, verified_at оновлено.")
+        else:
+            logger.info(f"is_verified для ID '{user_id}' вже {is_verified}. Змін немає.")
+        return UserResponseWithRoles.model_validate(user_db)
+
+    async def list_users(self, skip: int = 0, limit: int = 100,
+                         is_active: Optional[bool] = None,
+                         user_type_code: Optional[str] = None,
+                         role_code: Optional[str] = None,
+                         # TODO: Додати параметри сортування (sort_by, sort_order) згідно `technical_task.txt` (напр. 'created_at', 'last_login_at')
+                         ) -> List[UserResponseWithRoles]:
+        logger.debug(
+            f"Перелік користувачів: skip={skip}, limit={limit}, is_active={is_active}, type={user_type_code}, role={role_code}")
+        stmt = select(User).options(selectinload(User.roles), selectinload(User.user_type))
+
         if is_active is not None:
             stmt = stmt.where(User.is_active == is_active)
-        stmt = stmt.order_by(User.username).offset(skip).limit(limit)
+        if user_type_code:
+            stmt = stmt.join(User.user_type).where(UserType.code == user_type_code)
+        if role_code:
+            # join(User.roles) використовує таблицю зв'язку user_x_user_roles
+            stmt = stmt.join(User.roles).where(UserRole.code == role_code)
 
-        result = await self.db_session.execute(stmt)
-        users_db = result.scalars().all()
+        stmt = stmt.order_by(User.username).offset(skip).limit(limit)  # Сортування за замовчуванням
 
-        # response_list = [UserResponseWithRoles.model_validate(user) for user in users_db] # Pydantic v2
-        response_list = [UserResponseWithRoles.from_orm(user) for user in users_db] # Pydantic v1
-        logger.info(f"Retrieved {len(response_list)} users.")
+        users_db = (await self.db_session.execute(
+            stmt)).scalars().unique().all()  # .unique() для уникнення дублікатів через join
+
+        response_list = [UserResponseWithRoles.model_validate(user) for user in users_db]
+        logger.info(f"Отримано {len(response_list)} користувачів.")
         return response_list
 
-logger.info("UserService class defined.")
+
+logger.debug("UserService клас визначено та завантажено.")

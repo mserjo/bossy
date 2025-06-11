@@ -1,93 +1,168 @@
 # backend/app/src/api/v1/files/uploads.py
-from typing import Optional
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form
-from sqlalchemy.ext.asyncio import AsyncSession
+# -*- coding: utf-8 -*-
+"""
+Ендпоінти для процесу завантаження файлів.
 
-from app.src.core.dependencies import get_db_session, get_current_active_user
-from app.src.models.auth import User as UserModel
-# from app.src.models.files import FileRecord as FileRecordModel # Потрібна модель FileRecord
-from app.src.schemas.files.file import FileRecordResponse # Схема для відповіді з інформацією про файл
-from app.src.schemas.files.upload import FileUploadResponse # Може містити FileRecordResponse та URL
-from app.src.services.files.upload import FileUploadService # Сервіс для завантаження файлів
+Включає ініціалізацію завантаження, передачу даних файлу (можливо, частинами)
+та завершення завантаження зі створенням запису про файл.
+"""
+from typing import Optional, Dict, Any  # List не використовується
+from uuid import UUID
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Path, Body
+from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо, якщо сесія в сервісі
 
-router = APIRouter()
+# Повні шляхи імпорту
+from backend.app.src.api.dependencies import get_api_db_session, get_current_active_user
+from backend.app.src.models.auth.user import User as UserModel
+from backend.app.src.schemas.files.upload import (
+    FileUploadInitiateRequest,
+    FileUploadInitiateResponse,
+    FileUploadCompleteRequest,
+    FileUploadResponse,
+    FileDataUploadResponse  # Додано для відповіді на завантаження даних
+)
+from backend.app.src.services.files.file_upload_service import FileUploadService
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings
+
+router = APIRouter(
+    # Префікс /uploads буде додано в __init__.py батьківського роутера files
+    # Теги також успадковуються/додаються звідти
+)
+
+
+# Залежність для отримання FileUploadService
+async def get_file_upload_service(session: AsyncSession = Depends(get_api_db_session)) -> FileUploadService:
+    """Залежність FastAPI для отримання екземпляра FileUploadService."""
+    # FileUploadService.__init__ був змінений, щоб приймати db_session опціонально.
+    # Якщо FileUploadService потребує db_session для FileRecordService, він має бути переданий.
+    return FileUploadService(db_session=session)
+
 
 @router.post(
-    "/", # Шлях відносно /files/uploads/
-    response_model=FileUploadResponse, # Або FileRecordResponse, якщо URL не повертається одразу
-    status_code=status.HTTP_201_CREATED,
-    summary="Завантаження файлу",
-    description="""Завантажує файл на сервер.
-    Дозволяє передавати додаткові метадані, такі як 'upload_purpose' (наприклад, 'avatar', 'group_icon', 'task_attachment')
-    та 'related_item_id' (ID користувача, групи, задачі тощо)."""
+    "/initiate",
+    response_model=FileUploadInitiateResponse,
+    status_code=status.HTTP_200_OK,  # Зазвичай 200 для ініціації, а не 201
+    summary="Ініціалізація сесії завантаження файлу",  # i18n
+    description="""Починає сесію завантаження файлу, перевіряє метадані (розмір, тип MIME).
+    Повертає `upload_id` для використання при завантаженні даних файлу."""  # i18n
 )
-async def upload_file(
-    file: UploadFile = File(..., description="Файл для завантаження"),
-    upload_purpose: Optional[str] = Form(None, description="Призначення завантаження (наприклад, 'avatar', 'group_icon')"),
-    related_item_id: Optional[int] = Form(None, description="ID пов'язаного об'єкта (користувача, групи тощо)"),
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user),
-    upload_service: FileUploadService = Depends()
-):
-    '''
-    Обробляє завантаження файлу.
-    - `file`: Об'єкт UploadFile.
-    - `upload_purpose`: Опціональний рядок, що вказує на мету завантаження.
-    - `related_item_id`: Опціональний ID об'єкта, до якого прив'язується файл.
+async def initiate_file_upload(
+        initiate_data: FileUploadInitiateRequest,  # Включає file_name, mime_type, size_bytes
+        current_user: UserModel = Depends(get_current_active_user),
+        upload_service: FileUploadService = Depends(get_file_upload_service)
+) -> FileUploadInitiateResponse:
+    """
+    Ініціює сесію завантаження файлу.
+    Перевіряє обмеження на розмір та тип файлу.
+    """
+    logger.info(
+        f"Користувач ID '{current_user.id}' ініціює завантаження: {initiate_data.file_name} ({initiate_data.mime_type}, {initiate_data.size_bytes} байт).")
+    try:
+        response = await upload_service.initiate_upload(
+            initiate_data=initiate_data,
+            uploader_user_id=current_user.id
+        )
+        return response
+    except ValueError as e:
+        logger.warning(f"Помилка ініціалізації завантаження для '{initiate_data.file_name}': {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка при ініціалізації завантаження: {e}", exc_info=global_settings.DEBUG)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутрішня помилка сервера.")
 
-    Сервіс `FileUploadService` відповідає за:
-    - Валідацію файлу (розмір, тип MIME).
-    - Збереження файлу (локально або в хмарне сховище).
-    - Створення запису `FileRecord` в базі даних.
-    - Повернення інформації про завантажений файл, включаючи URL для доступу (якщо застосовно).
-    '''
-    if not hasattr(upload_service, 'db_session') or upload_service.db_session is None:
-        upload_service.db_session = db
 
-    # Перевірка прав на завантаження для конкретної мети/об'єкта може бути в сервісі
-    # на основі current_user, upload_purpose та related_item_id.
+@router.post(
+    "/data/{upload_id}",
+    response_model=FileDataUploadResponse,  # Спеціальна відповідь для завантаження даних
+    summary="Завантаження даних файлу (або його частини)",  # i18n
+    description="""Завантажує дані файлу (або частину файлу, якщо це чанкінг) для раніше ініційованої сесії.
+    Використовує `upload_id`, отриманий від ендпоінта `/initiate`."""  # i18n
+)
+async def upload_file_data_chunk(
+        upload_id: UUID = Path(..., description="ID сесії завантаження, отриманий від /initiate"),  # i18n
+        file_name: str = Form(..., description="Оригінальне ім'я файлу (має співпадати з тим, що в /initiate)"),  # i18n
+        file_data: UploadFile = File(..., description="Дані файлу (або частина файлу)"),  # i18n
+        is_last_chunk: bool = Form(True, description="Прапорець, чи це остання частина файлу"),  # i18n
+        chunk_number: Optional[int] = Form(None,
+                                           description="Порядковий номер частини (якщо файл ділиться на частини)"),
+        # i18n
+        current_user: UserModel = Depends(get_current_active_user),
+        # Перевірка, що користувач той самий, що ініціював (опціонально)
+        upload_service: FileUploadService = Depends(get_file_upload_service)
+) -> FileDataUploadResponse:
+    """
+    Обробляє завантаження даних файлу або його частини.
+    """
+    logger.info(
+        f"Користувач ID '{current_user.id}' завантажує дані для ID '{upload_id}', файл '{file_name}', чанк: {chunk_number}, останній: {is_last_chunk}.")
+
+    # TODO: Перевірити, чи поточний користувач є тим, хто ініціював `upload_id`, якщо це потрібно для безпеки.
+    #  Це може вимагати збереження `uploader_user_id` разом з `upload_id` в кеші або тимчасовій БД.
 
     try:
-        file_record = await upload_service.handle_file_upload(
-            uploaded_file=file,
-            requesting_user=current_user,
-            purpose=upload_purpose,
-            related_id=related_item_id
+        async with file_data.open("rb") as f:  # Відкриваємо UploadFile в бінарному режимі для читання
+            chunk_bytes = await f.read()
+
+        response_dict = await upload_service.handle_file_data_upload(
+            upload_id=upload_id,
+            file_name=file_name,  # Передаємо ім'я файлу для збереження в тимчасовій директорії
+            file_data_chunk=chunk_bytes,
+            is_last_chunk=is_last_chunk,
+            chunk_number=chunk_number
         )
-    except HTTPException as e:
-        # Якщо сервіс кидає специфічні HTTPException (наприклад, файл завеликий, не той тип)
-        raise e
+        return FileDataUploadResponse(**response_dict)
+    except ValueError as e:  # Наприклад, якщо upload_id не знайдено, або помилка запису
+        logger.warning(f"Помилка завантаження даних для ID '{upload_id}': {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
     except Exception as e:
-        # Логування помилки e
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Помилка під час завантаження файлу: {str(e)}"
+        logger.error(f"Неочікувана помилка при завантаженні даних файлу для ID '{upload_id}': {e}",
+                     exc_info=global_settings.DEBUG)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Внутрішня помилка сервера при обробці файлу.")
+
+
+@router.post(
+    "/complete/{upload_id}",
+    response_model=FileUploadResponse,  # Містить FileRecordResponse та повідомлення
+    status_code=status.HTTP_201_CREATED,  # Файл остаточно створено
+    summary="Завершення сесії завантаження файлу",  # i18n
+    description="""Підтверджує завершення завантаження файлу для вказаної сесії.
+    Файл переміщується в постійне сховище, створюється запис FileRecord."""  # i18n
+)
+async def complete_file_upload(
+        upload_id: UUID = Path(..., description="ID сесії завантаження"),  # i18n
+        completion_data: FileUploadCompleteRequest,
+        # Містить фінальні метадані: file_name, mime_type, size_bytes, group_id, entity_type, entity_id
+        current_user: UserModel = Depends(get_current_active_user),
+        upload_service: FileUploadService = Depends(get_file_upload_service)
+) -> FileUploadResponse:
+    """
+    Завершує процес завантаження файлу.
+    """
+    logger.info(
+        f"Користувач ID '{current_user.id}' завершує завантаження для ID '{upload_id}'. Дані: {completion_data.model_dump_minimal()}")
+
+    # TODO: Знову ж таки, перевірка, чи поточний користувач той, хто ініціював `upload_id`.
+
+    try:
+        file_upload_response = await upload_service.complete_upload(
+            upload_id=upload_id,
+            completion_data=completion_data,
+            uploader_user_id=current_user.id
         )
+        return file_upload_response
+    except ValueError as e:  # Наприклад, тимчасовий файл не знайдено, помилка створення FileRecord
+        logger.warning(f"Помилка завершення завантаження для ID '{upload_id}': {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка при завершенні завантаження ID '{upload_id}': {e}",
+                     exc_info=global_settings.DEBUG)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Внутрішня помилка сервера при фіналізації файлу.")
 
-    if not file_record: # Малоймовірно, якщо сервіс кидає винятки, але для повноти
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Не вдалося обробити завантажений файл."
-        )
 
-    # Припускаємо, що file_record, який повертає сервіс, вже є Pydantic схемою FileUploadResponse
-    # або може бути нею валідований.
-    return FileUploadResponse.model_validate(file_record)
-
-# Міркування:
-# 1.  `UploadFile`: FastAPI використовує `python-multipart` для обробки завантаження файлів.
-# 2.  Метадані: `upload_purpose` та `related_item_id` передаються як дані форми (`Form`).
-#     Це дозволяє серверу зрозуміти контекст завантаження.
-# 3.  Сервіс `FileUploadService`: Відповідає за основну логіку:
-#     - Валідація (розмір, тип). За `technical_task.txt` - аватари, іконки.
-#     - Збереження файлу (локально, як зазначено в `technical_task.txt`). Шлях до збереження має бути налаштовуваним.
-#     - Створення запису `FileRecord` в БД (зберігає метадані: оригінальне ім'я, ім'я на диску, тип, розмір, user_id, group_id тощо).
-#     - Повернення відповіді, що містить інформацію про файл, можливо, URL для доступу.
-# 4.  Схеми: `FileUploadResponse` (може включати `file_id`, `filename`, `content_type`, `size`, `url`).
-#     `FileRecordResponse` (схема для моделі `FileRecord`).
-# 5.  Права доступу: Будь-який аутентифікований користувач може спробувати завантажити файл.
-#     Сервіс має валідувати, чи дозволено завантаження для вказаної мети та пов'язаного об'єкта.
-# 6.  URL-и: Цей роутер буде підключений до `files_router` з префіксом `/uploads`.
-# 7.  Коментарі: Українською мовою.
-# 8.  Безпека: Важливо правильно валідувати типи файлів та розміри, щоб запобігти зловживанням.
-#     Імена файлів слід санітизувати перед збереженням.
+logger.info(f"Роутер для завантаження файлів (`{router.prefix}`) визначено.")

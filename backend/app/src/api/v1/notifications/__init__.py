@@ -1,24 +1,50 @@
 # backend/app/src/api/v1/notifications/__init__.py
+# -*- coding: utf-8 -*-
+"""
+Агрегований роутер для всіх ендпоінтів, пов'язаних із системою сповіщень.
+
+Цей модуль імпортує та об'єднує окремі роутери для:
+- Управління сповіщеннями користувачів (перегляд, позначення як прочитані) (`notifications.py`)
+- CRUD операцій над шаблонами сповіщень (адміністрування) (`templates.py`)
+- Перегляду статусів доставки сповіщень (адміністрування) (`delivery.py`)
+
+Загальний префікс для всіх цих шляхів (наприклад, `/notifications`) буде встановлено
+при підключенні `notifications_router` до роутера версії API (`v1_router`).
+"""
 from fastapi import APIRouter
 
-# Імпортуємо роутери з файлів цього модуля
+# Повні шляхи імпорту (відносно поточного пакету)
 from .notifications import router as user_notifications_router
 from .templates import router as notification_templates_router
 from .delivery import router as notification_delivery_router
 
+from backend.app.src.config.logging import logger # Централізований логер
+
 # Створюємо агрегований роутер для всіх ендпоінтів, пов'язаних із системою сповіщень
 notifications_router = APIRouter()
 
-# Підключення роутера для сповіщень користувача (перегляд, позначення як прочитані)
-# Його шляхи (напр. / та /{notification_id}) будуть відносні до префіксу notifications_router (/notifications)
-notifications_router.include_router(user_notifications_router, tags=["User Notifications"])
+# Підключення роутера для сповіщень користувача
+# Шляхи (напр. / та /{notification_id}) будуть відносні до префіксу notifications_router
+notifications_router.include_router(user_notifications_router, tags=["Сповіщення - Користувацькі"]) # i18n tag
 
 # Підключення роутера для шаблонів сповіщень (керування адміном)
-notifications_router.include_router(notification_templates_router, prefix="/templates", tags=["Notification Templates (Admin)"])
+notifications_router.include_router(
+    notification_templates_router,
+    prefix="/templates",
+    tags=["Сповіщення - Шаблони (Адмін)"] # i18n tag
+)
 
 # Підключення роутера для статусів доставки сповіщень (перегляд адміном)
-notifications_router.include_router(notification_delivery_router, prefix="/delivery", tags=["Notification Delivery Status (Admin)"])
+notifications_router.include_router(
+    notification_delivery_router,
+    prefix="/delivery-attempts", # Змінено префікс для ясності, що це про спроби доставки
+    tags=["Сповіщення - Спроби доставки (Адмін)"] # i18n tag
+)
 
 
-# Експортуємо notifications_router для використання в головному v1_router (app/src/api/v1/router.py)
-__all__ = ["notifications_router"]
+# Експортуємо notifications_router для використання в головному v1_router
+__all__ = [
+    "notifications_router",
+]
+
+logger.info("Роутер для системи сповіщень (`notifications_router`) зібрано та готовий до підключення до API v1.")

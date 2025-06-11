@@ -1,244 +1,346 @@
 # backend/app/src/api/v1/gamification/levels.py
-from typing import List, Optional, Generic, TypeVar # Додано Generic, TypeVar для PaginatedResponse
+# -*- coding: utf-8 -*-
+"""
+Ендпоінти для управління визначеннями Рівнів та перегляду рівнів користувачів.
+
+- Визначення рівнів (CRUD): Доступно адміністраторам/суперкористувачам.
+- Рівні користувачів (перегляд): Користувачі бачать свій рівень, адміни/СУ - рівні інших.
+"""
+from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
+from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
-from pydantic import BaseModel # Додано BaseModel для PaginatedResponse, якщо визначається локально
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.src.core.dependencies import get_db_session, get_current_active_user, get_current_active_superuser
-from app.src.models.auth import User as UserModel
-# from app.src.models.gamification import Level as LevelModel # Потрібна модель рівня
-# from app.src.models.gamification import UserLevel as UserLevelModel # Потрібна модель рівня користувача
-from app.src.schemas.gamification.level import ( # Схеми для рівнів
-    LevelCreate,
-    LevelUpdate,
-    LevelResponse,
-    UserLevelResponse
+# Повні шляхи імпорту
+from backend.app.src.api.dependencies import (
+    get_api_db_session, get_current_active_user,
+    get_current_active_superuser, paginator
 )
-# Припускаємо, що ці схеми імпортуються, якщо ні - можна визначити як у users.py або groups.py
-from app.src.schemas.pagination import PaginatedResponse, PageParams
-from app.src.services.gamification.level import LevelService # Сервіс для визначень рівнів
-from app.src.services.gamification.user_level import UserLevelService # Сервіс для рівнів користувачів
+# TODO: Створити/використати гранульовані залежності для прав доступу
+from backend.app.src.api.v1.groups.groups import check_group_edit_permission, check_group_view_permission  # Тимчасово
 
-router = APIRouter()
+from backend.app.src.models.auth.user import User as UserModel
+from backend.app.src.schemas.gamification.level import (
+    LevelCreate, LevelUpdate, LevelResponse, UserLevelResponse
+)
+from backend.app.src.core.pagination import PagedResponse, PageParams
+from backend.app.src.services.gamification.level import LevelService
+from backend.app.src.services.gamification.user_level import UserLevelService
+from backend.app.src.services.groups.group import GroupService  # Для перевірки групи при створенні/фільтрації
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings
 
-# Ендпоінти для управління визначеннями рівнів (Level Definitions)
-@router.post(
-    "/definitions/", # Шлях відносно /gamification/levels/definitions
+router = APIRouter(
+    # Префікс /levels буде додано в __init__.py батьківського роутера gamification
+    # Теги також успадковуються/додаються звідти
+)
+
+
+# --- Залежності для сервісів ---
+async def get_level_service(session: AsyncSession = Depends(get_api_db_session)) -> LevelService:
+    """Залежність FastAPI для отримання екземпляра LevelService."""
+    return LevelService(db_session=session)
+
+
+async def get_user_level_service(session: AsyncSession = Depends(get_api_db_session)) -> UserLevelService:
+    """Залежність FastAPI для отримання екземпляра UserLevelService."""
+    return UserLevelService(db_session=session)
+
+
+async def get_group_service_dep(session: AsyncSession = Depends(get_api_db_session)) -> GroupService:
+    return GroupService(db_session=session)
+
+
+# --- Ендпоінти для управління визначеннями рівнів (Level Definitions) ---
+definitions_router = APIRouter()
+
+
+@definitions_router.post(
+    "/",
     response_model=LevelResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Створення нового визначення рівня (Адмін/Суперюзер)",
-    description="Дозволяє адміністратору або суперюзеру створити нове визначення рівня в системі (наприклад, назва, необхідні бали)."
+    summary="Створення нового визначення рівня (Адмін/Суперюзер)",  # i18n
+    description="""Дозволяє адміністратору групи (для рівнів своєї групи) або суперюзеру
+    (для будь-яких рівнів, включаючи глобальні) створити нове визначення рівня."""  # i18n
 )
 async def create_level_definition(
-    level_in: LevelCreate,
-    db: AsyncSession = Depends(get_db_session),
-    current_admin_user: UserModel = Depends(get_current_active_superuser), # Або інша залежність для адміна
-    level_service: LevelService = Depends()
+        level_in: LevelCreate,  # Схема містить group_id (опціонально)
+        current_user: UserModel = Depends(get_current_active_user),
+        level_service: LevelService = Depends(get_level_service),
+        # group_service: GroupService = Depends(get_group_service_dep) # Для перевірки прав на групу
+        membership_service: GroupMembershipService = Depends(get_membership_service_dep)  # З groups.membership
 ):
-    '''
+    """
     Створює нове визначення рівня.
-    - `name`: Назва рівня.
-    - `points_required`: Кількість балів для досягнення.
-    - `group_id`: ID групи, якщо рівні специфічні для груп (опціонально).
-    '''
-    if not hasattr(level_service, 'db_session') or level_service.db_session is None:
-        level_service.db_session = db
+    Якщо `level_in.group_id` вказано, користувач має бути адміном цієї групи або суперюзером.
+    Якщо `level_in.group_id` не вказано (глобальний рівень), тільки суперюзер може його створити.
+    """
+    logger.info(
+        f"Користувач ID '{current_user.id}' намагається створити рівень '{level_in.name}'. Група: {level_in.group_id or 'Глобальний'}.")
 
-    created_level_def = await level_service.create_level_definition(
-        level_create_schema=level_in,
-        requesting_user=current_admin_user # Для перевірки прав, якщо потрібно
-    )
-    # Сервіс має кидати HTTPException у разі помилок
-    return LevelResponse.model_validate(created_level_def)
+    # Перевірка прав
+    if level_in.group_id:
+        if not current_user.is_superuser:
+            membership = await membership_service.get_membership_details(group_id=level_in.group_id,
+                                                                         user_id=current_user.id)
+            if not membership or not membership.is_active or membership.role.code != "ADMIN":  # ADMIN_ROLE_CODE
+                # i18n
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                    detail="Ви не є адміністратором вказаної групи для створення рівня.")
+    elif not current_user.is_superuser:
+        # i18n
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Тільки суперкористувачі можуть створювати глобальні рівні.")
 
-@router.get(
-    "/definitions/",
-    response_model=PaginatedResponse[LevelResponse],
-    summary="Отримання списку визначень рівнів",
-    description="Повертає список усіх визначень рівнів з пагінацією. Може фільтруватися за групою."
+    try:
+        # LevelService.create (успадкований та розширений) має обробляти унікальність name та min_points_required
+        # в межах group_id/глобально, та валідувати пов'язані ID (icon_file_id).
+        created_level = await level_service.create(data=level_in, created_by_user_id=current_user.id)
+        return created_level
+    except ValueError as e:
+        logger.warning(f"Помилка створення рівня '{level_in.name}': {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка при створенні рівня '{level_in.name}': {e}", exc_info=global_settings.DEBUG)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутрішня помилка сервера.")
+
+
+@definitions_router.get(
+    "/",
+    response_model=PagedResponse[LevelResponse],
+    summary="Отримання списку визначень рівнів",  # i18n
+    description="""Повертає список визначень рівнів з пагінацією.
+    Доступно всім автентифікованим користувачам. Фільтрується за групою (`group_id`),
+    показуючи глобальні рівні та рівні вказаної групи."""  # i18n
 )
 async def read_level_definitions(
-    group_id: Optional[int] = Query(None, description="ID групи для фільтрації визначень рівнів"),
-    page_params: PageParams = Depends(),
-    db: AsyncSession = Depends(get_db_session),
-    # current_user: UserModel = Depends(get_current_active_user), # Для загального доступу, якщо дозволено
-    level_service: LevelService = Depends()
-):
-    '''
+        group_id: Optional[UUID] = Query(None, description="ID групи для фільтрації (показує рівні групи + глобальні)"),
+        # i18n
+        page_params: PageParams = Depends(paginator),
+        current_user: UserModel = Depends(get_current_active_user),  # Для контексту доступу
+        level_service: LevelService = Depends(get_level_service)
+) -> PagedResponse[LevelResponse]:
+    """
     Отримує список визначень рівнів.
-    '''
-    if not hasattr(level_service, 'db_session') or level_service.db_session is None:
-        level_service.db_session = db
-
-    total_defs, level_defs = await level_service.get_level_definitions(
-        group_id=group_id,
+    Користувачі бачать глобальні рівні та рівні груп, до яких вони належать (якщо group_id вказано і вони члени).
+    Суперюзери бачать усі рівні.
+    """
+    logger.debug(f"Користувач ID '{current_user.id}' запитує список визначень рівнів. Група: {group_id}.")
+    # TODO: LevelService.list_levels_paginated має враховувати права current_user та group_id.
+    levels_orm, total_levels = await level_service.list_levels_paginated(
+        requesting_user_id=current_user.id,
+        is_superuser=current_user.is_superuser,
+        group_id_filter=group_id,
         skip=page_params.skip,
         limit=page_params.limit
     )
-    return PaginatedResponse[LevelResponse]( # Явно вказуємо тип Generic
-        total=total_defs,
+    return PagedResponse[LevelResponse](
+        total=total_levels,
         page=page_params.page,
         size=page_params.size,
-        results=[LevelResponse.model_validate(ld) for ld in level_defs]
+        results=[LevelResponse.model_validate(lvl) for lvl in levels_orm]  # Pydantic v2
     )
 
-@router.get(
-    "/definitions/{level_def_id}",
+
+async def check_level_def_access_permission(  # Залежність для перевірки прав на конкретне визначення рівня
+        level_id: UUID = Path(..., description="ID визначення рівня"),  # i18n
+        current_user: UserModel = Depends(get_current_active_user),
+        level_service: LevelService = Depends(get_level_service),
+        membership_service: GroupMembershipService = Depends(get_membership_service_dep)
+) -> LevelResponse:
+    level = await level_service.get_by_id(item_id=level_id)
+    if not level:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Визначення рівня не знайдено.")  # i18n
+    if current_user.is_superuser:
+        return level
+    if level.group_id:
+        membership = await membership_service.get_membership_details(group_id=level.group_id, user_id=current_user.id)
+        if not membership or not membership.is_active:
+            # i18n
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                detail="Ви не маєте доступу до цього групового визначення рівня.")
+    return level  # Глобальні рівні доступні всім автентифікованим
+
+
+@definitions_router.get(
+    "/{level_id}",  # Змінено з level_def_id
     response_model=LevelResponse,
-    summary="Отримання інформації про визначення рівня за ID",
-    description="Повертає детальну інформацію про конкретне визначення рівня."
+    summary="Отримання інформації про визначення рівня за ID",  # i18n
+    description="""Повертає детальну інформацію про конкретне визначення рівня.
+    Доступно, якщо рівень глобальний або користувач є членом групи рівня.""",  # i18n
+    dependencies=[Depends(check_level_def_access_permission)]
 )
 async def read_level_definition_by_id(
-    level_def_id: int,
-    db: AsyncSession = Depends(get_db_session),
-    level_service: LevelService = Depends()
-):
-    '''
-    Отримує інформацію про визначення рівня за його ID.
-    '''
-    if not hasattr(level_service, 'db_session') or level_service.db_session is None:
-        level_service.db_session = db
+        level_id: UUID,  # Змінено з level_def_id
+        retrieved_level: LevelResponse = Depends(check_level_def_access_permission)
+) -> LevelResponse:
+    """Отримує інформацію про визначення рівня за його ID."""
+    logger.debug(f"Запит деталей визначення рівня ID: {level_id}.")
+    return retrieved_level
 
-    level_def = await level_service.get_level_definition_by_id(level_def_id=level_def_id)
-    if not level_def:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Визначення рівня з ID {level_def_id} не знайдено."
-        )
-    return LevelResponse.model_validate(level_def)
 
-@router.put(
-    "/definitions/{level_def_id}",
+async def check_level_def_edit_permission(
+        level_id: UUID = Path(..., description="ID визначення рівня"),  # i18n
+        current_user: UserModel = Depends(get_current_active_user),
+        level_service: LevelService = Depends(get_level_service),
+        membership_service: GroupMembershipService = Depends(get_membership_service_dep)
+) -> LevelResponse:
+    level = await level_service.get_by_id(item_id=level_id)
+    if not level:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Визначення рівня не знайдено.")  # i18n
+    if current_user.is_superuser:
+        return level
+    if level.group_id:
+        membership = await membership_service.get_membership_details(group_id=level.group_id, user_id=current_user.id)
+        if not membership or not membership.is_active or membership.role.code != "ADMIN":  # ADMIN_ROLE_CODE
+            # i18n
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                detail="Ви не є адміністратором групи цього визначення рівня.")
+    else:  # Глобальний рівень може редагувати тільки суперюзер
+        # i18n
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Тільки суперкористувачі можуть редагувати глобальні визначення рівнів.")
+    return level
+
+
+@definitions_router.put(
+    "/{level_id}",  # Змінено з level_def_id
     response_model=LevelResponse,
-    summary="Оновлення визначення рівня (Адмін/Суперюзер)",
-    description="Дозволяє адміністратору або суперюзеру оновити існуюче визначення рівня."
+    summary="Оновлення визначення рівня (Адмін/Суперюзер)",  # i18n
+    description="Дозволяє адміністратору групи або суперюзеру оновити існуюче визначення рівня.",  # i18n
+    dependencies=[Depends(check_level_def_edit_permission)]
 )
 async def update_level_definition(
-    level_def_id: int,
-    level_in: LevelUpdate,
-    db: AsyncSession = Depends(get_db_session),
-    current_admin_user: UserModel = Depends(get_current_active_superuser),
-    level_service: LevelService = Depends()
-):
-    '''
-    Оновлює дані визначення рівня.
-    '''
-    if not hasattr(level_service, 'db_session') or level_service.db_session is None:
-        level_service.db_session = db
+        level_id: UUID,  # Змінено з level_def_id
+        level_in: LevelUpdate,
+        # retrieved_level_for_update: LevelResponse = Depends(check_level_def_edit_permission), # Не використовується прямо
+        current_user: UserModel = Depends(get_current_active_user),  # Для updated_by_user_id
+        level_service: LevelService = Depends(get_level_service)
+) -> LevelResponse:
+    """Оновлює дані визначення рівня."""
+    logger.info(f"Користувач ID '{current_user.id}' намагається оновити визначення рівня ID '{level_id}'.")
+    try:
+        updated_level = await level_service.update(
+            item_id=level_id, data=level_in, updated_by_user_id=current_user.id
+        )
+        if not updated_level:  # Малоймовірно
+            # i18n
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail="Визначення рівня не знайдено для оновлення.")
+        return updated_level
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка: {e}", exc_info=global_settings.DEBUG)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Внутрішня помилка сервера.")  # i18n
 
-    updated_level_def = await level_service.update_level_definition(
-        level_def_id=level_def_id,
-        level_update_schema=level_in,
-        requesting_user=current_admin_user
-    )
-    # Сервіс має кидати HTTPException у разі помилок
-    return LevelResponse.model_validate(updated_level_def)
 
-@router.delete(
-    "/definitions/{level_def_id}",
+@definitions_router.delete(
+    "/{level_id}",  # Змінено з level_def_id
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Видалення визначення рівня (Адмін/Суперюзер)",
-    description="Дозволяє адміністратору або суперюзеру видалити визначення рівня."
+    summary="Видалення визначення рівня (Адмін/Суперюзер)",  # i18n
+    description="Дозволяє адміністратору групи або суперюзеру видалити визначення рівня.",  # i18n
+    dependencies=[Depends(check_level_def_edit_permission)]
 )
 async def delete_level_definition(
-    level_def_id: int,
-    db: AsyncSession = Depends(get_db_session),
-    current_admin_user: UserModel = Depends(get_current_active_superuser),
-    level_service: LevelService = Depends()
+        level_id: UUID,  # Змінено з level_def_id
+        current_user: UserModel = Depends(get_current_active_user),  # Для логування
+        level_service: LevelService = Depends(get_level_service)
 ):
-    '''
-    Видаляє визначення рівня.
-    '''
-    if not hasattr(level_service, 'db_session') or level_service.db_session is None:
-        level_service.db_session = db
+    """Видаляє визначення рівня."""
+    logger.info(f"Користувач ID '{current_user.id}' намагається видалити визначення рівня ID '{level_id}'.")
+    try:
+        # TODO: LevelService.delete має перевіряти, чи не використовується рівень в UserLevel або інших залежностях.
+        success = await level_service.delete(item_id=level_id)
+        if not success:
+            # i18n
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Не вдалося видалити визначення рівня.")
+    except ValueError as e:  # Наприклад, якщо рівень використовується
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
 
-    success = await level_service.delete_level_definition(
-        level_def_id=level_def_id,
-        requesting_user=current_admin_user
-    )
-    if not success: # Сервіс має кидати HTTPException
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Не вдалося видалити визначення рівня з ID {level_def_id}."
-        )
-    # HTTP 204 No Content
+    return None
 
 
-# Ендпоінти для перегляду рівнів користувачів (User Levels)
-@router.get(
-    "/user/me", # Шлях відносно /gamification/levels/user/me
-    response_model=UserLevelResponse, # Або список, якщо користувач може мати рівні в різних контекстах/групах
-    summary="Отримання поточного рівня користувача",
-    description="Повертає інформацію про поточний рівень аутентифікованого користувача."
+# --- Ендпоінти для перегляду рівнів користувачів (User Levels) ---
+user_levels_router = APIRouter()
+
+
+@user_levels_router.get(
+    "/me",
+    response_model=List[UserLevelResponse],  # Користувач може мати рівні в різних групах + глобальний
+    summary="Отримання поточних рівнів користувача",  # i18n
+    description="Повертає інформацію про поточні рівні аутентифікованого користувача (глобальний та в групах)."  # i18n
 )
-async def get_my_user_level(
-    # group_id: Optional[int] = Query(None, description="ID групи, якщо рівні визначаються в контексті групи"),
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user),
-    user_level_service: UserLevelService = Depends()
-):
-    '''
-    Отримує поточний рівень користувача.
-    Якщо рівні залежать від групи, `group_id` може бути необхідним параметром.
-    '''
-    if not hasattr(user_level_service, 'db_session') or user_level_service.db_session is None:
-        user_level_service.db_session = db
+async def get_my_user_levels(  # Перейменовано
+        group_id: Optional[UUID] = Query(None,
+                                         description="ID групи для фільтрації (показати рівень тільки для цієї групи або глобальний, якщо не вказано)"),
+        # i18n
+        current_user: UserModel = Depends(get_current_active_user),
+        user_level_service: UserLevelService = Depends(get_user_level_service)
+) -> List[UserLevelResponse]:
+    """Отримує поточний(і) рівень(ні) користувача."""
+    logger.debug(f"Користувач ID '{current_user.id}' запитує свої рівні. Контекст групи: {group_id}.")
+    # TODO: UserLevelService.get_user_levels має повертати список, якщо group_id не вказано (всі рівні користувача).
+    #  Або один рівень, якщо group_id вказано (чи None для глобального).
+    #  Поточна реалізація UserLevelService.get_user_level повертає один Optional[UserLevelResponse].
 
-    user_level_info = await user_level_service.get_user_level_info(
-        user_id=current_user.id,
-        # group_id=group_id # Якщо потрібно
-        requesting_user=current_user
-    )
-    if not user_level_info:
-        # Можливо, користувач ще не має рівня (0 балів) або сталася помилка
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Інформацію про рівень користувача не знайдено.")
-    return UserLevelResponse.model_validate(user_level_info)
+    user_level_responses: List[UserLevelResponse] = []
+    if group_id is not None:  # Запит рівня для конкретної групи
+        user_level = await user_level_service.get_user_level(user_id=current_user.id, group_id=group_id)
+        if user_level: user_level_responses.append(user_level)
+    else:  # Запит всіх рівнів користувача (глобальний + всі групові)
+        # Спочатку глобальний
+        global_level = await user_level_service.get_user_level(user_id=current_user.id, group_id=None)
+        if global_level: user_level_responses.append(global_level)
+        # Потім групові (потребує отримання списку груп користувача)
+        # TODO: Додати отримання групових рівнів.
+        logger.warning("Отримання всіх групових рівнів для /me ще не реалізовано повністю.")
+
+    if not user_level_responses:
+        logger.info(f"Інформацію про рівні для користувача ID '{current_user.id}' (група: {group_id}) не знайдено.")
+        # Це не помилка, користувач може просто не мати рівня.
+    return user_level_responses
 
 
-@router.get(
-    "/user/{user_id}", # Шлях відносно /gamification/levels/user/{user_id}
-    response_model=UserLevelResponse,
-    summary="Отримання рівня конкретного користувача (Адмін/Суперюзер)",
-    description="Повертає інформацію про рівень вказаного користувача. Доступно адміністраторам або суперюзерам."
+@user_levels_router.get(
+    "/{user_id_target}",  # Змінено з user_id
+    response_model=List[UserLevelResponse],
+    summary="Отримання рівнів конкретного користувача (Адмін/Суперюзер)",  # i18n
+    description="Повертає інформацію про рівні вказаного користувача. Доступно адміністраторам або суперюзерам.",
+    # i18n
+    dependencies=[Depends(get_current_active_superuser)]  # TODO: Розширити права для адмінів груп
 )
-async def get_user_level_by_id(
-    user_id: int = Path(..., description="ID користувача"),
-    # group_id: Optional[int] = Query(None, description="ID групи, якщо рівні визначаються в контексті групи"),
-    db: AsyncSession = Depends(get_db_session),
-    current_admin_user: UserModel = Depends(get_current_active_superuser), # Або інша адмінська перевірка
-    user_level_service: UserLevelService = Depends()
-):
-    '''
-    Отримує рівень вказаного користувача.
-    Потрібна перевірка прав `current_admin_user` на перегляд даних `user_id`.
-    '''
-    if not hasattr(user_level_service, 'db_session') or user_level_service.db_session is None:
-        user_level_service.db_session = db
+async def get_user_levels_by_id_admin(  # Перейменовано
+        user_id_target: UUID = Path(..., description="ID користувача"),  # i18n
+        group_id: Optional[UUID] = Query(None, description="ID групи для фільтрації"),  # i18n
+        current_admin_or_superuser: UserModel = Depends(get_current_active_superuser),  # Поточний адмін/СУ
+        user_level_service: UserLevelService = Depends(get_user_level_service)
+) -> List[UserLevelResponse]:
+    """Отримує рівні вказаного користувача. Потрібна перевірка прав."""
+    # TODO: Реалізувати перевірку прав: чи може current_admin_or_superuser бачити рівні user_id_target
+    #  (наприклад, якщо він адмін спільної групи).
+    logger.debug(
+        f"Адмін/СУ ID '{current_admin_or_superuser.id}' запитує рівні для користувача ID '{user_id_target}'. Група: {group_id}.")
 
-    user_level_info = await user_level_service.get_user_level_info(
-        user_id=user_id,
-        # group_id=group_id,
-        requesting_user=current_admin_user # Передаємо для перевірки прав в сервісі
-    )
-    if not user_level_info:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Інформацію про рівень для користувача ID {user_id} не знайдено.")
-    return UserLevelResponse.model_validate(user_level_info)
+    user_level_responses: List[UserLevelResponse] = []  # Аналогічно /me
+    if group_id is not None:
+        user_level = await user_level_service.get_user_level(user_id=user_id_target, group_id=group_id)
+        if user_level: user_level_responses.append(user_level)
+    else:
+        global_level = await user_level_service.get_user_level(user_id=user_id_target, group_id=None)
+        if global_level: user_level_responses.append(global_level)
+        # TODO: Додати групові рівні.
+        logger.warning(f"Отримання всіх групових рівнів для /user/{user_id_target} ще не реалізовано повністю.")
+
+    if not user_level_responses:
+        logger.info(f"Інформацію про рівні для користувача ID '{user_id_target}' (група: {group_id}) не знайдено.")
+    return user_level_responses
 
 
-# Міркування:
-# 1.  Розділення: Ендпоінти для CRUD визначень рівнів та для перегляду рівнів користувачів.
-#     URL-и можуть бути структуровані як `/definitions` для визначень і `/user` для рівнів користувачів,
-#     все це під загальним префіксом `/levels` модуля `gamification`.
-# 2.  Схеми: `LevelCreate`, `LevelUpdate`, `LevelResponse` для визначень рівнів.
-#     `UserLevelResponse` для інформації про рівень користувача (може включати поточні бали, наступний рівень тощо).
-# 3.  Сервіси:
-#     - `LevelService`: CRUD операції для `LevelModel` (визначення рівнів).
-#     - `UserLevelService`: Логіка отримання інформації про рівень користувача (`UserLevelModel`).
-#       Розрахунок рівня користувача зазвичай відбувається автоматично на основі балів користувача.
-# 4.  Права доступу:
-#     - CRUD визначень рівнів: Адміністратори/Суперюзери.
-#     - Перегляд свого рівня: Будь-який аутентифікований користувач.
-#     - Перегляд чужого рівня: Адміністратори/Суперюзери.
-# 5.  Контекст групи: Якщо рівні залежать від групи (`group_id`), це має бути враховано в схемах, сервісах та ендпоінтах.
-#     Поки що `group_id` закоментовано як опціональний параметр.
-# 6.  Коментарі: Українською мовою.
+# Об'єднання роутерів
+router.include_router(definitions_router, prefix="/definitions")
+router.include_router(user_levels_router, prefix="/user")
+
+logger.info("Роутер для рівнів (`/levels`) та рівнів користувачів (`/levels/user`) визначено.")

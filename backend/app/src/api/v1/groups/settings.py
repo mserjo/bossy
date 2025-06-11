@@ -1,108 +1,122 @@
 # backend/app/src/api/v1/groups/settings.py
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
+# -*- coding: utf-8 -*-
+"""
+Ендпоінти для управління налаштуваннями конкретної групи.
 
-from app.src.core.dependencies import get_db_session, get_current_active_user
-from app.src.models.auth import User as UserModel
-# from app.src.models.groups import GroupSetting as GroupSettingModel # Якщо є окрема модель
-from app.src.schemas.groups.settings import ( # Схеми для налаштувань групи
+Дозволяє адміністраторам групи або суперкористувачам переглядати та оновлювати
+налаштування, специфічні для групи (наприклад, назва валюти бонусів).
+"""
+from uuid import UUID  # ID тепер UUID
+from fastapi import APIRouter, Depends, HTTPException, status, Path
+from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо, якщо сесія в сервісі
+
+# Повні шляхи імпорту
+from backend.app.src.api.dependencies import get_api_db_session, get_current_active_user
+# Використовуємо залежність, що перевіряє права адміна групи або суперюзера
+from backend.app.src.api.v1.groups.groups import check_group_edit_permission
+from backend.app.src.models.auth.user import User as UserModel
+from backend.app.src.schemas.groups.settings import (
     GroupSettingResponse,
     GroupSettingUpdate
 )
-from app.src.services.groups.settings import GroupSettingService # Сервіс для налаштувань групи
-# from app.src.core.permissions import GroupPermissionsChecker # Для перевірки прав
+from backend.app.src.services.groups.settings import GroupSettingService
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings  # Для DEBUG
 
-router = APIRouter()
+router = APIRouter(
+    # Префікс /{group_id}/settings буде додано в __init__.py батьківського роутера groups
+    # Теги також успадковуються/додаються звідти
+)
+
+
+# Залежність для отримання GroupSettingService
+async def get_group_setting_service(session: AsyncSession = Depends(get_api_db_session)) -> GroupSettingService:
+    """Залежність FastAPI для отримання екземпляра GroupSettingService."""
+    return GroupSettingService(db_session=session)
+
 
 @router.get(
-    "/{group_id}/settings",
+    "/",  # Відповідає /{group_id}/settings/
     response_model=GroupSettingResponse,
-    summary="Отримання налаштувань групи",
-    description="Повертає налаштування для вказаної групи. Доступно адміністраторам групи або суперюзерам."
+    summary="Отримання налаштувань групи",  # i18n
+    description="""Повертає налаштування для вказаної групи.
+    Доступно адміністраторам групи або суперюзерам.""",  # i18n
+    # Використовуємо check_group_edit_permission, оскільки перегляд налаштувань зазвичай є адмінською дією.
+    # Якщо потрібен доступ для звичайних членів, створити окрему залежність check_group_view_permission.
+    dependencies=[Depends(check_group_edit_permission)]
 )
 async def get_group_settings(
-    group_id: int,
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user),
-    settings_service: GroupSettingService = Depends()
-):
-    '''
+        group_id: UUID = Path(..., description="ID групи, для якої отримуються налаштування"),  # i18n
+        # current_user_with_permission: UserModel = Depends(check_group_edit_permission), # Користувач вже в current_user з залежності
+        settings_service: GroupSettingService = Depends(get_group_setting_service)
+) -> GroupSettingResponse:
+    """
     Отримує налаштування групи.
-    Необхідна перевірка, чи є поточний користувач адміністратором цієї групи або суперюзером.
-    '''
-    if not hasattr(settings_service, 'db_session') or settings_service.db_session is None:
-        settings_service.db_session = db
-    # if not hasattr(settings_service, 'current_user') or settings_service.current_user is None:
-    #     settings_service.current_user = current_user # Якщо сервіс потребує
+    Доступно адміністраторам групи та суперкористувачам.
+    """
+    logger.debug(f"Запит налаштувань для групи ID: {group_id}")
 
-    # Перевірка прав доступу (має бути в сервісі або через GroupPermissionsChecker)
-    # await GroupPermissionsChecker(db).check_user_can_manage_group_settings(user=current_user, group_id=group_id)
+    # GroupSettingService.get_settings_for_group повертає GroupSettingResponse або None
+    group_settings = await settings_service.get_settings_for_group(group_id=group_id)
 
-    group_settings = await settings_service.get_settings_by_group_id(
-        group_id=group_id,
-        requesting_user=current_user
-    )
     if not group_settings:
-        # Це може означати, що група не існує, налаштування не створені, або доступ заборонено.
-        # Сервіс має обробляти це відповідно.
+        # Це може означати, що група не існує (мало б перевіритися в check_group_edit_permission),
+        # або налаштування для неї ще не створені.
+        # TODO: Розглянути створення налаштувань за замовчуванням в сервісі, якщо їх немає.
+        logger.warning(f"Налаштування для групи ID '{group_id}' не знайдено.")
+        # i18n
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Налаштування для групи з ID {group_id} не знайдено або доступ заборонено."
+            detail=f"Налаштування для групи з ID {group_id} не знайдено. Можливо, їх потрібно створити."
         )
-    return GroupSettingResponse.model_validate(group_settings)
+    return group_settings
+
 
 @router.put(
-    "/{group_id}/settings",
+    "/",  # Відповідає /{group_id}/settings/
     response_model=GroupSettingResponse,
-    summary="Оновлення налаштувань групи",
-    description="Дозволяє адміністраторам групи або суперюзерам оновити налаштування групи."
+    summary="Оновлення налаштувань групи",  # i18n
+    description="Дозволяє адміністраторам групи або суперюзерам оновити налаштування групи.",  # i18n
+    dependencies=[Depends(check_group_edit_permission)]
 )
 async def update_group_settings(
-    group_id: int,
-    settings_in: GroupSettingUpdate,
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user),
-    settings_service: GroupSettingService = Depends()
-):
-    '''
+        group_id: UUID = Path(..., description="ID групи, для якої оновлюються налаштування"),  # i18n
+        settings_in: GroupSettingUpdate,  # Схема з полями, які можна оновлювати
+        current_user_with_permission: UserModel = Depends(check_group_edit_permission),
+        # Для аудиту та підтвердження прав
+        settings_service: GroupSettingService = Depends(get_group_setting_service)
+) -> GroupSettingResponse:
+    """
     Оновлює налаштування групи.
-    Необхідна перевірка, чи є поточний користувач адміністратором цієї групи або суперюзером.
-    '''
-    if not hasattr(settings_service, 'db_session') or settings_service.db_session is None:
-        settings_service.db_session = db
-    # if not hasattr(settings_service, 'current_user') or settings_service.current_user is None:
-    #     settings_service.current_user = current_user
-
-    # Перевірка прав доступу
-    # await GroupPermissionsChecker(db).check_user_can_manage_group_settings(user=current_user, group_id=group_id)
-
-    updated_settings = await settings_service.update_settings_by_group_id(
-        group_id=group_id,
-        settings_update_schema=settings_in,
-        requesting_user=current_user
-    )
-    if not updated_settings:
-        # Сервіс має обробляти це відповідно (не знайдено, заборонено, помилка валідації).
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, # Або 403, 400
-            detail=f"Не вдалося оновити налаштування для групи з ID {group_id}. Групу не знайдено, доступ заборонено або дані невалідні."
+    Доступно адміністраторам групи та суперкористувачам.
+    Використовує метод сервісу `create_or_update_group_settings` для логіки upsert.
+    """
+    logger.info(
+        f"Користувач ID '{current_user_with_permission.id}' намагається оновити налаштування для групи ID '{group_id}'.")
+    try:
+        updated_settings = await settings_service.create_or_update_group_settings(
+            group_id=group_id,
+            settings_data=settings_in,
+            current_user_id=current_user_with_permission.id  # Для аудиту
         )
-    return GroupSettingResponse.model_validate(updated_settings)
+        # Сервіс має кидати ValueError, якщо група не знайдена.
+        return updated_settings
+    except ValueError as e:  # Наприклад, якщо група не знайдена (перевірка в сервісі)
+        logger.warning(f"Помилка оновлення налаштувань для групи ID '{group_id}': {e}")
+        # i18n (повідомлення `e` з сервісу)
+        # Якщо помилка "група не знайдена", то 404, інакше 400.
+        # Припускаємо, що `check_group_edit_permission` вже перевірив існування групи.
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except Exception as e:
+        logger.error(f"Неочікувана помилка при оновленні налаштувань для групи ID '{group_id}': {e}",
+                     exc_info=global_settings.DEBUG)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Внутрішня помилка сервера при оновленні налаштувань групи.")
 
-# Міркування:
-# 1.  Структура URL: Ендпоінти використовують `/{group_id}/settings`. Це означає, що цей роутер (`settings_router`)
-#     має бути підключений до `groups_router` (в `groups/__init__.py`) без додаткового префіксу,
-#     але `groups_router` буде підключений до `v1_router` з префіксом `/groups`.
-#     Таким чином, повний шлях буде `/api/v1/groups/{group_id}/settings`.
-# 2.  Схеми: `GroupSettingResponse`, `GroupSettingUpdate` мають бути визначені в `app.src.schemas.groups.settings`.
-# 3.  Сервіс `GroupSettingService`: Відповідає за логіку отримання та оновлення налаштувань групи,
-#     включаючи перевірку прав (чи є користувач адміном групи або суперюзером).
-#     Методи: `get_settings_by_group_id`, `update_settings_by_group_id`.
-# 4.  Модель `GroupSettingModel`: Налаштування групи можуть зберігатися в окремій таблиці/моделі,
-#     пов'язаній з моделлю `Group`, або як JSONB поле в самій моделі `Group`.
-#     `GroupSettingService` абстрагує цю деталь реалізації.
-# 5.  Права доступу: Тільки адміністратори відповідної групи або суперюзери системи можуть керувати налаштуваннями.
-#     Ця логіка має бути реалізована в `GroupSettingService`.
-# 6.  Коментарі: Українською мовою.
-# 7.  Залежності: `get_current_active_user` для ідентифікації користувача, що робить запит.
-#     `GroupSettingService = Depends()` для ін'єкції сервісу.
+
+# Примітка: Роутер для налаштувань групи підключається в groups/__init__.py
+# до основного groups_router, який в свою чергу підключається до v1_router.
+# Шлях до цих ендпоінтів буде, наприклад: /api/v1/groups/{group_id}/settings
+
+logger.info("Роутер для налаштувань груп (`/groups/{group_id}/settings`) визначено.")

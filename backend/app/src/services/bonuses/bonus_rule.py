@@ -1,307 +1,376 @@
 # backend/app/src/services/bonuses/bonus_rule.py
 import logging
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 from uuid import UUID
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import or_ # Added for get_applicable_bonus_rules
+from sqlalchemy import or_, and_  # Додано and_ для складних умов
 
-from app.src.services.base import BaseService
-from app.src.models.bonuses.bonus import BonusRule # SQLAlchemy BonusRule model
-from app.src.models.groups.group import Group # For group-specific rules
-from app.src.models.dictionaries.task_types import TaskType # For rules linked to task types
-from app.src.models.tasks.task import Task # For rules linked to specific tasks
-# from app.src.models.tasks.event import Event # If rules can be linked to specific events
-from app.src.models.auth.user import User # For created_by_user, updated_by_user
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.bonuses.bonus import BonusRule  # Модель SQLAlchemy BonusRule
+from backend.app.src.models.groups.group import Group  # Для правил, специфічних для групи
+from backend.app.src.models.dictionaries.task_types import TaskType  # Для правил, пов'язаних з типами завдань
+from backend.app.src.models.tasks.task import Task  # Для правил, пов'язаних з конкретними завданнями
+# from backend.app.src.models.tasks.event import Event # Якщо правила можуть бути пов'язані з подіями
+from backend.app.src.models.auth.user import User  # Для created_by_user, updated_by_user
 
-from app.src.schemas.bonuses.bonus_rule import ( # Pydantic Schemas
+from backend.app.src.schemas.bonuses.bonus_rule import (  # Pydantic Схеми
     BonusRuleCreate,
     BonusRuleUpdate,
     BonusRuleResponse
 )
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
 
 class BonusRuleService(BaseService):
     """
-    Service for managing bonus rules.
-    Bonus rules define conditions under which points are awarded or deducted.
-    They can be linked to task types, specific tasks/events, or be general.
+    Сервіс для управління правилами нарахування бонусів.
+    Правила визначають умови, за яких нараховуються або списуються бали.
+    Вони можуть бути пов'язані з типами завдань, конкретними завданнями/подіями або бути загальними.
     """
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        logger.info("BonusRuleService initialized.")
+        logger.info("BonusRuleService ініціалізовано.")
 
     async def get_bonus_rule_by_id(self, rule_id: UUID) -> Optional[BonusRuleResponse]:
-        """Retrieves a bonus rule by its ID, with related entities loaded."""
-        logger.debug(f"Attempting to retrieve bonus rule by ID: {rule_id}")
+        """
+        Отримує правило нарахування бонусів за його ID, з завантаженими пов'язаними сутностями.
+
+        :param rule_id: ID правила.
+        :return: Pydantic схема BonusRuleResponse або None, якщо не знайдено.
+        """
+        logger.debug(f"Спроба отримання правила нарахування бонусів за ID: {rule_id}")
 
         stmt = select(BonusRule).options(
             selectinload(BonusRule.group),
             selectinload(BonusRule.task_type),
             selectinload(BonusRule.task),
-            # selectinload(BonusRule.event),
-            selectinload(BonusRule.created_by_user).options(selectinload(User.user_type)) if hasattr(BonusRule, 'created_by_user') else None,
-            selectinload(BonusRule.updated_by_user).options(selectinload(User.user_type)) if hasattr(BonusRule, 'updated_by_user') else None
+            # selectinload(BonusRule.event), # Якщо поле event існує в моделі
+            selectinload(BonusRule.created_by_user).options(selectinload(User.user_type)),
+            selectinload(BonusRule.updated_by_user).options(selectinload(User.user_type))
         ).where(BonusRule.id == rule_id)
-        stmt = stmt.options(*(opt for opt in stmt.get_options() if opt is not None))
 
         rule_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
         if rule_db:
-            logger.info(f"Bonus rule with ID '{rule_id}' found.")
-            # return BonusRuleResponse.model_validate(rule_db) # Pydantic v2
-            return BonusRuleResponse.from_orm(rule_db) # Pydantic v1
-        logger.info(f"Bonus rule with ID '{rule_id}' not found.")
+            logger.info(f"Правило нарахування бонусів з ID '{rule_id}' знайдено.")
+            return BonusRuleResponse.model_validate(rule_db)  # Pydantic v2
+        logger.info(f"Правило нарахування бонусів з ID '{rule_id}' не знайдено.")
         return None
 
-    async def create_bonus_rule(self, rule_data: BonusRuleCreate, creator_user_id: UUID) -> Optional[BonusRuleResponse]: # Return Optional
-        logger.debug(f"Attempting to create new bonus rule '{rule_data.name}' by user ID: {creator_user_id}")
+    async def create_bonus_rule(self, rule_data: BonusRuleCreate, creator_user_id: UUID) -> BonusRuleResponse:
+        """
+        Створює нове правило нарахування бонусів.
 
-        if rule_data.group_id:
-            if not await self.db_session.get(Group, rule_data.group_id):
-                raise ValueError(f"Group with ID '{rule_data.group_id}' not found.")
+        :param rule_data: Дані для створення правила (Pydantic схема).
+        :param creator_user_id: ID користувача, що створює правило.
+        :return: Pydantic схема створеного BonusRuleResponse.
+        :raises ValueError: Якщо пов'язані сутності не знайдено або ім'я правила не унікальне в межах області. # i18n
+        """
+        logger.debug(f"Спроба створення нового правила '{rule_data.name}' користувачем ID: {creator_user_id}")
 
-        if rule_data.task_type_id:
-            if not await self.db_session.get(TaskType, rule_data.task_type_id):
-                raise ValueError(f"TaskType with ID '{rule_data.task_type_id}' not found.")
+        # Перевірка існування пов'язаних сутностей
+        if rule_data.group_id and not await self.db_session.get(Group, rule_data.group_id):
+            raise ValueError(f"Групу з ID '{rule_data.group_id}' не знайдено.")  # i18n
+        if rule_data.task_type_id and not await self.db_session.get(TaskType, rule_data.task_type_id):
+            raise ValueError(f"Тип завдання з ID '{rule_data.task_type_id}' не знайдено.")  # i18n
+        if rule_data.task_id and not await self.db_session.get(Task, rule_data.task_id):
+            raise ValueError(f"Завдання з ID '{rule_data.task_id}' не знайдено.")  # i18n
 
-        if rule_data.task_id:
-            if not await self.db_session.get(Task, rule_data.task_id):
-                raise ValueError(f"Task with ID '{rule_data.task_id}' not found.")
-
-        stmt_name_check = select(BonusRule.id).where(BonusRule.name == rule_data.name) # Select only ID
+        # Перевірка унікальності імені правила в межах його області (глобальна або група)
+        stmt_name_check = select(BonusRule.id).where(BonusRule.name == rule_data.name)
+        scope_log_msg = "глобальній області"  # i18n
         if rule_data.group_id:
             stmt_name_check = stmt_name_check.where(BonusRule.group_id == rule_data.group_id)
+            scope_log_msg = f"групі ID '{rule_data.group_id}'"  # i18n
         else:
-            stmt_name_check = stmt_name_check.where(BonusRule.group_id == None)
+            stmt_name_check = stmt_name_check.where(BonusRule.group_id.is_(None))
 
         if (await self.db_session.execute(stmt_name_check)).scalar_one_or_none():
-            scope = f"group ID {rule_data.group_id}" if rule_data.group_id else "global scope"
-            logger.warning(f"Bonus rule with name '{rule_data.name}' already exists in {scope}.")
-            raise ValueError(f"Bonus rule with name '{rule_data.name}' already exists in {scope}.")
+            logger.warning(f"Правило з ім'ям '{rule_data.name}' вже існує в {scope_log_msg}.")
+            raise ValueError(f"Правило з ім'ям '{rule_data.name}' вже існує в {scope_log_msg}.")  # i18n
 
-        rule_db_data = rule_data.dict()
-
-        create_final_data = rule_db_data.copy()
-        if hasattr(BonusRule, 'created_by_user_id'):
-             create_final_data['created_by_user_id'] = creator_user_id
-        if hasattr(BonusRule, 'updated_by_user_id'): # Also set updated_by on creation
-             create_final_data['updated_by_user_id'] = creator_user_id
-
-        new_rule_db = BonusRule(**create_final_data)
+        # Створення об'єкта моделі
+        # created_at/updated_at встановлюються автоматично, якщо налаштовано в моделі
+        new_rule_db = BonusRule(
+            **rule_data.model_dump(),  # Pydantic v2
+            created_by_user_id=creator_user_id,
+            updated_by_user_id=creator_user_id  # При створенні updated_by_user_id = creator_user_id
+        )
 
         self.db_session.add(new_rule_db)
         try:
             await self.commit()
-            # Return fully populated response by calling get_bonus_rule_by_id
-            created_rule = await self.get_bonus_rule_by_id(new_rule_db.id)
-            if created_rule:
-                logger.info(f"Bonus rule '{new_rule_db.name}' (ID: {new_rule_db.id}) created successfully.")
-                return created_rule
-            else: # Should not happen if commit was successful
-                logger.error(f"Failed to retrieve newly created bonus rule ID {new_rule_db.id} after commit.")
-                return None
+            await self.db_session.refresh(new_rule_db, attribute_names=[
+                'group', 'task_type', 'task', 'created_by_user', 'updated_by_user'
+            ])  # Завантажуємо всі можливі зв'язки
         except IntegrityError as e:
             await self.rollback()
-            logger.error(f"Integrity error creating bonus rule '{rule_data.name}': {e}", exc_info=True)
-            raise ValueError(f"Could not create bonus rule due to a data conflict: {e}")
-        except Exception as e:
+            logger.error(f"Помилка цілісності при створенні правила '{rule_data.name}': {e}", exc_info=settings.DEBUG)
+            raise ValueError(f"Не вдалося створити правило через конфлікт даних: {e}")  # i18n
+        except Exception as e:  # Обробка інших можливих помилок
             await self.rollback()
-            logger.error(f"Unexpected error creating bonus rule '{rule_data.name}': {e}", exc_info=True)
-            raise
+            logger.error(f"Неочікувана помилка при створенні правила '{rule_data.name}': {e}", exc_info=settings.DEBUG)
+            raise  # Перекидаємо помилку далі
 
+        logger.info(f"Правило '{new_rule_db.name}' (ID: {new_rule_db.id}) успішно створено.")
+        return BonusRuleResponse.model_validate(new_rule_db)
 
     async def update_bonus_rule(
-        self, rule_id: UUID, rule_update_data: BonusRuleUpdate, current_user_id: UUID
+            self, rule_id: UUID, rule_update_data: BonusRuleUpdate, current_user_id: UUID
     ) -> Optional[BonusRuleResponse]:
-        logger.debug(f"Attempting to update bonus rule ID: {rule_id} by user ID: {current_user_id}")
+        """
+        Оновлює існуюче правило нарахування бонусів.
+
+        :param rule_id: ID правила для оновлення.
+        :param rule_update_data: Дані для оновлення (Pydantic схема).
+        :param current_user_id: ID користувача, що виконує оновлення.
+        :return: Pydantic схема оновленого BonusRuleResponse або None, якщо правило не знайдено.
+        :raises ValueError: Якщо пов'язані сутності не знайдено або ім'я правила не унікальне. # i18n
+        """
+        logger.debug(f"Спроба оновлення правила ID: {rule_id} користувачем ID: {current_user_id}")
 
         rule_db = await self.db_session.get(BonusRule, rule_id)
         if not rule_db:
-            logger.warning(f"Bonus rule ID '{rule_id}' not found for update.")
+            logger.warning(f"Правило ID '{rule_id}' не знайдено для оновлення.")
             return None
 
-        update_data = rule_update_data.dict(exclude_unset=True)
+        update_data = rule_update_data.model_dump(exclude_unset=True)  # Pydantic v2
 
+        # Перевірка існування нових пов'язаних сутностей, якщо вони змінюються
         if 'group_id' in update_data and rule_db.group_id != update_data['group_id']:
             if update_data['group_id'] and not await self.db_session.get(Group, update_data['group_id']):
-                raise ValueError(f"New Group ID '{update_data['group_id']}' not found.")
+                raise ValueError(f"Нова група з ID '{update_data['group_id']}' не знайдена.")  # i18n
         if 'task_type_id' in update_data and rule_db.task_type_id != update_data['task_type_id']:
             if update_data['task_type_id'] and not await self.db_session.get(TaskType, update_data['task_type_id']):
-                raise ValueError(f"New TaskType ID '{update_data['task_type_id']}' not found.")
+                raise ValueError(f"Новий тип завдання ID '{update_data['task_type_id']}' не знайдено.")  # i18n
+        if 'task_id' in update_data and rule_db.task_id != update_data['task_id']:
+            if update_data['task_id'] and not await self.db_session.get(Task, update_data['task_id']):
+                raise ValueError(f"Нове завдання ID '{update_data['task_id']}' не знайдено.")  # i18n
 
+        # Перевірка унікальності імені, якщо ім'я або група змінюються
         new_name = update_data.get('name', rule_db.name)
-        new_group_id = update_data.get('group_id', rule_db.group_id) # Handles if group_id becomes None (global)
+        # group_id може бути None, тому обережно з .get()
+        new_group_id = update_data['group_id'] if 'group_id' in update_data else rule_db.group_id
 
         if ('name' in update_data and new_name != rule_db.name) or \
-           ('group_id' in update_data and new_group_id != rule_db.group_id): # Check if group_id itself changed
+                ('group_id' in update_data and new_group_id != rule_db.group_id):
             stmt_name_check = select(BonusRule.id).where(
                 BonusRule.name == new_name,
-                BonusRule.id != rule_id
+                BonusRule.id != rule_id  # Виключаємо поточне правило
             )
-            if new_group_id is not None: # Rule is being set to group-specific or changing groups
+            scope_log_msg = "глобальній області"  # i18n
+            if new_group_id is not None:
                 stmt_name_check = stmt_name_check.where(BonusRule.group_id == new_group_id)
-            else: # Rule is being set to global (or was global and name changes)
-                stmt_name_check = stmt_name_check.where(BonusRule.group_id.is_(None)) # type: ignore
+                scope_log_msg = f"групі ID '{new_group_id}'"  # i18n
+            else:
+                stmt_name_check = stmt_name_check.where(BonusRule.group_id.is_(None))
 
             if (await self.db_session.execute(stmt_name_check)).scalar_one_or_none():
-                scope = f"group ID {new_group_id}" if new_group_id is not None else "global scope"
-                raise ValueError(f"Another bonus rule with name '{new_name}' already exists in {scope}.")
+                raise ValueError(f"Інше правило з ім'ям '{new_name}' вже існує в {scope_log_msg}.")  # i18n
 
+        # Оновлення полів
         for field, value in update_data.items():
-            if hasattr(rule_db, field):
-                setattr(rule_db, field, value)
-            else:
-                logger.warning(f"Field '{field}' not found on BonusRule model for update of rule ID '{rule_id}'.")
+            setattr(rule_db, field, value)
 
-        if hasattr(rule_db, 'updated_by_user_id'):
-            rule_db.updated_by_user_id = current_user_id
-        if hasattr(rule_db, 'updated_at'):
-            rule_db.updated_at = datetime.now(timezone.utc)
+        rule_db.updated_by_user_id = current_user_id
+        # rule_db.updated_at оновлюється автоматично, якщо налаштовано в моделі, або:
+        rule_db.updated_at = datetime.now(timezone.utc)
 
         self.db_session.add(rule_db)
         try:
             await self.commit()
-            logger.info(f"Bonus rule ID '{rule_id}' updated successfully by user ID '{current_user_id}'.")
-            return await self.get_bonus_rule_by_id(rule_id)
+            await self.db_session.refresh(rule_db, attribute_names=[
+                'group', 'task_type', 'task', 'created_by_user', 'updated_by_user'
+            ])
+            logger.info(f"Правило ID '{rule_id}' успішно оновлено користувачем ID '{current_user_id}'.")
+            return BonusRuleResponse.model_validate(rule_db)
+        except IntegrityError as e:  # Обробка помилки унікальності на рівні БД
+            await self.rollback()
+            logger.error(f"Помилка цілісності при оновленні правила ID '{rule_id}': {e}", exc_info=settings.DEBUG)
+            raise ValueError(f"Не вдалося оновити правило через конфлікт даних: {e}")  # i18n
         except Exception as e:
             await self.rollback()
-            logger.error(f"Error updating bonus rule ID '{rule_id}': {e}", exc_info=True)
+            logger.error(f"Помилка при оновленні правила ID '{rule_id}': {e}", exc_info=settings.DEBUG)
             raise
 
-
     async def delete_bonus_rule(self, rule_id: UUID, current_user_id: UUID) -> bool:
-        logger.debug(f"Attempting to delete bonus rule ID: {rule_id} by user ID: {current_user_id}")
+        """
+        Видаляє правило нарахування бонусів.
+
+        :param rule_id: ID правила для видалення.
+        :param current_user_id: ID користувача, що виконує видалення (для аудиту).
+        :return: True, якщо видалення успішне, False - якщо правило не знайдено.
+        """
+        logger.debug(f"Спроба видалення правила ID: {rule_id} користувачем ID: {current_user_id}")
 
         rule_db = await self.db_session.get(BonusRule, rule_id)
         if not rule_db:
-            logger.warning(f"Bonus rule ID '{rule_id}' not found for deletion.")
+            logger.warning(f"Правило ID '{rule_id}' не знайдено для видалення.")
             return False
+
+        # TODO: Згідно technical_task.txt, перевірити, чи є обмеження на видалення правил (наприклад, якщо вони вже використовувались).
+        # Наразі припускаємо пряме видалення.
 
         await self.db_session.delete(rule_db)
         await self.commit()
-        logger.info(f"Bonus rule ID '{rule_id}' deleted successfully by user ID '{current_user_id}'.")
+        logger.info(f"Правило ID '{rule_id}' успішно видалено користувачем ID '{current_user_id}'.")
         return True
 
     async def list_bonus_rules(
-        self,
-        group_id: Optional[UUID] = None,
-        task_type_id: Optional[UUID] = None,
-        task_id: Optional[UUID] = None,
-        is_active: Optional[bool] = True,
-        skip: int = 0,
-        limit: int = 100,
-        include_global_rules_for_group: bool = False # If true and group_id is given, also include global rules
+            self,
+            group_id: Optional[UUID] = None,
+            task_type_id: Optional[UUID] = None,
+            task_id: Optional[UUID] = None,
+            is_active: Optional[bool] = None,  # За замовчуванням не фільтрує за активністю, щоб показати всі
+            valid_on_date: Optional[datetime] = None,  # Дата для перевірки активності правила (valid_from/valid_until)
+            skip: int = 0,
+            limit: int = 100,
+            include_global_rules_if_group_given: bool = False
     ) -> List[BonusRuleResponse]:
-        logger.debug(f"Listing bonus rules: group={group_id}, task_type={task_type_id}, task={task_id}, active={is_active}, global_for_group={include_global_rules_for_group}")
+        """
+        Перелічує правила нарахування бонусів з можливістю фільтрації та пагінації.
+
+        :param group_id: Фільтр за ID групи.
+        :param task_type_id: Фільтр за ID типу завдання.
+        :param task_id: Фільтр за ID завдання.
+        :param is_active: Фільтр за статусом активності правила.
+        :param valid_on_date: Якщо вказано, фільтрує правила, активні на цю дату.
+        :param skip: Кількість записів для пропуску.
+        :param limit: Максимальна кількість записів.
+        :param include_global_rules_if_group_given: Якщо True та group_id вказано, включає також глобальні правила.
+        :return: Список Pydantic схем BonusRuleResponse.
+        """
+        logger.debug(
+            f"Перелік правил: group={group_id}, task_type={task_type_id}, task={task_id}, active={is_active}, valid_on={valid_on_date}, global_for_group={include_global_rules_if_group_given}")
 
         stmt = select(BonusRule).options(
             selectinload(BonusRule.group), selectinload(BonusRule.task_type),
             selectinload(BonusRule.task),
-            selectinload(BonusRule.created_by_user).options(selectinload(User.user_type)) if hasattr(BonusRule, 'created_by_user') else None
+            selectinload(BonusRule.created_by_user).options(selectinload(User.user_type)),
+            selectinload(BonusRule.updated_by_user).options(selectinload(User.user_type))
         )
-        stmt = stmt.options(*(opt for opt in stmt.get_options() if opt is not None))
-
 
         conditions = []
         if group_id is not None:
-            if include_global_rules_for_group:
-                conditions.append(or_(BonusRule.group_id == group_id, BonusRule.group_id.is_(None))) # type: ignore
+            if include_global_rules_if_group_given:
+                conditions.append(or_(BonusRule.group_id == group_id, BonusRule.group_id.is_(None)))
             else:
                 conditions.append(BonusRule.group_id == group_id)
-        # else: # No group_id specified, could list only global rules or all rules depending on desired behavior
-        #     conditions.append(BonusRule.group_id.is_(None)) # Example: only global if no group_id
+        # Якщо group_id не вказано, не фільтруємо за групою (показує всі: і глобальні, і групові)
+        # Для фільтрації тільки глобальних, якщо group_id is None, треба додати:
+        # elif group_id is None and filter_only_global: conditions.append(BonusRule.group_id.is_(None))
 
-        if task_type_id:
-            conditions.append(BonusRule.task_type_id == task_type_id)
-        if task_id:
-            conditions.append(BonusRule.task_id == task_id)
+        if task_type_id: conditions.append(BonusRule.task_type_id == task_type_id)
+        if task_id: conditions.append(BonusRule.task_id == task_id)
+        if is_active is not None: conditions.append(BonusRule.is_active == is_active)
 
-        if hasattr(BonusRule, 'is_active') and is_active is not None:
-            conditions.append(BonusRule.is_active == is_active) # type: ignore
+        if valid_on_date:
+            # Правило активне, якщо valid_from <= valid_on_date AND (valid_until IS NULL OR valid_until >= valid_on_date)
+            # Ігноруємо timezone для порівняння дат, якщо вони зберігаються як naive datetimes в БД.
+            # Якщо в БД дати з timezone, valid_on_date теж має бути timezone-aware.
+            # Припускаємо, що valid_on_date є timezone-aware (наприклад, UTC).
+            conditions.append(
+                and_(
+                    or_(BonusRule.valid_from.is_(None), BonusRule.valid_from <= valid_on_date),
+                    or_(BonusRule.valid_until.is_(None), BonusRule.valid_until >= valid_on_date)
+                )
+            )
 
         if conditions:
             stmt = stmt.where(*conditions)
 
-        stmt = stmt.order_by(BonusRule.group_id.nullsfirst(), BonusRule.name).offset(skip).limit(limit) # Show global rules first
+        # TODO: Згідно technical_task.txt, уточнити поля для сортування.
+        stmt = stmt.order_by(BonusRule.group_id.nulls_first(), BonusRule.name).offset(skip).limit(limit)
 
         rules_db = (await self.db_session.execute(stmt)).scalars().unique().all()
 
-        # response_list = [BonusRuleResponse.model_validate(r) for r in rules_db] # Pydantic v2
-        response_list = [BonusRuleResponse.from_orm(r) for r in rules_db] # Pydantic v1
-        logger.info(f"Retrieved {len(response_list)} bonus rules.")
+        response_list = [BonusRuleResponse.model_validate(r) for r in rules_db]
+        logger.info(f"Отримано {len(response_list)} правил нарахування бонусів.")
         return response_list
 
     async def get_applicable_bonus_rules(
-        self,
-        group_id: UUID, # Context: Current group
-        task_id: Optional[UUID] = None, # Context: Specific task, if any
-        task_type_id: Optional[UUID] = None, # Context: Type of task, if task_id not specific enough or not given
-        # action_type: str # Context: e.g., "TASK_COMPLETION", "STREAK_ACHIEVED" - for more complex rule conditions
+            self,
+            group_id: UUID,  # Контекст: поточна група
+            task_id: Optional[UUID] = None,  # Контекст: конкретне завдання, якщо є
+            task_type_id: Optional[UUID] = None,  # Контекст: тип завдання
+            # TODO: Розглянути `action_type: str` для більш складних умов, якщо потрібно (напр. 'TASK_COMPLETION')
     ) -> List[BonusRuleResponse]:
-        logger.debug(f"Getting applicable bonus rules for group {group_id}, task {task_id}, task_type {task_type_id}")
+        """
+        Отримує список правил, які потенційно застосовні до заданого контексту (група, завдання, тип завдання).
+        Правила повинні бути активними та валідними на поточну дату.
+        Повертає список, відсортований за специфічністю (найбільш специфічні перші).
+        """
+        current_time = datetime.now(timezone.utc)
+        logger.debug(
+            f"Пошук застосовних правил для групи {group_id}, завдання {task_id}, типу завдання {task_type_id} на {current_time.isoformat()}")
 
-        # This builds a query that finds rules matching:
-        # 1. Specific task ID (most specific)
-        # 2. Specific task_type_id AND (group_id OR global)
-        # 3. Specific group_id general rules (not task/type specific)
-        # 4. Global general rules (not task/type/group specific)
+        # Базові умови: правило активне та валідне за датою
+        base_conditions = [
+            BonusRule.is_active == True,
+            or_(BonusRule.valid_from.is_(None), BonusRule.valid_from <= current_time),
+            or_(BonusRule.valid_until.is_(None), BonusRule.valid_until >= current_time)
+        ]
 
-        # All rules must be active
-        base_conditions = [BonusRule.is_active == True] if hasattr(BonusRule, 'is_active') else []
+        # Формуємо умови для різних рівнів специфічності
+        clauses = []
 
-        rule_clauses = []
-
-        # Rule for specific task (task_id takes precedence, group_id is implicit if task belongs to group)
+        # 1. Правила для конкретного завдання (найвищий пріоритет)
+        #    (група завдання неявно враховується, якщо завдання належить групі; або правило може бути глобальним для завдання)
         if task_id:
-            rule_clauses.append(BonusRule.task_id == task_id)
+            clauses.append(and_(*base_conditions, BonusRule.task_id == task_id))
 
-        # Rule for task_type within the specific group OR globally for that task_type
+        # 2. Правила для типу завдання (в межах групи або глобальні)
         if task_type_id:
-            rule_clauses.append(
-                (BonusRule.task_type_id == task_type_id) &
-                (BonusRule.task_id == None) & # Not task-specific
-                (or_(BonusRule.group_id == group_id, BonusRule.group_id == None))
-            )
+            clauses.append(and_(
+                *base_conditions,
+                BonusRule.task_type_id == task_type_id,
+                BonusRule.task_id.is_(None),  # Не пов'язане з конкретним завданням
+                or_(BonusRule.group_id == group_id, BonusRule.group_id.is_(None))  # Або для цієї групи, або глобальне
+            ))
 
-        # General rule for the specific group (not task/type specific)
-        rule_clauses.append(
-            (BonusRule.group_id == group_id) &
-            (BonusRule.task_id == None) &
-            (BonusRule.task_type_id == None)
-        )
+        # 3. Загальні правила для конкретної групи
+        clauses.append(and_(
+            *base_conditions,
+            BonusRule.group_id == group_id,
+            BonusRule.task_id.is_(None),
+            BonusRule.task_type_id.is_(None)
+        ))
 
-        # Global general rule
-        rule_clauses.append(
-            (BonusRule.group_id == None) &
-            (BonusRule.task_id == None) &
-            (BonusRule.task_type_id == None)
-        )
+        # 4. Загальні глобальні правила
+        clauses.append(and_(
+            *base_conditions,
+            BonusRule.group_id.is_(None),
+            BonusRule.task_id.is_(None),
+            BonusRule.task_type_id.is_(None)
+        ))
 
         stmt = select(BonusRule).options(
-            selectinload(BonusRule.group), selectinload(BonusRule.task_type),
+            selectinload(BonusRule.group),
+            selectinload(BonusRule.task_type),
             selectinload(BonusRule.task)
-        ).where(or_(*rule_clauses), *base_conditions) # Apply base conditions (like is_active) to all clauses
+        ).where(or_(*clauses))
 
-        # Order to determine precedence: more specific rules first.
-        # Task-specific > Task_Type_Group > Task_Type_Global > Group_General > Global_General
+        # Сортування для пріоритезації: більш специфічні правила перші.
+        # task_id (не NULL) > task_type_id (не NULL) > group_id (не NULL)
         stmt = stmt.order_by(
-            BonusRule.task_id.desc().nullslast(),      # Task-specific first
-            BonusRule.task_type_id.desc().nullslast(), # Then type-specific
-            BonusRule.group_id.desc().nullslast()      # Then group-specific (global has group_id=NULL)
+            BonusRule.task_id.desc().nulls_last(),
+            BonusRule.task_type_id.desc().nulls_last(),
+            BonusRule.group_id.desc().nulls_last(),
+            BonusRule.name  # Додаткове сортування для стабільності
         )
 
         rules_db = (await self.db_session.execute(stmt)).scalars().unique().all()
 
-        # response_list = [BonusRuleResponse.model_validate(r) for r in rules_db] # Pydantic v2
-        response_list = [BonusRuleResponse.from_orm(r) for r in rules_db] # Pydantic v1
-        logger.info(f"Retrieved {len(response_list)} potentially applicable bonus rules, ordered by specificity.")
+        response_list = [BonusRuleResponse.model_validate(r) for r in rules_db]
+        logger.info(f"Отримано {len(response_list)} застосовних правил, відсортованих за специфічністю.")
         return response_list
 
-logger.info("BonusRuleService class defined.")
+
+logger.debug("BonusRuleService клас визначено та завантажено.")

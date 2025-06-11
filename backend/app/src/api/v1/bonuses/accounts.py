@@ -1,173 +1,212 @@
 # backend/app/src/api/v1/bonuses/accounts.py
-from typing import List, Optional, Generic, TypeVar # Додано Generic, TypeVar для PaginatedResponse
+# -*- coding: utf-8 -*-
+"""
+Ендпоінти для перегляду бонусних рахунків користувачів та історії транзакцій.
+"""
+from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
+from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
-from pydantic import BaseModel # Додано BaseModel для PaginatedResponse, якщо визначається локально
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.src.core.dependencies import get_db_session, get_current_active_user # May need get_current_active_superuser
-from app.src.models.auth import User as UserModel
-# from app.src.models.bonuses import UserAccount as UserAccountModel # Потрібна модель рахунку
-# from app.src.models.bonuses import AccountTransaction as AccountTransactionModel # Потрібна модель транзакції
-from app.src.schemas.bonuses.account import UserAccountResponse # Схема для відповіді по рахунку
-from app.src.schemas.bonuses.transaction import AccountTransactionResponse # Схема для відповіді по транзакції
-# Припускаємо, що ці схеми імпортуються, якщо ні - можна визначити як у users.py або groups.py
-from app.src.schemas.pagination import PaginatedResponse, PageParams
-from app.src.services.bonuses.account import UserAccountService # Сервіс для рахунків
+# Повні шляхи імпорту
+from backend.app.src.api.dependencies import (
+    get_api_db_session, get_current_active_user,
+    get_current_active_superuser,  # Для доступу до чужих даних або даних всієї групи
+    paginator
+)
+# TODO: Додати/використати залежність `check_group_view_permission_or_superuser`
+from backend.app.src.api.v1.groups.groups import check_group_view_permission  # Тимчасово
+from backend.app.src.models.auth.user import User as UserModel
+from backend.app.src.schemas.bonuses.account import UserAccountResponse
+from backend.app.src.schemas.bonuses.transaction import AccountTransactionResponse
+from backend.app.src.core.pagination import PagedResponse, PageParams
+from backend.app.src.services.bonuses.account import UserAccountService
+from backend.app.src.services.bonuses.transaction import AccountTransactionService  # Для історії транзакцій
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings
 
 router = APIRouter()
 
-@router.get(
-    "/me", # Шлях відносно /bonuses/accounts
-    response_model=UserAccountResponse,
-    summary="Отримання бонусного рахунку поточного користувача",
-    description="Повертає деталі бонусного рахунку та поточний баланс для аутентифікованого користувача."
-)
-async def get_my_bonus_account(
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user),
-    account_service: UserAccountService = Depends()
-):
-    '''
-    Отримує бонусний рахунок поточного користувача.
-    '''
-    if not hasattr(account_service, 'db_session') or account_service.db_session is None:
-        account_service.db_session = db
 
-    account = await account_service.get_user_account(user_id=current_user.id, requesting_user=current_user)
-    if not account: # Рахунок має створюватися автоматично при реєстрації користувача
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Бонусний рахунок не знайдено.")
-    return UserAccountResponse.model_validate(account)
+# Залежність для отримання UserAccountService
+async def get_user_account_service(session: AsyncSession = Depends(get_api_db_session)) -> UserAccountService:
+    """Залежність FastAPI для отримання екземпляра UserAccountService."""
+    return UserAccountService(db_session=session)
+
+
+# Залежність для отримання AccountTransactionService
+async def get_account_transaction_service(
+        session: AsyncSession = Depends(get_api_db_session)) -> AccountTransactionService:
+    """Залежність FastAPI для отримання екземпляра AccountTransactionService."""
+    return AccountTransactionService(db_session=session)
+
+
+@router.get(
+    "/me",
+    response_model=List[UserAccountResponse],  # Користувач може мати кілька рахунків (глобальний, групові)
+    summary="Отримання бонусних рахунків поточного користувача",  # i18n
+    description="""Повертає список бонусних рахунків (глобальний та для кожної групи,
+    де користувач є активним членом) для поточного аутентифікованого користувача."""  # i18n
+)
+async def get_my_bonus_accounts(  # Перейменовано для відображення списку
+        current_user: UserModel = Depends(get_current_active_user),
+        account_service: UserAccountService = Depends(get_user_account_service)
+) -> List[UserAccountResponse]:
+    """
+    Отримує всі бонусні рахунки поточного користувача.
+    """
+    logger.info(f"Користувач ID '{current_user.id}' запитує свої бонусні рахунки.")
+    # TODO: UserAccountService має надати метод `get_all_accounts_for_user(user_id)`
+    #  який повертає список ORM об'єктів UserAccount.
+    #  Або цей ендпоінт має приймати `group_id: Optional[UUID]` для вибору конкретного рахунку.
+    #  Поки що, симулюємо отримання глобального рахунку, якщо він є.
+
+    # Приклад отримання глобального рахунку (group_id=None)
+    global_account_orm = await account_service.get_user_account_orm(user_id=current_user.id, group_id=None,
+                                                                    load_relations=True)  # type: ignore
+
+    # TODO: Додати логіку отримання всіх групових рахунків користувача.
+    # user_group_memberships = await membership_service.get_user_group_memberships(user_id=current_user.id, is_active=True)
+    # group_accounts_orm = []
+    # for membership in user_group_memberships:
+    #     group_account = await account_service.get_user_account_orm(user_id=current_user.id, group_id=membership.group_id, load_relations=True)
+    #     if group_account: group_accounts_orm.append(group_account)
+
+    accounts_response = []
+    if global_account_orm:
+        accounts_response.append(UserAccountResponse.model_validate(global_account_orm))  # Pydantic v2
+    # accounts_response.extend([UserAccountResponse.model_validate(acc) for acc in group_accounts_orm])
+
+    if not accounts_response:
+        logger.warning(f"Бонусні рахунки для користувача ID '{current_user.id}' не знайдено.")
+        # i18n
+        # Не помилка, просто може не бути рахунків ще
+        # raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Бонусні рахунки не знайдено.")
+    return accounts_response
+
 
 @router.get(
     "/me/history",
-    response_model=PaginatedResponse[AccountTransactionResponse],
-    summary="Отримання історії транзакцій поточного користувача",
-    description="Повертає історію бонусних транзакцій для аутентифікованого користувача з пагінацією."
+    response_model=PagedResponse[AccountTransactionResponse],
+    summary="Отримання історії транзакцій поточного користувача",  # i18n
+    description="""Повертає історію бонусних транзакцій для всіх рахунків поточного
+    аутентифікованого користувача з пагінацією."""  # i18n
 )
 async def get_my_bonus_account_history(
-    page_params: PageParams = Depends(),
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user),
-    account_service: UserAccountService = Depends()
-):
-    '''
-    Отримує історію транзакцій бонусного рахунку поточного користувача.
-    '''
-    if not hasattr(account_service, 'db_session') or account_service.db_session is None:
-        account_service.db_session = db
+        group_id: Optional[UUID] = Query(None,
+                                         description="ID групи для фільтрації історії (не вказано - для глобального рахунку)"),
+        # i18n
+        page_params: PageParams = Depends(paginator),
+        current_user: UserModel = Depends(get_current_active_user),
+        transaction_service: AccountTransactionService = Depends(get_account_transaction_service),
+        account_service: UserAccountService = Depends(get_user_account_service)  # Для отримання user_account_id
+) -> PagedResponse[AccountTransactionResponse]:
+    """
+    Отримує історію транзакцій бонусного рахунку поточного користувача
+    (глобального або для вказаної групи).
+    """
+    logger.info(f"Користувач ID '{current_user.id}' запитує історію транзакцій (група: {group_id}).")
 
-    # Сервіс має перевірити, чи існує рахунок перед тим, як запитувати історію
-    total_transactions, transactions = await account_service.get_user_account_history(
-        user_id=current_user.id,
-        requesting_user=current_user,
+    # Спочатку отримуємо ID рахунку користувача для даної групи (або глобального)
+    user_account = await account_service.get_user_account(user_id=current_user.id, group_id=group_id)
+    if not user_account:
+        logger.info(
+            f"Відповідний бонусний рахунок для користувача ID '{current_user.id}' (група: {group_id}) не знайдено для перегляду історії.")
+        return PagedResponse(results=[], total=0, page=page_params.page,
+                             size=page_params.size)  # Повертаємо порожній результат
+
+    # Потім отримуємо транзакції для цього конкретного рахунку
+    transactions_list = await transaction_service.list_transactions_for_account(
+        user_account_id=user_account.id,  # Використовуємо ID знайденого рахунку
         skip=page_params.skip,
         limit=page_params.limit
     )
-    return PaginatedResponse[AccountTransactionResponse]( # Явно вказуємо тип Generic
+    # TODO: AccountTransactionService.list_transactions_for_account має повертати (items, total_count)
+    total_transactions = len(transactions_list)  # ЗАГЛУШКА
+    logger.warning("Використовується заглушка для total_count при переліку транзакцій користувача.")
+
+    return PagedResponse[AccountTransactionResponse](
         total=total_transactions,
         page=page_params.page,
         size=page_params.size,
-        results=[AccountTransactionResponse.model_validate(trans) for trans in transactions]
+        results=transactions_list  # Сервіс вже повертає список Pydantic моделей
     )
 
+
 @router.get(
-    "/user/{user_id}",
-    response_model=UserAccountResponse,
-    summary="Отримання бонусного рахунку вказаного користувача (Адмін/Суперюзер)",
-    description="Повертає деталі бонусного рахунку вказаного користувача. Доступно адміністраторам груп або суперюзерам."
+    "/user/{user_id_target}",
+    response_model=List[UserAccountResponse],  # Користувач може мати кілька рахунків
+    summary="Отримання бонусних рахунків вказаного користувача (Адмін/Суперюзер)",  # i18n
+    description="""Повертає список бонусних рахунків вказаного користувача.
+    Доступно суперюзерам або адміністраторам груп, членом яких є цільовий користувач."""  # i18n
+    # dependencies=[Depends(get_current_active_superuser)] # Або більш гранульована перевірка
 )
-async def get_user_bonus_account(
-    user_id: int = Path(..., description="ID користувача, чий рахунок запитується"),
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user), # Адмін групи або суперюзер
-    account_service: UserAccountService = Depends()
-):
-    '''
-    Отримує бонусний рахунок вказаного користувача.
-    Перевірка прав (чи має `current_user` доступ до інформації `user_id`) - у сервісі.
-    '''
-    if not hasattr(account_service, 'db_session') or account_service.db_session is None:
-        account_service.db_session = db
+async def get_user_bonus_accounts(  # Перейменовано
+        user_id_target: UUID = Path(..., description="ID користувача, чиї рахунки запитуються"),  # i18n
+        current_user: UserModel = Depends(get_current_active_superuser),
+        # TODO: Замінити на залежність, що перевіряє права (суперюзер АБО адмін спільної групи)
+        account_service: UserAccountService = Depends(get_user_account_service)
+) -> List[UserAccountResponse]:
+    """
+    Отримує бонусні рахунки вказаного користувача.
+    Перевірка прав: поточний користувач має бути суперюзером або адміном групи,
+    до якої належить цільовий користувач (потребує реалізації цієї логіки).
+    """
+    # TODO: Реалізувати перевірку прав: чи може `current_user` переглядати рахунки `user_id_target`.
+    #  Якщо не суперюзер, потрібно перевірити, чи є спільні групи, де `current_user` є адміном.
+    logger.info(f"Користувач ID '{current_user.id}' запитує бонусні рахунки для користувача ID '{user_id_target}'.")
 
-    account = await account_service.get_user_account(user_id=user_id, requesting_user=current_user)
-    if not account:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"Бонусний рахунок для користувача ID {user_id} не знайдено або доступ заборонено.")
-    return UserAccountResponse.model_validate(account)
+    # Поки що, ця логіка аналогічна /me, але для іншого юзера (потребує розширення прав)
+    global_account_orm = await account_service.get_user_account_orm(user_id=user_id_target, group_id=None,
+                                                                    load_relations=True)  # type: ignore
+    accounts_response = []
+    if global_account_orm:
+        accounts_response.append(UserAccountResponse.model_validate(global_account_orm))
+    # TODO: Додати групові рахунки для user_id_target, якщо current_user має до них доступ.
 
-@router.get(
-    "/user/{user_id}/history",
-    response_model=PaginatedResponse[AccountTransactionResponse],
-    summary="Отримання історії транзакцій вказаного користувача (Адмін/Суперюзер)",
-    description="Повертає історію бонусних транзакцій вказаного користувача. Доступно адміністраторам груп або суперюзерам."
-)
-async def get_user_bonus_account_history(
-    user_id: int = Path(..., description="ID користувача, чию історію транзакцій запитують"),
-    page_params: PageParams = Depends(),
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user), # Адмін групи або суперюзер
-    account_service: UserAccountService = Depends()
-):
-    '''
-    Отримує історію транзакцій бонусного рахунку вказаного користувача.
-    Перевірка прав - у сервісі.
-    '''
-    if not hasattr(account_service, 'db_session') or account_service.db_session is None:
-        account_service.db_session = db
+    if not accounts_response:
+        logger.warning(f"Бонусні рахунки для користувача ID '{user_id_target}' не знайдено або доступ обмежено.")
+    return accounts_response
 
-    total_transactions, transactions = await account_service.get_user_account_history(
-        user_id=user_id,
-        requesting_user=current_user,
-        skip=page_params.skip,
-        limit=page_params.limit
-    )
-    return PaginatedResponse[AccountTransactionResponse]( # Явно вказуємо тип Generic
-        total=total_transactions,
-        page=page_params.page,
-        size=page_params.size,
-        results=[AccountTransactionResponse.model_validate(trans) for trans in transactions]
-    )
 
 @router.get(
-    "/group/{group_id}",
-    response_model=PaginatedResponse[UserAccountResponse], # Список рахунків користувачів групи
-    summary="Список бонусних рахунків користувачів групи (Адмін/Суперюзер)",
-    description="Повертає список бонусних рахунків усіх користувачів у вказаній групі. Доступно адміністраторам цієї групи або суперюзерам."
+    "/group/{group_id}/all",  # Змінено шлях, щоб уникнути конфлікту з /group/{group_id} в інших модулях
+    response_model=PagedResponse[UserAccountResponse],
+    summary="Список бонусних рахунків користувачів групи (Адмін/Суперюзер)",  # i18n
+    description="""Повертає список бонусних рахунків усіх користувачів у вказаній групі.
+    Доступно адміністраторам цієї групи або суперюзерам.""",  # i18n
+    dependencies=[Depends(check_group_view_permission)]  # Використовуємо залежність з groups.py
 )
 async def list_group_user_accounts(
-    group_id: int = Path(..., description="ID групи"),
-    page_params: PageParams = Depends(),
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user), # Адмін групи або суперюзер
-    account_service: UserAccountService = Depends()
-):
-    '''
+        group_id: UUID = Path(..., description="ID групи"),  # i18n
+        page_params: PageParams = Depends(paginator),
+        # current_user_with_permission: UserModel = Depends(check_group_view_permission), # Користувач вже в current_user
+        account_service: UserAccountService = Depends(get_user_account_service)
+) -> PagedResponse[UserAccountResponse]:
+    """
     Отримує список бонусних рахунків для всіх користувачів у групі.
-    Перевірка прав (чи є `current_user` адміном `group_id` або суперюзером) - у сервісі.
-    '''
-    if not hasattr(account_service, 'db_session') or account_service.db_session is None:
-        account_service.db_session = db
+    Перевірка прав (чи є поточний користувач членом/адміном групи або суперюзером) - через залежність.
+    """
+    # logger.info(f"Користувач ID '{current_user_with_permission.id}' запитує рахунки для групи ID '{group_id}'.")
+    logger.info(f"Запит рахунків для групи ID '{group_id}'.")
 
-    total_accounts, accounts = await account_service.get_user_accounts_in_group(
+    # TODO: UserAccountService.list_user_accounts_in_group_paginated має повертати (items, total_count)
+    accounts_orm, total_accounts = await account_service.list_user_accounts_in_group_paginated(
         group_id=group_id,
-        requesting_user=current_user,
         skip=page_params.skip,
         limit=page_params.limit
     )
-    return PaginatedResponse[UserAccountResponse]( # Явно вказуємо тип Generic
+    return PagedResponse[UserAccountResponse](
         total=total_accounts,
         page=page_params.page,
         size=page_params.size,
-        results=[UserAccountResponse.model_validate(acc) for acc in accounts]
+        results=[UserAccountResponse.model_validate(acc) for acc in accounts_orm]  # Pydantic v2
     )
 
-# Міркування:
-# 1.  Схеми: `UserAccountResponse` (з `app.src.schemas.bonuses.account`),
-#     `AccountTransactionResponse` (з `app.src.schemas.bonuses.transaction`).
-# 2.  Сервіс `UserAccountService`: Керує логікою доступу до рахунків та історії транзакцій.
-#     - Забезпечує, що користувачі бачать тільки свою інформацію, а адміни/суперюзери - в межах своїх прав.
-#     - Рахунки користувачів мають створюватися автоматично при реєстрації.
-# 3.  Права доступу: Чітко розділені для звичайних користувачів (тільки свої дані) та адміністраторів/суперюзерів.
-# 4.  Пагінація: Для історії транзакцій та списку рахунків у групі.
-# 5.  URL-и: Цей роутер буде підключений до `bonuses_router` з префіксом `/accounts`.
-#     Шляхи будуть `/api/v1/bonuses/accounts/me`, `/api/v1/bonuses/accounts/user/{user_id}` тощо.
-# 6.  Коментарі: Українською мовою.
+
+# TODO: Розглянути ендпоінт для адміністративного коригування балансу (створення транзакції MANUAL_ADJUSTMENT).
+# POST /admin/adjust-balance
+# { "user_id": "...", "group_id": "...", "amount": "...", "description": "..." }
+# Потребує прав суперюзера.
+
+logger.info(f"Роутер для бонусних рахунків (`{router.prefix}`) визначено.")

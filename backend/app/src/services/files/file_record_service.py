@@ -1,168 +1,209 @@
 # backend/app/src/services/files/file_record_service.py
-import logging
+# import logging # Замінено на централізований логер
 from typing import List, Optional, Any
 from uuid import UUID
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
-from app.src.services.base import BaseService
-from app.src.models.files.file import FileRecord # SQLAlchemy FileRecord model
-from app.src.models.auth.user import User # For uploader_user relationship
-from app.src.models.groups.group import Group # For group relationship
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.files.file import FileRecord  # Модель SQLAlchemy FileRecord
+from backend.app.src.models.auth.user import User  # Для зв'язку uploader_user
+from backend.app.src.models.groups.group import Group  # Для зв'язку group
 
-from app.src.schemas.files.file import ( # Pydantic Schemas
+from backend.app.src.schemas.files.file import (  # Схеми Pydantic
     FileRecordCreate,
-    FileRecordUpdate, # For updating metadata like name, description
+    FileRecordUpdate,
     FileRecordResponse
 )
-# FileUploadService might be needed for deleting actual file from storage
-# from .file_upload_service import FileUploadService # Avoid circular if possible
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+
+# from .file_upload_service import FileUploadService # Розглянути переміщення імпорту, якщо немає циркулярності
 
 class FileRecordService(BaseService):
     """
-    Service for managing file metadata records (FileRecord entities).
-    Handles CRUD operations for these records. Actual file storage/deletion
-    is typically coordinated with a FileUploadService or storage utility.
+    Сервіс для управління записами метаданих файлів (сутності FileRecord).
+    Обробляє CRUD-операції для цих записів. Фактичне зберігання/видалення файлів
+    зазвичай координується з FileUploadService або утилітою для роботи зі сховищем.
     """
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        logger.info("FileRecordService initialized.")
+        logger.info("FileRecordService ініціалізовано.")
 
-    async def get_file_record_by_id(self, file_id: UUID) -> Optional[FileRecordResponse]:
-        """Retrieves a file record by its ID, with related uploader/group loaded."""
-        logger.debug(f"Attempting to retrieve file record by ID: {file_id}")
+    async def get_file_record_by_id(self, file_id: UUID, load_relations: bool = True) -> Optional[FileRecordResponse]:
+        """
+        Отримує запис файлу за його ID.
+        За замовчуванням завантажує пов'язані сутності uploader_user та group.
 
-        stmt = select(FileRecord).options(
-            selectinload(FileRecord.uploader_user).options(selectinload(User.user_type)) if hasattr(FileRecord, 'uploader_user') else None,
-            selectinload(FileRecord.group) if hasattr(FileRecord, 'group') else None
-        ).where(FileRecord.id == file_id)
-        stmt = stmt.options(*(opt for opt in stmt.get_options() if opt is not None))
+        :param file_id: ID запису файлу.
+        :param load_relations: Чи завантажувати пов'язані сутності.
+        :return: Pydantic схема FileRecordResponse або None, якщо не знайдено.
+        """
+        logger.debug(f"Спроба отримання запису файлу за ID: {file_id}")
 
+        query = select(FileRecord)
+        if load_relations:
+            options_to_load = []
+            if hasattr(FileRecord, 'uploader_user'):
+                options_to_load.append(selectinload(FileRecord.uploader_user).options(selectinload(User.user_type)))
+            if hasattr(FileRecord, 'group'):
+                options_to_load.append(selectinload(FileRecord.group))
+            if options_to_load:
+                query = query.options(*options_to_load)
+        else:
+            # Якщо зв'язки не потрібні, можна їх явно виключити для оптимізації
+            if hasattr(FileRecord, 'uploader_user'): query = query.options(noload(FileRecord.uploader_user))
+            if hasattr(FileRecord, 'group'): query = query.options(noload(FileRecord.group))
+
+        stmt = query.where(FileRecord.id == file_id)
         record_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
         if record_db:
-            logger.info(f"File record with ID '{file_id}' (Name: '{record_db.file_name}') found.")
-            # return FileRecordResponse.model_validate(record_db) # Pydantic v2
-            return FileRecordResponse.from_orm(record_db) # Pydantic v1
-        logger.info(f"File record with ID '{file_id}' not found.")
+            logger.info(f"Запис файлу з ID '{file_id}' (Ім'я: '{record_db.file_name}') знайдено.")
+            return FileRecordResponse.model_validate(record_db)  # Pydantic v2
+        logger.info(f"Запис файлу з ID '{file_id}' не знайдено.")
         return None
 
-    async def create_file_record(self, record_data: FileRecordCreate) -> Optional[FileRecordResponse]: # Return Optional
+    async def create_file_record(self, record_data: FileRecordCreate,
+                                 uploader_user_id: Optional[UUID] = None) -> FileRecordResponse:
         """
-        Creates a new file record.
-        This is typically called *after* a file has been successfully uploaded to storage,
-        and `record_data` includes the `storage_path` and other metadata.
+        Створює новий запис файлу.
+        Зазвичай викликається *після* успішного завантаження файлу до сховища.
+        `record_data` повинен містити `storage_path` та іншу метаінформацію.
+        `uploader_user_id` з параметра має пріоритет над `record_data.uploader_user_id`.
+
+        :param record_data: Дані для створення запису (Pydantic схема).
+        :param uploader_user_id: ID користувача, що завантажив файл (опціонально, може бути в record_data).
+        :return: Pydantic схема створеного FileRecordResponse.
+        :raises ValueError: Якщо пов'язані сутності не знайдено або шлях зберігання не унікальний. # i18n
         """
-        logger.debug(f"Attempting to create new file record for file: '{record_data.file_name}'")
+        logger.debug(f"Спроба створення нового запису для файлу: '{record_data.file_name}'")
 
-        if record_data.uploader_user_id and hasattr(FileRecord, 'uploader_user_id'):
-            if not await self.db_session.get(User, record_data.uploader_user_id):
-                raise ValueError(f"Uploader user with ID '{record_data.uploader_user_id}' not found.")
-        if record_data.group_id and hasattr(FileRecord, 'group_id'):
-            if not await self.db_session.get(Group, record_data.group_id):
-                raise ValueError(f"Group with ID '{record_data.group_id}' not found.")
+        effective_uploader_user_id = uploader_user_id or record_data.uploader_user_id
 
-        if hasattr(FileRecord, 'storage_path') and hasattr(record_data, 'storage_path'):
-            stmt_path_check = select(FileRecord.id).where(FileRecord.storage_path == record_data.storage_path) # Select only ID
-            if (await self.db_session.execute(stmt_path_check)).scalar_one_or_none():
-                logger.warning(f"File record with storage_path '{record_data.storage_path}' already exists.")
-                raise ValueError(f"File record with storage_path '{record_data.storage_path}' already exists.")
+        if effective_uploader_user_id and not await self.db_session.get(User, effective_uploader_user_id):
+            # i18n
+            raise ValueError(f"Користувача-завантажувача з ID '{effective_uploader_user_id}' не знайдено.")
+        if record_data.group_id and not await self.db_session.get(Group, record_data.group_id):
+            # i18n
+            raise ValueError(f"Групу з ID '{record_data.group_id}' не знайдено.")
 
-        record_db_data = record_data.dict()
+        # Перевірка унікальності storage_path
+        # TODO: Уточнити, чи storage_path має бути глобально унікальним, чи унікальним в межах uploader/group/entity.
+        # Поки що припускаємо глобальну унікальність.
+        stmt_path_check = select(FileRecord.id).where(FileRecord.storage_path == record_data.storage_path)
+        if (await self.db_session.execute(stmt_path_check)).scalar_one_or_none():
+            msg = f"Запис файлу зі шляхом зберігання '{record_data.storage_path}' вже існує."  # i18n
+            logger.warning(msg)
+            raise ValueError(msg)
 
-        new_record_db = FileRecord(**record_db_data)
+        # Створення запису FileRecord
+        # created_at, updated_at встановлюються автоматично моделлю/БД
+        new_record_db = FileRecord(
+            **record_data.model_dump(exclude_unset=True),  # Pydantic v2
+            uploader_user_id=effective_uploader_user_id  # Пріоритет параметра функції
+            # `created_at` та `updated_at` повинні встановлюватися автоматично моделлю
+        )
 
         self.db_session.add(new_record_db)
         try:
             await self.commit()
-            # Refresh to load relationships for the response
-            refresh_attrs = []
-            if hasattr(FileRecord, 'uploader_user'): refresh_attrs.append('uploader_user')
-            if hasattr(FileRecord, 'group'): refresh_attrs.append('group')
-            if refresh_attrs: await self.db_session.refresh(new_record_db, attribute_names=refresh_attrs)
-            else: await self.db_session.refresh(new_record_db)
+            # Оновлюємо для завантаження зв'язків для відповіді
+            # Використовуємо get_file_record_by_id для консистентного завантаження зв'язків
+            created_record_response = await self.get_file_record_by_id(new_record_db.id, load_relations=True)
+            if not created_record_response:  # Малоймовірно, якщо коміт пройшов успішно
+                logger.error(f"Не вдалося отримати щойно створений запис файлу ID {new_record_db.id} після коміту.")
+                # i18n
+                raise RuntimeError("Помилка створення запису файлу: не вдалося отримати після збереження.")
 
-            created_record = await self.get_file_record_by_id(new_record_db.id) # Use get for consistent response
-            if created_record:
-                logger.info(f"File record '{new_record_db.file_name}' (ID: {new_record_db.id}) created successfully.")
-                return created_record
-            else: # Should not happen
-                logger.error(f"Failed to retrieve newly created file record ID {new_record_db.id} after commit.")
-                return None
+            logger.info(f"Запис файлу '{new_record_db.file_name}' (ID: {new_record_db.id}) успішно створено.")
+            return created_record_response
         except IntegrityError as e:
             await self.rollback()
-            logger.error(f"Integrity error creating file record '{record_data.file_name}': {e}", exc_info=True)
-            raise ValueError(f"Could not create file record due to a data conflict: {e}")
+            logger.error(f"Помилка цілісності '{record_data.file_name}': {e}", exc_info=settings.DEBUG)
+            raise ValueError(f"Не вдалося створити запис файлу через конфлікт даних.")  # i18n
         except Exception as e:
             await self.rollback()
-            logger.error(f"Unexpected error creating file record '{record_data.file_name}': {e}", exc_info=True)
+            logger.error(f"Неочікувана помилка '{record_data.file_name}': {e}", exc_info=settings.DEBUG)
             raise
 
     async def update_file_record_metadata(
-        self,
-        file_id: UUID,
-        metadata_update_data: FileRecordUpdate,
-        current_user_id: Optional[UUID] = None # For audit, made optional
+            self,
+            file_id: UUID,
+            metadata_update_data: FileRecordUpdate,
+            # TODO: Додати current_user_id для аудиту, якщо поле updated_by_user_id є в моделі FileRecord
+            # current_user_id: Optional[UUID] = None
     ) -> Optional[FileRecordResponse]:
-        logger.debug(f"Attempting to update metadata for file record ID: {file_id} by user ID: {current_user_id or 'System'}")
+        """Оновлює метадані запису файлу (наприклад, ім'я, опис)."""
+        # logger.debug(f"Спроба оновлення метаданих для запису файлу ID: {file_id} користувачем ID: {current_user_id or 'System'}")
+        logger.debug(f"Спроба оновлення метаданих для запису файлу ID: {file_id}")
 
         record_db = await self.db_session.get(FileRecord, file_id)
         if not record_db:
-            logger.warning(f"File record ID '{file_id}' not found for metadata update.")
+            logger.warning(f"Запис файлу ID '{file_id}' не знайдено для оновлення метаданих.")
             return None
 
-        update_data = metadata_update_data.dict(exclude_unset=True)
+        update_data = metadata_update_data.model_dump(exclude_unset=True)  # Pydantic v2
 
         updated_fields_count = 0
+        # Поля, які не можна оновлювати цим методом (або взагалі)
+        restricted_fields = {'id', 'storage_path', 'uploader_user_id', 'created_at', 'group_id',
+                             'file_type', 'size_bytes', 'entity_type', 'entity_id'}
+        # TODO: Уточнити список полів, які не можна змінювати, згідно ТЗ.
+
         for field, value in update_data.items():
-            if field in ['id', 'storage_path', 'uploader_user_id', 'created_at', 'updated_at', 'group_id']: # Added group_id to restricted
-                logger.warning(f"Attempt to update restricted field '{field}' for file record ID '{file_id}' was ignored.")
+            if field in restricted_fields:
+                logger.warning(f"Спроба оновлення обмеженого поля '{field}' для запису ID '{file_id}' проігноровано.")
                 continue
             if hasattr(record_db, field):
                 setattr(record_db, field, value)
-                updated_fields_count +=1
-            else:
-                logger.warning(f"Field '{field}' not found on FileRecord model for update of record ID '{file_id}'.")
+                updated_fields_count += 1
+            else:  # Поле з Pydantic схеми не існує в моделі SQLAlchemy
+                logger.warning(f"Поле '{field}' не знайдено в моделі FileRecord для оновлення запису ID '{file_id}'.")
 
-        if updated_fields_count == 0 and not any(key in update_data for key in ['file_name', 'description', 'metadata']): # Check if any actual data field was in input
-            logger.info(f"No updatable metadata fields provided or no changes needed for file record ID '{file_id}'.")
-            return await self.get_file_record_by_id(file_id)
+        if updated_fields_count == 0:
+            logger.info(f"Не надано полів для оновлення або зміни не потрібні для запису ID '{file_id}'.")
+            return await self.get_file_record_by_id(file_id)  # Повертаємо поточний стан
 
-        if hasattr(record_db, 'updated_by_user_id') and current_user_id:
-            record_db.updated_by_user_id = current_user_id
-        if hasattr(record_db, 'updated_at'):
+        # if hasattr(record_db, 'updated_by_user_id') and current_user_id:
+        #     record_db.updated_by_user_id = current_user_id
+        if hasattr(record_db, 'updated_at'):  # Модель повинна автоматично оновлювати updated_at
             record_db.updated_at = datetime.now(timezone.utc)
 
         self.db_session.add(record_db)
         try:
             await self.commit()
-            logger.info(f"Metadata for file record ID '{file_id}' updated by user ID '{current_user_id or 'System'}'.")
-            return await self.get_file_record_by_id(file_id)
+            # logger.info(f"Метадані для запису файлу ID '{file_id}' оновлено користувачем ID '{current_user_id or 'System'}'.")
+            logger.info(f"Метадані для запису файлу ID '{file_id}' успішно оновлено.")
+            # Повертаємо оновлений запис з усіма зв'язками
+            return await self.get_file_record_by_id(file_id, load_relations=True)
         except Exception as e:
             await self.rollback()
-            logger.error(f"Error updating file record metadata for ID '{file_id}': {e}", exc_info=True)
+            logger.error(f"Помилка оновлення метаданих для запису ID '{file_id}': {e}", exc_info=settings.DEBUG)
             raise
 
-
     async def delete_file_record(
-        self,
-        file_id: UUID,
-        current_user_id: Optional[UUID] = None, # For audit, made optional
-        delete_from_storage: bool = True
+            self,
+            file_id: UUID,
+            # current_user_id: Optional[UUID] = None, # Для аудиту
+            delete_from_storage: bool = True  # Чи видаляти також фізичний файл
     ) -> bool:
-        logger.debug(f"User ID '{current_user_id or 'System'}' attempting to delete file record ID: {file_id}. Delete from storage: {delete_from_storage}")
+        """
+        Видаляє запис файлу з бази даних.
+        Опціонально може ініціювати видалення файлу зі сховища.
+        """
+        # logger.debug(f"Користувач ID '{current_user_id or 'System'}' намагається видалити запис файлу ID: {file_id}. Видалення зі сховища: {delete_from_storage}")
+        logger.debug(f"Спроба видалення запису файлу ID: {file_id}. Видалення зі сховища: {delete_from_storage}")
 
         record_db = await self.db_session.get(FileRecord, file_id)
         if not record_db:
-            logger.warning(f"File record ID '{file_id}' not found for deletion.")
+            logger.warning(f"Запис файлу ID '{file_id}' не знайдено для видалення.")
             return False
 
         storage_path_to_delete = getattr(record_db, 'storage_path', None)
@@ -170,61 +211,83 @@ class FileRecordService(BaseService):
         await self.db_session.delete(record_db)
         try:
             await self.commit()
-            logger.info(f"File record ID '{file_id}' (Path: {storage_path_to_delete}) deleted from database by '{current_user_id or 'System'}'.")
-        except Exception as e: # Catch issues on DB delete commit
+            # logger.info(f"Запис файлу ID '{file_id}' (Шлях: {storage_path_to_delete}) видалено з БД користувачем '{current_user_id or 'System'}'.")
+            logger.info(f"Запис файлу ID '{file_id}' (Шлях: {storage_path_to_delete}) успішно видалено з БД.")
+        except IntegrityError as e:  # Якщо запис файлу використовується (наприклад, FK в User.avatar_id)
             await self.rollback()
-            logger.error(f"Error committing deletion of file record ID '{file_id}' from database: {e}", exc_info=True)
-            return False # DB delete failed, so don't proceed to storage deletion
+            logger.error(
+                f"Помилка цілісності при видаленні запису файлу ID '{file_id}': {e}. Можливо, він використовується.",
+                exc_info=settings.DEBUG)
+            # i18n
+            raise ValueError(f"Запис файлу '{record_db.file_name}' використовується і не може бути видалений.")
+        except Exception as e:
+            await self.rollback()
+            logger.error(f"Помилка коміту видалення запису файлу ID '{file_id}' з БД: {e}", exc_info=settings.DEBUG)
+            return False  # Помилка БД, не продовжуємо до видалення зі сховища
 
         if delete_from_storage and storage_path_to_delete:
-            logger.info(f"Proceeding to delete actual file from storage for path: {storage_path_to_delete}")
-            # from .file_upload_service import FileUploadService
-            # upload_service = FileUploadService(self.db_session)
-            # delete_success = await upload_service.delete_actual_file(storage_path_to_delete)
-            # if not delete_success:
-            #     logger.warning(f"Failed to delete actual file at '{storage_path_to_delete}' from storage. DB record was already deleted.")
-            logger.warning(f"[Placeholder] Actual file deletion from storage for path '{storage_path_to_delete}' needs implementation.")
-            # delete_success_placeholder = True # Assume success for now
-            # if not delete_success_placeholder:
-            #     pass # Logged already
+            logger.info(f"Ініціювання видалення фактичного файлу зі сховища за шляхом: {storage_path_to_delete}")
+            # TODO: Реалізувати логіку видалення файлу зі сховища.
+            #  - Порядок операцій: спочатку видалити файл, потім запис з БД, або навпаки?
+            #    Якщо спочатку файл: що робити, якщо видалення запису з БД не вдалося? Файл буде "сиротою".
+            #    Якщо спочатку запис з БД (як зараз): що робити, якщо видалення файлу не вдалося? Файл буде "сиротою" без запису.
+            #    Потрібна стратегія для обробки таких випадків (наприклад, фонові завдання для очищення).
+            #  - Для локального сховища: os.remove(full_path_to_file). Потрібен FileUploadService.
+            try:
+                from .file_upload_service import FileUploadService  # Локальний імпорт для уникнення циркулярності
+                upload_service = FileUploadService()  # FileUploadService не потребує db_session для delete_actual_file
+                await upload_service.delete_actual_file(storage_path_to_delete)
+                logger.info(f"Фактичний файл за шляхом '{storage_path_to_delete}' успішно видалено.")
+            except Exception as e:
+                logger.error(
+                    f"Помилка при видаленні файлу '{storage_path_to_delete}' зі сховища: {e}. Запис в БД вже видалено.",
+                    exc_info=True)  # i18n log
+                # Запис в БД вже видалено. Потрібен механізм для обробки таких "файлів-сиріт".
+        elif delete_from_storage and not storage_path_to_delete:
+            logger.warning(
+                f"Прапорець delete_from_storage встановлено, але шлях зберігання для запису ID '{file_id}' не визначено.")
 
         return True
 
     async def list_file_records(
-        self,
-        uploader_user_id: Optional[UUID] = None,
-        group_id: Optional[UUID] = None,
-        mime_type_pattern: Optional[str] = None,
-        skip: int = 0,
-        limit: int = 100
+            self,
+            uploader_user_id: Optional[UUID] = None,
+            group_id: Optional[UUID] = None,
+            entity_type: Optional[str] = None,  # Додано фільтр
+            entity_id: Optional[UUID] = None,  # Додано фільтр
+            mime_type_pattern: Optional[str] = None,  # Наприклад, 'image/%'
+            skip: int = 0,
+            limit: int = 100
     ) -> List[FileRecordResponse]:
-        logger.debug(f"Listing file records: user={uploader_user_id}, group={group_id}, mime_pattern='{mime_type_pattern}'")
+        """Перелічує записи файлів з можливістю фільтрації та пагінації."""
+        logger.debug(
+            f"Перелік записів файлів: користувач={uploader_user_id}, група={group_id}, тип_сутності='{entity_type}', ID_сутності={entity_id}, MIME='{mime_type_pattern}'")
 
-        stmt = select(FileRecord).options(
-            selectinload(FileRecord.uploader_user).options(selectinload(User.user_type)) if hasattr(FileRecord, 'uploader_user') else None,
-            selectinload(FileRecord.group) if hasattr(FileRecord, 'group') else None
-        )
-        stmt = stmt.options(*(opt for opt in stmt.get_options() if opt is not None))
-
+        query = select(FileRecord)
+        options_to_load = []
+        if hasattr(FileRecord, 'uploader_user'): options_to_load.append(
+            selectinload(FileRecord.uploader_user).options(selectinload(User.user_type)))
+        if hasattr(FileRecord, 'group'): options_to_load.append(selectinload(FileRecord.group))
+        if options_to_load: query = query.options(*options_to_load)
 
         conditions = []
-        if uploader_user_id and hasattr(FileRecord, 'uploader_user_id'):
-            conditions.append(FileRecord.uploader_user_id == uploader_user_id)
-        if group_id and hasattr(FileRecord, 'group_id'):
-            conditions.append(FileRecord.group_id == group_id)
-        if mime_type_pattern and hasattr(FileRecord, 'mime_type'):
-            conditions.append(FileRecord.mime_type.ilike(mime_type_pattern)) # type: ignore
+        if uploader_user_id: conditions.append(FileRecord.uploader_user_id == uploader_user_id)
+        if group_id: conditions.append(FileRecord.group_id == group_id)
+        if entity_type: conditions.append(FileRecord.entity_type == entity_type)
+        if entity_id: conditions.append(FileRecord.entity_id == entity_id)
+        if mime_type_pattern: conditions.append(FileRecord.mime_type.ilike(mime_type_pattern))  # type: ignore
 
         if conditions:
-            stmt = stmt.where(*conditions)
+            query = query.where(*conditions)
 
-        stmt = stmt.order_by(FileRecord.created_at.desc()).offset(skip).limit(limit)
+        # TODO: Додати можливість передачі параметрів сортування (sort_by, sort_order)
+        stmt = query.order_by(FileRecord.created_at.desc()).offset(skip).limit(limit)
 
         records_db = (await self.db_session.execute(stmt)).scalars().unique().all()
 
-        # response_list = [FileRecordResponse.model_validate(r) for r in records_db] # Pydantic v2
-        response_list = [FileRecordResponse.from_orm(r) for r in records_db] # Pydantic v1
-        logger.info(f"Retrieved {len(response_list)} file records.")
+        response_list = [FileRecordResponse.model_validate(r) for r in records_db]  # Pydantic v2
+        logger.info(f"Отримано {len(response_list)} записів файлів.")
         return response_list
 
-logger.info("FileRecordService class defined.")
+
+logger.debug(f"{FileRecordService.__name__} (сервіс записів файлів) успішно визначено.")

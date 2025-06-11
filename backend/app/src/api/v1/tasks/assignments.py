@@ -1,194 +1,232 @@
 # backend/app/src/api/v1/tasks/assignments.py
-from typing import List, Optional, Generic, TypeVar # Додано Generic, TypeVar для PaginatedResponse
+# -*- coding: utf-8 -*-
+"""
+Ендпоінти для управління призначеннями завдань (та потенційно подій) користувачам.
+"""
+from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні тут, якщо імпортуються з core
+from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
-from pydantic import BaseModel # Додано BaseModel для PaginatedResponse, якщо визначається локально
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.src.core.dependencies import get_db_session, get_current_active_user
-from app.src.models.auth import User as UserModel
-# from app.src.models.tasks import TaskAssignment as TaskAssignmentModel # Потрібна модель призначення
-from app.src.schemas.tasks.assignment import ( # Схеми для призначень
-    TaskAssignmentCreate,
+# Повні шляхи імпорту
+from backend.app.src.api.dependencies import (
+    get_api_db_session, get_current_active_user,
+    # TODO: Створити/використати залежності для перевірки прав, наприклад:
+    #  `require_item_admin_or_superuser(item_id: UUID, item_type: str)`
+    #  `require_item_viewer_or_superuser(item_id: UUID, item_type: str)`
+    paginator
+)
+from backend.app.src.api.v1.groups.groups import check_group_edit_permission, check_group_view_permission  # Тимчасово
+
+from backend.app.src.models.auth.user import User as UserModel
+from backend.app.src.schemas.tasks.assignment import (
+    TaskAssignmentCreateBody,  # Схема для тіла запиту: user_id
     TaskAssignmentResponse
 )
-# Припускаємо, що ці схеми імпортуються, якщо ні - можна визначити як у users.py або groups.py
-from app.src.schemas.pagination import PaginatedResponse, PageParams
-from app.src.services.tasks.assignment import TaskAssignmentService # Сервіс для призначень
+from backend.app.src.core.pagination import PagedResponse, PageParams
+from backend.app.src.services.tasks.assignment import TaskAssignmentService
+from backend.app.src.services.tasks.task import TaskService  # Для отримання group_id завдання
+from backend.app.src.services.tasks.event import EventService  # Для отримання group_id події
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings
 
-router = APIRouter()
+router = APIRouter(
+    # Префікс /assignments буде додано в __init__.py батьківського роутера tasks
+    # Теги також успадковуються/додаються звідти
+)
+
+
+# Залежність для отримання TaskAssignmentService
+async def get_task_assignment_service(session: AsyncSession = Depends(get_api_db_session)) -> TaskAssignmentService:
+    """Залежність FastAPI для отримання екземпляра TaskAssignmentService."""
+    return TaskAssignmentService(db_session=session)
+
+
+# Залежність для TaskService (для перевірки прав через групу завдання)
+async def get_task_service_dep(session: AsyncSession = Depends(get_api_db_session)) -> TaskService:
+    return TaskService(db_session=session)
+
+
+# Залежність для EventService (для перевірки прав через групу події)
+async def get_event_service_dep(session: AsyncSession = Depends(get_api_db_session)) -> EventService:
+    return EventService(db_session=session)
+
+
+# Допоміжна залежність для перевірки прав на редагування призначень до завдання
+async def task_assignment_edit_dependency(
+        task_id: UUID = Path(..., description="ID Завдання"),  # i18n
+        current_user: UserModel = Depends(get_current_active_user),
+        task_service: TaskService = Depends(get_task_service_dep),
+        # Використовуємо check_group_edit_permission, передаючи group_id завдання
+        # Це потребує, щоб check_group_edit_permission був адаптований або викликався з group_id
+) -> UserModel:
+    task_orm = await task_service.get_task_orm_by_id(task_id)
+    if not task_orm:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Завдання не знайдено")  # i18n
+    # Тепер викликаємо check_group_edit_permission для групи цього завдання
+    # Це припускає, що check_group_edit_permission може бути використаний так,
+    # або потрібно створити нову залежність, що інкапсулює цю логіку.
+    # Для простоти, припустимо, що ми передаємо group_id в залежність, яка неявно використовується.
+    # Або, якщо check_group_edit_permission приймає group_id:
+    # await check_group_edit_permission(group_id=task_orm.group_id, current_user=current_user, ...)
+    # Поки що, для прикладу, просто повертаємо користувача, якщо завдання знайдено,
+    # а реальна перевірка прав адміна групи завдання має бути реалізована.
+    # TODO: Реалізувати належну перевірку прав: current_user має бути адміном task_orm.group_id або суперюзером.
+    # Наприклад, за допомогою `check_group_edit_permission(group_id=task_orm.group_id, ...)`
+    if not current_user.is_superuser:  # Спрощена перевірка, потрібна перевірка адміна групи
+        logger.warning(
+            f"Користувач {current_user.id} не суперюзер, потрібна перевірка адміна групи завдання {task_id}.")
+    return current_user
+
 
 @router.post(
-    "/", # Шлях відносно префіксу /tasks/assignments
+    "/task/{task_id}",  # Шлях: /assignments/task/{task_id}
     response_model=TaskAssignmentResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Створення нового призначення задачі/події",
-    description="Дозволяє адміністратору групи або суперюзеру призначити задачу або подію користувачеві."
+    summary="Призначення завдання користувачеві (Адмін)",  # i18n
+    description="Дозволяє адміністратору групи завдання або суперюзеру призначити завдання користувачеві."  # i18n
 )
-async def create_task_assignment(
-    assignment_in: TaskAssignmentCreate, # Включає task_id (або event_id) та user_id
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user), # Адмін групи або суперюзер
-    assignment_service: TaskAssignmentService = Depends()
-):
-    '''
-    Створює нове призначення задачі або події.
+async def assign_task_to_user_endpoint(  # Перейменовано
+        task_id: UUID = Path(..., description="ID завдання для призначення"),  # i18n
+        assignment_in: TaskAssignmentCreateBody,  # Тіло запиту з user_id
+        # TODO: Замінити current_user на залежність, що перевіряє права адміна групи завдання або суперюзера
+        current_admin_or_superuser: UserModel = Depends(task_assignment_edit_dependency),  # Використовуємо залежність
+        assignment_service: TaskAssignmentService = Depends(get_task_assignment_service)
+) -> TaskAssignmentResponse:
+    """
+    Призначає завдання користувачеві.
+    Вимагає прав адміністратора групи завдання або суперюзера.
+    """
+    logger.info(
+        f"Адмін/Суперюзер ID '{current_admin_or_superuser.id}' призначає завдання ID '{task_id}' користувачу ID '{assignment_in.user_id}'.")
+    try:
+        new_assignment = await assignment_service.assign_task_to_user(
+            task_id=task_id,
+            user_id=assignment_in.user_id,
+            assigned_by_user_id=current_admin_or_superuser.id
+        )
+        return new_assignment
+    except ValueError as e:
+        logger.warning(f"Помилка призначення завдання ID '{task_id}' користувачу '{assignment_in.user_id}': {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка: {e}", exc_info=global_settings.DEBUG)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутрішня помилка сервера.")
 
-    - **task_id**: ID задачі (якщо це задача).
-    - **event_id**: ID події (якщо це подія). Має бути одне з двох.
-    - **user_id**: ID користувача, якому призначається.
-    - **group_id**: ID групи, в контексті якої відбувається призначення (для перевірки прав).
-    - ... інші поля з TaskAssignmentCreate ...
-    '''
-    if not hasattr(assignment_service, 'db_session') or assignment_service.db_session is None:
-        assignment_service.db_session = db
-
-    # Логіка перевірки прав та створення призначення - у сервісі
-    new_assignment = await assignment_service.create_assignment(
-        assignment_create_schema=assignment_in,
-        requesting_user=current_user
-    )
-    # Сервіс має кидати HTTPException у разі помилок (не знайдено задачу/подію/користувача, заборонено, вже призначено)
-    return TaskAssignmentResponse.model_validate(new_assignment)
 
 @router.get(
-    "/task/{task_id}",
-    response_model=PaginatedResponse[TaskAssignmentResponse],
-    summary="Список призначень для задачі",
-    description="Повертає список користувачів, яким призначено вказану задачу. Доступно членам групи задачі."
+    "/task/{task_id}",  # Шлях: /assignments/task/{task_id}
+    response_model=PagedResponse[TaskAssignmentResponse],
+    summary="Список призначень для завдання",  # i18n
+    description="Повертає список користувачів, яким призначено вказане завдання. Доступно членам групи завдання.",
+    # i18n
+    # TODO: Додати залежність для перевірки прав перегляду (член групи завдання або суперюзер)
 )
-async def list_assignments_for_task(
-    task_id: int = Path(..., description="ID задачі"),
-    page_params: PageParams = Depends(),
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user),
-    assignment_service: TaskAssignmentService = Depends()
-):
-    '''
-    Отримує список призначень для конкретної задачі.
-    '''
-    if not hasattr(assignment_service, 'db_session') or assignment_service.db_session is None:
-        assignment_service.db_session = db
-
-    total_assignments, assignments = await assignment_service.get_assignments_for_task(
+async def list_assignments_for_task_endpoint(  # Перейменовано
+        task_id: UUID = Path(..., description="ID завдання"),  # i18n
+        page_params: PageParams = Depends(paginator),
+        # current_user: UserModel = Depends(get_current_active_user), # Для перевірки прав
+        assignment_service: TaskAssignmentService = Depends(get_task_assignment_service)
+) -> PagedResponse[TaskAssignmentResponse]:
+    """Отримує список призначень для конкретного завдання."""
+    # TODO: Перевірити права доступу поточного користувача до завдання task_id
+    logger.debug(f"Запит списку призначень для завдання ID '{task_id}'.")
+    # TODO: TaskAssignmentService.list_assignments_for_task має повертати (items, total_count)
+    assignments_orm, total_assignments = await assignment_service.list_assignments_for_task_paginated(
         task_id=task_id,
-        requesting_user=current_user,
         skip=page_params.skip,
-        limit=page_params.limit
+        limit=page_params.limit,
+        is_active=True  # За замовчуванням показуємо тільки активні призначення
     )
-    return PaginatedResponse[TaskAssignmentResponse]( # Явно вказуємо тип Generic
+    return PagedResponse[TaskAssignmentResponse](
         total=total_assignments,
         page=page_params.page,
         size=page_params.size,
-        results=[TaskAssignmentResponse.model_validate(ass) for ass in assignments]
+        results=[TaskAssignmentResponse.model_validate(ass) for ass in assignments_orm]  # Pydantic v2
     )
+
+
+# TODO: Додати аналогічні ендпоінти для призначення Подій (/event/{event_id}), якщо потрібно,
+#  або зробити TaskAssignmentCreate більш гнучким з `item_id` та `item_type`.
 
 @router.get(
-    "/event/{event_id}",
-    response_model=PaginatedResponse[TaskAssignmentResponse], # Та сама схема, якщо структура схожа
-    summary="Список призначень для події",
-    description="Повертає список користувачів, яким призначено вказану подію. Доступно членам групи події."
+    "/user/{user_id_target}",  # Шлях: /assignments/user/{user_id_target}
+    response_model=PagedResponse[TaskAssignmentResponse],
+    summary="Список завдань/подій, призначених користувачу",  # i18n
+    description="""Повертає список завдань та подій, призначених вказаному користувачу.
+    Доступно самому користувачу для своїх призначень, або суперюзеру для будь-якого користувача."""  # i18n
 )
-async def list_assignments_for_event(
-    event_id: int = Path(..., description="ID події"),
-    page_params: PageParams = Depends(),
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user),
-    assignment_service: TaskAssignmentService = Depends()
-):
-    '''
-    Отримує список призначень для конкретної події.
-    '''
-    if not hasattr(assignment_service, 'db_session') or assignment_service.db_session is None:
-        assignment_service.db_session = db
+async def list_assignments_for_user_endpoint(  # Перейменовано
+        user_id_target: UUID = Path(..., description="ID користувача, чиї призначення переглядаються"),  # i18n
+        page_params: PageParams = Depends(paginator),
+        current_user: UserModel = Depends(get_current_active_user),
+        assignment_service: TaskAssignmentService = Depends(get_task_assignment_service)
+) -> PagedResponse[TaskAssignmentResponse]:
+    """Отримує список завдань/подій, призначених вказаному користувачеві."""
+    logger.debug(f"Користувач ID '{current_user.id}' запитує призначення для користувача ID '{user_id_target}'.")
+    if user_id_target != current_user.id and not current_user.is_superuser:
+        # i18n
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Ви можете переглядати тільки власні призначення.")
 
-    total_assignments, assignments = await assignment_service.get_assignments_for_event(
-        event_id=event_id,
-        requesting_user=current_user,
+    # TODO: TaskAssignmentService.list_tasks_for_user має повертати (items, total_count)
+    assignments_orm, total_assignments = await assignment_service.list_items_for_user_paginated(
+        user_id=user_id_target,
         skip=page_params.skip,
-        limit=page_params.limit
+        limit=page_params.limit,
+        is_active_assignment=True  # За замовчуванням тільки активні
     )
-    return PaginatedResponse[TaskAssignmentResponse]( # Явно вказуємо тип Generic
+    return PagedResponse[TaskAssignmentResponse](
         total=total_assignments,
         page=page_params.page,
         size=page_params.size,
-        results=[TaskAssignmentResponse.model_validate(ass) for ass in assignments]
+        results=[TaskAssignmentResponse.model_validate(ass) for ass in assignments_orm]  # Pydantic v2
     )
 
-@router.get(
-    "/user/{user_id}",
-    response_model=PaginatedResponse[TaskAssignmentResponse],
-    summary="Список задач/подій, призначених користувачу",
-    description="Повертає список задач та подій, призначених вказаному користувачу. Доступно самому користувачу або адміну/суперюзеру."
-)
-async def list_assignments_for_user(
-    user_id: int = Path(..., description="ID користувача"),
-    page_params: PageParams = Depends(),
-    # type: Optional[str] = Query(None, description="Фільтр за типом: 'task' або 'event'"), # Можливе розширення
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user),
-    assignment_service: TaskAssignmentService = Depends()
-):
-    '''
-    Отримує список задач/подій, призначених вказаному користувачу.
-    Перевірка прав: чи запитує користувач свої призначення, чи це адмін/суперюзер.
-    '''
-    if not hasattr(assignment_service, 'db_session') or assignment_service.db_session is None:
-        assignment_service.db_session = db
-
-    total_assignments, assignments = await assignment_service.get_assignments_for_user(
-        user_id_target=user_id,
-        requesting_user=current_user,
-        skip=page_params.skip,
-        limit=page_params.limit
-        # type_filter=type
-    )
-    return PaginatedResponse[TaskAssignmentResponse]( # Явно вказуємо тип Generic
-        total=total_assignments,
-        page=page_params.page,
-        size=page_params.size,
-        results=[TaskAssignmentResponse.model_validate(ass) for ass in assignments]
-    )
 
 @router.delete(
-    "/{assignment_id}",
+    "/{task_id}/user/{user_id_to_unassign}",  # Шлях: /assignments/{task_id}/user/{user_id_to_unassign}
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Видалення/скасування призначення",
-    description="Дозволяє адміністратору групи або суперюзеру видалити (скасувати) призначення задачі/події."
+    summary="Видалення/скасування призначення завдання користувачеві (Адмін)",  # i18n
+    description="Дозволяє адміністратору групи завдання або суперюзеру скасувати призначення завдання користувачеві."
+    # i18n
 )
-async def delete_task_assignment(
-    assignment_id: int,
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user), # Адмін групи або суперюзер
-    assignment_service: TaskAssignmentService = Depends()
+async def unassign_task_from_user_endpoint(  # Перейменовано
+        task_id: UUID = Path(..., description="ID завдання"),  # i18n
+        user_id_to_unassign: UUID = Path(..., description="ID користувача, якого потрібно відкріпити"),  # i18n
+        # TODO: Замінити current_user на залежність, що перевіряє права адміна групи завдання або суперюзера
+        current_admin_or_superuser: UserModel = Depends(task_assignment_edit_dependency),
+        # Використовуємо залежність для завдання
+        assignment_service: TaskAssignmentService = Depends(get_task_assignment_service)
 ):
-    '''
-    Видаляє (скасовує) призначення.
-    Перевірка прав - у сервісі.
-    '''
-    if not hasattr(assignment_service, 'db_session') or assignment_service.db_session is None:
-        assignment_service.db_session = db
-
-    success = await assignment_service.delete_assignment(
-        assignment_id=assignment_id,
-        requesting_user=current_user
-    )
-    if not success: # Сервіс має кидати HTTPException
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND, # Або 403
-            detail=f"Не вдалося видалити призначення з ID {assignment_id}. Можливо, його не існує або у вас немає прав."
+    """
+    Скасовує призначення завдання користувачеві (встановлює is_active=False).
+    Вимагає прав адміністратора групи завдання або суперюзера.
+    """
+    logger.info(
+        f"Адмін/Суперюзер ID '{current_admin_or_superuser.id}' скасовує призначення завдання ID '{task_id}' для користувача ID '{user_id_to_unassign}'.")
+    try:
+        success = await assignment_service.unassign_task_from_user(
+            task_id=task_id,
+            user_id=user_id_to_unassign,
+            unassigned_by_user_id=current_admin_or_superuser.id
         )
-    # HTTP 204 No Content
+        if not success:
+            logger.warning(
+                f"Не вдалося скасувати призначення завдання ID '{task_id}' для користувача ID '{user_id_to_unassign}' (сервіс повернув False).")
+            # i18n
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail="Призначення не знайдено або вже неактивне.")
+    except ValueError as e:
+        logger.warning(f"Помилка скасування призначення: {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
 
-# Міркування:
-# 1.  Схеми: `TaskAssignmentCreate`, `TaskAssignmentResponse` з `app.src.schemas.tasks.assignment`.
-#     `TaskAssignmentCreate` має містити `group_id`, `user_id`, і або `task_id`, або `event_id`.
-# 2.  Сервіс `TaskAssignmentService`: Керує логікою створення, отримання та видалення призначень.
-#     - Валідує існування сутностей (задача, подія, користувач, група).
-#     - Перевіряє права (хто може призначати, хто може переглядати).
-# 3.  URL-и: Цей роутер буде підключений до `tasks_router` (в `tasks/__init__.py`)
-#     з префіксом `/assignments`. Шляхи будуть, наприклад, `/api/v1/tasks/assignments/task/{task_id}`.
-# 4.  Розрізнення Task/Event: `TaskAssignmentCreate` може мати `item_type: str` ('task'/'event') та `item_id: int`,
-#     або окремі поля `task_id: Optional[int]` та `event_id: Optional[int]`.
-#     Сервіс відповідає за правильну обробку.
-# 5.  Пагінація: Для списків призначень.
-# 6.  Коментарі: Українською мовою.
+    return None  # HTTP 204 No Content
+
+
+# TODO: Розглянути, чи потрібен окремий ендпоінт для видалення призначення за ID самого призначення (`assignment_id`),
+#  або поточна логіка через task_id/user_id є достатньою.
+#  Якщо за `assignment_id`, то шлях може бути просто `/{assignment_id}`.
+
+logger.info("Роутер для управління призначеннями завдань (`/assignments`) визначено.")

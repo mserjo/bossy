@@ -20,7 +20,8 @@
 - `exceptions.py`: Обробники винятків, специфічні для API.
 """
 
-import logging
+# import logging # Замінено на централізований логер
+from backend.app.src.config.logging import logger # Централізований логер
 
 # Головний роутер API буде визначено в api.router та імпортовано звідти
 # для підключення в main.py додатку.
@@ -30,5 +31,4 @@ __all__ = [
     "api_router",
 ]
 
-logger = logging.getLogger(__name__)
-logger.info("Пакет 'api' ініціалізовано.")
+logger.info("Пакет 'api' ініціалізовано та експортує 'api_router'.")

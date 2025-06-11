@@ -18,13 +18,13 @@
 
 import logging
 
-# Головний роутер для системних ендпоінтів v1 буде визначено в .router
+# Головний роутер для системних ендпоінтів v1 буде визначено в backend.app.src.api.v1.system.router
 # та імпортовано тут для можливого ре-експорту.
-from .router import system_router
+from backend.app.src.api.v1.system.router import system_router
 
 __all__ = [
     "system_router",
 ]
 
 logger = logging.getLogger(__name__)
-logger.info("Підпакет 'api.v1.system' ініціалізовано.")
+logger.info("Підпакет 'api.v1.system' ініціалізовано.")  # i18n: Log message, potentially for translation if logs are multilingual

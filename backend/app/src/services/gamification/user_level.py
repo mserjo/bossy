@@ -1,182 +1,237 @@
 # backend/app/src/services/gamification/user_level.py
-import logging
+# import logging # Замінено на централізований логер
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone
-from decimal import Decimal # For current_points_value
+from decimal import Decimal  # Для балів користувача
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
-from app.src.services.base import BaseService
-from app.src.models.gamification.user_level import UserLevel # SQLAlchemy UserLevel model
-from app.src.models.gamification.level import Level # For Level definitions
-from app.src.models.auth.user import User
-from app.src.models.groups.group import Group # If levels are per-group
+# Повні шляхи імпорту
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.gamification.user_level import UserLevel  # Модель SQLAlchemy UserLevel
+from backend.app.src.models.gamification.level import Level  # Для визначень рівнів
+from backend.app.src.models.auth.user import User
+from backend.app.src.models.groups.group import Group  # Якщо рівні залежать від групи
 
-from app.src.schemas.gamification.user_level import ( # Pydantic Schemas
-    UserLevelResponse
-)
-from app.src.schemas.gamification.level import LevelResponse # For nested level details
+from backend.app.src.schemas.gamification.user_level import UserLevelResponse
+from backend.app.src.schemas.gamification.level import LevelResponse  # Для вкладених деталей рівня
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+from backend.app.src.services.bonuses.account import UserAccountService  # Для отримання балів
+from backend.app.src.services.gamification.level import LevelService  # Для отримання визначень рівнів
+
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+
 
 class UserLevelService(BaseService):
     """
-    Service for managing users' levels based on their accumulated points or achievements.
-    Handles calculation and updates of UserLevel records.
+    Сервіс для управління рівнями користувачів на основі їхніх накопичених балів або досягнень.
+    Обробляє розрахунок та оновлення записів UserLevel.
+    Кожен користувач може мати один запис UserLevel для кожного контексту (глобально або на групу).
     """
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        logger.info("UserLevelService initialized.")
+        self.account_service = UserAccountService(db_session)
+        self.level_service = LevelService(db_session)
+        logger.info("UserLevelService ініціалізовано.")
+
+    async def _get_orm_user_level(self, user_id: UUID, group_id: Optional[UUID] = None, load_relations: bool = True) -> \
+    Optional[UserLevel]:
+        """Внутрішній метод для отримання ORM моделі UserLevel."""
+        stmt = select(UserLevel).where(UserLevel.user_id == user_id)
+
+        # Фільтрація за group_id: якщо group_id надано, шукаємо запис для цієї групи.
+        # Якщо group_id є None, шукаємо глобальний запис UserLevel (де group_id IS NULL).
+        if group_id:
+            stmt = stmt.where(UserLevel.group_id == group_id)
+        else:
+            stmt = stmt.where(UserLevel.group_id.is_(None))
+
+        if load_relations:
+            options_to_load = [
+                selectinload(UserLevel.user).options(selectinload(User.user_type)),
+                selectinload(UserLevel.level).options(
+                    selectinload(Level.icon_file),  # Завантажуємо іконку рівня
+                    selectinload(Level.group)  # Завантажуємо групу визначення рівня (якщо є)
+                )
+            ]
+            if group_id:  # Завантажуємо групу самого UserLevel, якщо вона є
+                options_to_load.append(selectinload(UserLevel.group))
+            stmt = stmt.options(*options_to_load)
+
+        return (await self.db_session.execute(stmt)).scalar_one_or_none()
 
     async def get_user_level(
-        self,
-        user_id: UUID,
-        group_id: Optional[UUID] = None
+            self,
+            user_id: UUID,
+            group_id: Optional[UUID] = None  # None для глобального рівня користувача
     ) -> Optional[UserLevelResponse]:
-        log_ctx = f"user ID '{user_id}'" + (f" in group ID '{group_id}'" if group_id and hasattr(UserLevel, 'group_id') else " (global)")
-        logger.debug(f"Attempting to retrieve UserLevel for {log_ctx}.")
+        """
+        Отримує поточний рівень користувача для вказаного контексту (глобально або для групи).
 
-        stmt = select(UserLevel).options(
-            selectinload(UserLevel.user).options(selectinload(User.user_type)),
-            selectinload(UserLevel.level),
-            selectinload(UserLevel.group) if hasattr(UserLevel, 'group') else None
-        ).where(UserLevel.user_id == user_id)
-        stmt = stmt.options(*(opt for opt in stmt.get_options() if opt is not None))
+        :param user_id: ID користувача.
+        :param group_id: ID групи (None для глобального контексту).
+        :return: Pydantic схема UserLevelResponse або None, якщо рівень не присвоєно.
+        """
+        log_ctx_parts = [f"користувач ID '{user_id}'"]
+        if group_id:
+            log_ctx_parts.append(f"група ID '{group_id}'")
+        else:
+            log_ctx_parts.append("(глобальний контекст)")
+        log_ctx = ", ".join(log_ctx_parts)
+        logger.debug(f"Спроба отримання UserLevel для {log_ctx}.")
 
-
-        if hasattr(UserLevel, 'group_id'):
-            stmt = stmt.where(UserLevel.group_id == group_id)
-        elif group_id:
-            logger.warning(f"UserLevel model does not have 'group_id', but one was provided for {log_ctx}. Ignoring group context for UserLevel retrieval.")
-
-        user_level_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
+        user_level_db = await self._get_orm_user_level(user_id, group_id, load_relations=True)
 
         if user_level_db:
-            level_name = getattr(getattr(user_level_db, 'level', None), 'name', 'N/A')
-            logger.info(f"UserLevel record found for {log_ctx} (Level: {level_name}).")
-            # return UserLevelResponse.model_validate(user_level_db) # Pydantic v2
-            return UserLevelResponse.from_orm(user_level_db) # Pydantic v1
+            level_name = getattr(user_level_db.level, 'name', 'N/A') if user_level_db.level else 'N/A'
+            logger.info(f"Запис UserLevel знайдено для {log_ctx} (Рівень: {level_name}).")
+            return UserLevelResponse.model_validate(user_level_db)  # Pydantic v2
 
-        logger.info(f"No UserLevel record found for {log_ctx}.")
+        logger.info(f"Запис UserLevel не знайдено для {log_ctx}.")
         return None
 
     async def update_user_level(
-        self,
-        user_id: UUID,
-        group_id: Optional[UUID] = None,
-    ) -> Optional[UserLevelResponse]:
-        log_ctx = f"user ID '{user_id}'" + (f" in group ID '{group_id}'" if group_id and hasattr(UserLevel, 'group_id') else " (global)")
-        logger.info(f"Attempting to update level for {log_ctx}.")
+            self,
+            user_id: UUID,
+            group_id: Optional[UUID] = None,  # None для глобального контексту
+    ) -> Optional[UserLevelResponse]:  # Може повернути None, якщо балів недостатньо для будь-якого рівня
+        """
+        Оновлює (або створює/видаляє) запис про рівень користувача на основі його поточних балів.
 
-        from app.src.services.bonuses.account import UserAccountService
-        account_service = UserAccountService(self.db_session)
-
-        user_account = await account_service.get_user_account(user_id, group_id=group_id)
-        if not user_account:
-            logger.warning(f"No bonus account found for {log_ctx}. Assuming 0 points for level update.")
-            current_points_value = Decimal("0.0")
+        :param user_id: ID користувача.
+        :param group_id: ID групи (None для глобального контексту).
+        :return: Pydantic схема UserLevelResponse оновленого/створеного рівня або None.
+        :raises ValueError: Якщо виникає конфлікт даних при збереженні. # i18n
+        """
+        log_ctx_parts = [f"користувач ID '{user_id}'"]
+        if group_id:
+            log_ctx_parts.append(f"група ID '{group_id}'")
         else:
-            current_points_value = user_account.balance
+            log_ctx_parts.append("(глобальний контекст)")
+        log_ctx = ", ".join(log_ctx_parts)
+        logger.info(f"Спроба оновлення рівня для {log_ctx}.")
 
-        logger.info(f"Current points for {log_ctx}: {current_points_value}")
+        # 1. Отримати поточні бали користувача для цього контексту (група або глобально)
+        #    `group_id` для `account_service.get_user_account` відповідає контексту рівня.
+        user_account = await self.account_service.get_user_account(user_id, group_id=group_id)
+        current_points_value = user_account.balance if user_account else Decimal("0.00")
+        logger.info(f"Поточні бали для {log_ctx}: {current_points_value}")
 
-        from app.src.services.gamification.level import LevelService
-        level_service = LevelService(self.db_session)
+        # 2. Визначити цільовий рівень на основі балів та контексту групи
+        #    `group_id` для `level_service.get_level_for_points` також відповідає контексту.
+        target_level_schema: Optional[LevelResponse] = await self.level_service.get_level_for_points(
+            points=int(current_points_value),  # get_level_for_points очікує int
+            group_id=group_id
+        )
 
-        target_level_schema: Optional[LevelResponse] = await level_service.get_level_for_points(int(current_points_value))
+        # 3. Отримати існуючий запис UserLevel для цього контексту
+        existing_user_level_db = await self._get_orm_user_level(user_id, group_id,
+                                                                load_relations=False)  # Зв'язки не потрібні для логіки
 
-        # Determine current UserLevel record query conditions
-        user_level_conditions = [UserLevel.user_id == user_id]
-        if hasattr(UserLevel, 'group_id'):
-            user_level_conditions.append(UserLevel.group_id == group_id)
+        current_time = datetime.now(timezone.utc)
 
-        existing_user_level_db = (await self.db_session.execute(
-            select(UserLevel).where(*user_level_conditions)
-        )).scalar_one_or_none()
-
-        if not target_level_schema: # No level for current points (e.g. below minimum)
-            logger.info(f"No specific level defined for {current_points_value} points for {log_ctx}.")
-            if existing_user_level_db:
-                logger.info(f"User {log_ctx} has {current_points_value} points, falling below any defined level. Deleting existing UserLevel record ID {existing_user_level_db.id}.")
+        if not target_level_schema:  # Балів недостатньо для будь-якого рівня
+            logger.info(f"Для {current_points_value} балів не визначено жодного рівня ({log_ctx}).")
+            if existing_user_level_db:  # Якщо був попередній рівень, його треба видалити
+                logger.info(
+                    f"Видалення існуючого запису UserLevel ID {existing_user_level_db.id} для {log_ctx}, оскільки балів недостатньо.")
                 await self.db_session.delete(existing_user_level_db)
                 await self.commit()
-            return None # No level assigned or existing one removed
+            return None  # Рівень не присвоєно або видалено
 
-        # Target level identified
-        if existing_user_level_db:
+        # Цільовий рівень визначено
+        if existing_user_level_db:  # Якщо запис UserLevel існує
             if existing_user_level_db.level_id == target_level_schema.id:
-                logger.info(f"User {log_ctx} is already at the correct level: '{target_level_schema.name}'. No update needed.")
+                logger.info(f"{log_ctx} вже на потрібному рівні: '{target_level_schema.name}'. Оновлення не потрібне.")
+                # Повертаємо поточний стан з завантаженими зв'язками
                 return await self.get_user_level(user_id, group_id)
-            else:
-                logger.info(f"Updating level for {log_ctx} from ID '{existing_user_level_db.level_id}' to new Level ID '{target_level_schema.id}' ('{target_level_schema.name}').")
+            else:  # Рівень змінився
+                logger.info(
+                    f"Оновлення рівня для {log_ctx} з ID '{existing_user_level_db.level_id}' на новий ID '{target_level_schema.id}' ('{target_level_schema.name}').")
                 existing_user_level_db.level_id = target_level_schema.id
-                existing_user_level_db.achieved_at = datetime.now(timezone.utc)
+                existing_user_level_db.achieved_at = current_time  # Оновлюємо час досягнення нового рівня
+                # `updated_at` оновлюється автоматично моделлю
                 user_level_to_save = existing_user_level_db
-        else:
-            logger.info(f"Creating new UserLevel record for {log_ctx} at Level ID '{target_level_schema.id}' ('{target_level_schema.name}').")
-            user_level_data = {
-                "user_id": user_id,
-                "level_id": target_level_schema.id,
-                "achieved_at": datetime.now(timezone.utc),
-            }
-            if hasattr(UserLevel, 'group_id'):
-                user_level_data['group_id'] = group_id
-
-            user_level_to_save = UserLevel(**user_level_data)
+        else:  # Створюємо новий запис UserLevel
+            logger.info(
+                f"Створення нового запису UserLevel для {log_ctx} на рівні ID '{target_level_schema.id}' ('{target_level_schema.name}').")
+            user_level_to_save = UserLevel(
+                user_id=user_id,
+                level_id=target_level_schema.id,
+                group_id=group_id,  # Буде None для глобального контексту
+                achieved_at=current_time
+                # `created_at`, `updated_at` встановлюються моделлю
+            )
             self.db_session.add(user_level_to_save)
 
         try:
             await self.commit()
-            # Refresh to load all relationships for the response
-            refresh_attrs = ['user', 'level']
-            if hasattr(UserLevel, 'group') and group_id: # Only refresh group if it's relevant and was set
-                 refresh_attrs.append('group')
-            await self.db_session.refresh(user_level_to_save, attribute_names=refresh_attrs)
+            # Отримуємо оновлений/створений запис з усіма зв'язками для відповіді
+            refreshed_user_level = await self._get_orm_user_level(user_id, group_id, load_relations=True)
+            if not refreshed_user_level:  # Малоймовірно, якщо коміт пройшов
+                logger.error(f"Не вдалося отримати UserLevel для {log_ctx} після коміту.")
+                # i18n
+                raise RuntimeError("Помилка оновлення рівня: не вдалося отримати запис після збереження.")
         except IntegrityError as e:
             await self.rollback()
-            logger.error(f"Integrity error updating/creating UserLevel for {log_ctx}: {e}", exc_info=True)
-            raise ValueError(f"Could not update/create UserLevel due to data conflict: {e}")
+            logger.error(f"Помилка цілісності UserLevel для {log_ctx}: {e}", exc_info=settings.DEBUG)
+            # i18n
+            raise ValueError(f"Не вдалося оновити/створити рівень користувача через конфлікт даних: {e}")
 
-        logger.info(f"UserLevel for {log_ctx} successfully set to Level '{target_level_schema.name}'.")
-        # return UserLevelResponse.model_validate(user_level_to_save) # Pydantic v2
-        return UserLevelResponse.from_orm(user_level_to_save) # Pydantic v1
+        logger.info(f"Рівень для {log_ctx} успішно встановлено на '{target_level_schema.name}'.")
+        return UserLevelResponse.model_validate(refreshed_user_level)  # Pydantic v2
 
     async def list_users_at_level(
-        self,
-        level_id: UUID,
-        group_id: Optional[UUID] = None,
-        skip: int = 0,
-        limit: int = 100
+            self,
+            level_id: UUID,
+            group_id: Optional[UUID] = None,  # None для глобального контексту рівня
+            skip: int = 0,
+            limit: int = 100
     ) -> List[UserLevelResponse]:
-        log_ctx = f"level ID '{level_id}'" + (f" in group ID '{group_id}'" if group_id and hasattr(UserLevel, 'group_id') else " (global)")
-        logger.debug(f"Listing users at {log_ctx}, skip={skip}, limit={limit}.")
+        """
+        Перелічує всіх користувачів, які досягли вказаного рівня в заданому контексті.
+
+        :param level_id: ID рівня.
+        :param group_id: ID групи (None для глобального контексту).
+        :param skip: Кількість записів для пропуску.
+        :param limit: Максимальна кількість записів.
+        :return: Список Pydantic схем UserLevelResponse.
+        """
+        log_ctx_parts = [f"рівень ID '{level_id}'"]
+        if group_id:
+            log_ctx_parts.append(f"група ID '{group_id}'")
+        else:
+            log_ctx_parts.append("(глобальний контекст)")
+        log_ctx = ", ".join(log_ctx_parts)
+        logger.debug(f"Перелік користувачів на {log_ctx}, пропустити={skip}, ліміт={limit}.")
 
         stmt = select(UserLevel).options(
             selectinload(UserLevel.user).options(selectinload(User.user_type)),
-            selectinload(UserLevel.level),
-            selectinload(UserLevel.group) if hasattr(UserLevel, 'group') else None
+            selectinload(UserLevel.level).options(selectinload(Level.icon_file)),  # Завантажуємо іконку рівня
+            selectinload(UserLevel.group)  # Завантажуємо групу UserLevel, якщо є
         ).where(UserLevel.level_id == level_id)
-        stmt = stmt.options(*(opt for opt in stmt.get_options() if opt is not None))
 
-
-        if hasattr(UserLevel, 'group_id'):
+        if group_id:
             stmt = stmt.where(UserLevel.group_id == group_id)
-        elif group_id:
-             logger.warning(f"UserLevel model does not have 'group_id', but one was provided for listing. Ignoring group context.")
+        else:
+            stmt = stmt.where(UserLevel.group_id.is_(None))  # Явно для глобального контексту
 
-        stmt = stmt.order_by(UserLevel.achieved_at.desc()).offset(skip).limit(limit)
-
+        # Сортування за датою досягнення (новіші спочатку), потім за ID користувача
+        stmt = stmt.order_by(UserLevel.achieved_at.desc(), UserLevel.user_id.asc()).offset(skip).limit(limit)
         user_levels_db = (await self.db_session.execute(stmt)).scalars().unique().all()
 
-        # response_list = [UserLevelResponse.model_validate(ul) for ul in user_levels_db] # Pydantic v2
-        response_list = [UserLevelResponse.from_orm(ul) for ul in user_levels_db] # Pydantic v1
-        logger.info(f"Retrieved {len(response_list)} users at {log_ctx}.")
+        response_list = [UserLevelResponse.model_validate(ul) for ul in user_levels_db]  # Pydantic v2
+        logger.info(f"Отримано {len(response_list)} користувачів на {log_ctx}.")
         return response_list
 
-logger.info("UserLevelService class defined.")
+    # TODO: Розглянути метод для отримання історії рівнів користувача (якщо UserLevel записується при кожній зміні,
+    # а не тільки оновлюється поточний). Поточна модель UserLevel передбачає один запис на user/group.
+
+
+logger.debug(f"{UserLevelService.__name__} (сервіс рівнів користувачів) успішно визначено.")

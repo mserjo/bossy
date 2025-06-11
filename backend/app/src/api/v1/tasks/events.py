@@ -1,185 +1,276 @@
 # backend/app/src/api/v1/tasks/events.py
-from typing import List, Optional, Generic, TypeVar # Додано Generic, TypeVar для PaginatedResponse
-from fastapi import APIRouter, Depends, HTTPException, status, Query
-from pydantic import BaseModel # Додано BaseModel для PaginatedResponse, якщо визначається локально
+# -*- coding: utf-8 -*-
+"""
+Ендпоінти для CRUD операцій над сутністю "Подія".
+Події є схожими на завдання, але зазвичай представляють заплановані заходи.
+"""
+from typing import List, Optional
+from uuid import UUID  # ID тепер UUID
+from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.src.core.dependencies import get_db_session, get_current_active_user
-from app.src.models.auth import User as UserModel
-from app.src.models.tasks import Event as EventModel # Потрібна модель події
-from app.src.schemas.tasks.event import ( # Схеми для подій
-    EventCreate,
-    EventUpdate,
-    EventResponse
+# Повні шляхи імпорту
+from backend.app.src.api.dependencies import (
+    get_api_db_session, get_current_active_user,
+    # TODO: Використати або створити залежності для перевірки прав доступу до подій/груп,
+    # аналогічні тим, що можуть бути для завдань (наприклад, check_event_view_permission)
+    paginator
 )
-# Припускаємо, що ці схеми імпортуються, якщо ні - можна визначити як у users.py або groups.py
-from app.src.schemas.pagination import PaginatedResponse, PageParams
-from app.src.services.tasks.event import EventService # Сервіс для подій
+from backend.app.src.api.v1.groups.groups import check_group_edit_permission, check_group_view_permission  # Тимчасово
+from backend.app.src.models.auth.user import User as UserModel
+from backend.app.src.schemas.tasks.event import (
+    EventCreate, EventUpdate, EventResponse, EventDetailedResponse
+)
+from backend.app.src.core.pagination import PagedResponse, PageParams  # Використовуємо з core.pagination
+from backend.app.src.services.tasks.event import EventService
+from backend.app.src.services.groups.membership import GroupMembershipService  # Для перевірки членства
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings
 
 router = APIRouter()
 
+
+# Залежність для отримання EventService
+async def get_event_service(session: AsyncSession = Depends(get_api_db_session)) -> EventService:
+    """Залежність FastAPI для отримання екземпляра EventService."""
+    return EventService(db_session=session)
+
+
+# Залежність для GroupMembershipService (для перевірки прав)
+async def get_membership_service_dep(session: AsyncSession = Depends(get_api_db_session)) -> GroupMembershipService:
+    return GroupMembershipService(db_session=session)
+
+
+# Допоміжна функція-залежність для перевірки прав редагування події
+async def event_edit_permission_dependency(
+        event_id: UUID = Path(..., description="ID Події"),  # i18n
+        current_user: UserModel = Depends(get_current_active_user),
+        event_service: EventService = Depends(get_event_service),
+        membership_service: GroupMembershipService = Depends(get_membership_service_dep)
+) -> UserModel:
+    event_orm = await event_service.get_event_orm_by_id(event_id)  # Потрібен метод, що повертає ORM модель
+    if not event_orm:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Подію не знайдено")  # i18n
+    if current_user.is_superuser:
+        return current_user
+
+    membership = await membership_service.get_membership_details(group_id=event_orm.group_id, user_id=current_user.id)
+    if not membership or not membership.is_active or membership.role.code != "ADMIN":  # ADMIN_ROLE_CODE
+        # i18n
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Недостатньо прав для редагування цієї події.")
+    return current_user
+
+
+# Допоміжна функція-залежність для перевірки прав перегляду події
+async def event_view_permission_dependency(
+        event_id: UUID = Path(..., description="ID Події"),  # i18n
+        current_user: UserModel = Depends(get_current_active_user),
+        event_service: EventService = Depends(get_event_service),
+        membership_service: GroupMembershipService = Depends(get_membership_service_dep)
+) -> UserModel:
+    event_orm = await event_service.get_event_orm_by_id(event_id)
+    if not event_orm:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Подію не знайдено")  # i18n
+    if current_user.is_superuser:
+        return current_user
+
+    membership = await membership_service.get_membership_details(group_id=event_orm.group_id, user_id=current_user.id)
+    if not membership or not membership.is_active:
+        # i18n
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ви не є членом групи цієї події.")
+    return current_user
+
+
 @router.post(
-    "/", # Шлях відносно префіксу, який буде /tasks/events (або просто /events, якщо tasks_router включає його з префіксом /events)
-    response_model=EventResponse,
+    "/",
+    response_model=EventDetailedResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Створення нової події",
-    description="Дозволяє адміністратору групи або суперюзеру створити нову подію в межах групи."
+    summary="Створення нової події",  # i18n
+    description="Дозволяє адміністратору групи або суперюзеру створити нову подію в межах групи."  # i18n
 )
 async def create_event(
-    event_in: EventCreate, # Очікує group_id в тілі запиту
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user), # Адмін групи або суперюзер
-    event_service: EventService = Depends()
-):
-    '''
+        event_in: EventCreate,  # group_id має бути в EventCreate
+        # TODO: Використати залежність, що перевіряє права адміна на event_in.group_id
+        current_user: UserModel = Depends(get_current_active_user),  # Тимчасово, потрібна перевірка адміна групи
+        event_service: EventService = Depends(get_event_service),
+        membership_service: GroupMembershipService = Depends(get_membership_service_dep)  # Для перевірки прав
+) -> EventDetailedResponse:
+    """
     Створює нову подію.
+    Перевіряє, чи є `current_user` адміністратором групи, вказаної в `event_in.group_id`, або суперюзером.
+    """
+    logger.info(
+        f"Користувач ID '{current_user.id}' намагається створити подію '{event_in.title}' в групі ID '{event_in.group_id}'.")
 
-    - **title**: Назва події (обов'язково).
-    - **description**: Опис події (опціонально).
-    - **group_id**: ID групи, до якої належить подія (обов'язково).
-    - **event_type_id**: ID типу події (опціонально, якщо є типи подій).
-    - **start_time**: Час початку події (опціонально).
-    - **end_time**: Час завершення події (опціонально).
-    - ... інші поля з EventCreate ...
-    '''
-    if not hasattr(event_service, 'db_session') or event_service.db_session is None:
-        event_service.db_session = db
+    if not current_user.is_superuser:
+        membership = await membership_service.get_membership_details(group_id=event_in.group_id,
+                                                                     user_id=current_user.id)
+        if not membership or not membership.is_active or membership.role.code != "ADMIN":  # ADMIN_ROLE_CODE
+            # i18n
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                                detail="Ви не є адміністратором вказаної групи для створення події.")
 
-    created_event = await event_service.create_event(
-        event_create_schema=event_in,
-        requesting_user=current_user
-    )
-    if not created_event: # Сервіс має кидати HTTPException
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Не вдалося створити подію."
+    try:
+        # EventService.create_event тепер приймає event_create_data та creator_id
+        created_event = await event_service.create_event(
+            event_create_data=event_in,
+            creator_user_id=current_user.id
         )
-    return EventResponse.model_validate(created_event)
+        return created_event  # Сервіс вже повертає EventDetailedResponse
+    except ValueError as e:
+        logger.warning(f"Помилка створення події '{event_in.title}': {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка при створенні події '{event_in.title}': {e}", exc_info=global_settings.DEBUG)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутрішня помилка сервера.")
+
 
 @router.get(
     "/",
-    response_model=PaginatedResponse[EventResponse],
-    summary="Отримання списку подій",
+    response_model=PagedResponse[EventResponse],
+    summary="Отримання списку подій",  # i18n
     description="""Повертає список подій з пагінацією.
-    Може фільтруватися за групою (`group_id`) або повертати події, доступні поточному користувачеві."""
+    Фільтрується за `group_id`, якщо надано (користувач має бути членом групи або суперюзером).
+    Якщо `group_id` не надано, суперюзер бачить усі події, звичайний користувач - події з усіх своїх груп."""  # i18n
 )
 async def read_events(
-    group_id: Optional[int] = Query(None, description="ID групи для фільтрації подій"),
-    page_params: PageParams = Depends(),
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user),
-    event_service: EventService = Depends()
-):
-    '''
+        group_id: Optional[UUID] = Query(None, description="ID групи для фільтрації подій"),  # i18n
+        page_params: PageParams = Depends(paginator),
+        current_user: UserModel = Depends(get_current_active_user),
+        event_service: EventService = Depends(get_event_service),
+        membership_service: GroupMembershipService = Depends(get_membership_service_dep)
+) -> PagedResponse[EventResponse]:
+    """
     Отримує список подій з пагінацією.
-    '''
-    if not hasattr(event_service, 'db_session') or event_service.db_session is None:
-        event_service.db_session = db
+    """
+    logger.info(
+        f"Користувач ID '{current_user.id}' запитує список подій. Група: {group_id}, сторінка: {page_params.page}.")
 
-    total_events, events = await event_service.get_events_for_user(
-        user=current_user,
-        group_id=group_id,
+    if group_id and not current_user.is_superuser:
+        membership = await membership_service.get_membership_details(group_id=group_id, user_id=current_user.id)
+        if not membership or not membership.is_active:
+            # i18n
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ви не є членом вказаної групи.")
+
+    # TODO: EventService.list_events_paginated має обробляти логіку доступу та повертати (items, total_count)
+    events_orm, total_events = await event_service.list_events_paginated(
+        user_id_context=current_user.id,
+        is_superuser_context=current_user.is_superuser,
+        group_id_filter=group_id,
         skip=page_params.skip,
         limit=page_params.limit
+        # TODO: Передати інші фільтри (статус, тип, дати) з Query параметрів сюди
     )
 
-    return PaginatedResponse[EventResponse]( # Явно вказуємо тип Generic
+    return PagedResponse[EventResponse](
         total=total_events,
         page=page_params.page,
         size=page_params.size,
-        results=[EventResponse.model_validate(event) for event in events]
+        results=[EventResponse.model_validate(event) for event in events_orm]  # Pydantic v2
     )
+
 
 @router.get(
     "/{event_id}",
-    response_model=EventResponse,
-    summary="Отримання інформації про подію за ID",
-    description="Повертає детальну інформацію про конкретну подію. Доступно, якщо користувач має доступ до групи події."
+    response_model=EventDetailedResponse,
+    summary="Отримання інформації про подію за ID",  # i18n
+    description="Повертає детальну інформацію про конкретну подію. Доступно члену групи події або суперюзеру.",  # i18n
+    dependencies=[Depends(event_view_permission_dependency)]
 )
 async def read_event_by_id(
-    event_id: int,
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user),
-    event_service: EventService = Depends()
-):
-    '''
+        event_id: UUID,
+        # current_user_with_permission: UserModel = Depends(event_view_permission_dependency), # Вже перевірено
+        event_service: EventService = Depends(get_event_service)
+) -> EventDetailedResponse:
+    """
     Отримує інформацію про подію за її ID.
-    '''
-    if not hasattr(event_service, 'db_session') or event_service.db_session is None:
-        event_service.db_session = db
+    Доступ контролюється залежністю `event_view_permission_dependency`.
+    """
+    logger.debug(f"Запит деталей події ID: {event_id}")
+    event_details = await event_service.get_event_by_id(event_id=event_id, include_details=True)
+    if not event_details:  # Малоймовірно
+        logger.warning(f"Подію з ID '{event_id}' не знайдено (після перевірки прав).")
+        # i18n
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Подію не знайдено.")
+    return event_details
 
-    event = await event_service.get_event_by_id_for_user(event_id=event_id, user=current_user)
-    if not event:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Подія з ID {event_id} не знайдена або доступ заборонено."
-        )
-    return EventResponse.model_validate(event)
 
 @router.put(
     "/{event_id}",
-    response_model=EventResponse,
-    summary="Оновлення інформації про подію",
-    description="Дозволяє адміністратору групи або суперюзеру оновити дані існуючої події."
+    response_model=EventDetailedResponse,
+    summary="Оновлення інформації про подію",  # i18n
+    description="Дозволяє адміністратору групи події або суперюзеру оновити дані існуючої події.",  # i18n
+    dependencies=[Depends(event_edit_permission_dependency)]
 )
 async def update_event(
-    event_id: int,
-    event_in: EventUpdate,
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user), # Адмін групи або суперюзер
-    event_service: EventService = Depends()
-):
-    '''
+        event_id: UUID,
+        event_in: EventUpdate,
+        current_user_with_permission: UserModel = Depends(event_edit_permission_dependency),
+        event_service: EventService = Depends(get_event_service)
+) -> EventDetailedResponse:
+    """
     Оновлює дані події.
-    '''
-    if not hasattr(event_service, 'db_session') or event_service.db_session is None:
-        event_service.db_session = db
-
-    updated_event = await event_service.update_event(
-        event_id=event_id,
-        event_update_schema=event_in,
-        requesting_user=current_user
-    )
-    if not updated_event: # Сервіс має кидати HTTPException
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Подію з ID {event_id} не знайдено або оновлення не вдалося/заборонено."
+    Доступно адміністратору групи події або суперюзеру.
+    """
+    logger.info(f"Користувач ID '{current_user_with_permission.id}' намагається оновити подію ID '{event_id}'.")
+    try:
+        updated_event = await event_service.update_event(
+            event_id=event_id,
+            event_update_data=event_in,
+            current_user_id=current_user_with_permission.id
         )
-    return EventResponse.model_validate(updated_event)
+        if not updated_event:  # Малоймовірно
+            # i18n
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail="Подію не знайдено або оновлення не вдалося.")
+        return updated_event
+    except ValueError as e:
+        logger.warning(f"Помилка валідації при оновленні події ID '{event_id}': {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка при оновленні події ID '{event_id}': {e}", exc_info=global_settings.DEBUG)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутрішня помилка сервера.")
+
 
 @router.delete(
     "/{event_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Видалення події",
-    description="Дозволяє адміністратору групи або суперюзеру видалити подію."
+    summary="Видалення події",  # i18n
+    description="Дозволяє адміністратору групи події або суперюзеру видалити подію.",  # i18n
+    dependencies=[Depends(event_edit_permission_dependency)]
 )
 async def delete_event(
-    event_id: int,
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user), # Адмін групи або суперюзер
-    event_service: EventService = Depends()
+        event_id: UUID,
+        current_user_with_permission: UserModel = Depends(event_edit_permission_dependency),
+        event_service: EventService = Depends(get_event_service)
 ):
-    '''
+    """
     Видаляє подію.
-    '''
-    if not hasattr(event_service, 'db_session') or event_service.db_session is None:
-        event_service.db_session = db
-
-    success = await event_service.delete_event(event_id=event_id, requesting_user=current_user)
-    if not success: # Сервіс має кидати HTTPException
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Не вдалося видалити подію з ID {event_id}. Можливо, її не існує або у вас немає прав."
+    Доступно адміністратору групи події або суперюзеру.
+    """
+    logger.info(f"Користувач ID '{current_user_with_permission.id}' намагається видалити подію ID '{event_id}'.")
+    try:
+        success = await event_service.delete_event(
+            event_id=event_id,
+            current_user_id=current_user_with_permission.id
         )
-    # HTTP 204 No Content
+        if not success:
+            logger.warning(f"Не вдалося видалити подію ID '{event_id}' (сервіс повернув False).")
+            # i18n
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail="Подію не знайдено або не вдалося видалити.")
+    except ValueError as e:
+        logger.warning(f"Помилка бізнес-логіки при видаленні події ID '{event_id}': {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка при видаленні події ID '{event_id}': {e}", exc_info=global_settings.DEBUG)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутрішня помилка сервера.")
 
-# Міркування:
-# 1.  Схеми: `EventCreate`, `EventUpdate`, `EventResponse` з `app.src.schemas.tasks.event`.
-#     `EventCreate` має містити `group_id`.
-# 2.  Сервіс `EventService`: Аналогічно до `TaskService`, керує логікою та правами для подій.
-#     Методи: `create_event`, `get_events_for_user`, `get_event_by_id_for_user`, `update_event`, `delete_event`.
-# 3.  Права доступу: Аналогічні до задач.
-# 4.  Пагінація: Для списку подій.
-# 5.  Коментарі: Українською мовою.
-# 6.  URL-и: Цей роутер буде підключений до `tasks_router` (в `tasks/__init__.py`)
-#     з префіксом `/events`. Таким чином, шляхи будуть `/api/v1/tasks/events/`, `/api/v1/tasks/events/{event_id}`.
+    return None
+
+
+logger.info("Роутер для CRUD операцій з подіями визначено.")

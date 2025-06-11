@@ -1,258 +1,329 @@
 # backend/app/src/services/tasks/event.py
-import logging
+# import logging # Замінено на централізований логер
 from typing import List, Optional, Any
 from uuid import UUID
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload, joinedload, noload
 from sqlalchemy.exc import IntegrityError
 
-from app.src.services.base import BaseService
-from app.src.models.tasks.event import Event # SQLAlchemy Event model
-from app.src.models.auth.user import User
-from app.src.models.groups.group import Group
-from app.src.models.dictionaries.task_types import TaskType # Events might still use task types, or have event types
-from app.src.models.dictionaries.statuses import Status # For event status
-# Assuming these models exist for relationships if used by Event model
-from app.src.models.tasks.assignment import TaskAssignment # If events can be "assigned"
-# from app.src.models.tasks.rsvp import EventRSVP # If events have RSVP functionality
+# Повні шляхи імпорту
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.tasks.event import Event  # Модель SQLAlchemy Event
+from backend.app.src.models.auth.user import User
+from backend.app.src.models.groups.group import Group
+from backend.app.src.models.dictionaries.task_types import \
+    TaskType  # Події можуть використовувати типи завдань або мати свої EventType
+from backend.app.src.models.dictionaries.statuses import Status  # Для статусу події
+from backend.app.src.models.tasks.assignment import TaskAssignment  # Якщо події можна "призначати"
+# from backend.app.src.models.tasks.rsvp import EventRSVP # Якщо події мають функціонал RSVP
 
-
-from app.src.schemas.tasks.event import ( # Pydantic Event schemas
+from backend.app.src.schemas.tasks.event import (  # Схеми Pydantic Event
     EventCreate,
     EventUpdate,
     EventResponse,
-    EventDetailedResponse # Assuming a more detailed response schema
+    EventDetailedResponse  # Розширена схема відповіді
 )
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# TODO: Винести коди статусів за замовчуванням (наприклад, "SCHEDULED") в конфігурацію або константи.
+DEFAULT_EVENT_STATUS_CODE = "SCHEDULED"  # Заплановано
+
 
 class EventService(BaseService):
     """
-    Service for managing events. Events are similar to tasks but may represent
-    scheduled occurrences, activities, or milestones.
-    This service provides CRUD operations and specific event logic.
+    Сервіс для управління подіями. Події схожі на завдання, але можуть представляти
+    заплановані заходи, активності або віхи.
+    Цей сервіс надає CRUD-операції та специфічну логіку для подій.
     """
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        logger.info("EventService initialized.")
+        logger.info("EventService ініціалізовано.")
 
-    async def get_event_by_id(self, event_id: UUID, include_details: bool = False) -> Optional[EventResponse]: # Or EventDetailedResponse
-        """
-        Retrieves an event by its ID.
-        Can optionally include more details like assignees, type, status, etc.
-        """
-        logger.debug(f"Attempting to retrieve event by ID: {event_id}, include_details: {include_details}")
-
+    async def _get_orm_event_with_relations(self, event_id: UUID, include_details: bool = True) -> Optional[Event]:
+        """Внутрішній метод для отримання ORM моделі Event з завантаженням зв'язків."""
         query = select(Event).where(Event.id == event_id)
         if include_details:
-            # Adjust eager loading based on Event model's relationships
-            query = query.options(
-                selectinload(Event.event_type),
-                selectinload(Event.status),
+            # TODO: Уточнити назву поля для типу події в моделі Event: 'event_type' чи 'task_type'.
+            #  Припускаємо, що модель Event може мати поле event_type (зв'язок з TaskType або окремим EventType)
+            #  або використовувати task_type, якщо Event є підтипом Task.
+            event_type_relation = getattr(Event, 'event_type', getattr(Event, 'task_type', None))
+
+            options_to_load = [
                 selectinload(Event.group),
+                selectinload(Event.status),
                 selectinload(Event.created_by_user).options(selectinload(User.user_type)),
-                selectinload(Event.updated_by_user).options(selectinload(User.user_type)) if hasattr(Event, 'updated_by_user') else None,
-                selectinload(Event.assignments).joinedload(TaskAssignment.user).options(selectinload(User.user_type)) if hasattr(Event, 'assignments') else None,
-                # selectinload(Event.rsvps).joinedload(EventRSVP.user).options(selectinload(User.user_type)) if hasattr(Event, 'rsvps') else None,
+                selectinload(Event.updated_by_user).options(selectinload(User.user_type)),
+            ]
+            if event_type_relation:  # Додаємо, тільки якщо атрибут існує
+                options_to_load.append(selectinload(event_type_relation))
+            if hasattr(Event, 'assignments'):
+                options_to_load.append(selectinload(Event.assignments).options(
+                    selectinload(TaskAssignment.user).options(selectinload(User.user_type))
+                ))
+            # if hasattr(Event, 'rsvps'): # Якщо є RSVP
+            #     options_to_load.append(selectinload(Event.rsvps).options(
+            #         selectinload(EventRSVP.user).options(selectinload(User.user_type))
+            #     ))
+            query = query.options(*options_to_load)
+        else:  # Для звичайного EventResponse
+            query = query.options(
+                selectinload(getattr(Event, 'event_type', getattr(Event, 'task_type', None))),
+                selectinload(Event.status),
+                selectinload(Event.created_by_user).options(noload("*"))
             )
-            query = query.options(*(opt for opt in query.get_options() if opt is not None))
+        return (await self.db_session.execute(query)).scalar_one_or_none()
 
-
-        result = await self.db_session.execute(query)
-        event_db = result.scalar_one_or_none()
+    async def get_event_by_id(self, event_id: UUID, include_details: bool = False) -> Optional[EventResponse]:
+        """
+        Отримує подію за її ID.
+        Опціонально може включати більше деталей.
+        """
+        logger.debug(f"Спроба отримання події за ID: {event_id}, include_details: {include_details}")
+        event_db = await self._get_orm_event_with_relations(event_id, include_details)
 
         if event_db:
-            logger.info(f"Event with ID '{event_id}' found.")
-            if include_details:
-                # return EventDetailedResponse.model_validate(event_db) # Pydantic v2
-                return EventDetailedResponse.from_orm(event_db) # Pydantic v1
-            # return EventResponse.model_validate(event_db) # Pydantic v2
-            return EventResponse.from_orm(event_db) # Pydantic v1
+            logger.info(f"Подію з ID '{event_id}' знайдено.")
+            response_model = EventDetailedResponse if include_details else EventResponse
+            return response_model.model_validate(event_db)  # Pydantic v2
 
-        logger.info(f"Event with ID '{event_id}' not found.")
+        logger.info(f"Подію з ID '{event_id}' не знайдено.")
         return None
 
-    async def create_event(self, event_create_data: EventCreate, creator_user_id: UUID) -> Optional[EventDetailedResponse]: # Return Optional
+    async def create_event(self, event_create_data: EventCreate, creator_user_id: UUID) -> EventDetailedResponse:
         """
-        Creates a new event.
+        Створює нову подію.
+
+        :param event_create_data: Дані для нової події.
+        :param creator_user_id: ID користувача, що створює подію.
+        :return: Pydantic схема EventDetailedResponse створеної події.
+        :raises ValueError: Якщо пов'язані сутності не знайдено або конфлікт даних. # i18n
         """
-        logger.debug(f"Attempting to create new event '{event_create_data.title}' by user ID: {creator_user_id}")
+        logger.debug(f"Спроба створення нової події '{event_create_data.title}' користувачем ID: {creator_user_id}")
 
-        group = await self.db_session.get(Group, event_create_data.group_id)
-        if not group: raise ValueError(f"Group with ID '{event_create_data.group_id}' not found.")
+        if not await self.db_session.get(Group, event_create_data.group_id):
+            raise ValueError(f"Групу з ID '{event_create_data.group_id}' не знайдено.")  # i18n
 
-        event_type_id_to_check = getattr(event_create_data, 'event_type_id', None) # Event model should have event_type_id
-        if not event_type_id_to_check: raise ValueError("Event type ID (event_type_id) must be provided.")
+        # Визначаємо, яке поле для типу використовується: event_type_id чи task_type_id
+        type_id_to_check = getattr(event_create_data, 'event_type_id', getattr(event_create_data, 'task_type_id', None))
+        if not type_id_to_check:
+            # i18n
+            raise ValueError("Необхідно вказати 'event_type_id' або 'task_type_id' для події.")
 
-        event_type_model = TaskType # Or a dedicated EventType model if it exists
-        event_type = await self.db_session.get(event_type_model, event_type_id_to_check)
-        if not event_type: raise ValueError(f"EventType/TaskType with ID '{event_type_id_to_check}' not found.")
+        # Припускаємо, що типи подій зберігаються в TaskType або окремій таблиці EventType
+        # TODO: Якщо EventType - окрема модель, замінити TaskType на EventType.
+        if not await self.db_session.get(TaskType, type_id_to_check):
+            raise ValueError(f"Тип події/завдання з ID '{type_id_to_check}' не знайдено.")  # i18n
 
         status_id_to_set = event_create_data.status_id
         if not status_id_to_set:
-            default_status_stmt = select(Status.id).where(Status.code == "SCHEDULED")
-            default_status_id = (await self.db_session.execute(default_status_stmt)).scalar_one_or_none()
-            if not default_status_id:
-                if not hasattr(Event, 'status_id') or Event.status_id.nullable is False:
-                     raise ValueError("Event status is required and default 'SCHEDULED' status not found.")
-                status_id_to_set = None
-            else:
-                status_id_to_set = default_status_id
-            logger.info(f"No status_id provided for new event, using default status ID: {status_id_to_set or 'None (if nullable)'}")
-        else:
-            status = await self.db_session.get(Status, status_id_to_set)
-            if not status: raise ValueError(f"Status with ID '{status_id_to_set}' not found.")
+            default_status_id = (await self.db_session.execute(
+                select(Status.id).where(Status.code == DEFAULT_EVENT_STATUS_CODE))
+                                 # Використовуємо DEFAULT_EVENT_STATUS_CODE
+                                 ).scalar_one_or_none()
+            if not default_status_id and (
+                    not hasattr(Event, 'status_id') or Event.status_id.nullable is False):  # type: ignore
+                # i18n
+                raise ValueError(
+                    f"Статус події є обов'язковим, але статус за замовчуванням '{DEFAULT_EVENT_STATUS_CODE}' не знайдено.")
+            status_id_to_set = default_status_id
+            logger.info(
+                f"Для нової події не надано ID статусу, використано статус за замовчуванням ID: {status_id_to_set or 'None (якщо nullable)'}")
+        elif not await self.db_session.get(Status, status_id_to_set):
+            raise ValueError(f"Статус з ID '{status_id_to_set}' не знайдено.")  # i18n
 
-        event_db_data = event_create_data.dict()
-        event_db_data['status_id'] = status_id_to_set
-        # Ensure the field name for type ID matches the Event model (e.g., event_type_id)
-        if 'task_type_id' in event_db_data and 'event_type_id' not in event_db_data and hasattr(Event, 'event_type_id'):
-            event_db_data['event_type_id'] = event_db_data.pop('task_type_id')
-        elif 'event_type_id' not in event_db_data and 'task_type_id' in event_db_data and not hasattr(Event, 'event_type_id') and hasattr(Event, 'task_type_id'):
-             pass # Use task_type_id as is
-        elif 'event_type_id' not in event_db_data and 'task_type_id' not in event_db_data:
-             raise ValueError("Missing event_type_id or task_type_id in data for Event model.")
+        event_db_dict = event_create_data.model_dump(exclude_unset=True)  # Pydantic v2
+        event_db_dict['status_id'] = status_id_to_set
 
+        # Узгодження поля для типу події
+        if 'event_type_id' not in event_db_dict and 'task_type_id' in event_db_dict:
+            if hasattr(Event, 'event_type_id') and not hasattr(Event, 'task_type_id'):
+                event_db_dict['event_type_id'] = event_db_dict.pop('task_type_id')
+        elif 'task_type_id' in event_db_dict and not hasattr(Event, 'task_type_id') and hasattr(Event, 'event_type_id'):
+            # Якщо схема мала task_type_id, а модель тільки event_type_id, це проблема схеми або мапінгу.
+            # Для безпеки, якщо event_type_id є в моделі, використовуємо його.
+            if 'event_type_id' not in event_db_dict:  # Якщо event_type_id ще не встановлено
+                event_db_dict['event_type_id'] = event_db_dict.pop('task_type_id')
+            elif event_db_dict['event_type_id'] != event_db_dict['task_type_id']:  # Якщо обидва є, але різні
+                logger.warning(
+                    "Надано і event_type_id, і task_type_id з різними значеннями. Використано event_type_id.")
+                event_db_dict.pop('task_type_id', None)  # Видаляємо task_type_id, якщо є event_type_id
+            else:  # Обидва є і однакові
+                event_db_dict.pop('task_type_id', None)
 
-        new_event_db = Event(**event_db_data, created_by_user_id=creator_user_id)
-
+        new_event_db = Event(
+            **event_db_dict,
+            created_by_user_id=creator_user_id,
+            updated_by_user_id=creator_user_id  # При створенні
+        )
         self.db_session.add(new_event_db)
         try:
             await self.commit()
             created_event_detailed = await self.get_event_by_id(new_event_db.id, include_details=True)
-            if created_event_detailed:
-                logger.info(f"Event '{new_event_db.title}' (ID: {new_event_db.id}) created by user ID '{creator_user_id}'.")
-                return created_event_detailed
-            else:
-                logger.error(f"Failed to retrieve newly created event ID {new_event_db.id} after commit.")
-                return None
+            if not created_event_detailed:
+                # i18n
+                raise RuntimeError(
+                    f"Критична помилка: не вдалося отримати створену подію ID {new_event_db.id} після коміту.")
+            logger.info(
+                f"Подію '{new_event_db.title}' (ID: {new_event_db.id}) успішно створено користувачем ID '{creator_user_id}'.")
+            return created_event_detailed
         except IntegrityError as e:
             await self.rollback()
-            logger.error(f"Integrity error creating event '{event_create_data.title}': {e}", exc_info=True)
-            raise ValueError(f"Could not create event due to a data conflict: {e}")
+            logger.error(f"Помилка цілісності '{event_create_data.title}': {e}", exc_info=global_settings.DEBUG)
+            # i18n
+            raise ValueError(f"Не вдалося створити подію через конфлікт даних: {e}")
         except Exception as e:
             await self.rollback()
-            logger.error(f"Unexpected error creating event '{event_create_data.title}': {e}", exc_info=True)
+            logger.error(f"Неочікувана помилка '{event_create_data.title}': {e}", exc_info=global_settings.DEBUG)
             raise
 
-    async def update_event(self, event_id: UUID, event_update_data: EventUpdate, current_user_id: UUID) -> Optional[EventDetailedResponse]:
-        logger.debug(f"Attempting to update event ID: {event_id} by user ID: {current_user_id}")
+    async def update_event(self, event_id: UUID, event_update_data: EventUpdate, current_user_id: UUID) -> Optional[
+        EventDetailedResponse]:
+        """Оновлює деталі події."""
+        logger.debug(f"Спроба оновлення події ID: {event_id} користувачем ID: {current_user_id}")
 
         event_db = await self.db_session.get(Event, event_id)
-
         if not event_db:
-            logger.warning(f"Event ID '{event_id}' not found for update.")
+            logger.warning(f"Подію ID '{event_id}' не знайдено для оновлення.")
             return None
 
-        update_data = event_update_data.dict(exclude_unset=True)
+        update_data = event_update_data.model_dump(exclude_unset=True)  # Pydantic v2
 
-        event_type_id_to_check = update_data.get('event_type_id', update_data.get('task_type_id'))
-        current_event_type_id = getattr(event_db, 'event_type_id', getattr(event_db, 'task_type_id', None))
+        # Узгодження та перевірка типу події
+        type_id_key_in_update = 'event_type_id' if 'event_type_id' in update_data else 'task_type_id'
+        model_type_id_attr = 'event_type_id' if hasattr(Event, 'event_type_id') else 'task_type_id'
 
-        if event_type_id_to_check and current_event_type_id != event_type_id_to_check :
-            if not await self.db_session.get(TaskType, event_type_id_to_check): # Or EventType model
-                raise ValueError(f"New EventType/TaskType ID '{event_type_id_to_check}' not found.")
+        if type_id_key_in_update in update_data and \
+                getattr(event_db, model_type_id_attr) != update_data[type_id_key_in_update]:
+            if not await self.db_session.get(TaskType, update_data[type_id_key_in_update]):  # Або EventType
+                # i18n
+                raise ValueError(f"Новий тип події/завдання ID '{update_data[type_id_key_in_update]}' не знайдено.")
 
         if 'status_id' in update_data and event_db.status_id != update_data['status_id']:
             if not await self.db_session.get(Status, update_data['status_id']):
-                raise ValueError(f"New Status ID '{update_data['status_id']}' not found.")
+                # i18n
+                raise ValueError(f"Новий статус ID '{update_data['status_id']}' не знайдено.")
 
         for field, value in update_data.items():
+            # Мапінг з схеми на модель, якщо імена полів відрізняються (напр. task_type_id -> event_type_id)
             model_field_name = field
-            if field == 'task_type_id' and hasattr(Event, 'event_type_id') and not hasattr(Event, 'task_type_id'):
+            if field == 'task_type_id' and model_type_id_attr == 'event_type_id':
                 model_field_name = 'event_type_id'
 
-            if hasattr(event_db, model_field_name):
-                setattr(event_db, model_field_name, value)
-            else:
-                logger.warning(f"Field '{model_field_name}' (from '{field}') not found on Event model for update of event ID '{event_id}'.")
+            setattr(event_db, model_field_name, value)
 
-        if hasattr(event_db, 'updated_by_user_id'):
-            event_db.updated_by_user_id = current_user_id
-        if hasattr(event_db, 'updated_at'):
-            event_db.updated_at = datetime.now(timezone.utc)
+        event_db.updated_by_user_id = current_user_id
+        event_db.updated_at = datetime.now(timezone.utc)
 
         self.db_session.add(event_db)
         try:
             await self.commit()
-            logger.info(f"Event ID '{event_id}' updated successfully by user ID '{current_user_id}'.")
-            return await self.get_event_by_id(event_id, include_details=True)
+            updated_event_detailed = await self.get_event_by_id(event_id, include_details=True)
+            if not updated_event_detailed:
+                # i18n
+                raise RuntimeError(f"Критична помилка: не вдалося отримати оновлену подію ID {event_id} після коміту.")
+            logger.info(f"Подію ID '{event_id}' успішно оновлено користувачем ID '{current_user_id}'.")
+            return updated_event_detailed
+        except IntegrityError as e:
+            await self.rollback()
+            logger.error(f"Помилка цілісності ID '{event_id}': {e}", exc_info=global_settings.DEBUG)
+            # i18n
+            raise ValueError(f"Не вдалося оновити подію через конфлікт даних: {e}")
         except Exception as e:
             await self.rollback()
-            logger.error(f"Error during event update commit for event ID '{event_id}': {e}", exc_info=True)
+            logger.error(f"Помилка оновлення ID '{event_id}': {e}", exc_info=global_settings.DEBUG)
             raise
 
-
     async def delete_event(self, event_id: UUID, current_user_id: UUID) -> bool:
-        logger.debug(f"Attempting to delete event ID: {event_id} by user ID: {current_user_id}")
-
+        """Видаляє подію."""
+        # TODO: Політика видалення: каскадне видалення пов'язаних призначень, RSVP? Чи заборона, якщо є залежності?
+        logger.debug(f"Спроба видалення події ID: {event_id} користувачем ID: {current_user_id}")
         event_db = await self.db_session.get(Event, event_id)
         if not event_db:
-            logger.warning(f"Event ID '{event_id}' not found for deletion.")
+            logger.warning(f"Подію ID '{event_id}' не знайдено для видалення.")
             return False
 
-        await self.db_session.delete(event_db)
-        await self.commit()
-        logger.info(f"Event ID '{event_id}' deleted successfully by user ID '{current_user_id}'.")
-        return True
+        try:
+            await self.db_session.delete(event_db)
+            await self.commit()
+            logger.info(
+                f"Подію ID '{event_id}' (Назва: '{event_db.title}') успішно видалено користувачем ID '{current_user_id}'.")
+            return True
+        except IntegrityError as e:
+            await self.rollback()
+            logger.error(f"Помилка цілісності '{event_id}': {e}. Можливо, подія використовується.",
+                         exc_info=global_settings.DEBUG)
+            # i18n
+            raise ValueError(f"Подія '{event_db.title}' використовується і не може бути видалена.")
+        except Exception as e:
+            await self.rollback()
+            logger.error(f"Неочікувана помилка '{event_id}': {e}", exc_info=global_settings.DEBUG)
+            raise
 
     async def list_events_for_group(
-        self, group_id: UUID, skip: int = 0, limit: int = 100,
-        status_code: Optional[str] = None, event_type_code: Optional[str] = None,
-        include_details: bool = False,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None
-    ) -> List[EventResponse]:
-        logger.debug(f"Listing events for group ID: {group_id}, status: {status_code}, type: {event_type_code}, details: {include_details}, start: {start_date}, end: {end_date}")
+            self, group_id: UUID, skip: int = 0, limit: int = 100,
+            status_code: Optional[str] = None, event_type_code: Optional[str] = None,
+            # `event_type_code` замість `task_type_code`
+            include_details: bool = False,
+            start_date_filter: Optional[datetime] = None,  # Фільтр для подій, що починаються не раніше цієї дати
+            end_date_filter: Optional[datetime] = None  # Фільтр для подій, що починаються не пізніше цієї дати
+    ) -> List[EventResponse]:  # Або List[EventDetailedResponse]
+        """Перелічує події для групи з фільтрами та пагінацією."""
+        logger.debug(
+            f"Перелік подій для групи ID: {group_id}, статус: {status_code}, тип: {event_type_code}, деталі: {include_details}, період з {start_date_filter} по {end_date_filter}")
 
         query = select(Event).where(Event.group_id == group_id)
-        event_type_field_name = 'event_type_id' if hasattr(Event, 'event_type_id') else 'task_type_id'
 
+        # Визначення назви поля для типу події в моделі Event
+        event_type_attr = getattr(Event, 'event_type', getattr(Event, 'task_type', None))
+        event_type_field_on_model = 'event_type_id' if hasattr(Event, 'event_type_id') else 'task_type_id'
 
         if include_details:
-            query = query.options(
-                selectinload(getattr(Event, 'event_type', getattr(Event, 'task_type', None))), # Adapt based on actual field name
+            options = [
                 selectinload(Event.status),
                 selectinload(Event.created_by_user).options(selectinload(User.user_type)),
-                selectinload(Event.assignments).joinedload(TaskAssignment.user).options(selectinload(User.user_type)) if hasattr(Event, 'assignments') else None,
-            )
-            query = query.options(*(opt for opt in query.get_options() if opt is not None))
+                selectinload(Event.updated_by_user).options(selectinload(User.user_type)),
+            ]
+            if event_type_attr: options.append(selectinload(event_type_attr))
+            if hasattr(Event, 'assignments'): options.append(selectinload(Event.assignments).options(
+                selectinload(TaskAssignment.user).options(selectinload(User.user_type))))
+            # if hasattr(Event, 'rsvps'): options.append(selectinload(Event.rsvps)) # Якщо є RSVP
+            query = query.options(*options)
         else:
-             query = query.options(selectinload(getattr(Event, 'event_type', getattr(Event, 'task_type', None))), selectinload(Event.status))
-
+            options = [selectinload(Event.status)]
+            if event_type_attr: options.append(selectinload(event_type_attr))
+            query = query.options(*options)
 
         if status_code:
             query = query.join(Status, Event.status_id == Status.id).where(Status.code == status_code)
+        if event_type_code and hasattr(Event, event_type_field_on_model):
+            # TODO: Якщо EventType - окрема модель, замінити TaskType на EventType тут
+            query = query.join(TaskType, getattr(Event, event_type_field_on_model) == TaskType.id).where(
+                TaskType.code == event_type_code)
 
-        if event_type_code: # Join with TaskType or EventType model
-            query = query.join(TaskType, getattr(Event, event_type_field_name) == TaskType.id).where(TaskType.code == event_type_code)
+        if start_date_filter and hasattr(Event, 'start_time'):
+            query = query.where(Event.start_time >= start_date_filter)
+        if end_date_filter:  # Фільтруємо за часом початку події, якщо немає end_time, або за end_time, якщо є
+            if hasattr(Event, 'end_time') and Event.end_time is not None:
+                query = query.where(Event.end_time <= end_date_filter)
+            elif hasattr(Event, 'start_time'):
+                query = query.where(Event.start_time <= end_date_filter)
 
-        # Assume Event model has 'start_time' and 'end_time' for date filtering.
-        # If it only has 'start_time', adjust end_date filter accordingly.
-        if start_date and hasattr(Event, 'start_time'):
-            query = query.where(Event.start_time >= start_date)
-        if end_date:
-            if hasattr(Event, 'end_time') and Event.end_time is not None : # If events have a specific end_time
-                 query = query.where(Event.end_time <= end_date)
-            elif hasattr(Event, 'start_time'): # If only start_time, filter events starting before or on end_date
-                 query = query.where(Event.start_time <= end_date)
+        # Сортування за замовчуванням: за часом початку (новіші спочатку), потім за датою створення
+        order_by_attr = getattr(Event, 'start_time', Event.created_at)
+        query = query.order_by(order_by_attr.desc().nulls_last(), Event.created_at.desc()).offset(skip).limit(limit)
 
-        order_by_attr = getattr(Event, 'start_time', Event.created_at) # Order by start_time if available
-        query = query.order_by(order_by_attr.desc() if order_by_attr is not None else Event.created_at.desc()).offset(skip).limit(limit) # type: ignore
-
-        result = await self.db_session.execute(query)
-        events_db = result.scalars().unique().all()
+        events_db = (await self.db_session.execute(query)).scalars().unique().all()
 
         response_model = EventDetailedResponse if include_details else EventResponse
-        # response_list = [response_model.model_validate(e) for e in events_db] # Pydantic v2
-        response_list = [response_model.from_orm(e) for e in events_db] # Pydantic v1
+        response_list = [response_model.model_validate(e) for e in events_db]  # Pydantic v2
 
-        logger.info(f"Retrieved {len(response_list)} events for group ID '{group_id}'.")
+        logger.info(f"Отримано {len(response_list)} подій для групи ID '{group_id}'.")
         return response_list
 
-logger.info("EventService class defined.")
+
+logger.debug(f"{EventService.__name__} (сервіс подій) успішно визначено.")

@@ -1,234 +1,313 @@
 # backend/app/src/services/tasks/task.py
-import logging
+# import logging # Замінено на централізований логер
 from typing import List, Optional, Any
 from uuid import UUID
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload, joinedload, noload
 from sqlalchemy.exc import IntegrityError
 
-from app.src.services.base import BaseService
-from app.src.models.tasks.task import Task # SQLAlchemy Task model
-from app.src.models.auth.user import User
-from app.src.models.groups.group import Group
-from app.src.models.dictionaries.task_types import TaskType
-from app.src.models.dictionaries.statuses import Status # For task status
-# Assuming these models exist for relationships mentioned in get_task_by_id
-from app.src.models.tasks.assignment import TaskAssignment
-from app.src.models.tasks.completion import TaskCompletion
-from app.src.models.tasks.review import TaskReview
+# Повні шляхи імпорту
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.tasks.task import Task  # Модель SQLAlchemy Task
+from backend.app.src.models.auth.user import User
+from backend.app.src.models.groups.group import Group
+from backend.app.src.models.dictionaries.task_types import TaskType
+from backend.app.src.models.dictionaries.statuses import Status  # Для статусу завдання
 
+from backend.app.src.models.tasks.assignment import TaskAssignment
+from backend.app.src.models.tasks.completion import TaskCompletion
+from backend.app.src.models.tasks.review import TaskReview
 
-from app.src.schemas.tasks.task import ( # Pydantic Task schemas
+from backend.app.src.schemas.tasks.task import (  # Схеми Pydantic Task
     TaskCreate,
     TaskUpdate,
     TaskResponse,
-    TaskDetailedResponse # Assuming a more detailed response schema
+    TaskDetailedResponse  # Розширена схема відповіді
 )
-# For recurring task creation logic, if complex, might involve TaskSchedulingService or utilities
-# from .scheduler import TaskSchedulingService # Avoid direct import for now if possible
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# TODO: Винести коди статусів за замовчуванням (наприклад, "OPEN") в конфігурацію або константи.
+DEFAULT_TASK_STATUS_CODE = "OPEN"
+
 
 class TaskService(BaseService):
     """
-    Service for managing tasks, including CRUD operations, and handling
-    task-specific logic like recurrence (though actual instance creation for
-    recurrence might be delegated to a scheduling service).
+    Сервіс для управління завданнями, включаючи CRUD-операції та обробку
+    специфічної для завдань логіки, такої як повторення (хоча фактичне створення
+    екземплярів для повторюваних завдань може бути делеговано сервісу планування).
     """
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        logger.info("TaskService initialized.")
+        logger.info("TaskService ініціалізовано.")
 
-    async def get_task_by_id(self, task_id: UUID, include_details: bool = False) -> Optional[TaskResponse]: # Or TaskDetailedResponse
+    async def get_task_by_id(self, task_id: UUID, include_details: bool = False) -> Optional[
+        TaskResponse]:  # Або TaskDetailedResponse
         """
-        Retrieves a task by its ID.
-        Can optionally include more details like assignees, completions, type, status, etc.
+        Отримує завдання за його ID.
+        Опціонально може включати більше деталей, таких як виконавці, завершення, тип, статус тощо.
+
+        :param task_id: ID завдання.
+        :param include_details: Якщо True, завантажує розширену інформацію про завдання.
+        :return: Pydantic схема TaskResponse або TaskDetailedResponse, або None, якщо не знайдено.
         """
-        logger.debug(f"Attempting to retrieve task by ID: {task_id}, include_details: {include_details}")
+        logger.debug(f"Спроба отримання завдання за ID: {task_id}, include_details: {include_details}")
 
         query = select(Task).where(Task.id == task_id)
         if include_details:
             query = query.options(
+                selectinload(Task.group),  # Завжди завантажуємо групу, якщо є
                 selectinload(Task.task_type),
                 selectinload(Task.status),
-                selectinload(Task.group),
-                selectinload(Task.created_by_user).options(selectinload(User.user_type)), # Load user's type
-                selectinload(Task.updated_by_user).options(selectinload(User.user_type)) if hasattr(Task, 'updated_by_user') else None,
-                selectinload(Task.assignments).joinedload(TaskAssignment.user).options(selectinload(User.user_type)),
-                selectinload(Task.completions).joinedload(TaskCompletion.user).options(selectinload(User.user_type)),
-                selectinload(Task.reviews).joinedload(TaskReview.reviewer_user).options(selectinload(User.user_type))
-                # selectinload(Task.bonus_rules) # If bonus rules are linked
+                selectinload(Task.created_by_user).options(selectinload(User.user_type)),
+                selectinload(Task.updated_by_user).options(selectinload(User.user_type)),
+                selectinload(Task.assignments).options(
+                    selectinload(TaskAssignment.user).options(selectinload(User.user_type))
+                ),
+                selectinload(Task.completions).options(
+                    selectinload(TaskCompletion.user).options(selectinload(User.user_type))
+                ),
+                selectinload(Task.reviews).options(
+                    selectinload(TaskReview.reviewer_user).options(selectinload(User.user_type))
+                )
+                # TODO: selectinload(Task.bonus_rules), якщо є прямий зв'язок
             )
-            # Filter out None options from query.options if they occur (e.g. conditional updated_by_user)
-            query = query.options(*(opt for opt in query.get_options() if opt is not None))
+        else:  # Для звичайного TaskResponse
+            query = query.options(
+                selectinload(Task.group).options(noload("*")),  # Тільки ID, якщо GroupResponse не потрібен повністю
+                selectinload(Task.task_type),
+                selectinload(Task.status),
+                selectinload(Task.created_by_user).options(noload("*"))
+            )
 
-        result = await self.db_session.execute(query)
-        task_db = result.scalar_one_or_none()
+        task_db = (await self.db_session.execute(query)).scalar_one_or_none()
 
         if task_db:
-            logger.info(f"Task with ID '{task_id}' found.")
-            if include_details:
-                # return TaskDetailedResponse.model_validate(task_db) # Pydantic v2
-                return TaskDetailedResponse.from_orm(task_db) # Pydantic v1
-            # return TaskResponse.model_validate(task_db) # Pydantic v2
-            return TaskResponse.from_orm(task_db) # Pydantic v1
+            logger.info(f"Завдання з ID '{task_id}' знайдено.")
+            response_model = TaskDetailedResponse if include_details else TaskResponse
+            return response_model.model_validate(task_db)  # Pydantic v2
 
-        logger.info(f"Task with ID '{task_id}' not found.")
+        logger.info(f"Завдання з ID '{task_id}' не знайдено.")
         return None
 
-    async def create_task(self, task_create_data: TaskCreate, creator_user_id: UUID) -> Optional[TaskDetailedResponse]: # Return Optional for consistency
+    async def create_task(self, task_create_data: TaskCreate, creator_user_id: UUID) -> TaskDetailedResponse:
         """
-        Creates a new task.
+        Створює нове завдання.
 
-        Args:
-            task_create_data (TaskCreate): Data for the new task.
-            creator_user_id (UUID): ID of the user creating the task.
-
-        Returns:
-            Optional[TaskDetailedResponse]: The created task with details, or None if creation failed.
-
-        Raises:
-            ValueError: If referenced entities (group, task type, status) are not found.
+        :param task_create_data: Дані для нового завдання.
+        :param creator_user_id: ID користувача, що створює завдання.
+        :return: Pydantic схема TaskDetailedResponse створеного завдання.
+        :raises ValueError: Якщо пов'язані сутності (група, тип завдання, статус) не знайдено,
+                            або виникає конфлікт даних. # i18n
         """
-        logger.debug(f"Attempting to create new task '{task_create_data.title}' by user ID: {creator_user_id}")
+        logger.debug(f"Спроба створення нового завдання '{task_create_data.title}' користувачем ID: {creator_user_id}")
 
-        group = await self.db_session.get(Group, task_create_data.group_id)
-        if not group: raise ValueError(f"Group with ID '{task_create_data.group_id}' not found.")
-
-        task_type = await self.db_session.get(TaskType, task_create_data.task_type_id)
-        if not task_type: raise ValueError(f"TaskType with ID '{task_create_data.task_type_id}' not found.")
+        # Перевірка існування пов'язаних сутностей
+        if not await self.db_session.get(Group, task_create_data.group_id):
+            # i18n
+            raise ValueError(f"Групу з ID '{task_create_data.group_id}' не знайдено.")
+        if not await self.db_session.get(TaskType, task_create_data.task_type_id):
+            # i18n
+            raise ValueError(f"Тип завдання з ID '{task_create_data.task_type_id}' не знайдено.")
 
         status_id_to_set = task_create_data.status_id
-        if not status_id_to_set:
-            default_status_stmt = select(Status.id).where(Status.code == "OPEN")
-            default_status_id = (await self.db_session.execute(default_status_stmt)).scalar_one_or_none()
+        if not status_id_to_set:  # Якщо статус не надано, встановлюємо за замовчуванням
+            default_status_id = (await self.db_session.execute(
+                select(Status.id).where(Status.code == DEFAULT_TASK_STATUS_CODE))
+                                 ).scalar_one_or_none()
             if not default_status_id:
-                # If status is mandatory for a Task (model has status_id as non-nullable without DB default)
-                # and no default "OPEN" status is found, this is a configuration issue.
-                logger.error("Default status 'OPEN' not found and no status_id provided. Task creation failed.")
-                raise ValueError("Task status is required, but default 'OPEN' status not found in system.")
+                logger.error(
+                    f"Статус за замовчуванням '{DEFAULT_TASK_STATUS_CODE}' не знайдено. Створення завдання не вдалося.")
+                # i18n
+                raise ValueError(
+                    f"Статус завдання є обов'язковим, але статус за замовчуванням '{DEFAULT_TASK_STATUS_CODE}' не знайдено.")
             status_id_to_set = default_status_id
-            logger.info(f"No status_id provided for new task, using default 'OPEN' status ID: {status_id_to_set}")
-        else: # status_id was provided, validate it
-            status = await self.db_session.get(Status, status_id_to_set)
-            if not status: raise ValueError(f"Status with ID '{status_id_to_set}' not found.")
+            logger.info(
+                f"Для нового завдання не надано ID статусу, використано статус за замовчуванням ID: {status_id_to_set}")
+        elif not await self.db_session.get(Status, status_id_to_set):  # Якщо ID статусу надано, перевіряємо його
+            # i18n
+            raise ValueError(f"Статус з ID '{status_id_to_set}' не знайдено.")
 
-        task_db_data = task_create_data.dict()
-        task_db_data['status_id'] = status_id_to_set # Ensure status_id is correctly set
-
-        new_task_db = Task(**task_db_data, created_by_user_id=creator_user_id)
-
+        # Створення завдання
+        # `created_at`, `updated_at` встановлюються автоматично моделлю
+        new_task_db = Task(
+            **task_create_data.model_dump(exclude={'status_id'}),  # Виключаємо status_id, бо він встановлюється окремо
+            status_id=status_id_to_set,  # Встановлюємо перевірений/дефолтний status_id
+            created_by_user_id=creator_user_id,
+            updated_by_user_id=creator_user_id  # При створенні
+        )
         self.db_session.add(new_task_db)
         try:
             await self.commit()
-            # Refresh to get all relationships loaded as defined in get_task_by_id for detailed response
-            # This ensures consistency in the response object.
+            # Отримуємо завдання з усіма деталями для відповіді
             created_task_detailed = await self.get_task_by_id(new_task_db.id, include_details=True)
-            if created_task_detailed:
-                logger.info(f"Task '{new_task_db.title}' (ID: {new_task_db.id}) created successfully by user ID '{creator_user_id}'.")
-                return created_task_detailed
-            else: # Should not happen if commit was successful
-                logger.error(f"Failed to retrieve newly created task ID {new_task_db.id} after commit.")
-                return None
+            if not created_task_detailed:  # Малоймовірно
+                # i18n
+                raise RuntimeError(
+                    f"Критична помилка: не вдалося отримати створене завдання ID {new_task_db.id} після коміту.")
+
+            logger.info(
+                f"Завдання '{new_task_db.title}' (ID: {new_task_db.id}) успішно створено користувачем ID '{creator_user_id}'.")
+            return created_task_detailed
         except IntegrityError as e:
             await self.rollback()
-            logger.error(f"Integrity error creating task '{task_create_data.title}': {e}", exc_info=True)
-            raise ValueError(f"Could not create task due to a data conflict: {e}")
-        except Exception as e: # Catch any other errors during commit or re-fetch
+            logger.error(f"Помилка цілісності при створенні завдання '{task_create_data.title}': {e}",
+                         exc_info=global_settings.DEBUG)
+            # i18n
+            raise ValueError(f"Не вдалося створити завдання через конфлікт даних: {e}")
+        except Exception as e:
             await self.rollback()
-            logger.error(f"Unexpected error creating task '{task_create_data.title}': {e}", exc_info=True)
+            logger.error(f"Неочікувана помилка при створенні завдання '{task_create_data.title}': {e}",
+                         exc_info=global_settings.DEBUG)
             raise
 
-
-    async def update_task(self, task_id: UUID, task_update_data: TaskUpdate, current_user_id: UUID) -> Optional[TaskDetailedResponse]:
-        logger.debug(f"Attempting to update task ID: {task_id} by user ID: {current_user_id}")
+    async def update_task(self, task_id: UUID, task_update_data: TaskUpdate, current_user_id: UUID) -> Optional[
+        TaskDetailedResponse]:
+        """Оновлює деталі завдання."""
+        # Перевірка прав (наприклад, чи є користувач адміном групи або творцем завдання) - на рівні API.
+        logger.debug(f"Спроба оновлення завдання ID: {task_id} користувачем ID: {current_user_id}")
 
         task_db = await self.db_session.get(Task, task_id)
-
         if not task_db:
-            logger.warning(f"Task ID '{task_id}' not found for update.")
+            logger.warning(f"Завдання ID '{task_id}' не знайдено для оновлення.")
             return None
 
-        update_data = task_update_data.dict(exclude_unset=True)
+        update_data = task_update_data.model_dump(exclude_unset=True)  # Pydantic v2
 
+        # Перевірка існування пов'язаних сутностей, якщо вони змінюються
         if 'task_type_id' in update_data and task_db.task_type_id != update_data['task_type_id']:
             if not await self.db_session.get(TaskType, update_data['task_type_id']):
-                raise ValueError(f"New TaskType ID '{update_data['task_type_id']}' not found.")
+                # i18n
+                raise ValueError(f"Новий тип завдання ID '{update_data['task_type_id']}' не знайдено.")
         if 'status_id' in update_data and task_db.status_id != update_data['status_id']:
             if not await self.db_session.get(Status, update_data['status_id']):
-                raise ValueError(f"New Status ID '{update_data['status_id']}' not found.")
+                # i18n
+                raise ValueError(f"Новий статус ID '{update_data['status_id']}' не знайдено.")
+        # TODO: Додати перевірку group_id, якщо його дозволено змінювати (зазвичай ні).
 
         for field, value in update_data.items():
-            if hasattr(task_db, field):
-                setattr(task_db, field, value)
-            else:
-                logger.warning(f"Field '{field}' not found on Task model for update of task ID '{task_id}'.")
+            setattr(task_db, field, value)
 
-        if hasattr(task_db, 'updated_by_user_id'):
-            task_db.updated_by_user_id = current_user_id
-        if hasattr(task_db, 'updated_at'): # Some models might not have this if using DB defaults only
-            task_db.updated_at = datetime.now(timezone.utc)
+        task_db.updated_by_user_id = current_user_id
+        task_db.updated_at = datetime.now(timezone.utc)  # Явне оновлення
 
         self.db_session.add(task_db)
         try:
             await self.commit()
-            logger.info(f"Task ID '{task_id}' updated successfully by user ID '{current_user_id}'.")
-            return await self.get_task_by_id(task_id, include_details=True)
+            updated_task_detailed = await self.get_task_by_id(task_id, include_details=True)
+            if not updated_task_detailed:  # Малоймовірно
+                # i18n
+                raise RuntimeError(
+                    f"Критична помилка: не вдалося отримати оновлене завдання ID {task_id} після коміту.")
+            logger.info(f"Завдання ID '{task_id}' успішно оновлено користувачем ID '{current_user_id}'.")
+            return updated_task_detailed
+        except IntegrityError as e:  # Наприклад, якщо назва завдання має бути унікальною в групі (не реалізовано)
+            await self.rollback()
+            logger.error(f"Помилка цілісності при оновленні завдання ID '{task_id}': {e}",
+                         exc_info=global_settings.DEBUG)
+            # i18n
+            raise ValueError(f"Не вдалося оновити завдання через конфлікт даних: {e}")
         except Exception as e:
             await self.rollback()
-            logger.error(f"Error during task update commit for task ID '{task_id}': {e}", exc_info=True)
+            logger.error(f"Помилка при оновленні завдання ID '{task_id}': {e}", exc_info=global_settings.DEBUG)
             raise
 
     async def delete_task(self, task_id: UUID, current_user_id: UUID) -> bool:
-        logger.debug(f"Attempting to delete task ID: {task_id} by user ID: {current_user_id}")
+        """Видаляє завдання."""
+        # TODO: Уточнити політику видалення: що відбувається з пов'язаними TaskAssignment, TaskCompletion, TaskReview?
+        #  Чи потрібне каскадне видалення, чи м'яке видалення, чи заборона видалення, якщо є залежності?
+        logger.debug(f"Спроба видалення завдання ID: {task_id} користувачем ID: {current_user_id}")
 
         task_db = await self.db_session.get(Task, task_id)
         if not task_db:
-            logger.warning(f"Task ID '{task_id}' not found for deletion.")
+            logger.warning(f"Завдання ID '{task_id}' не знайдено для видалення.")
             return False
 
-        await self.db_session.delete(task_db)
-        await self.commit()
-        logger.info(f"Task ID '{task_id}' deleted successfully by user ID '{current_user_id}'.")
-        return True
+        # Перевірка прав (адмін групи, творець завдання, суперюзер) - на рівні API.
+
+        try:
+            await self.db_session.delete(task_db)
+            await self.commit()
+            logger.info(
+                f"Завдання ID '{task_id}' (Назва: '{task_db.title}') успішно видалено користувачем ID '{current_user_id}'.")
+            return True
+        except IntegrityError as e:  # Якщо є залежності, що блокують видалення (FK constraints)
+            await self.rollback()
+            logger.error(f"Помилка цілісності '{task_id}': {e}. Можливо, завдання використовується.",
+                         exc_info=global_settings.DEBUG)
+            # i18n
+            raise ValueError(f"Завдання '{task_db.title}' використовується і не може бути видалене.")
+        except Exception as e:
+            await self.rollback()
+            logger.error(f"Неочікувана помилка '{task_id}': {e}", exc_info=global_settings.DEBUG)
+            raise
 
     async def list_tasks_for_group(
-        self, group_id: UUID, skip: int = 0, limit: int = 100,
-        status_code: Optional[str] = None, task_type_code: Optional[str] = None,
-        include_details: bool = False
-    ) -> List[TaskResponse]:
-        logger.debug(f"Listing tasks for group ID: {group_id}, status: {status_code}, type: {task_type_code}, details: {include_details}")
+            self, group_id: UUID, skip: int = 0, limit: int = 100,
+            status_code: Optional[str] = None, task_type_code: Optional[str] = None,
+            assignee_user_id: Optional[UUID] = None,  # Фільтр за призначеним користувачем
+            is_recurring_filter: Optional[bool] = None,  # Фільтр за повторюваністю
+            due_date_before: Optional[datetime] = None,  # Фільтр за терміном виконання (до)
+            due_date_after: Optional[datetime] = None,  # Фільтр за терміном виконання (після)
+            include_details: bool = False
+    ) -> List[TaskResponse]:  # Або List[TaskDetailedResponse]
+        """Перелічує завдання для групи з розширеними фільтрами та пагінацією."""
+        logger.debug(
+            f"Перелік завдань для групи ID: {group_id}, статус: {status_code}, тип: {task_type_code}, деталі: {include_details}")
 
         query = select(Task).where(Task.group_id == group_id)
+
+        # Налаштування завантаження зв'язків
         if include_details:
             query = query.options(
                 selectinload(Task.task_type), selectinload(Task.status),
                 selectinload(Task.created_by_user).options(selectinload(User.user_type)),
-                selectinload(Task.assignments).joinedload(TaskAssignment.user).options(selectinload(User.user_type))
+                selectinload(Task.updated_by_user).options(selectinload(User.user_type)),
+                selectinload(Task.assignments).options(
+                    selectinload(TaskAssignment.user).options(selectinload(User.user_type))
+                ),
+                selectinload(Task.completions), selectinload(Task.reviews)
             )
-        else:
-             query = query.options(selectinload(Task.task_type), selectinload(Task.status))
+        else:  # Мінімум для TaskResponse
+            query = query.options(
+                selectinload(Task.task_type),
+                selectinload(Task.status),
+                selectinload(Task.created_by_user).options(noload("*"))
+                # Тільки ID, якщо UserResponse не потрібен повністю
+            )
 
+        # Застосування фільтрів
         if status_code:
-            query = query.join(Status, Task.status_id == Status.id).where(Status.code == status_code) # Ensure join is on correct condition
+            query = query.join(Status, Task.status_id == Status.id).where(Status.code == status_code)
         if task_type_code:
-            query = query.join(TaskType, Task.task_type_id == TaskType.id).where(TaskType.code == task_type_code) # Ensure join is on correct condition
+            query = query.join(TaskType, Task.task_type_id == TaskType.id).where(TaskType.code == task_type_code)
+        if assignee_user_id:
+            # Потрібен join з TaskAssignment
+            query = query.join(TaskAssignment, Task.id == TaskAssignment.task_id).where(
+                TaskAssignment.user_id == assignee_user_id,
+                TaskAssignment.is_active == True  # Тільки активні призначення
+            )
+        if is_recurring_filter is not None:
+            query = query.where(Task.is_recurring == is_recurring_filter)
+        if due_date_before:
+            query = query.where(Task.due_date <= due_date_before)
+        if due_date_after:
+            query = query.where(Task.due_date >= due_date_after)
 
-        query = query.order_by(Task.created_at.desc()).offset(skip).limit(limit)
+        # TODO: Додати можливість передачі параметрів сортування (sort_by, sort_order)
+        query = query.order_by(Task.due_date.asc().nulls_last(), Task.created_at.desc()).offset(skip).limit(limit)
 
-        result = await self.db_session.execute(query)
-        tasks_db = result.scalars().unique().all()
+        tasks_db = (await self.db_session.execute(query)).scalars().unique().all()
 
         response_model = TaskDetailedResponse if include_details else TaskResponse
-        # response_list = [response_model.model_validate(t) for t in tasks_db] # Pydantic v2
-        response_list = [response_model.from_orm(t) for t in tasks_db] # Pydantic v1
+        response_list = [response_model.model_validate(t) for t in tasks_db]  # Pydantic v2
 
-        logger.info(f"Retrieved {len(response_list)} tasks for group ID '{group_id}'.")
+        logger.info(f"Отримано {len(response_list)} завдань для групи ID '{group_id}'.")
         return response_list
 
-logger.info("TaskService class defined.")
+
+logger.debug(f"{TaskService.__name__} (сервіс завдань) успішно визначено.")

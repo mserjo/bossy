@@ -1,122 +1,114 @@
 # backend/app/src/services/base.py
-import logging
-from typing import TypeVar, Generic, Optional, Any # Added Any for get_object_or_none example
-from uuid import UUID # Added for get_object_or_none example
-# Assuming asynchronous operations with SQLAlchemy
+# import logging # Замінено на централізований логер
+from typing import TypeVar, Generic, Optional, Any, Type  # Додано Type
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select  # Додано для get_object_or_none
 
-# For repository pattern, if used (example, replace with actual base repository if available)
-# from app.src.repositories.base import BaseRepository # Placeholder
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# Генеричний тип для моделей SQLAlchemy, якщо буде потрібно в майбутньому для більш типізованих методів
+ModelType = TypeVar("ModelType")
 
-# Generic type for the repository, if we were to use one.
-# RepositoryType = TypeVar("RepositoryType", bound=BaseRepository) # Placeholder
 
-class BaseService(Generic): # Add RepositoryType if using generic repository: class BaseService(Generic[RepositoryType]):
+# Генеричний тип для репозиторію, якщо використовується патерн "Репозиторій".
+# Наразі не використовується активно в сервісах, але залишено для можливого розширення.
+# from backend.app.src.repositories.base import BaseRepository # Приклад базового репозиторію
+# RepositoryType = TypeVar("RepositoryType", bound=BaseRepository)
+
+class BaseService(Generic[ModelType]):  # Прибрано RepositoryType, оскільки не використовується
     """
-    Base class for all services.
-    Provides common functionalities and dependencies for service classes,
-    such as a database session.
+    Базовий клас для всіх сервісів.
+    Надає спільні функціональні можливості та залежності для класів сервісів,
+    такі як сесія бази даних.
 
-    Services are responsible for encapsulating business logic and coordinating
-    data access through repositories (if the repository pattern is used) or directly
-    via ORM/database sessions.
+    Сервіси відповідають за інкапсуляцію бізнес-логіки та координацію
+    доступу до даних через репозиторії (якщо використовується патерн "Репозиторій")
+    або безпосередньо через ORM/сесії бази даних.
 
-    Attributes:
-        db_session (AsyncSession): The SQLAlchemy asynchronous database session.
-        # repo (RepositoryType): An instance of a repository specific to the service's domain.
-                                 # This is commented out as per the decision to start with just the session.
+    Атрибути:
+        db_session (AsyncSession): Асинхронна сесія бази даних SQLAlchemy.
     """
 
-    def __init__(self, db_session: AsyncSession): # Add repo: RepositoryType = None if using generic repo
+    def __init__(self, db_session: AsyncSession):
         """
-        Initializes the BaseService with a database session.
+        Ініціалізує BaseService з сесією бази даних.
 
-        Args:
-            db_session (AsyncSession): The SQLAlchemy asynchronous database session
-                                       to be used for database operations.
-            # repo (RepositoryType, optional): An instance of a repository.
-            #                                 Defaults to None. If provided, it will be used
-            #                                 for data access.
+        :param db_session: Асинхронна сесія бази даних SQLAlchemy,
+                           яка буде використовуватися для операцій з базою даних.
+        :raises ValueError: Якщо db_session не надано (None).
         """
         if db_session is None:
-            # This check is crucial. Services should not operate without a db session.
-            logger.error("BaseService initialized without a database session. This is not allowed.")
-            raise ValueError("Database session cannot be None for BaseService.")
+            # Ця перевірка є критично важливою. Сервіси не повинні працювати без сесії БД.
+            # i18n
+            msg = "Сесія бази даних не може бути None для BaseService."
+            logger.error(f"BaseService ініціалізовано без сесії бази даних. {msg}")
+            raise ValueError(msg)
 
         self.db_session: AsyncSession = db_session
-        # self.repo: Optional[RepositoryType] = repo # Uncomment if repository is used
 
         logger.debug(
-            f"{self.__class__.__name__} initialized with DB session ID: {id(db_session)}"
-            # Add {f"and repository: {type(repo).__name__}" if repo else ''} if repo is used
+            f"{self.__class__.__name__} ініціалізовано з ID сесії БД: {id(db_session)}"
         )
 
     async def commit(self) -> None:
         """
-        Commits the current database session.
-        Logs the action and handles potential exceptions during commit.
+        Здійснює коміт поточної сесії бази даних.
+        Логує дію та обробляє потенційні винятки під час коміту.
+        У разі помилки коміту, намагається виконати відкат.
         """
         try:
             await self.db_session.commit()
-            logger.info(f"Database session {id(self.db_session)} committed successfully by {self.__class__.__name__}.")
+            logger.info(f"Сесію бази даних {id(self.db_session)} успішно закомічено класом {self.__class__.__name__}.")
         except Exception as e:
-            logger.error(f"Error committing database session {id(self.db_session)} in {self.__class__.__name__}: {e}", exc_info=True)
-            # Depending on error handling strategy, you might want to rollback here or raise the exception.
-            # For now, just logging and re-raising to let the caller handle it or global exception handlers.
-            await self.rollback() # Attempt a rollback on commit error
+            logger.error(f"Помилка коміту сесії бази даних {id(self.db_session)} в {self.__class__.__name__}: {e}",
+                         exc_info=settings.DEBUG)
+            # Залежно від стратегії обробки помилок, тут можна або відкотити, або передати виняток далі.
+            # Наразі логуємо, намагаємося відкотити та передаємо виняток далі.
+            await self.rollback()
             raise
 
     async def rollback(self) -> None:
         """
-        Rolls back the current database session.
-        Logs the action and handles potential exceptions during rollback.
+        Здійснює відкат поточної сесії бази даних.
+        Логує дію та обробляє потенційні винятки під час відкату.
         """
         try:
             await self.db_session.rollback()
-            logger.warning(f"Database session {id(self.db_session)} rolled back by {self.__class__.__name__}.")
+            logger.warning(f"Сесію бази даних {id(self.db_session)} відкочено класом {self.__class__.__name__}.")
         except Exception as e:
-            logger.error(f"Error rolling back database session {id(self.db_session)} in {self.__class__.__name__}: {e}", exc_info=True)
-            # If rollback fails, the session might be in an inconsistent state.
-            # This is a critical error.
+            logger.error(f"Помилка відкату сесії бази даних {id(self.db_session)} в {self.__class__.__name__}: {e}",
+                         exc_info=settings.DEBUG)
+            # Якщо відкат не вдався, сесія може бути в неузгодженому стані.
+            # Це критична помилка.
             raise
 
-    # Example of a common utility method that might be useful in services
-    # async def get_object_or_none(self, model_cls, object_id: UUID) -> Optional[Any]:
-    #     """
-    #     Fetches an object by its ID, returning None if not found.
-    #     This would typically use self.repo if repository pattern is active,
-    #     or self.db_session directly with SQLAlchemy queries.
-    #     """
-    #     logger.debug(f"Attempting to fetch {model_cls.__name__} with ID: {object_id}")
-    #     # Example with direct session usage (replace with actual query)
-    #     # from sqlalchemy.future import select
-    #     # stmt = select(model_cls).where(model_cls.id == object_id)
-    #     # result = await self.db_session.execute(stmt)
-    #     # instance = result.scalar_one_or_none()
-    #     # if instance:
-    #     #     logger.info(f"Found {model_cls.__name__} with ID: {object_id}")
-    #     # else:
-    #     #     logger.info(f"{model_cls.__name__} with ID: {object_id} not found.")
-    #     # return instance
-    #     pass # Placeholder
+    async def get_object_or_none(self, model_cls: Type[ModelType], object_id: UUID) -> Optional[ModelType]:
+        """
+        Допоміжний метод: отримує об'єкт за його ID, повертає None, якщо не знайдено.
+        Використовує self.db_session для прямого запиту через SQLAlchemy.
 
-logger.info("BaseService class defined successfully.")
+        :param model_cls: Клас моделі SQLAlchemy для запиту.
+        :param object_id: UUID об'єкта для пошуку.
+        :return: Екземпляр моделі або None.
+        """
+        logger.debug(f"Спроба отримання {model_cls.__name__} з ID: {object_id}")
 
-# Example of how a specific service would inherit from BaseService:
-#
-# from app.src.models.user import User # Assuming a User model
-# from app.src.repositories.user_repository import UserRepository # Assuming a UserRepository
-#
-# class UserService(BaseService[UserRepository]):
-#     def __init__(self, db_session: AsyncSession, user_repo: UserRepository):
-#         super().__init__(db_session, repo=user_repo)
-#         logger.info("UserService initialized.")
-#
-#     async def get_user_by_id(self, user_id: UUID) -> Optional[User]:
-#         """Get a user by their ID."""
-#         return await self.repo.get_by_id(user_id)
-#
-#     # ... other user-specific service methods ...
+        # Припускаємо, що модель має атрибут 'id'
+        if not hasattr(model_cls, 'id'):
+            logger.error(f"Модель {model_cls.__name__} не має атрибута 'id'. Неможливо виконати get_object_or_none.")
+            return None  # Або кинути AttributeError
+
+        stmt = select(model_cls).where(getattr(model_cls, 'id') == object_id)
+        result = await self.db_session.execute(stmt)
+        instance = result.scalar_one_or_none()
+
+        if instance:
+            logger.debug(f"Знайдено {model_cls.__name__} з ID: {object_id}")
+        else:
+            logger.debug(f"{model_cls.__name__} з ID: {object_id} не знайдено.")
+        return instance
+
+
+logger.info("BaseService (базовий клас сервісів) успішно визначено.")

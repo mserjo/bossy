@@ -1,209 +1,233 @@
 # backend/app/src/services/tasks/review.py
-import logging
+# import logging # Замінено на централізований логер
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
-from app.src.services.base import BaseService
-from app.src.models.tasks.review import TaskReview # SQLAlchemy TaskReview model
-from app.src.models.tasks.task import Task # For task context
-# from app.src.models.tasks.event import Event # If reviews can be for events too
-from app.src.models.auth.user import User # For user context (reviewer)
-from app.src.models.tasks.completion import TaskCompletion # Reviews might be linked to a specific completion
+# Повні шляхи імпорту
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.tasks.review import TaskReview  # Модель SQLAlchemy TaskReview
+from backend.app.src.models.tasks.task import Task  # Для контексту завдання
+# from backend.app.src.models.tasks.event import Event # Якщо відгуки можуть бути і для подій
+from backend.app.src.models.auth.user import User  # Для контексту користувача (рецензента)
+from backend.app.src.models.tasks.completion import \
+    TaskCompletion  # Відгуки можуть бути пов'язані з конкретним виконанням
 
-from app.src.schemas.tasks.review import ( # Pydantic Schemas
+from backend.app.src.schemas.tasks.review import (  # Схеми Pydantic
     TaskReviewCreate,
     TaskReviewUpdate,
     TaskReviewResponse
 )
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
 
 class TaskReviewService(BaseService):
     """
-    Service for managing user reviews and ratings on tasks (or events).
-    Handles creation, retrieval, update, and deletion of reviews.
+    Сервіс для управління відгуками та оцінками користувачів щодо завдань (або подій).
+    Обробляє створення, отримання, оновлення та видалення відгуків.
     """
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        logger.info("TaskReviewService initialized.")
+        logger.info("TaskReviewService ініціалізовано.")
+
+    async def _get_orm_review_with_relations(self, review_id: UUID) -> Optional[TaskReview]:
+        """Внутрішній метод для отримання ORM моделі TaskReview з усіма зв'язками."""
+        stmt = select(TaskReview).options(
+            selectinload(TaskReview.reviewer_user).options(selectinload(User.user_type)),
+            selectinload(TaskReview.task).options(
+                selectinload(Task.task_type), selectinload(Task.status), selectinload(Task.group)
+            ),
+            selectinload(TaskReview.completion).options(  # Якщо відгук пов'язаний з виконанням
+                selectinload(TaskCompletion.user).options(selectinload(User.user_type))  # Користувач, що виконав
+            )
+        ).where(TaskReview.id == review_id)
+        return (await self.db_session.execute(stmt)).scalar_one_or_none()
 
     async def create_task_review(
-        self,
-        task_id: UUID,
-        reviewer_user_id: UUID,
-        review_data: TaskReviewCreate,
-        completion_id: Optional[UUID] = None
+            self,
+            task_id: UUID,
+            reviewer_user_id: UUID,
+            review_data: TaskReviewCreate,
+            completion_id: Optional[UUID] = None  # Опціонально, якщо відгук стосується конкретного виконання
     ) -> TaskReviewResponse:
-        logger.debug(f"User ID '{reviewer_user_id}' attempting to create review for task ID '{task_id}'.")
+        """
+        Створює новий відгук для завдання.
 
-        task = await self.db_session.get(Task, task_id)
-        if not task: raise ValueError(f"Task with ID '{task_id}' not found.")
+        :param task_id: ID завдання, для якого створюється відгук.
+        :param reviewer_user_id: ID користувача, який залишає відгук.
+        :param review_data: Дані для створення відгуку (оцінка, коментар).
+        :param completion_id: Опціональний ID виконання завдання, до якого відноситься відгук.
+        :return: Pydantic схема TaskReviewResponse створеного відгуку.
+        :raises ValueError: Якщо завдання, рецензента або виконання не знайдено, або якщо користувач вже залишив відгук (якщо це заборонено). # i18n
+        """
+        logger.debug(f"Користувач ID '{reviewer_user_id}' намагається створити відгук для завдання ID '{task_id}'.")
 
-        reviewer = await self.db_session.get(User, reviewer_user_id)
-        if not reviewer: raise ValueError(f"Reviewer user with ID '{reviewer_user_id}' not found.")
+        if not await self.db_session.get(Task, task_id):
+            raise ValueError(f"Завдання з ID '{task_id}' не знайдено.")  # i18n
+        if not await self.db_session.get(User, reviewer_user_id):
+            raise ValueError(f"Рецензента з ID '{reviewer_user_id}' не знайдено.")  # i18n
 
         if completion_id:
             completion = await self.db_session.get(TaskCompletion, completion_id)
-            if not completion: raise ValueError(f"TaskCompletion with ID '{completion_id}' not found.")
-            # Ensure completion matches task and potentially reviewer, depending on rules
+            if not completion:
+                raise ValueError(f"Виконання завдання з ID '{completion_id}' не знайдено.")  # i18n
             if completion.task_id != task_id:
-                 raise ValueError(f"Completion ID '{completion_id}' does not belong to task ID '{task_id}'.")
-            # Example rule: if review is for a completion, only the completer can "self-review" or it's a peer review.
-            # if completion.user_id != reviewer_user_id: # This rule depends on the system's design for reviews.
-            #     logger.warning(f"Reviewer {reviewer_user_id} is not the completer {completion.user_id} for this completion-linked review.")
-            #     # This might be allowed or disallowed based on business logic. For now, allowing.
+                # i18n
+                raise ValueError(f"Виконання ID '{completion_id}' не належить завданню ID '{task_id}'.")
+            # TODO: Уточнити бізнес-правила: чи може користувач залишати відгук на власне виконання?
+            #  Чи може залишати відгук тільки той, хто перевіряв (reviewed_by_user_id з TaskCompletion)?
+            #  Поточна логіка дозволяє будь-кому (reviewer_user_id) залишити відгук на будь-яке completion_id.
 
-        # Business Logic: Check if user has already reviewed this task/completion (if one review per user)
-        # existing_review_stmt = select(TaskReview.id).where( # Select only ID for existence check
+        # TODO: Реалізувати політику "один відгук на користувача" (на завдання або на виконання).
+        #  Якщо відгук один на завдання від користувача:
+        # existing_review_stmt = select(TaskReview.id).where(
         #     TaskReview.task_id == task_id,
         #     TaskReview.reviewer_user_id == reviewer_user_id
         # )
-        # if completion_id: # If review is per completion
+        #  Якщо відгук один на конкретне виконання від користувача:
+        # if completion_id:
         #     existing_review_stmt = existing_review_stmt.where(TaskReview.completion_id == completion_id)
+        # else: # Якщо відгук на завдання в цілому, а не на виконання, і completion_id не надано
+        #     existing_review_stmt = existing_review_stmt.where(TaskReview.completion_id.is_(None))
 
         # if (await self.db_session.execute(existing_review_stmt)).scalar_one_or_none():
-        #     # Customize error based on whether it's per task or per completion
-        #     context_msg = f"completion ID '{completion_id}'" if completion_id else f"task ID '{task_id}'"
-        #     raise ValueError(f"User ID '{reviewer_user_id}' has already reviewed {context_msg}.")
-
-
-        review_db_data = review_data.dict()
+        #     context_msg = f"виконання ID '{completion_id}'" if completion_id else f"завдання ID '{task_id}'" # i18n
+        #     raise ValueError(f"Користувач ID '{reviewer_user_id}' вже залишив відгук для {context_msg}.") # i18n
 
         new_review_db = TaskReview(
+            **review_data.model_dump(),  # Pydantic v2
             task_id=task_id,
             reviewer_user_id=reviewer_user_id,
-            completion_id=completion_id,
-            **review_db_data
+            completion_id=completion_id
+            # `created_at`, `updated_at` встановлюються автоматично моделлю
         )
-
         self.db_session.add(new_review_db)
         try:
             await self.commit()
-            await self.db_session.refresh(new_review_db, attribute_names=['reviewer', 'task', 'completion'])
+            refreshed_review = await self._get_orm_review_with_relations(new_review_db.id)
+            if not refreshed_review: raise RuntimeError("Не вдалося отримати створений відгук.")  # i18n
         except IntegrityError as e:
             await self.rollback()
-            logger.error(f"Integrity error creating review for task ID '{task_id}': {e}", exc_info=True)
-            raise ValueError(f"Could not create review due to a data conflict: {e}")
+            logger.error(f"Помилка цілісності при створенні відгуку для завдання ID '{task_id}': {e}",
+                         exc_info=global_settings.DEBUG)
+            # i18n
+            raise ValueError(f"Не вдалося створити відгук через конфлікт даних: {e}")
 
-        logger.info(f"Review created successfully (ID: {new_review_db.id}) for task ID '{task_id}' by user ID '{reviewer_user_id}'.")
-        # return TaskReviewResponse.model_validate(new_review_db) # Pydantic v2
-        return TaskReviewResponse.from_orm(new_review_db) # Pydantic v1
+        logger.info(
+            f"Відгук ID: {refreshed_review.id} успішно створено для завдання ID '{task_id}' користувачем ID '{reviewer_user_id}'.")
+        return TaskReviewResponse.model_validate(refreshed_review)  # Pydantic v2
 
     async def get_review_by_id(self, review_id: UUID) -> Optional[TaskReviewResponse]:
-        logger.debug(f"Attempting to retrieve task review by ID: {review_id}")
-
-        stmt = select(TaskReview).options(
-            selectinload(TaskReview.reviewer).options(selectinload(User.user_type)),
-            selectinload(TaskReview.task),
-            selectinload(TaskReview.completion)
-        ).where(TaskReview.id == review_id)
-
-        review_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
-
+        """Отримує відгук за його ID."""
+        logger.debug(f"Спроба отримання відгуку на завдання за ID: {review_id}")
+        review_db = await self._get_orm_review_with_relations(review_id)
         if review_db:
-            logger.info(f"Task review with ID '{review_id}' found.")
-            # return TaskReviewResponse.model_validate(review_db) # Pydantic v2
-            return TaskReviewResponse.from_orm(review_db) # Pydantic v1
-
-        logger.info(f"Task review with ID '{review_id}' not found.")
+            logger.info(f"Відгук на завдання з ID '{review_id}' знайдено.")
+            return TaskReviewResponse.model_validate(review_db)  # Pydantic v2
+        logger.info(f"Відгук на завдання з ID '{review_id}' не знайдено.")
         return None
 
     async def update_task_review(
-        self,
-        review_id: UUID,
-        review_update_data: TaskReviewUpdate,
-        current_user_id: UUID
+            self, review_id: UUID, review_update_data: TaskReviewUpdate, current_user_id: UUID
     ) -> Optional[TaskReviewResponse]:
-        logger.debug(f"User ID '{current_user_id}' attempting to update task review ID: {review_id}")
+        """
+        Оновлює існуючий відгук на завдання.
+        Дозволяє оновлювати тільки власні відгуки (якщо не адмін/суперюзер).
+        """
+        logger.debug(f"Користувач ID '{current_user_id}' намагається оновити відгук ID: {review_id}")
 
-        # Load reviewer relationship for permission check
-        review_db = await self.db_session.get(TaskReview, review_id, options=[selectinload(TaskReview.reviewer)])
-
-
+        review_db = await self.db_session.get(TaskReview,
+                                              review_id)  # Не завантажуємо зв'язки для простої перевірки власника
         if not review_db:
-            logger.warning(f"Task review ID '{review_id}' not found for update.")
+            logger.warning(f"Відгук ID '{review_id}' не знайдено для оновлення.")
             return None
 
+        # TODO: Додати перевірку прав адміністратора/суперкористувача для оновлення чужих відгуків.
         if review_db.reviewer_user_id != current_user_id:
-            logger.error(f"User ID '{current_user_id}' is not authorized to update review ID '{review_id}' (owner: {review_db.reviewer_user_id}).")
-            raise ValueError("You are not authorized to update this review.")
+            logger.error(
+                f"Користувач ID '{current_user_id}' не авторизований для оновлення відгуку ID '{review_id}' (власник: {review_db.reviewer_user_id}).")
+            # i18n
+            raise PermissionError("Ви не маєте дозволу на оновлення цього відгуку.")
 
-        update_data = review_update_data.dict(exclude_unset=True)
-
+        update_data = review_update_data.model_dump(exclude_unset=True)  # Pydantic v2
         for field, value in update_data.items():
-            if hasattr(review_db, field):
-                setattr(review_db, field, value)
-            else:
-                logger.warning(f"Field '{field}' not found on TaskReview model for update of review ID '{review_id}'.")
+            setattr(review_db, field, value)
 
-        if hasattr(review_db, 'updated_at'): # Check if model has updated_at
-             review_db.updated_at = datetime.now(timezone.utc)
+        review_db.updated_at = datetime.now(timezone.utc)  # Явне оновлення
 
         self.db_session.add(review_db)
         await self.commit()
-        # Refresh all relevant fields for the response
-        await self.db_session.refresh(review_db, attribute_names=['reviewer', 'task', 'completion'])
 
-        logger.info(f"Task review ID '{review_id}' updated successfully by user ID '{current_user_id}'.")
-        # return TaskReviewResponse.model_validate(review_db) # Pydantic v2
-        return TaskReviewResponse.from_orm(review_db) # Pydantic v1
+        # Отримуємо оновлений запис з усіма зв'язками для відповіді
+        updated_review = await self._get_orm_review_with_relations(review_id)
+        if not updated_review: raise RuntimeError("Не вдалося отримати оновлений відгук.")  # i18n
+
+        logger.info(f"Відгук ID '{review_id}' успішно оновлено користувачем ID '{current_user_id}'.")
+        return TaskReviewResponse.model_validate(updated_review)  # Pydantic v2
 
     async def delete_task_review(self, review_id: UUID, current_user_id: UUID) -> bool:
-        logger.debug(f"User ID '{current_user_id}' attempting to delete task review ID: {review_id}")
+        """
+        Видаляє відгук на завдання.
+        Дозволяє видаляти тільки власні відгуки (якщо не адмін/суперюзер).
+        """
+        logger.debug(f"Користувач ID '{current_user_id}' намагається видалити відгук ID: {review_id}")
 
         review_db = await self.db_session.get(TaskReview, review_id)
         if not review_db:
-            logger.warning(f"Task review ID '{review_id}' not found for deletion.")
+            logger.warning(f"Відгук ID '{review_id}' не знайдено для видалення.")
             return False
 
-        # Simplified permission: only owner can delete. Admin/moderator logic would be more complex.
+        # TODO: Додати перевірку прав адміністратора/суперкористувача для видалення чужих відгуків.
         if review_db.reviewer_user_id != current_user_id:
-             logger.warning(f"User ID '{current_user_id}' is not the owner of review ID '{review_id}'. Deletion denied.")
-             raise ValueError("You can only delete your own reviews.")
+            logger.warning(
+                f"Користувач ID '{current_user_id}' не є власником відгуку ID '{review_id}'. Видалення заборонено.")
+            # i18n
+            raise PermissionError("Ви можете видаляти тільки власні відгуки.")
 
         await self.db_session.delete(review_db)
         await self.commit()
-        logger.info(f"Task review ID '{review_id}' deleted successfully by user ID '{current_user_id}'.")
+        logger.info(f"Відгук ID '{review_id}' успішно видалено користувачем ID '{current_user_id}'.")
         return True
 
     async def list_reviews_for_task(self, task_id: UUID, skip: int = 0, limit: int = 100) -> List[TaskReviewResponse]:
-        logger.debug(f"Listing reviews for task ID: {task_id}, skip={skip}, limit={limit}")
+        """Перелічує всі відгуки для конкретного завдання."""
+        logger.debug(f"Перелік відгуків для завдання ID: {task_id}, пропустити={skip}, ліміт={limit}")
 
         stmt = select(TaskReview).options(
-            selectinload(TaskReview.reviewer).options(selectinload(User.user_type)),
-            selectinload(TaskReview.task),
-            selectinload(TaskReview.completion)
+            selectinload(TaskReview.reviewer_user).options(selectinload(User.user_type)),
+            selectinload(TaskReview.task).options(noload("*")),  # Завдання вже відоме
+            selectinload(TaskReview.completion)  # Опціонально, може бути None
         ).where(TaskReview.task_id == task_id).order_by(TaskReview.created_at.desc()).offset(skip).limit(limit)
 
         reviews_db = (await self.db_session.execute(stmt)).scalars().unique().all()
 
-        # response_list = [TaskReviewResponse.model_validate(r) for r in reviews_db] # Pydantic v2
-        response_list = [TaskReviewResponse.from_orm(r) for r in reviews_db] # Pydantic v1
-        logger.info(f"Retrieved {len(response_list)} reviews for task ID '{task_id}'.")
+        response_list = [TaskReviewResponse.model_validate(r) for r in reviews_db]  # Pydantic v2
+        logger.info(f"Отримано {len(response_list)} відгуків для завдання ID '{task_id}'.")
         return response_list
 
-    async def list_reviews_by_user(self, reviewer_user_id: UUID, skip: int = 0, limit: int = 100) -> List[TaskReviewResponse]:
-        logger.debug(f"Listing reviews by user ID: {reviewer_user_id}, skip={skip}, limit={limit}")
+    async def list_reviews_by_user(self, reviewer_user_id: UUID, skip: int = 0, limit: int = 100) -> List[
+        TaskReviewResponse]:
+        """Перелічує всі відгуки, залишені конкретним користувачем."""
+        logger.debug(f"Перелік відгуків користувачем ID: {reviewer_user_id}, пропустити={skip}, ліміт={limit}")
 
         stmt = select(TaskReview).options(
-            selectinload(TaskReview.reviewer).options(selectinload(User.user_type)),
-            selectinload(TaskReview.task).options(selectinload(Task.task_type)),
+            selectinload(TaskReview.reviewer_user).options(noload("*")),  # Рецензент вже відомий
+            selectinload(TaskReview.task).options(selectinload(Task.task_type), selectinload(Task.group)),
             selectinload(TaskReview.completion)
-        ).where(TaskReview.reviewer_user_id == reviewer_user_id).order_by(TaskReview.created_at.desc()).offset(skip).limit(limit)
+        ).where(TaskReview.reviewer_user_id == reviewer_user_id).order_by(TaskReview.created_at.desc()).offset(
+            skip).limit(limit)
 
         reviews_db = (await self.db_session.execute(stmt)).scalars().unique().all()
-
-        # response_list = [TaskReviewResponse.model_validate(r) for r in reviews_db] # Pydantic v2
-        response_list = [TaskReviewResponse.from_orm(r) for r in reviews_db] # Pydantic v1
-        logger.info(f"Retrieved {len(response_list)} reviews by user ID '{reviewer_user_id}'.")
+        response_list = [TaskReviewResponse.model_validate(r) for r in reviews_db]  # Pydantic v2
+        logger.info(f"Отримано {len(response_list)} відгуків користувачем ID '{reviewer_user_id}'.")
         return response_list
 
-logger.info("TaskReviewService class defined.")
+
+logger.debug(f"{TaskReviewService.__name__} (сервіс відгуків на завдання) успішно визначено.")

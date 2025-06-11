@@ -1,118 +1,191 @@
 # backend/scripts/run_server.py
+# -*- coding: utf-8 -*-
+"""
+Скрипт для запуску FastAPI додатку за допомогою Uvicorn.
+
+Цей скрипт надає зручний спосіб запуску Uvicorn сервера з різними
+конфігураціями через аргументи командного рядка або змінні середовища.
+Він дозволяє налаштовувати хост, порт, кількість робочих процесів,
+режим автоматичного перезавантаження та рівень логування.
+"""
 import uvicorn
 import argparse
 import os
-import logging
+import logging  # Стандартний модуль логування
 import sys
+from typing import List  # Для типізації
 
-# Налаштування базового логування для скрипта
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
+# --- Налаштування шляхів ---
+# Додаємо директорію 'backend' до sys.path, щоб uvicorn.run міг знайти модуль додатку.
+SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
+BACKEND_DIR = os.path.dirname(SCRIPT_DIR)  # Директорія 'backend/'
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
+
+# --- Налаштування логування ---
+try:
+    from backend.app.src.config.logging import logger
+
+    logger.info("Використовується логер додатку для скрипта run_server.")  # i18n
+except ImportError:
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger(__name__)
+    logger.info("Логер додатку не знайдено, використовується базовий логер для run_server.")  # i18n
+
+if BACKEND_DIR not in sys.path:  # Це повідомлення тепер буде виведено через налаштований логер
+    logger.info(f"Додано '{BACKEND_DIR}' до sys.path для запуску Uvicorn.")  # i18n
+
+
+# Базова функція-заглушка для інтернаціоналізації рядків
+def _(text: str) -> str:
+    return text
+
 
 def main():
     """
     Головна функція для запуску Uvicorn сервера.
-    Розбирає аргументи командного рядка для налаштування хоста, порту та режиму перезавантаження.
+    Розбирає аргументи командного рядка для налаштування хоста, порту,
+    кількості робітників, режиму перезавантаження та рівня логування.
     """
-    parser = argparse.ArgumentParser(description="Скрипт для запуску FastAPI додатку за допомогою Uvicorn.")
+    # i18n: Argparse description for the script
+    parser = argparse.ArgumentParser(description=_("Скрипт для запуску FastAPI додатку за допомогою Uvicorn."))
 
+    # Визначення значень за замовчуванням з змінних середовища
     default_host = os.getenv("UVICORN_HOST", "127.0.0.1")
     default_port = int(os.getenv("UVICORN_PORT", "8000"))
-    env_reload = os.getenv("UVICORN_RELOAD", "False").lower() in ('true', '1', 't')
+    # Визначаємо значення reload з UVICORN_RELOAD, але дозволяємо --reload/--no-reload його перекрити
+    env_reload_str = os.getenv("UVICORN_RELOAD", "False").lower()
+    initial_reload_default = env_reload_str in ('true', '1', 't', 'yes', 'on')
+
     default_workers = int(os.getenv("UVICORN_WORKERS", "1"))
     default_log_level = os.getenv("UVICORN_LOG_LEVEL", "info").lower()
+    # Шлях до головного файлу додатка FastAPI відносно директорії `backend/`
+    default_app_module = os.getenv("APP_MODULE", "app.main:app")
 
     parser.add_argument(
-        "--host",
-        type=str,
-        default=default_host,
-        help=f"Хост, на якому буде запущено сервер (за замовчуванням: {default_host} або UVICORN_HOST)"
+        "--host", type=str, default=default_host,
+        # i18n: Argparse help for --host
+        help=_("Хост, на якому буде запущено сервер (за замовчуванням: {default} або з UVICORN_HOST).").format(
+            default=default_host)
     )
     parser.add_argument(
-        "--port",
-        type=int,
-        default=default_port,
-        help=f"Порт, на якому буде запущено сервер (за замовчуванням: {default_port} або UVICORN_PORT)"
+        "--port", type=int, default=default_port,
+        # i18n: Argparse help for --port
+        help=_("Порт, на якому буде запущено сервер (за замовчуванням: {default} або з UVICORN_PORT).").format(
+            default=default_port)
     )
-    parser.add_argument(
-        "--reload",
-        action="store_true",
-        help=f"Увімкнути режим автоматичного перезавантаження Uvicorn (для розробки). Перевизначає UVICORN_RELOAD. За замовчуванням активовано, якщо UVICORN_RELOAD встановлено в true."
+
+    # Група для керування --reload, щоб --reload та --no-reload були взаємовиключними
+    reload_group = parser.add_mutually_exclusive_group()
+    reload_group.add_argument(
+        "--reload", action="store_true", dest="reload_explicitly_set", default=None,
+        # i18n: Argparse help for --reload
+        help=_("Увімкнути режим автоматичного перезавантаження Uvicorn (для розробки). Перевизначає UVICORN_RELOAD.")
     )
-    parser.add_argument(
-        "--no-reload",
-        action="store_false",
-        dest="reload",
-        help="Явно вимкнути режим автоматичного перезавантаження. Має вищий пріоритет ніж --reload або UVICORN_RELOAD."
+    reload_group.add_argument(
+        "--no-reload", action="store_false", dest="reload_explicitly_set",
+        # i18n: Argparse help for --no-reload
+        help=_(
+            "Явно вимкнути режим автоматичного перезавантаження. Має вищий пріоритет ніж --reload або UVICORN_RELOAD.")
     )
-    parser.set_defaults(reload=env_reload)
 
     parser.add_argument(
-        "--workers",
-        type=int,
-        default=default_workers,
-        help=f"Кількість робочих процесів Uvicorn (за замовчуванням: {default_workers} або UVICORN_WORKERS)"
+        "--workers", type=int, default=default_workers,
+        # i18n: Argparse help for --workers
+        help=_("Кількість робочих процесів Uvicorn (за замовчуванням: {default} або з UVICORN_WORKERS).").format(
+            default=default_workers)
     )
     parser.add_argument(
-        "--log-level",
-        type=str,
-        default=default_log_level,
+        "--log-level", type=str, default=default_log_level,
         choices=['critical', 'error', 'warning', 'info', 'debug', 'trace'],
-        help=f"Рівень логування Uvicorn (за замовчуванням: {default_log_level} або UVICORN_LOG_LEVEL)"
+        # i18n: Argparse help for --log-level
+        help=_("Рівень логування Uvicorn (за замовчуванням: {default} або з UVICORN_LOG_LEVEL).").format(
+            default=default_log_level)
     )
     parser.add_argument(
-        "--app",
-        type=str,
-        default=os.getenv("APP_MODULE", "app.main:app"),
-        help="Рядок для імпорту FastAPI додатку (наприклад, 'app.main:app'). За замовчуванням: APP_MODULE або 'app.main:app'"
+        "--app", type=str, default=default_app_module,
+        # i18n: Argparse help for --app
+        help=_(
+            "Рядок для імпорту FastAPI додатку (наприклад, 'app.main:app', відносно директорії 'backend/'). За замовчуванням: APP_MODULE або '{default}'.").format(
+            default=default_app_module)
     )
 
     args = parser.parse_args()
 
-    logger.info(f"Запуск Uvicorn сервера для додатку: {args.app}")
-    logger.info(f"Хост: {args.host}")
-    logger.info(f"Порт: {args.port}")
-    logger.info(f"Режим перезавантаження: {'Увімкнено' if args.reload else 'Вимкнено'}")
-    logger.info(f"Кількість робітників: {args.workers}")
-    logger.info(f"Рівень логування: {args.log_level}")
+    # Визначення фінального значення для reload
+    if args.reload_explicitly_set is not None:  # Якщо --reload або --no-reload було вказано
+        final_reload_enabled = args.reload_explicitly_set
+    else:  # Інакше беремо з env (або False, якщо env не було)
+        final_reload_enabled = initial_reload_default
+
+    # i18n: Log message - Starting Uvicorn server for app
+    logger.info(_("Запуск Uvicorn сервера для додатку: {app_module}").format(app_module=args.app))
+    logger.info(_("Хост: {host}").format(host=args.host))  # i18n
+    logger.info(_("Порт: {port}").format(port=args.port))  # i18n
+    logger.info(_("Режим перезавантаження: {status}").format(
+        status=_("Увімкнено") if final_reload_enabled else _("Вимкнено")))  # i18n
+    logger.info(_("Кількість робітників: {workers}").format(workers=args.workers))  # i18n
+    logger.info(_("Рівень логування Uvicorn: {log_level}").format(log_level=args.log_level))  # i18n
 
     if not args.app:
-        logger.error("Не вказано FastAPI додаток для запуску. Використайте --app або встановіть APP_MODULE.")
-        return
+        # i18n: Error message - FastAPI app module not specified
+        logger.error(
+            _("Не вказано FastAPI додаток для запуску. Використайте --app або встановіть змінну середовища APP_MODULE."))
+        sys.exit(1)  # Вихід з помилкою
 
     workers_to_run = args.workers
-    if args.reload and args.workers > 1:
-        logger.warning("Режим перезавантаження (--reload) несумісний з кількістю робітників > 1. Встановлено кількість робітників = 1.")
+    if final_reload_enabled and args.workers > 1:
+        # i18n: Warning message - Reload mode incompatible with multiple workers
+        logger.warning(
+            _("Режим перезавантаження (--reload) несумісний з кількістю робітників > 1. Кількість робітників буде встановлено в 1."))
         workers_to_run = 1
 
-    # Щоб uvicorn.run знайшов 'app.main:app', зазвичай цей скрипт має запускатися
-    # з директорії `backend/` (тобто `python scripts/run_server.py`),
-    # або директорія `backend/` має бути в PYTHONPATH.
-    # Uvicorn CLI робить це автоматично, додаючи поточну директорію до sys.path.
-    # Для програмного виклику uvicorn.run, це може потребувати уваги.
-    # Однак, стандартна практика - запускати uvicorn з командного рядка з кореня проекту,
-    # де він може знайти `app`.
-    # Якщо PYTHONPATH налаштований правильно (наприклад, через poetry або venv активацію,
-    # що додає корінь проекту до шляху), то прямий виклик uvicorn.run також спрацює.
+    # Uvicorn використовує поточну робочу директорію для пошуку модуля додатку,
+    # якщо шлях до модуля не є абсолютним.
+    # Оскільки ми додали BACKEND_DIR до sys.path, uvicorn.run повинен знайти 'app.main:app'.
+    # Якщо запускати скрипт з директорії `backend/` (наприклад, `python scripts/run_server.py`),
+    # то `app.main:app` буде знайдено відносно `backend/`.
+    # Якщо запускати з кореня проекту (на один рівень вище `backend/`),
+    # то для uvicorn командного рядка потрібно було б вказати `backend.app.main:app`.
+    # Але оскільки `backend` додано в sys.path, `app.main:app` має працювати.
 
-    # Додамо корінь проекту (директорію backend) до sys.path, якщо скрипт запускається з backend/scripts
-    # Це допоможе uvicorn знайти модуль app.main:app
-    # Визначаємо шлях до директорії backend
-    current_script_path = os.path.dirname(os.path.abspath(__file__))
-    backend_dir = os.path.abspath(os.path.join(current_script_path, os.pardir))
+    try:
+        uvicorn.run(
+            args.app,  # Наприклад, "app.main:app"
+            host=args.host,
+            port=args.port,
+            reload=final_reload_enabled,
+            workers=workers_to_run,
+            log_level=args.log_level.lower()
+            # reload_dirs можна вказати, якщо стандартний механізм не відстежує всі потрібні зміни,
+            # наприклад, якщо конфігураційні файли поза стандартними шляхами Python.
+            # reload_dirs=[os.path.join(BACKEND_DIR, "app")]
+        )
+    except ImportError as e:
+        logger.error(
+            _("Помилка імпорту модуля додатку '{app_module}': {error}. Переконайтеся, що шлях правильний і всі залежності встановлено.").format(
+                app_module=args.app, error=e))  # i18n
+        logger.error(_("Поточний sys.path: {sys_path}").format(sys_path=sys.path))  # i18n
+        logger.error(_("Поточна робоча директорія: {cwd}").format(cwd=os.getcwd()))  # i18n
+        sys.exit(1)
+    except Exception as e:
+        logger.error(_("Неочікувана помилка при запуску Uvicorn: {error}").format(error=e), exc_info=True)  # i18n
+        sys.exit(1)
 
-    if backend_dir not in sys.path:
-        logger.info(f"Додавання {backend_dir} до sys.path для знаходження модуля додатку.")
-        sys.path.insert(0, backend_dir)
-
-    uvicorn.run(
-        args.app,
-        host=args.host,
-        port=args.port,
-        reload=args.reload,
-        workers=workers_to_run,
-        log_level=args.log_level.lower()
-    )
 
 if __name__ == "__main__":
+    # Приклади запуску:
+    # # Запуск з налаштуваннями за замовчуванням (з директорії backend/):
+    # python scripts/run_server.py
+    #
+    # # Запуск на іншому порту з увімкненим перезавантаженням (з директорії backend/):
+    # python scripts/run_server.py --port 8080 --reload
+    #
+    # # Запуск з іншим модулем додатку (якщо потрібно, з директорії backend/):
+    # python scripts/run_server.py --app custom_app.api:my_fastapi_instance
+    #
+    # # Запуск з кореня проекту (на один рівень вище backend/):
+    # # python backend/scripts/run_server.py --app backend.app.main:app (якщо APP_MODULE не налаштовано)
+    # # Або, якщо APP_MODULE="app.main:app", то `python backend/scripts/run_server.py` має працювати
+    # # завдяки додаванню `backend` до sys.path.
     main()

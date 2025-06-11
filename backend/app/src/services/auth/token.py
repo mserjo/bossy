@@ -1,214 +1,213 @@
 # backend/app/src/services/auth/token.py
-import logging
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any, List # Added List for scopes
+from typing import Optional, Dict, Any, List, Type
 from uuid import UUID, uuid4
 
-from jose import JWTError, jwt # python-jose for JWT handling
+from jose import JWTError, jwt  # python-jose для обробки JWT
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload # Added for process_refresh_token
+from sqlalchemy.orm import selectinload
 
-from app.src.services.base import BaseService # For potential DB interaction (e.g. refresh token storage)
-from app.src.config.settings import settings # To access JWT secret, algorithm, expiry times
-from app.src.schemas.auth.token import TokenResponse, RefreshTokenCreate, RefreshTokenResponse # Pydantic schemas
-from app.src.models.auth.token import RefreshToken # SQLAlchemy model for refresh tokens
-from app.src.models.auth.user import User # To link refresh token to user
-# from app.src.services.auth.user import UserService # Potential dependency, but avoid circular if possible
+# Виправлені повні шляхи імпорту
+from backend.app.src.services.base import BaseService
+from backend.app.src.config.settings import settings  # Доступ до секрету JWT, алгоритму, часу життя токенів
+from backend.app.src.schemas.auth.token import TokenResponse  # Pydantic схема для відповіді з токенами
+# TODO: (Залишено) Якщо RefreshTokenCreate та RefreshTokenResponse будуть використовуватися для сигнатур методів
+#  цього сервісу, розкоментувати та перевірити їх використання. Наразі вони більше стосуються шару API.
+# from backend.app.src.schemas.auth.token import RefreshTokenCreate, RefreshTokenResponse
+from backend.app.src.models.auth.token import RefreshToken  # Модель SQLAlchemy для refresh-токенів
+from backend.app.src.models.auth.user import User  # Модель SQLAlchemy для користувача
+from backend.app.src.config.logging import logger  # Використання централізованого логера
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
 
-class TokenService(BaseService): # Inherits BaseService for db_session if storing refresh tokens
+# from backend.app.src.core.exceptions import InvalidTokenTypeError # Має бути визначено в exceptions.py
+
+# Тимчасове визначення кастомної помилки. TODO: Перенести до backend/app/src/core/exceptions.py
+class InvalidTokenTypeError(ValueError):
+    """Кастомна помилка для невірного типу токена."""
+    pass
+
+
+class TokenService(BaseService):
     """
-    Service for handling JWT (access and refresh) token generation, validation,
-    and management of refresh tokens if stored in the database.
+    Сервіс для обробки JWT (access та refresh) токенів: генерація, валідація,
+    та управління refresh-токенами, якщо вони зберігаються в базі даних.
     """
 
-    def __init__(self, db_session: AsyncSession): # db_session needed for refresh token DB operations
+    def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        logger.info("TokenService initialized.")
+        logger.info("TokenService ініціалізовано.")
 
-    def create_access_token(self, subject: str, # Typically user ID or username
-                              expires_delta: Optional[timedelta] = None,
-                              scopes: Optional[List[str]] = None, # For role/permission based access
-                              additional_claims: Optional[Dict[str, Any]] = None
-                             ) -> str:
+    def create_access_token(self,
+                            subject: str,
+                            expires_delta: Optional[timedelta] = None,
+                            scopes: Optional[List[str]] = None,  # Фактично це дозволи (permissions)
+                            additional_claims: Optional[Dict[str, Any]] = None
+                            ) -> str:
         """
-        Generates a new JWT access token.
+        Генерує новий JWT access-токен.
 
-        Args:
-            subject (str): The subject of the token (e.g., user_id).
-            expires_delta (Optional[timedelta]): Lifetime of the token. Defaults to ACCESS_TOKEN_EXPIRE_MINUTES.
-            scopes (Optional[List[str]]): List of scopes (permissions/roles) for the token.
-            additional_claims (Optional[Dict[str, Any]]): Any other custom claims to include.
-
-        Returns:
-            str: The encoded JWT access token.
+        :param subject: Суб'єкт токена (наприклад, user_id).
+        :param expires_delta: Час життя токена. За замовчуванням ACCESS_TOKEN_EXPIRE_MINUTES.
+        :param scopes: Список дозволів (permissions) для токена.
+        :param additional_claims: Будь-які інші користувацькі заяви для включення в токен.
+        :return: Закодований JWT access-токен.
         """
         if expires_delta:
             expire = datetime.now(timezone.utc) + expires_delta
         else:
             expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
 
-        to_encode: Dict[str, Any] = {"exp": expire, "sub": str(subject), "type": "access"}
+        to_encode: Dict[str, Any] = {
+            "exp": expire,
+            "sub": str(subject),
+            "type": "access"
+        }
         if scopes:
-            to_encode["scopes"] = scopes
+            # Згідно technical_task.txt, назва поля для дозволів - "permissions"
+            to_encode["permissions"] = scopes
         if additional_claims:
             to_encode.update(additional_claims)
 
-        # Add 'jti' (JWT ID) claim for unique token identification, useful for revocation lists
-        to_encode["jti"] = str(uuid4())
+        jti_claim = str(uuid4())
+        to_encode["jti"] = jti_claim
 
         encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
-        logger.info(f"Access token created for subject '{subject}' with JTI '{to_encode['jti']}'. Expires at {expire.isoformat()}")
+        logger.info(
+            f"Access-токен створено для суб'єкта '{subject}' з JTI '{jti_claim}'. Термін дії: {expire.isoformat()}")
         return encoded_jwt
 
     async def create_refresh_token(
-        self,
-        user_id: UUID,
-        expires_delta: Optional[timedelta] = None,
-        device_info: Optional[str] = None # Optional: for tracking device associated with refresh token
-    ) -> str:
+            self,
+            user_id: UUID,
+            expires_delta: Optional[timedelta] = None,
+            device_info: Optional[str] = None,
+            ip_address: Optional[str] = None  # Додано згідно technical_task.txt
+    ) -> str:  # Повертає JTI як рядок
         """
-        Generates a new refresh token and stores its record in the database.
+        Генерує новий refresh-токен та зберігає його запис у базі даних.
 
-        Args:
-            user_id (UUID): The user ID for whom the refresh token is created.
-            expires_delta (Optional[timedelta]): Lifetime of the refresh token. Defaults to REFRESH_TOKEN_EXPIRE_DAYS.
-            device_info (Optional[str]): Information about the device using the refresh token.
-
-        Returns:
-            str: The refresh token string (this is the JTI, not a JWT itself for refresh usually).
-                 The actual JWT refresh token can also be generated if preferred.
-                 Here, we'll use a simple UUID as the refresh token value and store its metadata.
+        :param user_id: ID користувача.
+        :param expires_delta: Час життя refresh-токена.
+        :param device_info: Інформація про пристрій.
+        :param ip_address: IP-адреса, з якої видано токен.
+        :return: Рядок JTI refresh-токена.
+        :raises ValueError: Якщо користувача не знайдено. # i18n
         """
         if expires_delta:
             expire_at = datetime.now(timezone.utc) + expires_delta
         else:
             expire_at = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
 
-        # Generate a unique JTI (JWT ID) for this refresh token. This JTI will be the actual refresh token value.
         jti = uuid4()
 
-        # Check if user exists (optional, but good practice if user_id is passed directly)
         user_db = await self.db_session.get(User, user_id)
         if not user_db:
-            logger.error(f"User with ID '{user_id}' not found. Cannot create refresh token.")
-            raise ValueError(f"User with ID '{user_id}' not found.")
+            logger.error(f"Користувача з ID '{user_id}' не знайдено. Неможливо створити refresh-токен.")
+            raise ValueError(f"Користувача з ID '{user_id}' не знайдено.")  # i18n
 
         refresh_token_db = RefreshToken(
             jti=jti,
             user_id=user_id,
             expires_at=expire_at,
             is_revoked=False,
-            device_info=device_info
+            device_info=device_info,
+            ip_address=ip_address  # Додано поле
+            # `created_at` та `revoked_at` обробляються моделлю або при відповідних діях.
         )
 
         self.db_session.add(refresh_token_db)
-        await self.commit() # Commit to save the refresh token record
-        # await self.db_session.refresh(refresh_token_db) # Not strictly needed if not returning its DB fields
+        await self.commit()
 
-        logger.info(f"Refresh token (JTI: {jti}) created for user ID '{user_id}'. Expires at {expire_at.isoformat()}")
-        return str(jti) # Return the JTI string as the refresh token
-
+        logger.info(
+            f"Refresh-токен (JTI: {jti}) створено для користувача ID '{user_id}'. IP: {ip_address}. Термін дії: {expire_at.isoformat()}")
+        return str(jti)
 
     async def validate_access_token(self, token: str) -> Optional[Dict[str, Any]]:
         """
-        Validates an access token.
+        Валідує access-токен.
 
-        Args:
-            token (str): The JWT access token to validate.
-
-        Returns:
-            Optional[Dict[str, Any]]: The decoded token payload if valid, otherwise None.
+        :param token: JWT access-токен для валідації.
+        :return: Декодований пейлоад токена, якщо валідний, інакше None.
+        :raises InvalidTokenTypeError: Якщо тип токена не 'access'.
         """
         try:
             payload = jwt.decode(token, settings.JWT_SECRET_KEY, algorithms=[settings.JWT_ALGORITHM])
 
-            # Check token type
             if payload.get("type") != "access":
-                logger.warning("Invalid token type provided for access token validation.")
-                return None # Or raise specific error
+                jti = payload.get("jti")
+                logger.warning(
+                    f"Надано невірний тип токена ('{payload.get('type')}') для валідації access-токена. JTI: {jti}")
+                raise InvalidTokenTypeError(f"Невірний тип токена. Очікувався 'access'. JTI: {jti}")  # i18n
 
-            # Check expiration (already handled by jwt.decode, but explicit check can be added if needed)
-            # exp = payload.get("exp")
-            # if exp and datetime.fromtimestamp(exp, timezone.utc) < datetime.now(timezone.utc):
-            # logger.warning(f"Access token has expired. JTI: {payload.get('jti')}")
-            # return None # Or raise specific error: raise credentials_exception ("Token has expired")
+            if "sub" not in payload or "jti" not in payload:
+                logger.warning(f"Access-токен не містить обов'язкових полів 'sub' або 'jti'. JTI: {payload.get('jti')}")
+                return None  # Або кинути іншу кастомну помилку
 
-            # Check if token is on a denylist (if implemented)
+            # TODO: Реалізувати перевірку токена у дені-листі Redis згідно `technical_task.txt`.
+            #  Потрібні методи: `await self.is_jti_denylisted(jti)` та `await self.add_jti_to_denylist(jti, expires_at)`.
+            #  Ця функціональність потребує інтеграції з Redis.
             # jti = payload.get("jti")
-            # if jti and await self.is_token_denylisted(jti):
-            #     logger.warning(f"Access token JTI '{jti}' is denylisted.")
-            #     return None # Or raise
+            # if jti and await self.is_jti_denylisted(jti):
+            #     logger.warning(f"Access-токен JTI '{jti}' знаходиться у дені-листі (був відкликаний).")
+            #     return None # Або кинути помилку "токен відкликано"
 
-            logger.info(f"Access token validated successfully. Subject: {payload.get('sub')}, JTI: {payload.get('jti')}")
+            logger.info(f"Access-токен успішно валідовано. Суб'єкт: {payload.get('sub')}, JTI: {payload.get('jti')}")
             return payload
+        except InvalidTokenTypeError:  # Перехоплення для ре-рейзу, щоб не потрапити в загальний JWTError
+            raise
         except JWTError as e:
-            logger.warning(f"Access token validation failed: {e}", exc_info=True)
-            return None # Or raise specific error like credentials_exception(f"Invalid token: {e}")
+            logger.warning(f"Валідація access-токена не вдалася: {e}", exc_info=settings.DEBUG)
+            return None
 
-    async def process_refresh_token(self, refresh_token_jti: str) -> Optional[User]:
+    async def process_refresh_token(self, refresh_token_jti_str: str) -> Optional[User]:
         """
-        Processes a refresh token (JTI string).
-        Validates it against the database, checks expiry and revocation.
-        If valid, it marks the old token as used (or revokes it) and can issue new tokens.
-        This method primarily validates and returns the associated User model.
-        New token issuance should be handled by the calling logic (e.g., in an API endpoint).
-
-        Args:
-            refresh_token_jti (str): The JTI string of the refresh token.
-
-        Returns:
-            Optional[User]: The User object associated with the valid refresh token, otherwise None.
+        Обробляє refresh-токен. Якщо використовується вже відкликаний токен,
+        всі активні refresh-токени для цього користувача будуть відкликані.
         """
         try:
-            jti_uuid = UUID(refresh_token_jti) # Ensure it's a valid UUID
+            jti_uuid = UUID(refresh_token_jti_str)
         except ValueError:
-            logger.warning(f"Invalid JTI format for refresh token: {refresh_token_jti}")
+            logger.warning(f"Невірний формат JTI для refresh-токена: {refresh_token_jti_str}")
             return None
 
         stmt = select(RefreshToken).options(selectinload(RefreshToken.user)).where(RefreshToken.jti == jti_uuid)
-        result = await self.db_session.execute(stmt)
-        token_db = result.scalar_one_or_none()
+        token_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
         if not token_db:
-            logger.warning(f"Refresh token JTI '{refresh_token_jti}' not found in database.")
+            logger.warning(f"Refresh-токен JTI '{refresh_token_jti_str}' не знайдено в базі даних.")
             return None
 
         if token_db.is_revoked:
-            logger.warning(f"Refresh token JTI '{refresh_token_jti}' has been revoked.")
-            # Potentially implement logic to revoke all tokens for this user if a revoked token is used.
+            logger.warning(
+                f"Спроба використання вже відкликаного refresh-токена JTI '{refresh_token_jti_str}' користувачем ID '{token_db.user_id}'. "
+                "Відкликання всіх refresh-токенів для цього користувача з міркувань безпеки.")
+            await self.revoke_all_refresh_tokens_for_user(token_db.user_id)
+            await self.commit()  # Переконайтеся, що відкликання всіх токенів закоммічено
             return None
 
         if token_db.expires_at < datetime.now(timezone.utc):
-            logger.warning(f"Refresh token JTI '{refresh_token_jti}' has expired at {token_db.expires_at.isoformat()}.")
-            # Optionally, clean up expired tokens here or via a background task
-            # await self.db_session.delete(token_db)
-            # await self.commit()
+            logger.warning(
+                f"Термін дії refresh-токена JTI '{refresh_token_jti_str}' закінчився {token_db.expires_at.isoformat()}.")
             return None
 
-        # Refresh token is valid.
-        # Standard practice: Revoke this refresh token to prevent reuse (one-time use).
-        # A new refresh token should be issued along with a new access token.
         token_db.is_revoked = True
+        token_db.revoked_at = datetime.now(timezone.utc)
         self.db_session.add(token_db)
-        await self.commit() # Commit revocation of this token
+        await self.commit()
 
-        logger.info(f"Refresh token JTI '{refresh_token_jti}' processed successfully for user ID '{token_db.user_id}'. Token has been revoked.")
-        return token_db.user # Return the associated user object
+        logger.info(
+            f"Refresh-токен JTI '{refresh_token_jti_str}' успішно оброблено для користувача ID '{token_db.user_id}'. Токен було відкликано.")
+        return token_db.user
 
-    async def revoke_refresh_token(self, refresh_token_jti: str, user_id: Optional[UUID] = None) -> bool:
-        """
-        Revokes a specific refresh token.
-        If user_id is provided, it also verifies that the token belongs to the user.
-        """
-        logger.debug(f"Attempting to revoke refresh token JTI: {refresh_token_jti} for user: {user_id if user_id else 'any'}")
+    async def revoke_refresh_token(self, refresh_token_jti_str: str, user_id: Optional[UUID] = None) -> bool:
+        """Відкликає конкретний refresh-токен."""
+        logger.debug(
+            f"Спроба відкликання refresh-токена JTI: {refresh_token_jti_str} для користувача: {user_id if user_id else 'будь-який'}")
         try:
-            jti_uuid = UUID(refresh_token_jti)
+            jti_uuid = UUID(refresh_token_jti_str)
         except ValueError:
-            logger.warning(f"Invalid JTI format for revocation: {refresh_token_jti}")
+            logger.warning(f"Невірний формат JTI для відкликання: {refresh_token_jti_str}")
             return False
 
         stmt = select(RefreshToken).where(RefreshToken.jti == jti_uuid)
@@ -218,43 +217,66 @@ class TokenService(BaseService): # Inherits BaseService for db_session if storin
         token_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
         if not token_db:
-            logger.warning(f"Refresh token JTI '{refresh_token_jti}' not found or does not belong to user '{user_id}'.")
+            logger.warning(
+                f"Refresh-токен JTI '{refresh_token_jti_str}' не знайдено або не належить користувачеві '{user_id}'.")
             return False
 
         if token_db.is_revoked:
-            logger.info(f"Refresh token JTI '{refresh_token_jti}' was already revoked.")
-            return True # Already revoked, consider it a success
+            logger.info(f"Refresh-токен JTI '{refresh_token_jti_str}' вже було відкликано раніше.")
+            return True
 
         token_db.is_revoked = True
+        token_db.revoked_at = datetime.now(timezone.utc)
         self.db_session.add(token_db)
         await self.commit()
-        logger.info(f"Refresh token JTI '{refresh_token_jti}' successfully revoked for user ID '{token_db.user_id}'.")
+        logger.info(
+            f"Refresh-токен JTI '{refresh_token_jti_str}' успішно відкликано для користувача ID '{token_db.user_id}'.")
         return True
 
-    async def revoke_all_refresh_tokens_for_user(self, user_id: UUID) -> int:
-        """
-        Revokes all active refresh tokens for a given user.
-        Useful for "log out all devices" functionality or security events.
-        """
-        logger.info(f"Attempting to revoke all refresh tokens for user ID: {user_id}")
-        stmt = select(RefreshToken).where(RefreshToken.user_id == user_id, RefreshToken.is_revoked == False)
+    async def revoke_all_refresh_tokens_for_user(self, user_id: UUID, exclude_jti: Optional[UUID] = None) -> int:
+        """Відкликає всі активні refresh-токени для даного користувача."""
+        logger.info(
+            f"Спроба відкликання всіх refresh-токенів для користувача ID: {user_id}, виключаючи JTI: {exclude_jti}")
+        stmt = select(RefreshToken).where(
+            RefreshToken.user_id == user_id,
+            RefreshToken.is_revoked == False
+        )
+        if exclude_jti:
+            stmt = stmt.where(RefreshToken.jti != exclude_jti)
+
         tokens_to_revoke_db = (await self.db_session.execute(stmt)).scalars().all()
 
         if not tokens_to_revoke_db:
-            logger.info(f"No active refresh tokens found for user ID '{user_id}' to revoke.")
+            logger.info(
+                f"Не знайдено активних refresh-токенів для користувача ID '{user_id}' для відкликання (виключаючи: {exclude_jti}).")
             return 0
 
+        revoked_at_time = datetime.now(timezone.utc)
         for token_db in tokens_to_revoke_db:
             token_db.is_revoked = True
+            token_db.revoked_at = revoked_at_time
             self.db_session.add(token_db)
 
-        await self.commit()
+        # Важливо: commit тут не потрібен, якщо цей метод викликається з іншого методу,
+        # який вже має свій commit. Якщо ж викликається самостійно, commit потрібен.
+        # Для послідовності, якщо revoke_all_refresh_tokens_for_user викликається з process_refresh_token,
+        # то commit в process_refresh_token покриє і ці зміни.
+        # Однак, якщо цей метод може бути викликаний окремо (наприклад, адміністратором),
+        # то він повинен мати власний commit. Поточна реалізація без власного commit.
+        # Для безпеки, додам commit, якщо щось було змінено.
+        if tokens_to_revoke_db:
+            await self.commit()
+
         count = len(tokens_to_revoke_db)
-        logger.info(f"Successfully revoked {count} refresh tokens for user ID '{user_id}'.")
+        logger.info(f"Успішно відкликано {count} refresh-токенів для користувача ID '{user_id}'.")
         return count
 
-    # Optional: Method to manage JWT denylist (if storing JTI of logged-out access tokens)
-    # async def is_token_denylisted(self, jti: str) -> bool: ...
-    # async def add_token_to_denylist(self, jti: str, expires_at: datetime) -> None: ...
+    # TODO: (Залишено) Реалізація дені-листа для JWT access-токенів згідно `technical_task.txt`.
+    #  Потребує інтеграції з Redis та визначення методів:
+    #  - `async def add_jti_to_denylist(self, jti: str, expires_at: datetime) -> None:`
+    #  - `async def is_jti_denylisted(self, jti: str) -> bool:`
+    #  Ці методи будуть взаємодіяти з Redis для зберігання JTI відкликаних access-токенів
+    #  до моменту їх природного закінчення терміну дії.
 
-logger.info("TokenService class defined.")
+
+logger.debug("TokenService клас визначено та завантажено.")

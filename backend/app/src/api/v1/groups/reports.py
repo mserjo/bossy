@@ -1,64 +1,87 @@
 # backend/app/src/api/v1/groups/reports.py
+# -*- coding: utf-8 -*-
+"""
+Ендпоінти для генерації та отримання звітів по активності та іншим даним груп.
+
+На даний момент ці ендпоінти є переважно концептуальними (заглушками).
+Логіка генерації звітів буде реалізована в відповідних сервісах.
+"""
+from typing import Any, Dict, Optional # Optional не використовується, можна прибрати
+from uuid import UUID # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Path
-from sqlalchemy.ext.asyncio import AsyncSession
-from typing import Any, Dict # Для гнучкої відповіді звіту
+from sqlalchemy.ext.asyncio import AsyncSession # Не використовується прямо, якщо сесія в сервісі
 
-from app.src.core.dependencies import get_db_session, get_current_active_user
-from app.src.models.auth import User as UserModel
-# from app.src.services.groups.report import GroupReportService # Майбутній сервіс для звітів
-# from app.src.schemas.groups.report import GroupActivityReportResponse # Майбутня схема для звіту
+# Повні шляхи імпорту
+from backend.app.src.api.dependencies import get_api_db_session, get_current_active_user
+# TODO: Використати або створити залежність `check_group_view_permission` (або `require_group_member_or_superuser`)
+from backend.app.src.api.v1.groups.groups import check_group_view_permission # Приклад імпорту залежності
+from backend.app.src.models.auth.user import User as UserModel
+# from backend.app.src.services.groups.report_service import GroupReportService # Майбутній сервіс для звітів
+# from backend.app.src.schemas.groups.report import GroupActivityReportResponse # Майбутня схема для звіту
+from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import settings as global_settings
 
-router = APIRouter()
+router = APIRouter(
+    # Префікс /{group_id}/reports буде додано в __init__.py батьківського роутера
+    # Теги також успадковуються/додаються звідти
+)
+
+# Залежність для отримання GroupReportService (коли буде створено)
+# async def get_group_report_service(session: AsyncSession = Depends(get_api_db_session)) -> GroupReportService:
+#     return GroupReportService(db_session=session)
 
 @router.get(
-    "/activity", # Шлях відносно префіксу, що буде заданий при підключенні (наприклад, /{group_id}/reports)
-    response_model=Dict[str, Any],
-    summary="Звіт про активність групи (Placeholder)",
+    "/activity", # Шлях відносно префіксу /{group_id}/reports -> /{group_id}/reports/activity
+    response_model=Dict[str, Any], # TODO: Замінити на GroupActivityReportResponse, коли схема буде визначена
+    summary="Звіт про активність групи (Заглушка)", # i18n
     description="""Повертає звіт про активність у вказаній групі.
-    Доступно адміністраторам групи або суперюзерам.
-    На даний момент цей ендпоінт є концептуальним (placeholder) і повертатиме заглушку."""
+Доступно членам групи або суперюзерам (TODO: уточнити рівні доступу до різних звітів).
+На даний момент цей ендпоінт є концептуальним (заглушкою) і повертає лише приклад відповіді.""", # i18n
+    dependencies=[Depends(check_group_view_permission)] # Перевірка, що користувач є членом групи або суперюзером
 )
-async def get_group_activity_report(
-    group_id: int = Path(..., description="ID групи, для якої потрібен звіт"), # group_id береться з префіксу шляху, який буде /groups/{group_id}/reports
-    db: AsyncSession = Depends(get_db_session),
-    current_user: UserModel = Depends(get_current_active_user)
-    # report_service: GroupReportService = Depends() # Коли сервіс буде реалізовано
+async def get_group_activity_report_endpoint( # Перейменовано
+    group_id: UUID = Path(..., description="ID групи, для якої потрібен звіт"), # i18n
+    # current_user_with_permission: UserModel = Depends(check_group_view_permission), # Користувач з перевіреними правами
+    # report_service: GroupReportService = Depends(get_group_report_service) # Розкоментувати, коли сервіс буде готовий
 ):
-    '''
+    """
     Отримує звіт про активність групи.
-    - Потрібна перевірка прав: користувач має бути адміністратором групи або суперюзером.
+    - Потрібна перевірка прав: користувач має бути членом групи (або мати специфічні права на перегляд звітів).
     - Логіка генерації звіту буде в `GroupReportService`.
-    '''
-    # Перевірка прав (має бути в сервісі або через GroupPermissionsChecker)
-    # await GroupPermissionsChecker(db).check_user_can_view_group_reports(user=current_user, group_id=group_id)
+    """
+    # logger.info(f"Користувач ID '{current_user_with_permission.id}' запитує звіт про активність для групи ID '{group_id}'.")
+    logger.info(f"Запит звіту про активність для групи ID '{group_id}'.")
 
-    # Логіка отримання звіту з report_service
-    # report_data = await report_service.generate_activity_report(group_id=group_id, requesting_user=current_user)
+
+    # TODO: Реалізувати логіку отримання звіту з GroupReportService
+    # report_data = await report_service.generate_activity_report(
+    #     group_id=group_id,
+    #     requesting_user_id=current_user_with_permission.id
+    # )
     # if not report_data:
-    #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Звіт не знайдено або доступ заборонено.")
+    #     # i18n
+    #     raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Звіт не знайдено або дані для звіту відсутні.")
     # return report_data
 
     # Повертаємо заглушку, оскільки реалізація звіту ще не визначена
+    logger.warning(f"Повернення заглушки для звіту про активність групи ID '{group_id}'.")
+    # i18n
     return {
         "group_id": group_id,
-        "report_type": "activity",
-        "status": "Placeholder - Not Implemented",
-        "message": "Функціонал звіту про активність групи буде реалізовано пізніше.",
+        "report_type": "активність", # i18n
+        "status": "Заглушка - Не реалізовано", # i18n
+        "message": "Функціонал звіту про активність групи буде реалізовано пізніше.", # i18n
+        "generated_at": datetime.now(timezone.utc).isoformat(),
         "data": {
             "total_tasks_completed": "N/A",
             "active_members_count": "N/A",
-            "recent_activities": []
+            "new_members_last_30_days": "N/A",
+            "bonus_points_awarded_last_30_days": "N/A",
+            "recent_activities": [
+                {"timestamp": datetime.now(timezone.utc).isoformat(), "description": "Приклад активності 1"}, # i18n
+                {"timestamp": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(), "description": "Приклад активності 2"} # i18n
+            ]
         }
     }
 
-# Міркування:
-# 1.  Placeholder: Цей файл та ендпоінт є заглушками. Коли вимоги до звітів стануть відомі,
-#     будуть додані конкретні Pydantic схеми для відповідей та реалізований `GroupReportService`.
-# 2.  URL: Ендпоінт `/activity` буде доступний за шляхом на кшталт `/api/v1/groups/{group_id}/reports/activity`,
-#     де префікс `/{group_id}/reports` задається при підключенні цього роутера (`reports_router`)
-#     до агрегованого `groups_router` в `groups/__init__.py`.
-# 3.  Права доступу: Передбачається, що звіти будуть доступні адміністраторам групи та суперюзерам.
-#     Ця логіка буде в сервісі звітів.
-# 4.  Коментарі: Українською мовою.
-# 5.  Майбутні розширення: Можуть бути додані інші типи звітів (наприклад, фінансові, по залученості тощо)
-#     з відповідними ендпоінтами та логікою.
+logger.info("Роутер для звітів по групах (`/groups/{group_id}/reports`) визначено.")

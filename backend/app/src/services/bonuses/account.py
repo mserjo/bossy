@@ -1,217 +1,296 @@
 # backend/app/src/services/bonuses/account.py
 import logging
-from typing import List, Optional, Tuple, Any # Added Any for adjust_account_balance return
+from typing import List, Optional, Tuple, Any
 from uuid import UUID
-from decimal import Decimal # For precise balance calculations
+from decimal import Decimal  # Для точних розрахунків балансу
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
-from app.src.services.base import BaseService
-from app.src.models.bonuses.account import UserAccount # SQLAlchemy UserAccount model
-from app.src.models.auth.user import User # For linking account to user
-from app.src.models.groups.group import Group # If accounts are per-group per-user
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.bonuses.account import UserAccount  # Модель SQLAlchemy UserAccount
+from backend.app.src.models.auth.user import User  # Для зв'язку рахунку з користувачем
+from backend.app.src.models.groups.group import Group  # Якщо рахунки для групи користувачів
+from backend.app.src.models.bonuses.transaction import AccountTransaction  # Модель для транзакцій
 
-from app.src.schemas.bonuses.account import ( # Pydantic Schemas
-    UserAccountCreate, # May not be directly exposed if accounts are auto-created
+from backend.app.src.schemas.bonuses.account import (  # Pydantic Схеми
     UserAccountResponse,
-    UserAccountUpdate # For manual adjustments by admin, perhaps
+    # UserAccountCreate, # Не використовується прямо, оскільки рахунки створюються автоматично або через get_or_create
+    # UserAccountUpdate, # Для ручних коригувань адміністратором (не реалізовано в цьому сервісі)
 )
-# from app.src.schemas.bonuses.transaction import AccountTransactionCreate # For adjust_account_balance conceptual call
-# from app.src.services.bonuses.transaction import AccountTransactionService # For balance adjustments
+from backend.app.src.schemas.bonuses.transaction import AccountTransactionResponse
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до конфігурацій
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+
+# TODO: Перенести кастомні помилки до backend/app/src/core/exceptions.py
+class InsufficientFundsError(ValueError):
+    """Помилка недостатньо коштів на рахунку."""
+
+    def __init__(self, message="Недостатньо коштів на рахунку", current_balance: Optional[Decimal] = None):  # i18n
+        self.current_balance = current_balance
+        super().__init__(message)
+
 
 class UserAccountService(BaseService):
     """
-    Service for managing user bonus accounts.
-    Handles creation, retrieval, and balance display.
-    Balance adjustments should ideally be done atomically via AccountTransactionService.
+    Сервіс для управління бонусними рахунками користувачів.
+    Обробляє створення, отримання та відображення балансу.
+    Зміни балансу повинні відбуватися атомарно через AccountTransactionService (або, як тут, створюючи транзакцію).
     """
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        logger.info("UserAccountService initialized.")
+        logger.info("UserAccountService ініціалізовано.")
 
-    async def get_user_account(
-        self,
-        user_id: UUID,
-        group_id: Optional[UUID] = None
-    ) -> Optional[UserAccountResponse]:
-        log_msg = f"user ID '{user_id}'"
-        if group_id: log_msg += f" in group ID '{group_id}'"
-        logger.debug(f"Attempting to retrieve bonus account for {log_msg}.")
+    async def _get_user_account_orm(
+            self,
+            user_id: UUID,
+            group_id: Optional[UUID] = None,
+            load_relations: bool = True
+    ) -> Optional[UserAccount]:
+        """
+        Внутрішній метод для отримання ORM моделі UserAccount.
+        """
+        log_msg = f"користувача ID '{user_id}'"
+        if group_id: log_msg += f" у групі ID '{group_id}'"
 
-        stmt = select(UserAccount).options(
-            selectinload(UserAccount.user).options(selectinload(User.user_type)),
-            selectinload(UserAccount.group) if hasattr(UserAccount, 'group') else None
-        ).where(UserAccount.user_id == user_id)
-        stmt = stmt.options(*(opt for opt in stmt.get_options() if opt is not None))
+        stmt = select(UserAccount).where(UserAccount.user_id == user_id)
 
+        if group_id:
+            stmt = stmt.where(UserAccount.group_id == group_id)
+        else:
+            # Згідно ТЗ, group_id nullable для глобального рахунку
+            stmt = stmt.where(UserAccount.group_id.is_(None))
 
-        if hasattr(UserAccount, 'group_id'):
-            if group_id:
-                stmt = stmt.where(UserAccount.group_id == group_id)
-            else:
-                stmt = stmt.where(UserAccount.group_id.is_(None)) # type: ignore
-        elif group_id:
-             logger.warning(f"UserAccount model does not seem to support group-specific accounts, but group_id '{group_id}' was provided. Ignoring group_id.")
+        if load_relations:
+            options_to_load = [selectinload(UserAccount.user).options(selectinload(User.user_type))]
+            if group_id:  # Завантажуємо групу тільки якщо вона є
+                options_to_load.append(selectinload(UserAccount.group))
+            stmt = stmt.options(*options_to_load)
+        else:  # Якщо відносини не потрібні, явно їх не завантажуємо
+            stmt = stmt.options(noload('*'))
 
         account_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
+        return account_db
+
+    async def get_user_account(
+            self,
+            user_id: UUID,
+            group_id: Optional[UUID] = None  # None для глобального рахунку
+    ) -> Optional[UserAccountResponse]:
+        """
+        Отримує бонусний рахунок користувача.
+
+        :param user_id: ID користувача.
+        :param group_id: ID групи (None для глобального рахунку).
+        :return: Pydantic схема відповіді UserAccountResponse або None.
+        """
+        log_msg = f"користувача ID '{user_id}'"
+        if group_id:
+            log_msg += f" в групі ID '{group_id}'"
+        else:
+            log_msg += " (глобальний)"
+        logger.debug(f"Спроба отримання бонусного рахунку для {log_msg}.")
+
+        account_db = await self._get_user_account_orm(user_id, group_id, load_relations=True)
 
         if account_db:
-            logger.info(f"Bonus account found for {log_msg}.")
-            # return UserAccountResponse.model_validate(account_db) # Pydantic v2
-            return UserAccountResponse.from_orm(account_db) # Pydantic v1
+            logger.info(f"Бонусний рахунок знайдено для {log_msg}.")
+            return UserAccountResponse.model_validate(account_db)  # Pydantic v2
 
-        logger.info(f"No bonus account found for {log_msg}.")
+        logger.info(f"Бонусний рахунок не знайдено для {log_msg}.")
         return None
 
     async def get_or_create_user_account(
-        self,
-        user_id: UUID,
-        group_id: Optional[UUID] = None,
-        initial_balance: Decimal = Decimal("0.0")
-    ) -> UserAccountResponse:
-        account_response = await self.get_user_account(user_id, group_id)
-        if account_response:
-            return account_response
+            self,
+            user_id: UUID,
+            group_id: Optional[UUID] = None,  # None для глобального рахунку
+            initial_balance: Decimal = Decimal("0.00")
+    ) -> UserAccount:  # Повертає ORM модель для внутрішнього використання
+        """
+        Отримує або створює бонусний рахунок користувача.
+        Повертає ORM модель UserAccount.
 
-        log_msg = f"user ID '{user_id}'"
-        if group_id: log_msg += f" in group ID '{group_id}'"
-        logger.info(f"No existing bonus account for {log_msg}. Creating new account.")
+        :param user_id: ID користувача.
+        :param group_id: ID групи (None для глобального).
+        :param initial_balance: Початковий баланс, якщо рахунок створюється.
+        :return: ORM модель UserAccount.
+        :raises ValueError: Якщо користувача або групу не знайдено. # i18n
+        """
+        account_db = await self._get_user_account_orm(user_id, group_id,
+                                                      load_relations=True)  # Завантажуємо відносини для можливого повернення
+        if account_db:
+            return account_db
+
+        log_msg = f"користувача ID '{user_id}'"
+        if group_id:
+            log_msg += f" в групі ID '{group_id}'"
+        else:
+            log_msg += " (глобальний)"
+        logger.info(f"Існуючий бонусний рахунок для {log_msg} не знайдено. Створення нового.")
 
         user = await self.db_session.get(User, user_id)
-        if not user: raise ValueError(f"User with ID '{user_id}' not found.")
+        if not user:
+            logger.error(f"Користувача з ID '{user_id}' не знайдено при спробі створити бонусний рахунок.")
+            raise ValueError(f"Користувача з ID '{user_id}' не знайдено.")  # i18n
 
-        actual_group_id_for_creation = group_id
-        if group_id and hasattr(UserAccount, 'group_id'):
+        if group_id:
             group = await self.db_session.get(Group, group_id)
-            if not group: raise ValueError(f"Group with ID '{group_id}' not found.")
-        elif group_id:
-             logger.warning(f"UserAccount model does not support group_id, but group_id '{group_id}' provided. Creating account without group linkage.")
-             actual_group_id_for_creation = None
+            if not group:
+                logger.error(f"Групу з ID '{group_id}' не знайдено при спробі створити бонусний рахунок.")
+                raise ValueError(f"Групу з ID '{group_id}' не знайдено.")  # i18n
 
-        account_db_data = {"user_id": user_id, "balance": initial_balance}
-        if hasattr(UserAccount, 'group_id'): # Only add group_id if model supports it
-            account_db_data["group_id"] = actual_group_id_for_creation
-
-        new_account_db = UserAccount(**account_db_data)
+        # Створюємо новий рахунок
+        new_account_db = UserAccount(
+            user_id=user_id,
+            group_id=group_id,  # Може бути None для глобального
+            balance=initial_balance,
+            # created_at, updated_at - обробляються базовою моделлю або БД
+            # last_transaction_at - буде None до першої транзакції
+        )
 
         self.db_session.add(new_account_db)
         try:
             await self.commit()
-            # Refresh to load relationships like user, group
-            refresh_attrs = ['user']
-            if hasattr(UserAccount, 'group') and actual_group_id_for_creation:
-                refresh_attrs.append('group')
-            await self.db_session.refresh(new_account_db, attribute_names=refresh_attrs)
+            # Оновлюємо для завантаження зв'язків, якщо вони потрібні для відповіді або подальшої обробки
+            await self.db_session.refresh(new_account_db, attribute_names=['user', 'group'] if group_id else ['user'])
+            logger.info(f"Бонусний рахунок створено для {log_msg} з ID {new_account_db.id}.")
+            return new_account_db
         except IntegrityError as e:
             await self.rollback()
-            logger.error(f"Integrity error creating account for {log_msg}: {e}", exc_info=True)
-            account_response_retry = await self.get_user_account(user_id, group_id) # Check if concurrently created
-            if account_response_retry: return account_response_retry
-            raise ValueError(f"Could not create account for {log_msg} due to data conflict.")
-
-        logger.info(f"Bonus account created for {log_msg} with ID {new_account_db.id}.")
-        # return UserAccountResponse.model_validate(new_account_db) # Pydantic v2
-        return UserAccountResponse.from_orm(new_account_db) # Pydantic v1
-
+            logger.error(f"Помилка цілісності при створенні рахунку для {log_msg}: {e}", exc_info=settings.DEBUG)
+            # Спроба повторно отримати, якщо рахунок був створений конкурентно
+            account_db_retry = await self._get_user_account_orm(user_id, group_id, load_relations=True)
+            if account_db_retry:
+                logger.info(
+                    f"Рахунок для {log_msg} знайдено після помилки цілісності (ймовірно, створено конкурентно).")
+                return account_db_retry
+            raise ValueError(f"Не вдалося створити рахунок для {log_msg} через конфлікт даних.")  # i18n
 
     async def adjust_account_balance(
-        self,
-        user_id: UUID,
-        amount: Decimal,
-        transaction_type: str,
-        description: Optional[str] = None,
-        related_entity_id: Optional[UUID] = None,
-        group_id: Optional[UUID] = None,
-        commit_session: bool = True
-    ) -> Tuple[UserAccountResponse, Any]: # Any for simulated transaction response
+            self,
+            user_id: UUID,
+            amount: Decimal,
+            transaction_type: str,  # Наприклад, 'ENROLLMENT', 'MANUAL_ADJUSTMENT', 'REWARD_PAYOUT', 'WITHDRAWAL'
+            description: Optional[str] = None,
+            related_entity_id: Optional[UUID] = None,  # ID пов'язаної сутності (наприклад, Reward.id)
+            group_id: Optional[UUID] = None,  # None для глобального рахунку
+            commit_session: bool = True  # Чи потрібно комітити сесію в цьому методі
+    ) -> Tuple[UserAccountResponse, AccountTransactionResponse]:
+        """
+        Коригує баланс рахунку користувача, створюючи при цьому транзакцію.
 
-        logger.info(f"Attempting to adjust balance for user ID '{user_id}' by {amount} for type '{transaction_type}'. Group: {group_id}")
+        :param user_id: ID користувача.
+        :param amount: Сума для коригування (додатня для поповнення, від'ємна для списання).
+        :param transaction_type: Тип транзакції.
+        :param description: Опис транзакції.
+        :param related_entity_id: ID пов'язаної сутності.
+        :param group_id: ID групи (None для глобального).
+        :param commit_session: Якщо True, сесія буде закомічена.
+        :return: Кортеж з оновленим UserAccountResponse та створеним AccountTransactionResponse.
+        :raises InsufficientFundsError: Якщо коштів недостатньо для списання.
+        :raises ValueError: Якщо рахунок користувача не знайдено.
+        """
+        log_msg = f"користувача ID '{user_id}'"
+        if group_id:
+            log_msg += f" в групі ID '{group_id}'"
+        else:
+            log_msg += " (глобальний)"
+        logger.info(f"Спроба коригування балансу для {log_msg} на {amount}, тип: '{transaction_type}'.")
 
-        # Get ORM model instance of the account
-        account_response_schema = await self.get_or_create_user_account(user_id, group_id)
-        # Assuming UserAccountResponse has an 'id' field corresponding to UserAccount.id
-        stmt_get_orm = select(UserAccount).where(UserAccount.id == account_response_schema.id)
-        account_db_model = (await self.db_session.execute(stmt_get_orm)).scalar_one_or_none()
+        # Отримуємо ORM модель рахунку
+        account_db = await self.get_or_create_user_account(user_id, group_id)
+        if not account_db:  # Практично неможливо, якщо get_or_create_user_account працює коректно
+            logger.error(f"Рахунок для {log_msg} не знайдено навіть після get_or_create_user_account.")
+            raise ValueError(f"Рахунок для {log_msg} не знайдено.")  # i18n
 
-        if not account_db_model: # Should not happen if get_or_create works
-            raise ValueError(f"User account not found for user {user_id}, group {group_id} after get_or_create.")
-
-
-        current_balance = Decimal(account_db_model.balance)
+        current_balance = Decimal(account_db.balance)
         adjustment_amount = Decimal(amount)
 
-        if adjustment_amount < Decimal("0.0") and current_balance < abs(adjustment_amount):
-            logger.warning(f"Insufficient funds for user ID '{user_id}'. Current: {current_balance}, Debit: {abs(adjustment_amount)}.")
-            raise ValueError(f"Insufficient funds. Current balance: {current_balance}.")
-
-        from app.src.models.bonuses.transaction import AccountTransaction # Local import
+        if adjustment_amount < Decimal("0.00") and current_balance < abs(adjustment_amount):
+            logger.warning(
+                f"Недостатньо коштів для {log_msg}. Поточний баланс: {current_balance}, спроба списання: {abs(adjustment_amount)}.")
+            raise InsufficientFundsError(current_balance=current_balance)  # i18n
 
         new_balance = current_balance + adjustment_amount
-        account_db_model.balance = new_balance
-        if hasattr(account_db_model, 'last_transaction_at'): # Check model attribute
-            account_db_model.last_transaction_at = datetime.now(timezone.utc)
-        self.db_session.add(account_db_model)
+        account_db.balance = new_balance
+        account_db.last_transaction_at = datetime.now(timezone.utc)  # Оновлюємо час останньої транзакції
+        # updated_at оновлюється автоматично базовою моделлю
+        self.db_session.add(account_db)
 
+        # Створення запису транзакції
         transaction_db = AccountTransaction(
-            user_account_id=account_db_model.id,
+            user_account_id=account_db.id,
             transaction_type=transaction_type,
             amount=adjustment_amount,
             balance_after_transaction=new_balance,
             description=description,
             related_entity_id=related_entity_id
+            # created_at обробляється базовою моделлю
         )
         self.db_session.add(transaction_db)
 
         if commit_session:
             await self.commit()
         else:
-            await self.db_session.flush([account_db_model, transaction_db])
+            # Якщо сесія не комітиться тут, зміни будуть передані викликаючому коду.
+            # Важливо забезпечити flush для отримання ID, якщо вони потрібні до коміту.
+            await self.db_session.flush([account_db, transaction_db])
 
-        # Refresh for response
-        refresh_attrs = ['user']
-        if hasattr(UserAccount, 'group') and account_db_model.group_id:
-             refresh_attrs.append('group')
-        await self.db_session.refresh(account_db_model, attribute_names=refresh_attrs)
-        await self.db_session.refresh(transaction_db)
+        # Оновлюємо для відповіді, щоб відобразити зміни та завантажені зв'язки
+        # (get_or_create_user_account вже завантажив user/group)
+        await self.db_session.refresh(account_db)
+        await self.db_session.refresh(transaction_db,
+                                      attribute_names=['account'])  # Завантажити зв'язок з рахунком для транзакції
 
-        logger.info(f"Balance for user ID '{user_id}' (Account ID: {account_db_model.id}) adjusted by {adjustment_amount}. New balance: {new_balance}.")
+        logger.info(
+            f"Баланс для {log_msg} (ID Рахунку: {account_db.id}) скориговано на {adjustment_amount}. Новий баланс: {new_balance}.")
 
-        from app.src.schemas.bonuses.transaction import AccountTransactionResponse # Local import
-        # transaction_response = AccountTransactionResponse.model_validate(transaction_db) # Pydantic v2
-        transaction_response = AccountTransactionResponse.from_orm(transaction_db) # Pydantic v1
-
-        # return UserAccountResponse.model_validate(account_db_model), transaction_response # Pydantic v2
-        return UserAccountResponse.from_orm(account_db_model), transaction_response # Pydantic v1
+        return UserAccountResponse.model_validate(account_db), AccountTransactionResponse.model_validate(transaction_db)
 
     async def list_user_accounts(
-        self,
-        skip: int = 0,
-        limit: int = 100,
-        group_id: Optional[UUID] = None,
-        min_balance: Optional[Decimal] = None
+            self,
+            skip: int = 0,
+            limit: int = 100,
+            user_id: Optional[UUID] = None,  # Додано фільтр за user_id
+            group_id: Optional[UUID] = None,  # Якщо вказано, фільтрує для цієї групи
+            filter_global_only: bool = False,  # Якщо True і group_id не вказано, фільтрує тільки глобальні
+            min_balance: Optional[Decimal] = None
     ) -> List[UserAccountResponse]:
-        logger.debug(f"Listing user accounts: group={group_id}, min_balance={min_balance}, skip={skip}, limit={limit}")
+        """
+        Перелічує бонусні рахунки користувачів з фільтрами та пагінацією.
+
+        :param skip: Кількість записів для пропуску.
+        :param limit: Максимальна кількість записів.
+        :param user_id: Опціональний фільтр за ID користувача.
+        :param group_id: Опціональний фільтр за ID групи.
+        :param filter_global_only: Якщо True, повертає тільки глобальні рахунки (group_id IS NULL).
+                                   Ігнорується, якщо group_id вказано.
+        :param min_balance: Опціональний фільтр для мінімального балансу.
+        :return: Список Pydantic схем UserAccountResponse.
+        """
+        logger.debug(
+            f"Перелік бонусних рахунків: user={user_id}, group={group_id}, global_only={filter_global_only}, min_balance={min_balance}, skip={skip}, limit={limit}")
 
         stmt = select(UserAccount).options(
             selectinload(UserAccount.user).options(selectinload(User.user_type)),
-            selectinload(UserAccount.group) if hasattr(UserAccount, 'group') else None
+            selectinload(UserAccount.group)
+            # Завжди намагаємось завантажити, SQLAlchemy впорається, якщо group_id є None
         )
-        stmt = stmt.options(*(opt for opt in stmt.get_options() if opt is not None))
-
 
         conditions = []
-        if hasattr(UserAccount, 'group_id'):
-            if group_id:
-                conditions.append(UserAccount.group_id == group_id)
-            # If group_id is None, lists all accounts (global and all groups if not filtered otherwise).
-            # To list only global accounts when group_id is None: conditions.append(UserAccount.group_id.is_(None))
+        if user_id:
+            conditions.append(UserAccount.user_id == user_id)
+
+        if group_id:  # Якщо group_id вказано, filter_global_only ігнорується
+            conditions.append(UserAccount.group_id == group_id)
+        elif filter_global_only:  # group_id не вказано, але потрібні тільки глобальні
+            conditions.append(UserAccount.group_id.is_(None))
+        # Якщо group_id не вказано і filter_global_only=False, то фільтр за групою не застосовується (всі рахунки для користувача або всі взагалі)
 
         if min_balance is not None:
             conditions.append(UserAccount.balance >= min_balance)
@@ -219,16 +298,14 @@ class UserAccountService(BaseService):
         if conditions:
             stmt = stmt.where(*conditions)
 
-        order_by_attrs = [UserAccount.user_id]
-        if hasattr(UserAccount, 'group_id'):
-            order_by_attrs.append(UserAccount.group_id) # type: ignore
-        stmt = stmt.order_by(*order_by_attrs).offset(skip).limit(limit)
+        # TODO: Згідно technical_task.txt, уточнити поля для сортування. Наразі: user_id, group_id.
+        stmt = stmt.order_by(UserAccount.user_id, UserAccount.group_id).offset(skip).limit(limit)
 
         accounts_db = (await self.db_session.execute(stmt)).scalars().unique().all()
 
-        # response_list = [UserAccountResponse.model_validate(acc) for acc in accounts_db] # Pydantic v2
-        response_list = [UserAccountResponse.from_orm(acc) for acc in accounts_db] # Pydantic v1
-        logger.info(f"Retrieved {len(response_list)} user accounts.")
+        response_list = [UserAccountResponse.model_validate(acc) for acc in accounts_db]
+        logger.info(f"Отримано {len(response_list)} бонусних рахунків.")
         return response_list
 
-logger.info("UserAccountService class defined.")
+
+logger.debug("UserAccountService клас визначено та завантажено.")

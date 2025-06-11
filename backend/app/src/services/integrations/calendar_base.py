@@ -1,196 +1,222 @@
 # backend/app/src/services/integrations/calendar_base.py
-import logging
+# import logging # Замінено на централізований логер
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime
 
-from sqlalchemy.ext.asyncio import AsyncSession # For potential DB interaction with tokens/settings
+from sqlalchemy.ext.asyncio import AsyncSession # Для потенційної взаємодії з БД (токени/налаштування)
 
-from app.src.services.base import BaseService # Optional: inherit if needs DB session for common tasks like storing tokens
-from app.src.models.auth.user import User # For user context
-# Define Pydantic models for Calendar Event data structures if not using external library models directly
-# For example:
-from pydantic import BaseModel, Field
+# Повні шляхи імпорту
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.auth.user import User # Для контексту користувача (не використовується прямо тут, але в підкласах)
+from backend.app.src.config.logging import logger # Централізований логер
+
+from pydantic import BaseModel, Field # Використовуємо Pydantic для структур даних
+
+# TODO: Розглянути переміщення Pydantic моделей CalendarEventData та CalendarInfo
+#  до відповідного файлу схем, наприклад, backend/app/src/schemas/integrations/calendar.py
 
 class CalendarEventData(BaseModel):
-    id: Optional[str] = Field(None, description="Provider's unique ID for the event")
-    title: str = Field(..., description="Title or summary of the event")
-    start_time: datetime = Field(..., description="Event start_time (timezone-aware)")
-    end_time: datetime = Field(..., description="Event end_time (timezone-aware)")
-    description: Optional[str] = Field(None, description="Detailed description of the event")
-    location: Optional[str] = Field(None, description="Location of the event")
-    is_all_day: bool = Field(False, description="True if it's an all-day event")
-    # attendees: Optional[List[str]] = Field(None, description="List of attendee emails") # Example
-    # meeting_link: Optional[str] = Field(None, description="Link to online meeting") # Example
-    # raw: Optional[Dict[str, Any]] = Field(None, description="Original raw event data from provider") # For debugging or unprocessed fields
+    """
+    Pydantic модель для уніфікованого представлення даних календарної події.
+    """
+    id: Optional[str] = Field(None, description="Унікальний ID події від провайдера") # i18n
+    title: str = Field(..., description="Назва або короткий опис події") # i18n
+    start_time: datetime = Field(..., description="Час початку події (з інформацією про часовий пояс)") # i18n
+    end_time: datetime = Field(..., description="Час закінчення події (з інформацією про часовий пояс)") # i18n
+    description: Optional[str] = Field(None, description="Детальний опис події") # i18n
+    location: Optional[str] = Field(None, description="Місце проведення події") # i18n
+    is_all_day: bool = Field(False, description="True, якщо подія триває весь день") # i18n
+    attendees: Optional[List[str]] = Field(default_factory=list, description="Список email-адрес учасників") # i18n
+    meeting_link: Optional[str] = Field(None, description="Посилання на онлайн-зустріч (наприклад, Google Meet, Teams)") # i18n
+    # raw: Optional[Dict[str, Any]] = Field(None, description="Оригінальні необроблені дані події від провайдера") # Для відладки
 
 class CalendarInfo(BaseModel):
-    id: str = Field(..., description="Provider's unique ID for the calendar")
-    name: str = Field(..., description="Display name of the calendar (e.g., 'Primary', 'Work')")
-    is_primary: bool = Field(False, description="True if this is the user's primary calendar on the platform")
-    can_edit: bool = Field(False, description="True if the application has write access to this calendar")
-
-
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
-
-class BaseCalendarIntegrationService(BaseService, ABC): # Inherit BaseService for db_session
     """
-    Abstract Base Class for calendar integration services.
-    Defines a common interface for interacting with different calendar platforms
-    like Google Calendar, Outlook Calendar, etc.
+    Pydantic модель для інформації про календар користувача.
+    """
+    id: str = Field(..., description="Унікальний ID календаря від провайдера") # i18n
+    name: str = Field(..., description="Відображуване ім'я календаря (наприклад, 'Основний', 'Робота')") # i18n
+    is_primary: bool = Field(False, description="True, якщо це основний календар користувача на платформі") # i18n
+    can_edit: bool = Field(False, description="True, якщо застосунок має права на запис до цього календаря") # i18n
 
-    Requires concrete implementations for each specific calendar provider.
-    May need to store OAuth tokens or API keys, potentially in a UserIntegrationSetting model.
+
+class BaseCalendarIntegrationService(BaseService, ABC):
+    """
+    Абстрактний базовий клас для сервісів інтеграції з календарями.
+    Визначає спільний інтерфейс для взаємодії з різними календарними платформами,
+    такими як Google Calendar, Outlook Calendar тощо.
+
+    Потребує конкретних реалізацій для кожного окремого провайдера календарів.
+    Може потребувати зберігання OAuth токенів або API ключів, потенційно в моделі
+    UserIntegrationCredential або подібній.
     """
 
-    service_name: str # To be defined by concrete class, e.g., "GOOGLE_CALENDAR"
+    service_name: str # Має бути визначено в підкласах, наприклад, "GOOGLE_CALENDAR"
 
     def __init__(self, db_session: AsyncSession, user_id_for_context: Optional[UUID] = None):
         """
-        Initialize with a DB session (for token/settings storage via BaseService)
-        and optionally a user_id if operations are user-specific.
+        Ініціалізує сервіс з сесією БД (для зберігання токенів/налаштувань через BaseService)
+        та опціонально user_id, якщо операції специфічні для користувача.
+
+        :param db_session: Асинхронна сесія бази даних SQLAlchemy.
+        :param user_id_for_context: ID користувача для контексту операцій.
         """
-        super().__init__(db_session) # BaseService provides self.db_session
-        self.user_id_for_context = user_id_for_context # For user-specific operations
-        logger.info(f"BaseCalendarIntegrationService (subclass: {self.__class__.__name__}) initialized for user: {user_id_for_context or 'N/A'}.")
+        super().__init__(db_session) # BaseService надає self.db_session
+        self.user_id_for_context = user_id_for_context # Для операцій, специфічних для користувача
+        logger.info(f"BaseCalendarIntegrationService (підклас: {self.__class__.__name__}) ініціалізовано для користувача: {self.user_id_for_context or 'N/A'}.")
 
     @abstractmethod
-    async def connect_account(self, auth_code: str, redirect_uri: str, user_id: UUID) -> Dict[str, Any]: # Added user_id
+    async def connect_account(self, auth_code: str, redirect_uri: str, user_id: UUID) -> Dict[str, Any]:
         """
-        Connects a user's calendar account using an authorization code (OAuth2 flow).
-        Should store tokens securely (e.g., in DB, encrypted).
+        Підключає обліковий запис календаря користувача за допомогою коду авторизації (OAuth2).
+        Повинен безпечно зберігати токени (наприклад, в БД, зашифровані).
 
-        Args:
-            auth_code (str): The authorization code received from OAuth provider.
-            redirect_uri (str): The redirect URI used in the OAuth flow.
-            user_id (UUID): The ID of the user connecting their account.
-
-        Returns:
-            Dict[str, Any]: Status of connection, user's calendar email/ID.
+        :param auth_code: Код авторизації, отриманий від провайдера OAuth.
+        :param redirect_uri: URI перенаправлення, використаний в процесі OAuth.
+        :param user_id: ID користувача, що підключає свій обліковий запис.
+        :return: Словник зі статусом підключення та email/ID календаря користувача.
+        :raises NotImplementedError: Якщо метод не реалізовано.
         """
-        pass
+        # i18n
+        raise NotImplementedError(f"Метод 'connect_account' не реалізовано для {self.__class__.__name__}")
 
     @abstractmethod
     async def disconnect_account(self, user_id: UUID) -> bool:
         """
-        Disconnects a user's calendar account, revoking tokens.
-        Should remove stored tokens.
+        Відключає обліковий запис календаря користувача, відкликаючи токени.
+        Повинен видаляти збережені токени.
+
+        :param user_id: ID користувача, чий обліковий запис відключається.
+        :return: True, якщо відключення успішне, інакше False.
+        :raises NotImplementedError: Якщо метод не реалізовано.
         """
-        pass
+        # i18n
+        raise NotImplementedError(f"Метод 'disconnect_account' не реалізовано для {self.__class__.__name__}")
 
     @abstractmethod
     async def refresh_access_token_if_needed(self, user_id: UUID) -> bool:
         """
-        Checks if the access token for a user is expired and refreshes it using the refresh token.
-        Updates stored tokens.
+        Перевіряє, чи не закінчився термін дії access-токену для користувача,
+        і оновлює його за допомогою refresh-токену. Оновлює збережені токени.
+
+        :param user_id: ID користувача.
+        :return: True, якщо токен успішно оновлено або не потребував оновлення, інакше False.
+        :raises NotImplementedError: Якщо метод не реалізовано.
         """
-        pass
+        # i18n
+        raise NotImplementedError(f"Метод 'refresh_access_token_if_needed' не реалізовано для {self.__class__.__name__}")
 
     @abstractmethod
     async def list_user_calendars(self, user_id: UUID) -> List[CalendarInfo]:
         """
-        Lists all calendars accessible for the connected user account.
+        Перелічує всі календарі, доступні для підключеного облікового запису користувача.
+
+        :param user_id: ID користувача.
+        :return: Список об'єктів CalendarInfo.
+        :raises NotImplementedError: Якщо метод не реалізовано.
         """
-        pass
+        # i18n
+        raise NotImplementedError(f"Метод 'list_user_calendars' не реалізовано для {self.__class__.__name__}")
 
     @abstractmethod
     async def create_event(
-        self,
-        user_id: UUID,
-        calendar_id: str,
-        event_data: CalendarEventData
+        self, user_id: UUID, calendar_id: str, event_data: CalendarEventData
     ) -> Optional[CalendarEventData]:
         """
-        Creates a new event in the specified user's calendar.
+        Створює нову подію в указаному календарі користувача.
+
+        :param user_id: ID користувача.
+        :param calendar_id: ID календаря, в якому створюється подія.
+        :param event_data: Дані події (Pydantic модель CalendarEventData).
+        :return: Створена подія CalendarEventData або None у разі помилки.
+        :raises NotImplementedError: Якщо метод не реалізовано.
         """
-        pass
+        # i18n
+        raise NotImplementedError(f"Метод 'create_event' не реалізовано для {self.__class__.__name__}")
 
     @abstractmethod
     async def get_event(
-        self,
-        user_id: UUID,
-        calendar_id: str,
-        event_id: str
+        self, user_id: UUID, calendar_id: str, event_id: str
     ) -> Optional[CalendarEventData]:
         """
-        Retrieves a specific event from the user's calendar.
+        Отримує конкретну подію з календаря користувача.
+
+        :param user_id: ID користувача.
+        :param calendar_id: ID календаря.
+        :param event_id: ID події.
+        :return: Дані події CalendarEventData або None.
+        :raises NotImplementedError: Якщо метод не реалізовано.
         """
-        pass
+        # i18n
+        raise NotImplementedError(f"Метод 'get_event' не реалізовано для {self.__class__.__name__}")
 
     @abstractmethod
     async def update_event(
-        self,
-        user_id: UUID,
-        calendar_id: str,
-        event_id: str,
-        event_data: CalendarEventData
+        self, user_id: UUID, calendar_id: str, event_id: str, event_data: CalendarEventData
     ) -> Optional[CalendarEventData]:
         """
-        Updates an existing event in the user's calendar.
+        Оновлює існуючу подію в календарі користувача.
+
+        :param user_id: ID користувача.
+        :param calendar_id: ID календаря.
+        :param event_id: ID події для оновлення.
+        :param event_data: Нові дані для події.
+        :return: Оновлена подія CalendarEventData або None.
+        :raises NotImplementedError: Якщо метод не реалізовано.
         """
-        pass
+        # i18n
+        raise NotImplementedError(f"Метод 'update_event' не реалізовано для {self.__class__.__name__}")
 
     @abstractmethod
     async def delete_event(
-        self,
-        user_id: UUID,
-        calendar_id: str,
-        event_id: str
+        self, user_id: UUID, calendar_id: str, event_id: str
     ) -> bool:
         """
-        Deletes an event from the user's calendar.
+        Видаляє подію з календаря користувача.
+
+        :param user_id: ID користувача.
+        :param calendar_id: ID календаря.
+        :param event_id: ID події для видалення.
+        :return: True, якщо видалення успішне, інакше False.
+        :raises NotImplementedError: Якщо метод не реалізовано.
         """
-        pass
+        # i18n
+        raise NotImplementedError(f"Метод 'delete_event' не реалізовано для {self.__class__.__name__}")
 
     @abstractmethod
     async def list_events(
-        self,
-        user_id: UUID,
-        calendar_id: str,
-        start_time: datetime,
-        end_time: datetime,
+        self, user_id: UUID, calendar_id: str, start_time: datetime, end_time: datetime,
         query: Optional[str] = None
     ) -> List[CalendarEventData]:
         """
-        Lists events from a specific calendar within a given time range.
-        """
-        pass
+        Перелічує події з конкретного календаря в заданому часовому діапазоні.
 
-    # Example helper methods for token management (to be implemented in concrete or another base class)
+        :param user_id: ID користувача.
+        :param calendar_id: ID календаря.
+        :param start_time: Початковий час діапазону.
+        :param end_time: Кінцевий час діапазону.
+        :param query: Опціональний рядок для пошуку серед подій.
+        :return: Список об'єктів CalendarEventData.
+        :raises NotImplementedError: Якщо метод не реалізовано.
+        """
+        # i18n
+        raise NotImplementedError(f"Метод 'list_events' не реалізовано для {self.__class__.__name__}")
+
+    # --- Приклади допоміжних методів для управління токенами ---
+    # (Мають бути реалізовані в конкретних класах або в іншому базовому класі/сервісі для токенів інтеграцій)
+    # TODO: Визначити модель та сервіс для зберігання токенів інтеграції (наприклад, UserIntegrationCredentialService).
     # async def _get_user_tokens(self, user_id: UUID) -> Optional[Dict[str, Any]]:
-    #     # Placeholder: Fetch from a UserIntegrationToken model using self.db_session
-    #     # stmt = select(UserIntegrationToken).where(
-    #     #     UserIntegrationToken.user_id == user_id,
-    #     #     UserIntegrationToken.service_name == self.service_name
-    #     # )
-    #     # token_record = (await self.db_session.execute(stmt)).scalar_one_or_none()
-    #     # if token_record:
-    #     #     return {
-    #     #         "access_token": token_record.access_token,
-    #     #         "refresh_token": token_record.refresh_token,
-    #     #         "expires_at": token_record.token_expires_at # Assuming datetime object
-    #     #     }
-    #     logger.warning(f"Token retrieval placeholder: No stored tokens found for user {user_id} and service {getattr(self, 'service_name', 'UnknownService')}.")
+    #     """Заглушка: Отримує збережені токени для користувача та цього сервісу."""
+    #     service_name_val = getattr(self, 'service_name', 'НевідомийСервіс')
+    #     logger.warning(f"Заглушка отримання токенів: Не знайдено збережених токенів для користувача {user_id} та сервісу {service_name_val}.")
     #     return None
 
     # async def _store_user_tokens(self, user_id: UUID, tokens: Dict[str, Any], token_expires_at: Optional[datetime]) -> bool:
-    #     # Placeholder: Store/update tokens in UserIntegrationToken model using self.db_session
-    #     # Needs to handle creation or update (upsert).
-    #     # Example:
-    #     # existing_token_record = ... fetch ...
-    #     # if existing_token_record:
-    #     #    existing_token_record.access_token = tokens['access_token']
-    #     #    if 'refresh_token' in tokens: existing_token_record.refresh_token = tokens['refresh_token']
-    #     #    existing_token_record.token_expires_at = token_expires_at
-    #     #    self.db_session.add(existing_token_record)
-    #     # else:
-    #     #    new_token_record = UserIntegrationToken(user_id=user_id, service_name=self.service_name, ...)
-    #     #    self.db_session.add(new_token_record)
-    #     # await self.commit() # Or caller commits if part of larger transaction
-    #     logger.info(f"Token storage placeholder: Storing tokens for user {user_id}, service {getattr(self, 'service_name', 'UnknownService')}.")
+    #     """Заглушка: Зберігає/оновлює токени для користувача та цього сервісу."""
+    #     service_name_val = getattr(self, 'service_name', 'НевідомийСервіс')
+    #     logger.info(f"Заглушка зберігання токенів: Збереження токенів для користувача {user_id}, сервіс {service_name_val}.")
     #     return True
 
-
-logger.info("BaseCalendarIntegrationService (ABC) and CalendarEventData/CalendarInfo (Pydantic) defined.")
+logger.info("BaseCalendarIntegrationService (ABC) та Pydantic моделі CalendarEventData/CalendarInfo визначено.")

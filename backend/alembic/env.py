@@ -9,7 +9,11 @@
 та як виконувати міграції в онлайн та офлайн режимах.
 """
 import asyncio
+import logging
 from logging.config import fileConfig
+
+# Налаштування логера для цього файлу (буде керуватися fileConfig з alembic.ini)
+logger = logging.getLogger("alembic.env")
 
 from sqlalchemy import pool
 from sqlalchemy.ext.asyncio import async_engine_from_config  # Для асинхронного рушія SQLAlchemy
@@ -97,7 +101,7 @@ def run_migrations_offline() -> None:
     with context.begin_transaction():
         context.run_migrations()
     # i18n: Log message - Offline migrations finished (output to script)
-    logger.info(_("Офлайн міграції згенеровано (виведено в стандартний вивід або файл)."))
+    logger.info("Офлайн міграції згенеровано (виведено в стандартний вивід або файл).")
 
 
 # --- Онлайн режим виконання міграцій ---
@@ -159,7 +163,7 @@ async def run_migrations_online() -> None:
     # Звільняємо ресурси рушія після завершення роботи.
     await connectable.dispose()
     # i18n: Log message - Online migrations finished
-    logger.info(_("Онлайн міграції успішно застосовано до бази даних."))
+    logger.info("Онлайн міграції успішно застосовано до бази даних.")
 
 
 # --- Визначення режиму виконання ---
@@ -168,9 +172,9 @@ async def run_migrations_online() -> None:
 # - Онлайн: підключається до БД і виконує міграції.
 if context.is_offline_mode():
     # i18n: Log message - Running in offline mode
-    logger.info(_("Запуск Alembic в офлайн режимі..."))
+    logger.info("Запуск Alembic в офлайн режимі...")
     run_migrations_offline()
 else:
     # i18n: Log message - Running in online mode
-    logger.info(_("Запуск Alembic в онлайн режимі..."))
+    logger.info("Запуск Alembic в онлайн режимі...")
     asyncio.run(run_migrations_online())  # Використовуємо asyncio.run для запуску асинхронної функції

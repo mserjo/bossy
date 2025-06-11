@@ -22,6 +22,7 @@ logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
+    from backend.app.src.models.files.avatar import UserAvatar # Ensure this is imported
 
 
 class FileRecord(Base, TimestampedMixin):
@@ -81,8 +82,12 @@ class FileRecord(Base, TimestampedMixin):
 
     # --- Зв'язки (Relationships) ---
     uploader: Mapped[Optional["User"]] = relationship(foreign_keys=[uploader_user_id], lazy="selectin")
-    # Зв'язок з UserAvatar (якщо потрібно знати, чи є цей файл аватаром)
-    # user_avatar_link: Mapped[Optional["UserAvatar"]] = relationship(back_populates="file_record", lazy="selectin") # Якщо UserAvatar має back_populates
+    # Зв'язок з UserAvatar (зворотний до UserAvatar.file_record)
+    user_avatar_link: Mapped[Optional["UserAvatar"]] = relationship(
+        back_populates="file_record",
+        lazy="selectin",
+        # uselist=False # Not needed here, as UserAvatar.file_record_id implies one-to-one from UserAvatar
+    )
 
     # Поля для __repr__
     _repr_fields = ["id", "file_name", "mime_type", "file_size", "uploader_user_id", "purpose"]
@@ -103,7 +108,7 @@ if __name__ == "__main__":
         logger.info(f"  - {field}")
 
     logger.info("\nОчікувані зв'язки (relationships):")
-    expected_relationships = ['uploader']  # , 'user_avatar_link' (якщо додано)
+    expected_relationships = ['uploader', 'user_avatar_link']
     for rel in expected_relationships:
         logger.info(f"  - {rel}")
 

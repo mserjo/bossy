@@ -1,4 +1,5 @@
 # backend/app/src/models/dictionaries/user_types.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для довідника "Типи користувачів".
 

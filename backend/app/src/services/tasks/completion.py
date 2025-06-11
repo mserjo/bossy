@@ -1,233 +1,280 @@
 # backend/app/src/services/tasks/completion.py
-import logging
+# import logging # Замінено на централізований логер
 from typing import List, Optional, Any
 from uuid import UUID
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
-from app.src.services.base import BaseService
-from app.src.models.tasks.completion import TaskCompletion # SQLAlchemy TaskCompletion model
-from app.src.models.tasks.task import Task # For task context
-# from app.src.models.tasks.event import Event # If completions can be for events too
-from app.src.models.auth.user import User # For user context (completer, approver)
-from app.src.models.tasks.assignment import TaskAssignment # To check if user was assigned
+# Повні шляхи імпорту
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.tasks.completion import TaskCompletion # Модель SQLAlchemy TaskCompletion
+from backend.app.src.models.tasks.task import Task # Для контексту завдання
+from backend.app.src.models.auth.user import User # Для контексту користувача
+from backend.app.src.models.tasks.assignment import TaskAssignment # Для перевірки, чи користувач призначений
+from backend.app.src.models.dictionaries.task_types import TaskType # Для перевірки `requires_approval`
 
-from app.src.schemas.tasks.completion import ( # Pydantic Schemas
-    TaskCompletionCreateRequest, # User marking task as done
-    TaskCompletionAdminUpdateRequest, # Admin approving/rejecting
+from backend.app.src.schemas.tasks.completion import ( # Схеми Pydantic
+    TaskCompletionCreateRequest, # Користувач позначає завдання як виконане
+    TaskCompletionAdminUpdateRequest, # Адмін ухвалює/відхиляє
     TaskCompletionResponse
 )
-# from app.src.services.bonuses.account import UserAccountService # For awarding points - potential circularity
-# from app.src.services.notifications.notification import InternalNotificationService # For sending notifications
+from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import settings as global_settings # Для доступу до конфігурацій (наприклад, DEBUG)
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
-
-# Define completion statuses (could be an Enum or from a Status dictionary model)
-COMPLETION_STATUS_PENDING_APPROVAL = "PENDING_APPROVAL"
-COMPLETION_STATUS_APPROVED = "APPROVED"
-COMPLETION_STATUS_REJECTED = "REJECTED"
-COMPLETION_STATUS_COMPLETED = "COMPLETED" # For tasks not requiring approval
+# TODO: Винести статуси завершення до спільного файлу констант або Enum,
+#  наприклад, backend/app/src/core/enums.py
+COMPLETION_STATUS_PENDING_APPROVAL = "PENDING_APPROVAL" # Очікує на ухвалення
+COMPLETION_STATUS_APPROVED = "APPROVED" # Ухвалено
+COMPLETION_STATUS_REJECTED = "REJECTED" # Відхилено
+COMPLETION_STATUS_COMPLETED = "COMPLETED" # Завершено (для завдань, що не потребують ухвалення)
 
 class TaskCompletionService(BaseService):
     """
-    Service for managing the lifecycle of task (or event) completions.
-    Handles users marking tasks as done, admin approvals/rejections,
-    and potentially triggering point allocations.
+    Сервіс для управління життєвим циклом завершень завдань (або подій).
+    Обробляє позначення завдань користувачами як виконаних, ухвалення/відхилення адміністраторами
+    та потенційно ініціює нарахування балів.
     """
 
-    def __init__(self, db_session: AsyncSession): # Add other services like UserAccountService if needed
+    def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        # self.user_account_service = UserAccountService(db_session) # Example
-        # self.notification_service = InternalNotificationService(db_session) # Example
-        logger.info("TaskCompletionService initialized.")
+        # TODO: Ініціалізувати NotificationService та BonusCalculationService (або UserAccountService)
+        # self.notification_service = NotificationService(db_session)
+        # self.bonus_service = BonusCalculationService(db_session)
+        logger.info("TaskCompletionService ініціалізовано.")
+
+    async def _get_orm_completion_with_relations(self, completion_id: UUID) -> Optional[TaskCompletion]:
+        """Внутрішній метод для отримання ORM моделі TaskCompletion з усіма зв'язками."""
+        stmt = select(TaskCompletion).options(
+            selectinload(TaskCompletion.user).options(selectinload(User.user_type)),
+            selectinload(TaskCompletion.task).options(
+                selectinload(Task.task_type),
+                selectinload(Task.status), # Статус самого завдання
+                selectinload(Task.group)
+            ),
+            selectinload(TaskCompletion.reviewed_by_user).options(selectinload(User.user_type))
+        ).where(TaskCompletion.id == completion_id)
+        return (await self.db_session.execute(stmt)).scalar_one_or_none()
+
 
     async def mark_task_as_completed_by_user(
         self,
         task_id: UUID,
         user_id: UUID,
-        completion_data: TaskCompletionCreateRequest
+        completion_data: TaskCompletionCreateRequest # Містить, наприклад, user_notes, submitted_file_id
     ) -> TaskCompletionResponse:
-        logger.debug(f"User ID '{user_id}' attempting to mark task ID '{task_id}' as completed.")
+        """
+        Позначає завдання як виконане користувачем.
+        Статус може бути 'PENDING_APPROVAL' або 'COMPLETED' залежно від налаштувань типу завдання.
+
+        :param task_id: ID завдання.
+        :param user_id: ID користувача, що виконав завдання.
+        :param completion_data: Дані від користувача про виконання.
+        :return: Pydantic схема TaskCompletionResponse.
+        :raises ValueError: Якщо завдання/користувача не знайдено, або завдання вже виконано (якщо не повторюване). # i18n
+        """
+        logger.debug(f"Користувач ID '{user_id}' намагається позначити завдання ID '{task_id}' як виконане.")
 
         task = await self.db_session.get(Task, task_id, options=[selectinload(Task.task_type)])
-        if not task: raise ValueError(f"Task with ID '{task_id}' not found.")
+        if not task: raise ValueError(f"Завдання з ID '{task_id}' не знайдено.") # i18n
 
-        user = await self.db_session.get(User, user_id)
-        if not user: raise ValueError(f"User with ID '{user_id}' not found.")
+        if not await self.db_session.get(User, user_id):
+            raise ValueError(f"Користувача з ID '{user_id}' не знайдено.") # i18n
 
-        # Optional: Check if user is assigned (if assignments are enforced for completion)
-        # assignment_stmt = select(TaskAssignment.id).where(
-        #     TaskAssignment.task_id == task_id,
-        #     TaskAssignment.user_id == user_id,
-        #     TaskAssignment.is_active == True
-        # )
-        # if not (await self.db_session.execute(assignment_stmt)).scalar_one_or_none():
-        #     raise ValueError(f"User ID '{user_id}' is not actively assigned to task ID '{task_id}'.")
+        # TODO: Узгодити з `technical_task.txt`: чи обов'язково бути призначеним на завдання для його виконання?
+        #  Якщо так, додати перевірку активного TaskAssignment.
+        # assignment = (await self.db_session.execute(
+        #     select(TaskAssignment.id).where(
+        #         TaskAssignment.task_id == task_id, TaskAssignment.user_id == user_id, TaskAssignment.is_active == True
+        #     )
+        # )).scalar_one_or_none()
+        # if not assignment:
+        #     raise ValueError(f"Користувач ID '{user_id}' не призначений на завдання ID '{task_id}'.") # i18n
 
-        existing_completion_stmt = select(TaskCompletion.id).where(
-            TaskCompletion.task_id == task_id,
-            TaskCompletion.user_id == user_id,
-            TaskCompletion.status != COMPLETION_STATUS_REJECTED
-        )
-        existing_completion_id = (await self.db_session.execute(existing_completion_stmt)).scalar_one_or_none()
+        # Перевірка, чи завдання вже було виконано цим користувачем (і не є повторюваним)
+        # Дозволяємо нове виконання, якщо попереднє було відхилено (REJECTED).
+        if not getattr(task, 'is_repeatable', False): # Припускаємо, що модель Task має поле is_repeatable
+            existing_completion = (await self.db_session.execute(
+                select(TaskCompletion.id).where(
+                    TaskCompletion.task_id == task_id,
+                    TaskCompletion.user_id == user_id,
+                    TaskCompletion.status != COMPLETION_STATUS_REJECTED # Дозволяє повторно подати після відхилення
+                )
+            )).scalar_one_or_none()
+            if existing_completion:
+                msg = f"Завдання ID '{task_id}' вже було виконано Вами і не є повторюваним." # i18n
+                logger.warning(f"{msg} (Користувач ID: {user_id})")
+                raise ValueError(msg)
 
-        is_task_repeatable = getattr(task, 'is_repeatable', False)
-        if existing_completion_id and not is_task_repeatable:
-            logger.warning(f"Task ID '{task_id}' already completed by user ID '{user_id}' and is not repeatable.")
-            raise ValueError(f"Task ID '{task_id}' already completed by you and is not repeatable.")
-
+        # Визначення початкового статусу на основі типу завдання
+        # Припускаємо, що модель TaskType має поле requires_approval: bool
         requires_approval = getattr(task.task_type, 'requires_approval', True) if task.task_type else True
-
         initial_status = COMPLETION_STATUS_PENDING_APPROVAL if requires_approval else COMPLETION_STATUS_COMPLETED
 
-        completion_db_data = completion_data.dict()
-
+        # `completed_at` - час, коли користувач позначив завдання як виконане
+        # `created_at`, `updated_at` для TaskCompletion встановлюються автоматично
         new_completion_db = TaskCompletion(
             task_id=task_id,
             user_id=user_id,
             status=initial_status,
             completed_at=datetime.now(timezone.utc),
-            **completion_db_data
+            user_notes=completion_data.user_notes,
+            submitted_file_id=completion_data.submitted_file_id
         )
-
         self.db_session.add(new_completion_db)
         try:
             await self.commit()
-            await self.db_session.refresh(new_completion_db, attribute_names=['user', 'task', 'reviewed_by_user']) # Add reviewed_by_user
+            refreshed_completion = await self._get_orm_completion_with_relations(new_completion_db.id)
+            if not refreshed_completion: raise RuntimeError("Не вдалося отримати створене виконання завдання.") # i18n
         except IntegrityError as e:
             await self.rollback()
-            logger.error(f"Integrity error marking task ID '{task_id}' as completed by user ID '{user_id}': {e}", exc_info=True)
-            raise ValueError(f"Could not mark task as completed due to a data conflict: {e}")
+            logger.error(f"Помилка цілісності '{task_id}' для '{user_id}': {e}", exc_info=global_settings.DEBUG)
+            # i18n
+            raise ValueError(f"Не вдалося позначити завдання як виконане через конфлікт даних: {e}")
 
-        logger.info(f"Task ID '{task_id}' marked as '{initial_status}' by user ID '{user_id}'. Completion ID: {new_completion_db.id}")
+        logger.info(f"Завдання ID '{task_id}' позначено як '{initial_status}' користувачем ID '{user_id}'. ID Завершення: {refreshed_completion.id}")
 
-        # TODO: Trigger notifications and point allocations based on initial_status and task.points_value
+        # TODO: Ініціювати сповіщення та нарахування бонусів (якщо статус COMPLETED)
+        # if initial_status == COMPLETION_STATUS_COMPLETED and task.points_reward > 0:
+        #     # await self.bonus_service.award_points_for_task_completion(refreshed_completion)
+        #     logger.info(f"[ЗАГЛУШКА] Нарахування {task.points_reward} балів за завдання ID {task_id} для {user_id}.")
+        # if initial_status == COMPLETION_STATUS_PENDING_APPROVAL:
+        #     # await self.notification_service.notify_group_admins_task_pending_approval(task.group_id, task_id, user_id)
+        #     logger.info(f"[ЗАГЛУШКА] Сповіщення адмінів групи {task.group_id} про завдання {task_id}, що очікує на ухвалення.")
 
-        # return TaskCompletionResponse.model_validate(new_completion_db) # Pydantic v2
-        return TaskCompletionResponse.from_orm(new_completion_db) # Pydantic v1
+        return TaskCompletionResponse.model_validate(refreshed_completion) # Pydantic v2
 
 
     async def update_task_completion_status(
-        self,
-        completion_id: UUID,
-        admin_update_data: TaskCompletionAdminUpdateRequest,
-        admin_user_id: UUID
-    ) -> Optional[TaskCompletionResponse]:
-        logger.debug(f"Admin ID '{admin_user_id}' attempting to update status of completion ID '{completion_id}' to '{admin_update_data.status}'.")
+        self, completion_id: UUID, admin_update_data: TaskCompletionAdminUpdateRequest, admin_user_id: UUID
+    ) -> TaskCompletionResponse:
+        """
+        Оновлює статус завершення завдання (зазвичай адміністратором).
 
-        completion_db = await self.db_session.get(TaskCompletion, completion_id, options=[
-            selectinload(TaskCompletion.task).options(selectinload(Task.task_type)),
-            selectinload(TaskCompletion.user)
-        ])
+        :param completion_id: ID запису завершення завдання.
+        :param admin_update_data: Дані оновлення від адміністратора (новий статус, коментарі).
+        :param admin_user_id: ID адміністратора, що виконує дію.
+        :return: Pydantic схема оновленого TaskCompletionResponse.
+        :raises ValueError: Якщо запис не знайдено, або статус не дозволяє оновлення. # i18n
+        """
+        logger.debug(f"Адмін ID '{admin_user_id}' намагається оновити статус завершення ID '{completion_id}' на '{admin_update_data.status}'.")
+
+        completion_db = await self._get_orm_completion_with_relations(completion_id)
         if not completion_db:
-            logger.warning(f"TaskCompletion record with ID '{completion_id}' not found.")
-            return None
+            raise ValueError(f"Запис завершення завдання з ID '{completion_id}' не знайдено.") # i18n
 
         if completion_db.status != COMPLETION_STATUS_PENDING_APPROVAL:
-            logger.warning(f"TaskCompletion ID '{completion_id}' is not pending approval (current status: {completion_db.status}). Cannot update.")
-            raise ValueError(f"Completion is not pending approval. Current status: {completion_db.status}")
+            msg = f"Завершення ID '{completion_id}' не очікує на ухвалення (поточний статус: {completion_db.status})." # i18n
+            logger.warning(msg)
+            raise ValueError(msg)
+
+        # Перевірка, чи новий статус є допустимим (APPROVED або REJECTED)
+        valid_new_statuses = {COMPLETION_STATUS_APPROVED, COMPLETION_STATUS_REJECTED}
+        if admin_update_data.status not in valid_new_statuses:
+            # i18n
+            raise ValueError(f"Неприпустимий новий статус '{admin_update_data.status}'. Дозволені: {valid_new_statuses}.")
 
         original_status = completion_db.status
-        new_status = admin_update_data.status
-
-        completion_db.status = new_status
+        completion_db.status = admin_update_data.status
         completion_db.admin_notes = admin_update_data.admin_notes
         completion_db.reviewed_by_user_id = admin_user_id
         completion_db.reviewed_at = datetime.now(timezone.utc)
+        # `updated_at` оновлюється автоматично
 
         self.db_session.add(completion_db)
         await self.commit()
-        await self.db_session.refresh(completion_db, attribute_names=['user', 'task', 'reviewed_by_user'])
+        # Оновлюємо для відповіді, оскільки зв'язки вже були завантажені _get_orm_completion_with_relations
+        await self.db_session.refresh(completion_db)
 
-        logger.info(f"Status of completion ID '{completion_id}' updated from '{original_status}' to '{new_status}' by admin ID '{admin_user_id}'.")
+        logger.info(f"Статус завершення ID '{completion_id}' оновлено з '{original_status}' на '{completion_db.status}' адміном ID '{admin_user_id}'.")
 
-        # TODO: Trigger notifications and point allocations based on new_status and completion_db.task.points_value
+        # TODO: Ініціювати сповіщення користувачу про результат перевірки.
+        # await self.notification_service.notify_user_task_completion_reviewed(completion_db)
 
-        # return TaskCompletionResponse.model_validate(completion_db) # Pydantic v2
-        return TaskCompletionResponse.from_orm(completion_db) # Pydantic v1
+        # TODO: Якщо статус APPROVED, ініціювати нарахування бонусів.
+        # if completion_db.status == COMPLETION_STATUS_APPROVED and completion_db.task and completion_db.task.points_reward > 0:
+        #     # await self.bonus_service.award_points_for_task_completion(completion_db)
+        #     logger.info(f"[ЗАГЛУШКА] Нарахування {completion_db.task.points_reward} балів за завдання ID {completion_db.task_id} для {completion_db.user_id}.")
+
+        # TODO: Якщо тип завдання 'EXECUTE_ONCE_CLOSE' і статус APPROVED, оновити статус основного завдання Task.
+        # if completion_db.status == COMPLETION_STATUS_APPROVED and \
+        #    getattr(completion_db.task.task_type, 'execution_logic', None) == 'EXECUTE_ONCE_CLOSE':
+        #    # task_service = TaskService(self.db_session)
+        #    # await task_service.update_task_status(completion_db.task_id, "COMPLETED", admin_user_id)
+        #    logger.info(f"[ЗАГЛУШКА] Завдання ID {completion_db.task_id} має бути закрито, оскільки воно типу 'EXECUTE_ONCE_CLOSE'.")
+
+        return TaskCompletionResponse.model_validate(completion_db) # Pydantic v2
 
     async def list_completions_for_task(
-        self, task_id: UUID, skip: int = 0, limit: int = 100,
-        status: Optional[str] = None
+        self, task_id: UUID, skip: int = 0, limit: int = 100, status: Optional[str] = None
     ) -> List[TaskCompletionResponse]:
-        logger.debug(f"Listing completions for task ID: {task_id}, status: {status}, skip={skip}, limit={limit}")
+        """Перелічує всі завершення для конкретного завдання."""
+        logger.debug(f"Перелік завершень для завдання ID: {task_id}, статус: {status}, пропустити={skip}, ліміт={limit}")
 
         stmt = select(TaskCompletion).options(
             selectinload(TaskCompletion.user).options(selectinload(User.user_type)),
-            selectinload(TaskCompletion.task),
-            selectinload(TaskCompletion.reviewed_by_user).options(selectinload(User.user_type)) if hasattr(TaskCompletion, 'reviewed_by_user') else None
+            selectinload(TaskCompletion.task).options(noload("*")), # Завдання вже відоме
+            selectinload(TaskCompletion.reviewed_by_user).options(selectinload(User.user_type))
         ).where(TaskCompletion.task_id == task_id)
-        stmt = stmt.options(*(opt for opt in stmt.get_options() if opt is not None))
-
 
         if status:
             stmt = stmt.where(TaskCompletion.status == status)
 
         stmt = stmt.order_by(TaskCompletion.completed_at.desc()).offset(skip).limit(limit)
-
         completions_db = (await self.db_session.execute(stmt)).scalars().unique().all()
 
-        # response_list = [TaskCompletionResponse.model_validate(c) for c in completions_db] # Pydantic v2
-        response_list = [TaskCompletionResponse.from_orm(c) for c in completions_db] # Pydantic v1
-        logger.info(f"Retrieved {len(response_list)} completions for task ID '{task_id}'.")
+        response_list = [TaskCompletionResponse.model_validate(c) for c in completions_db] # Pydantic v2
+        logger.info(f"Отримано {len(response_list)} завершень для завдання ID '{task_id}'.")
         return response_list
 
     async def list_completions_by_user(
         self, user_id: UUID, skip: int = 0, limit: int = 100,
-        status: Optional[str] = None,
-        group_id: Optional[UUID] = None
+        status: Optional[str] = None, group_id: Optional[UUID] = None
     ) -> List[TaskCompletionResponse]:
-        logger.debug(f"Listing completions by user ID: {user_id}, status: {status}, group: {group_id}, skip={skip}, limit={limit}")
+        """Перелічує всі завершення, зроблені конкретним користувачем."""
+        logger.debug(f"Перелік завершень користувачем ID: {user_id}, статус: {status}, група: {group_id}, пропустити={skip}, ліміт={limit}")
 
         stmt = select(TaskCompletion).options(
-            selectinload(TaskCompletion.user).options(selectinload(User.user_type)),
+            selectinload(TaskCompletion.user).options(noload("*")), # Користувач вже відомий
             selectinload(TaskCompletion.task).options(
-                selectinload(Task.task_type),
-                selectinload(Task.group)
+                selectinload(Task.task_type), selectinload(Task.status), selectinload(Task.group)
             ),
-            selectinload(TaskCompletion.reviewed_by_user).options(selectinload(User.user_type)) if hasattr(TaskCompletion, 'reviewed_by_user') else None
+            selectinload(TaskCompletion.reviewed_by_user).options(selectinload(User.user_type))
         ).where(TaskCompletion.user_id == user_id)
-        stmt = stmt.options(*(opt for opt in stmt.get_options() if opt is not None))
-
 
         if status:
             stmt = stmt.where(TaskCompletion.status == status)
-        if group_id:
+        if group_id: # Фільтр за групою завдання
             stmt = stmt.join(Task, TaskCompletion.task_id == Task.id).where(Task.group_id == group_id)
 
         stmt = stmt.order_by(TaskCompletion.completed_at.desc()).offset(skip).limit(limit)
-
         completions_db = (await self.db_session.execute(stmt)).scalars().unique().all()
 
-        # response_list = [TaskCompletionResponse.model_validate(c) for c in completions_db] # Pydantic v2
-        response_list = [TaskCompletionResponse.from_orm(c) for c in completions_db] # Pydantic v1
-        logger.info(f"Retrieved {len(response_list)} completions by user ID '{user_id}'.")
+        response_list = [TaskCompletionResponse.model_validate(c) for c in completions_db] # Pydantic v2
+        logger.info(f"Отримано {len(response_list)} завершень користувачем ID '{user_id}'.")
         return response_list
 
-    async def get_completion_details(self, completion_id: UUID) -> Optional[TaskCompletionResponse]:
-        logger.debug(f"Getting completion details for ID {completion_id}")
-        stmt = select(TaskCompletion).options(
-            selectinload(TaskCompletion.user).options(selectinload(User.user_type)),
-            selectinload(TaskCompletion.task).options(
-                selectinload(Task.task_type),
-                selectinload(Task.status),
-                selectinload(Task.group)
-            ),
-            selectinload(TaskCompletion.reviewed_by_user).options(selectinload(User.user_type)) if hasattr(TaskCompletion, 'reviewed_by_user') else None
-        ).where(TaskCompletion.id == completion_id)
-        stmt = stmt.options(*(opt for opt in stmt.get_options() if opt is not None))
+    async def get_completion_details(self, completion_id: UUID, user_id_check: Optional[UUID] = None) -> Optional[TaskCompletionResponse]:
+        """
+        Отримує деталі конкретного завершення завдання за його ID.
+        Якщо надано `user_id_check`, перевіряє, чи належить запис цьому користувачеві.
+        """
+        logger.debug(f"Отримання деталей для завершення ID {completion_id}" + (f" для користувача {user_id_check}" if user_id_check else ""))
 
-        completion_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
+        completion_db = await self._get_orm_completion_with_relations(completion_id)
         if not completion_db:
-            logger.info(f"No task completion found for ID {completion_id}")
+            logger.info(f"Завершення завдання з ID {completion_id} не знайдено.")
             return None
 
-        # return TaskCompletionResponse.model_validate(completion_db) # Pydantic v2
-        return TaskCompletionResponse.from_orm(completion_db) # Pydantic v1
+        if user_id_check and completion_db.user_id != user_id_check:
+            logger.warning(f"Спроба доступу до завершення ID {completion_id} користувачем {user_id_check}, але воно належить {completion_db.user_id}.")
+            # i18n
+            raise PermissionError("Ви не маєте дозволу на перегляд цього запису про виконання.")
 
-logger.info("TaskCompletionService class defined.")
+
+        return TaskCompletionResponse.model_validate(completion_db) # Pydantic v2
+
+logger.debug(f"{TaskCompletionService.__name__} (сервіс завершення завдань) успішно визначено.")

@@ -1,53 +1,67 @@
 # backend/app/src/services/dictionaries/statuses.py
-import logging
-from typing import List # Required for commented out example
+# import logging # Замінено на централізований логер
+from typing import List # Потрібно для прикладу кастомного методу
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select # Required for commented out example
+from sqlalchemy.future import select # Потрібно для прикладу кастомного методу
 
-from app.src.services.dictionaries.base_dict import BaseDictionaryService
-from app.src.models.dictionaries.statuses import Status # SQLAlchemy Model
-from app.src.schemas.dictionaries.statuses import ( # Pydantic Schemas
+# Повні шляхи імпорту
+from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
+from backend.app.src.models.dictionaries.statuses import Status # Модель SQLAlchemy
+from backend.app.src.schemas.dictionaries.statuses import ( # Схеми Pydantic
     StatusCreate,
     StatusUpdate,
     StatusResponse,
 )
-
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+from backend.app.src.config.logging import logger # Централізований логер
 
 class StatusService(BaseDictionaryService[Status, StatusCreate, StatusUpdate, StatusResponse]):
     """
-    Service for managing Status dictionary items.
-    Inherits generic CRUD operations from BaseDictionaryService.
+    Сервіс для управління елементами довідника "Статуси".
+    Статуси є загальними для системи і можуть застосовуватися до різних сутностей
+    (наприклад, 'НОВИЙ', 'В РОБОТІ', 'ЗАВЕРШЕНО', 'СКАСОВАНО').
+    Кожен статус може мати поле `entity_type`, що вказує, до якого типу сутності
+    він застосовується (наприклад, 'ЗАВДАННЯ', 'ПРОЕКТ').
+    Успадковує загальні CRUD-операції від BaseDictionaryService.
+    Згідно з `technical_task.txt`, перегляд доступний усім, але зміни - тільки суперкористувачам
+    (це контролюється на рівні API, сервіс надає операції).
     """
 
     def __init__(self, db_session: AsyncSession):
         """
-        Initializes the StatusService.
+        Ініціалізує сервіс StatusService.
 
-        Args:
-            db_session (AsyncSession): The SQLAlchemy asynchronous database session.
+        :param db_session: Асинхронна сесія бази даних SQLAlchemy.
         """
         super().__init__(db_session, model=Status, response_schema=StatusResponse)
-        logger.info("StatusService initialized.")
+        logger.info(f"StatusService ініціалізовано для моделі: {self._model_name}")
 
-    # --- Custom methods for StatusService (if any) ---
-    # For example, if statuses had specific business logic beyond simple CRUD:
-    # async def get_active_statuses(self) -> List[StatusResponse]:
-    #     logger.debug("Attempting to retrieve all active statuses.")
-    #     # Assuming an 'is_active' field on the Status model
-    #     # stmt = select(self.model).where(self.model.is_active == True).order_by(self.model.name)
-    #     # result = await self.db_session.execute(stmt)
-    #     # items_db = result.scalars().all()
-    #     # Pydantic v1:
-    #     # response_list = [self.response_schema.from_orm(item) for item in items_db]
-    #     # Pydantic v2:
-    #     # response_list = [self.response_schema.model_validate(item) for item in items_db]
-    #     # logger.info(f"Retrieved {len(response_list)} active statuses.")
-    #     # return response_list
-    #     pass # Placeholder for custom methods
+    # --- Кастомні методи для StatusService (якщо потрібні) ---
+    # Наприклад, якщо статуси мають специфічну бізнес-логіку або потрібно фільтрувати
+    # статуси за типом сутності, до якої вони застосовуються.
+    #
+    # async def get_statuses_for_entity_type(self, entity_type: str) -> List[StatusResponse]:
+    #     """
+    #     Отримує всі статуси, що застосовуються до вказаного типу сутності.
+    #     Припускає наявність поля 'entity_type' в моделі Status.
+    #
+    #     :param entity_type: Тип сутності (наприклад, 'TASK', 'PROJECT').
+    #     :return: Список Pydantic схем StatusResponse.
+    #     """
+    #     # TODO: Розглянути використання Enum для entity_type, якщо значення фіксовані.
+    #     logger.debug(f"Спроба отримання статусів для типу сутності: {entity_type} ({self._model_name}).")
+    #     if not hasattr(self.model, 'entity_type'):
+    #         logger.warning(f"Модель {self._model_name} не має атрибута 'entity_type'. Повернення порожнього списку.")
+    #         return []
+    #
+    #     stmt = select(self.model).where(self.model.entity_type == entity_type).order_by(self.model.name) # type: ignore
+    #     items_db = (await self.db_session.execute(stmt)).scalars().all()
+    #
+    #     response_list = [self.response_schema.model_validate(item) for item in items_db]
+    #     logger.info(f"Отримано {len(response_list)} статусів для типу сутності '{entity_type}'.")
+    #     return response_list
+    #
+    # Загальні CRUD-методи (get_by_id, get_by_code, get_all, create, update, delete)
+    # успадковуються від BaseDictionaryService і використовують модель Status та відповідні схеми.
+    # Поле 'entity_type' буде оброблятися базовим сервісом, якщо воно є в схемах Create/Update.
 
-    # The generic CRUD methods (get_by_id, get_by_code, get_all, create, update, delete)
-    # are inherited from BaseDictionaryService and will use the Status model and schemas.
-
-logger.info("StatusService class defined.")
+logger.debug(f"{StatusService.__name__} (сервіс статусів) успішно визначено.")

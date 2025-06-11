@@ -1,128 +1,145 @@
 # backend/app/src/api/external/calendar.py
+# -*- coding: utf-8 -*-
+"""
+Обробники вебхуків для інтеграцій з календарними сервісами.
+
+Ці ендпоінти приймають асинхронні сповіщення від зовнішніх календарних платформ
+(наприклад, Google Calendar, Outlook Calendar) про зміни в календарях користувачів,
+які надали доступ до своїх даних.
+"""
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, Request, Header, HTTPException, status, Response as FastAPIResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-import logging
+# import logging # Замінено на централізований логер
 
-# from app.src.core.dependencies import get_db_session
-# from app.src.services.integrations.calendar import CalendarIntegrationService
-# # Або специфічні сервіси:
-# from app.src.services.integrations.google import GoogleCalendarService
-# from app.src.services.integrations.outlook import OutlookCalendarService
+# Повні шляхи імпорту
+from backend.app.src.api.dependencies import get_api_db_session # Залежність для сесії БД
+from backend.app.src.services.integrations.google_calendar_service import GoogleCalendarService
+from backend.app.src.services.integrations.outlook_calendar_service import OutlookCalendarService
+from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import settings # Для доступу до VALIDATION_TOKENS або Client State Secrets
 
-logger = logging.getLogger(__name__)
 router = APIRouter()
 
+# TODO: Розглянути механізм зберігання та перевірки токенів каналів (X-Goog-Channel-Token)
+#  та клієнтських станів (clientState для Outlook) для валідації вебхуків.
+#  Це може зберігатися в моделі UserIntegration або окремій моделі підписок на вебхуки.
+
 @router.post(
-    "/google", # Шлях відносно /external/calendar/google
-    summary="Вебхук для Google Calendar API",
+    "/google",
+    summary="Вебхук для Google Calendar API Push Notifications", # i18n
     description="""Приймає сповіщення від Google Calendar API (Push Notifications).
-    Потребує валідації запиту (наприклад, перевірка `X-Goog-Channel-Token`, `X-Goog-Resource-State`).""",
-    status_code=status.HTTP_200_OK # Google очікує 2xx відповідь
+    Потребує валідації запиту (наприклад, перевірка `X-Goog-Channel-Token`, `X-Goog-Resource-State`).""", # i18n
+    status_code=status.HTTP_200_OK # Google очікує 2xx відповідь для підтвердження отримання
 )
 async def google_calendar_webhook(
     request: Request,
     x_goog_channel_id: Optional[str] = Header(None, alias="X-Goog-Channel-ID"),
     x_goog_resource_id: Optional[str] = Header(None, alias="X-Goog-Resource-ID"),
     x_goog_resource_state: Optional[str] = Header(None, alias="X-Goog-Resource-State"), # 'sync', 'exists', 'not_exists'
-    x_goog_message_number: Optional[str] = Header(None, alias="X-Goog-Message-Number")
-    # google_calendar_service: GoogleCalendarService = Depends(),
-    # db: AsyncSession = Depends(get_db_session)
+    x_goog_message_number: Optional[str] = Header(None, alias="X-Goog-Message-Number"),
+    x_goog_channel_token: Optional[str] = Header(None, alias="X-Goog-Channel-Token"), # Для валідації
+    # db: AsyncSession = Depends(get_api_db_session), # Розкоментувати, якщо потрібна сесія БД
+    # google_calendar_service: GoogleCalendarService = Depends() # Розкоментувати для ін'єкції сервісу
 ):
-    '''
+    """
     Обробляє вебхуки від Google Calendar.
-    - Валідує запит.
-    - Запускає обробку змін в календарі (наприклад, синхронізацію подій).
-    '''
-    logger.info(f"Отримано вебхук від Google Calendar:")
-    logger.info(f"Headers: X-Goog-Channel-ID={x_goog_channel_id}, X-Goog-Resource-ID={x_goog_resource_id}, X-Goog-Resource-State={x_goog_resource_state}, X-Goog-Message-Number={x_goog_message_number}")
+    - Валідує запит (TODO: реалізувати повну валідацію).
+    - Запускає обробку змін в календарі (TODO: викликати відповідний метод сервісу).
+    """
+    logger.info(
+        f"Отримано вебхук від Google Calendar. Заголовки: X-Goog-Channel-ID={x_goog_channel_id}, "
+        f"X-Goog-Resource-ID={x_goog_resource_id}, X-Goog-Resource-State={x_goog_resource_state}, "
+        f"X-Goog-Message-Number={x_goog_message_number}, X-Goog-Channel-Token (наявність): {'Так' if x_goog_channel_token else 'Ні'}"
+    )
 
-    # Важливо: Перевірити токен каналу (X-Goog-Channel-Token), якщо він використовувався при підписці,
-    # або інші механізми валідації, надані Google.
+    # TODO: Валідація X-Goog-Channel-Token
+    #  Отримати очікуваний токен, збережений під час створення каналу (watch) для `x_goog_channel_id`.
+    #  Порівняти з `x_goog_channel_token`. Якщо не співпадають, повернути 401/403.
+    #  expected_token = await some_service.get_expected_google_channel_token(x_goog_channel_id)
+    #  if not x_goog_channel_token or x_goog_channel_token != expected_token:
+    #      logger.error(f"Невалідний або відсутній X-Goog-Channel-Token для каналу {x_goog_channel_id}")
+    #      raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Невалідний токен каналу")
 
     if x_goog_resource_state == "sync":
-        logger.info("Це повідомлення про синхронізацію каналу Google Calendar.")
-        # Зазвичай нічого не потрібно робити, крім підтвердження отримання
-        return {"status": "sync received", "message": "Google Calendar sync webhook processed."}
+        logger.info("Це повідомлення про синхронізацію каналу Google Calendar (sync).")
+        # Зазвичай нічого не потрібно робити, крім підтвердження отримання (200 OK)
+        # i18n
+        return {"status": "sync_received", "message": "Вебхук синхронізації Google Calendar оброблено."}
 
-    # Обробка реальних змін (exists, not_exists)
+    # Обробка реальних змін (стани 'exists', 'not_exists')
+    # TODO: Делегувати обробку `google_calendar_service.handle_webhook_notification(...)`
+    #  Цей метод має бути асинхронним і, можливо, ставити завдання у фонову чергу.
     # await google_calendar_service.handle_webhook_notification(
     #     channel_id=x_goog_channel_id,
     #     resource_id=x_goog_resource_id,
     #     resource_state=x_goog_resource_state,
-    #     headers=dict(request.headers)
+    #     message_number=x_goog_message_number,
+    #     headers=dict(request.headers) # Передача всіх заголовків може бути корисною
     # )
 
-    # Google очікує швидку відповідь 2xx. Тривалі операції - у фонові задачі.
-    logger.info("Google Calendar event webhook received, placeholder processing.")
-    return {"status": "google calendar event webhook received"}
+    logger.info(f"[ЗАГЛУШКА] Вебхук про подію Google Calendar ({x_goog_resource_state}) отримано. Потрібна подальша обробка.")
+    # i18n
+    return {"status": "google_event_webhook_received", "message": "Вебхук Google Calendar оброблено (заглушка)."}
 
 
 @router.post(
-    "/outlook", # Шлях відносно /external/calendar/outlook
-    summary="Вебхук для Outlook Calendar API",
-    description="""Приймає сповіщення від Outlook Calendar API (Microsoft Graph Webhooks).
-    Потребує валідації запиту (наприклад, параметр `validationToken` при підписці, перевірка `clientState`)."""
-    # Статус код буде залежати від типу запиту (200 для validationToken, 202 для сповіщень)
+    "/outlook",
+    summary="Вебхук для Outlook Calendar API (Microsoft Graph)", # i18n
+    description="""Приймає сповіщення від Outlook Calendar API через Microsoft Graph Webhooks.
+    Обробляє запит валідації (`validationToken`) та сповіщення про зміни.
+    Потребує валідації `clientState` в сповіщеннях, якщо використовується.""", # i18n
+    # Статус код відповіді залежить від типу запиту (200 для validationToken, 202 для сповіщень)
 )
 async def outlook_calendar_webhook(
-    request: Request
-    # outlook_calendar_service: OutlookCalendarService = Depends(),
-    # db: AsyncSession = Depends(get_db_session)
+    request: Request,
+    # db: AsyncSession = Depends(get_api_db_session), # Розкоментувати, якщо потрібна сесія БД
+    # outlook_calendar_service: OutlookCalendarService = Depends() # Розкоментувати для ін'єкції сервісу
 ):
-    '''
-    Обробляє вебхуки від Outlook Calendar.
+    """
+    Обробляє вебхуки від Outlook Calendar (Microsoft Graph).
     - Обробляє запит валідації підписки (якщо є `validationToken`).
-    - Обробляє сповіщення про зміни.
-    '''
+    - Обробляє сповіщення про зміни (TODO: викликати відповідний метод сервісу).
+    """
     try:
         payload = await request.json()
+        logger.info(f"Отримано вебхук від Outlook Calendar. Тіло: {payload}")
     except Exception as e:
-        logger.error(f"Помилка розбору JSON з Outlook вебхука: {e}")
-        # Microsoft Graph може надсилати порожнє тіло або не JSON, залежно від ситуації
-        # Якщо тіло не JSON, а очікується validationToken, це проблема.
-        # Якщо це сповіщення, воно має бути JSON.
-        # Повертаємо помилку, якщо не можемо обробити запит.
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Не вдалося розпарсити JSON тіло запиту.")
+        # Якщо тіло не JSON, але є validationToken в query params (деякі старі API Microsoft так робили)
+        validation_token_query = request.query_params.get("validationToken")
+        if validation_token_query:
+            logger.info(f"Отримано validationToken з query параметра для Outlook: {validation_token_query}")
+            # i18n
+            return FastAPIResponse(content=validation_token_query, media_type="text/plain", status_code=status.HTTP_200_OK)
 
-    logger.info(f"Отримано вебхук від Outlook Calendar: {payload}")
+        logger.error(f"Помилка розбору JSON з Outlook вебхука або відсутній validationToken в query: {e}", exc_info=True)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Не вдалося розпарсити JSON тіло запиту або відсутній validationToken.")
 
-    # Обробка запиту валідації підписки (одноразово при створенні підписки)
+    # Обробка запиту валідації підписки (надсилається Microsoft Graph при створенні підписки)
     if "validationToken" in payload:
         validation_token = payload.get("validationToken")
-        logger.info(f"Outlook validation token received: {validation_token}")
+        logger.info(f"Отримано validationToken для Outlook: {validation_token}")
         # Згідно документації Microsoft, потрібно повернути validationToken як text/plain зі статусом 200 OK
         return FastAPIResponse(content=validation_token, media_type="text/plain", status_code=status.HTTP_200_OK)
 
     # Обробка сповіщень про зміни
+    # TODO: Делегувати обробку `outlook_calendar_service.handle_webhook_notification(...)`
+    #  Цей метод має бути асинхронним і, можливо, ставити завдання у фонову чергу.
     # if "value" in payload and isinstance(payload["value"], list):
-    #     for notification in payload["value"]:
-    #         client_state = notification.get("clientState") # Перевірити, чи співпадає з тим, що було надіслано при підписці
-    #         subscription_id = notification.get("subscriptionId")
-    #         resource_data = notification.get("resourceData") # Містить ID ресурсу
-    #         change_type = notification.get("changeType") # 'created', 'updated', 'deleted'
+    #     for notification_item in payload["value"]:
+    #         client_state_from_notification = notification_item.get("clientState")
+    #         # TODO: Валідація client_state, якщо він використовувався при створенні підписки.
+    #         #  expected_client_state = await some_service.get_client_state_for_subscription(notification_item.get("subscriptionId"))
+    #         #  if client_state_from_notification != expected_client_state:
+    #         #      logger.error("Невідповідність clientState у вебхуку Outlook. Можлива підробка.")
+    #         #      raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Невалідний clientState.")
+    #
+    #         await outlook_calendar_service.handle_webhook_notification(notification_data=notification_item)
 
-    #         logger.info(f"Outlook notification: clientState={client_state}, subscriptionId={subscription_id}, changeType={change_type}, resourceId={resource_data.get('id') if resource_data else None}")
-
-    #         # await outlook_calendar_service.handle_webhook_notification(notification_data=notification)
-
-    # Microsoft Graph API очікує відповідь 202 Accepted протягом 3 секунд для сповіщень.
-    logger.info("Outlook Calendar event webhook received, placeholder processing. Sending 202 Accepted.")
+    logger.info("[ЗАГЛУШКА] Вебхук про подію Outlook Calendar отримано. Потрібна подальша обробка. Надсилання 202 Accepted.")
+    # Microsoft Graph API очікує відповідь 202 Accepted протягом короткого часу (наприклад, 3-5 секунд) для сповіщень.
     return FastAPIResponse(status_code=status.HTTP_202_ACCEPTED)
 
 
-# Міркування:
-# 1.  Специфіка провайдерів: Кожен календарний сервіс (Google, Outlook) має свій формат вебхуків,
-#     механізми валідації та очікувані відповіді.
-# 2.  Валідація запиту: Критично важлива для безпеки.
-#     - Google: `X-Goog-Channel-Token`, `X-Goog-Resource-State`.
-#     - Outlook: `validationToken` при підписці, `clientState` в сповіщеннях.
-# 3.  Обробка: `CalendarIntegrationService` або специфічні сервіси (`GoogleCalendarService`, `OutlookCalendarService`)
-#     мають реалізовувати логіку обробки сповіщень (наприклад, отримання змін, оновлення локальних даних).
-# 4.  Асинхронність: Обробка вебхуків має бути швидкою. Тривалі операції слід виносити у фонові задачі.
-# 5.  Коментарі: Українською мовою.
-# 6.  URL-и: Цей роутер буде підключений до `external_api_router` з префіксом `/calendar`.
-#     Шляхи будуть `/external/calendar/google`, `/external/calendar/outlook`.
-# 7.  Відповіді: Важливо повертати саме ті статуси та формати, які очікує провайдер вебхука.
-#     Для Outlook validationToken - це 200 OK з text/plain. Для сповіщень - 202 Accepted.
-#     Для Google - 2xx.
+logger.info("Роутер для вебхуків календарних сервісів (`/external/calendar`) визначено.")

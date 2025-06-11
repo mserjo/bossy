@@ -1,56 +1,57 @@
 # backend/app/src/services/dictionaries/user_roles.py
-import logging
-from typing import Optional # Required for commented out example
+# import logging # Замінено на централізований логер
+# from typing import Optional # Для потенційних кастомних методів
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select # Required for commented out example
+# from sqlalchemy.future import select # Для потенційних кастомних методів
 
-from app.src.services.dictionaries.base_dict import BaseDictionaryService
-from app.src.models.dictionaries.user_roles import UserRole # SQLAlchemy Model
-from app.src.schemas.dictionaries.user_roles import ( # Pydantic Schemas
+# Повні шляхи імпорту
+from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
+from backend.app.src.models.dictionaries.user_roles import UserRole # Модель SQLAlchemy
+from backend.app.src.schemas.dictionaries.user_roles import ( # Схеми Pydantic
     UserRoleCreate,
     UserRoleUpdate,
     UserRoleResponse,
 )
-
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+from backend.app.src.config.logging import logger # Централізований логер
 
 class UserRoleService(BaseDictionaryService[UserRole, UserRoleCreate, UserRoleUpdate, UserRoleResponse]):
     """
-    Service for managing UserRole dictionary items.
-    Inherits generic CRUD operations from BaseDictionaryService.
+    Сервіс для управління елементами довідника "Ролі Користувачів".
+    Ролі визначають набір прав та обов'язків користувачів у системі
+    (наприклад, 'SUPERUSER', 'ADMIN', 'GROUP_MANAGER', 'USER').
+    Успадковує загальні CRUD-операції від BaseDictionaryService.
+
+    Кожна роль може мати поле `permissions` (наприклад, JSONB або текстове поле),
+    що описує конкретні дозволи. Обробка цього поля залежить від його реалізації
+    в моделі та Pydantic-схемах.
     """
 
     def __init__(self, db_session: AsyncSession):
         """
-        Initializes the UserRoleService.
+        Ініціалізує сервіс UserRoleService.
 
-        Args:
-            db_session (AsyncSession): The SQLAlchemy asynchronous database session.
+        :param db_session: Асинхронна сесія бази даних SQLAlchemy.
         """
         super().__init__(db_session, model=UserRole, response_schema=UserRoleResponse)
-        logger.info("UserRoleService initialized.")
+        logger.info(f"UserRoleService ініціалізовано для моделі: {self._model_name}")
 
-    # --- Custom methods for UserRoleService (if any) ---
-    # For example, assigning a default role or checking role permissions might go here
-    # if not handled by a more specialized auth/permission service.
+    # --- Кастомні методи для UserRoleService (якщо потрібні) ---
+    # Наприклад, для управління дозволами, пов'язаними з ролями,
+    # або для обробки системних ролей, які не можна видаляти/змінювати.
 
-    # async def get_role_by_name(self, name: str) -> Optional[UserRoleResponse]:
-    #     """Retrieves a user role by its unique name (if name is unique)."""
-    #     logger.debug(f"Attempting to retrieve UserRole by name: {name}")
-    #     if not hasattr(self.model, 'name'):
-    #         logger.error(f"Model {self._model_name} does not have a 'name' attribute for get_role_by_name.")
-    #         return None
-    #     stmt = select(self.model).where(self.model.name == name) # type: ignore
-    #     result = await self.db_session.execute(stmt)
-    #     item_db = result.scalar_one_or_none()
-    #     if item_db:
-    #         logger.info(f"UserRole with name '{name}' found.")
-    #         # Pydantic v1: return self.response_schema.from_orm(item_db)
-    #         # Pydantic v2: return self.response_schema.model_validate(item_db)
-    #         return self.response_schema.from_orm(item_db) # Assuming Pydantic v1 for now
-    #     logger.info(f"UserRole with name '{name}' not found.")
-    #     return None
+    # TODO: Розглянути додавання логіки для захисту системних ролей (наприклад, 'SUPERUSER')
+    # від видалення або зміни критичних полів через стандартні методи update/delete.
+    # Це може вимагати перевірки 'code' ролі перед виконанням операції.
+    # Наприклад, в методі delete:
+    # async def delete(self, item_id: UUID) -> bool:
+    #     item_to_delete = await self.get_by_id_orm_model(item_id) # Потрібен метод для отримання ORM моделі
+    #     if item_to_delete and getattr(item_to_delete, 'code', None) == 'SUPERUSER':
+    #         logger.warning(f"Спроба видалення системної ролі 'SUPERUSER' (ID: {item_id}). Відхилено.")
+    #         # i18n
+    #         raise ValueError("Системну роль 'SUPERUSER' не можна видалити.")
+    #     return await super().delete(item_id)
+    #
+    # Примітка: `BaseDictionaryService` вже забезпечує перевірку унікальності 'code' та 'name'
+    # при створенні та оновленні, якщо ці поля є в схемах.
 
-
-logger.info("UserRoleService class defined.")
+logger.debug(f"{UserRoleService.__name__} (сервіс ролей користувачів) успішно визначено.")

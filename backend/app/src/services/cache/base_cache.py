@@ -1,146 +1,143 @@
 # backend/app/src/services/cache/base_cache.py
-import logging
+# import logging # Замінено на централізований логер
 from abc import ABC, abstractmethod
-from typing import Optional, Any, Set # Added Set for potential return type like smembers
+from typing import Optional, Any, Set # Додано Set для потенційних типів повернення (наприклад, smembers)
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+from backend.app.src.config.logging import logger # Централізований логер
 
 class BaseCacheService(ABC):
     """
-    Abstract Base Class for cache services.
-    Defines a common interface for interacting with different cache backends
-    like Redis, Memcached, or an in-memory cache.
+    Абстрактний базовий клас для сервісів кешування.
+    Визначає спільний інтерфейс для взаємодії з різними бекендами кешу,
+    такими як Redis, Memcached або кеш в пам'яті.
 
-    Concrete implementations will provide the actual caching logic.
-    This class itself does not inherit from BaseService as it typically
-    doesn't directly need a database session for its core caching operations.
-    Connection details for cache backends (like Redis URL) should come from settings.
+    Конкретні реалізації надаватимуть фактичну логіку кешування.
+    Цей клас сам по собі не успадковує BaseService, оскільки зазвичай
+    не потребує прямого доступу до сесії бази даних для своїх основних операцій кешування.
+    Деталі підключення до бекендів кешу (наприклад, URL Redis) повинні надходити з налаштувань.
     """
 
-    # service_name: str # To be defined by concrete class if needed for specific config lookup
+    # service_name: str # Може бути визначено конкретним класом, якщо потрібно для специфічного пошуку конфігурації
 
-    def __init__(self): # Constructor might take specific cache client or config
-        logger.info(f"BaseCacheService (subclass: {self.__class__.__name__}) initialized.")
+    def __init__(self): # Конструктор може приймати специфічний клієнт кешу або конфігурацію
+        logger.info(f"BaseCacheService (підклас: {self.__class__.__name__}) ініціалізовано.")
 
     @abstractmethod
     async def get(self, key: str) -> Optional[Any]:
         """
-        Retrieves an item from the cache by key.
+        Отримує елемент з кешу за ключем.
 
-        Args:
-            key (str): The key of the item to retrieve.
-
-        Returns:
-            Optional[Any]: The cached value if found and not expired, otherwise None.
-                           The value will likely be deserialized from a string (e.g., JSON).
+        :param key: Ключ елемента для отримання.
+        :return: Значення з кешу, якщо знайдено і не прострочено, інакше None.
+                 Значення, ймовірно, буде десеріалізовано з рядка (наприклад, JSON).
         """
         pass
 
     @abstractmethod
     async def set(self, key: str, value: Any, expire_seconds: Optional[int] = None) -> bool:
         """
-        Stores an item in the cache.
+        Зберігає елемент в кеші.
 
-        Args:
-            key (str): The key under which to store the value.
-            value (Any): The value to store. It will likely be serialized (e.g., to JSON string).
-            expire_seconds (Optional[int]): Time in seconds until the item expires.
-                                           If None, uses default expiry or persists indefinitely (backend-dependent).
-
-        Returns:
-            bool: True if the item was successfully set, False otherwise.
+        :param key: Ключ, за яким зберігається значення.
+        :param value: Значення для зберігання. Ймовірно, буде серіалізовано (наприклад, у JSON рядок).
+        :param expire_seconds: Час у секундах до закінчення терміну дії елемента.
+                               Якщо None, використовується стандартний термін дії або зберігається безстроково (залежить від бекенду).
+        :return: True, якщо елемент успішно встановлено, інакше False.
         """
         pass
 
     @abstractmethod
     async def delete(self, key: str) -> bool:
         """
-        Removes an item from the cache by key.
+        Видаляє елемент з кешу за ключем.
 
-        Args:
-            key (str): The key of the item to delete.
-
-        Returns:
-            bool: True if the item was deleted or did not exist, False on error.
+        :param key: Ключ елемента для видалення.
+        :return: True, якщо елемент було видалено або він не існував, False у разі помилки.
         """
         pass
 
     @abstractmethod
     async def exists(self, key: str) -> bool:
         """
-        Checks if a key exists in the cache.
+        Перевіряє, чи існує ключ в кеші.
 
-        Args:
-            key (str): The key to check.
-
-        Returns:
-            bool: True if the key exists, False otherwise.
+        :param key: Ключ для перевірки.
+        :return: True, якщо ключ існує, інакше False.
         """
         pass
 
     @abstractmethod
     async def clear_all_prefix(self, prefix: str) -> int:
         """
-        Removes all cache entries whose keys start with the given prefix.
-        Warning: This can be a slow operation on some backends like Redis if not using SCAN.
+        Видаляє всі записи кешу, ключі яких починаються з заданого префіксу.
+        Увага: Це може бути повільною операцією на деяких бекендах, таких як Redis, якщо не використовувати SCAN.
 
-        Args:
-            prefix (str): The prefix for keys to delete (e.g., "user_session:").
-
-        Returns:
-            int: The number of keys deleted.
+        :param prefix: Префікс для ключів, що підлягають видаленню (наприклад, "user_session:").
+        :return: Кількість видалених ключів.
         """
         pass
 
     @abstractmethod
     async def clear_all(self) -> bool:
         """
-        Clears the entire cache (all keys). Use with extreme caution, especially in production.
+        Очищає весь кеш (всі ключі). Використовувати з особливою обережністю, особливо в робочому середовищі.
 
-        Returns:
-            bool: True if the cache was successfully cleared, False otherwise.
+        :return: True, якщо кеш успішно очищено, інакше False.
         """
         pass
 
-    # --- Optional common utility methods for specific cache types ---
+    # --- Опціональні загальні утилітні методи для специфічних типів кешу ---
 
     async def increment(self, key: str, amount: int = 1) -> Optional[int]:
         """
-        Increments the integer value of a key by a given amount.
-        If key does not exist, it's set to 0 before performing the operation.
-        Returns the value of key after the increment.
-        Not all cache backends might support this atomically.
-        Base implementation returns None and logs a warning.
+        Збільшує цілочисельне значення ключа на задану величину.
+        Якщо ключ не існує, він встановлюється в 0 перед виконанням операції.
+        Повертає значення ключа після інкременту.
+        Не всі бекенди кешу можуть підтримувати цю операцію атомарно.
+        Базова реалізація повертає None та логує попередження.
+
+        :param key: Ключ для інкременту.
+        :param amount: Величина, на яку збільшити значення.
+        :return: Значення після інкременту або None, якщо не реалізовано.
         """
-        logger.warning(f"Increment method not implemented for {self.__class__.__name__} by default.")
+        logger.warning(f"Метод 'increment' не реалізований для {self.__class__.__name__} за замовчуванням.")
         return None
 
     async def decrement(self, key: str, amount: int = 1) -> Optional[int]:
         """
-        Decrements the integer value of a key by a given amount.
-        If key does not exist, it's set to 0 before performing the operation.
-        Returns the value of key after the decrement.
-        Base implementation returns None and logs a warning.
+        Зменшує цілочисельне значення ключа на задану величину.
+        Якщо ключ не існує, він встановлюється в 0 перед виконанням операції.
+        Повертає значення ключа після декременту.
+        Базова реалізація повертає None та логує попередження.
+
+        :param key: Ключ для декременту.
+        :param amount: Величина, на яку зменшити значення.
+        :return: Значення після декременту або None, якщо не реалізовано.
         """
-        logger.warning(f"Decrement method not implemented for {self.__class__.__name__} by default.")
+        logger.warning(f"Метод 'decrement' не реалізований для {self.__class__.__name__} за замовчуванням.")
         return None
 
-    # Example methods for set operations (if backend supports, e.g., Redis SADD, SMEMBERS)
+    # --- Приклади методів для операцій з множинами (якщо бекенд підтримує, наприклад, Redis SADD, SMEMBERS) ---
+    # (Закоментовано, оскільки це специфічно для певних бекендів і не є частиною базового інтерфейсу)
+
     # async def set_add(self, key: str, *values: Any) -> int:
-    #     logger.warning(f"set_add method not implemented for {self.__class__.__name__} by default.")
-    #     return 0 # Or raise NotImplementedError
+    #     """Додає один або більше елементів до множини, що зберігається за ключем."""
+    #     logger.warning(f"Метод 'set_add' не реалізований для {self.__class__.__name__} за замовчуванням.")
+    #     return 0 # Або викликати NotImplementedError
 
     # async def set_get_all(self, key: str) -> Set[Any]:
-    #     logger.warning(f"set_get_all method not implemented for {self.__class__.__name__} by default.")
-    #     return set() # Or raise NotImplementedError
+    #     """Повертає всі елементи множини, що зберігається за ключем."""
+    #     logger.warning(f"Метод 'set_get_all' не реалізований для {self.__class__.__name__} за замовчуванням.")
+    #     return set() # Або викликати NotImplementedError
 
     # async def set_remove(self, key: str, *values: Any) -> int:
-    #     logger.warning(f"set_remove method not implemented for {self.__class__.__name__} by default.")
-    #     return 0 # Or raise NotImplementedError
+    #     """Видаляє один або більше елементів з множини, що зберігається за ключем."""
+    #     logger.warning(f"Метод 'set_remove' не реалізований для {self.__class__.__name__} за замовчуванням.")
+    #     return 0 # Або викликати NotImplementedError
 
     # async def set_is_member(self, key: str, value: Any) -> bool:
-    #     logger.warning(f"set_is_member method not implemented for {self.__class__.__name__} by default.")
-    #     return False # Or raise NotImplementedError
+    #     """Перевіряє, чи є елемент членом множини, що зберігається за ключем."""
+    #     logger.warning(f"Метод 'set_is_member' не реалізований для {self.__class__.__name__} за замовчуванням.")
+    #     return False # Або викликати NotImplementedError
 
-logger.info("BaseCacheService (ABC) defined.")
+logger.info("BaseCacheService (ABC) визначено.")

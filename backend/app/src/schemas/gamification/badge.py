@@ -1,144 +1,142 @@
 # backend/app/src/schemas/gamification/badge.py
-import logging
-from typing import Optional
-from uuid import UUID
+"""
+Pydantic схеми для сутності "Бейдж" (Badge) в системі гейміфікації.
 
-from pydantic import BaseModel, Field, HttpUrl
+Цей модуль визначає схеми для:
+- Створення нового бейджа (`BadgeCreateSchema`).
+- Оновлення існуючого бейджа (`BadgeUpdateSchema`).
+- Представлення даних про бейдж у відповідях API (`BadgeSchema`).
+"""
+from datetime import datetime  # Потрібен для TimestampedSchemaMixin через BaseMainSchema
+from typing import Optional, Any  # Any для тимчасових полів
 
-from app.src.schemas.base import BaseDBRead # Common DB fields
-# Assuming BaseMainModel from technical_task.txt implies some fields are in models,
-# schemas will reflect what's needed for API interaction.
-# Fields like 'state', 'group_id', 'deleted_at', 'notes' mentioned for BaseMainModel
-# would be added here if they are part of the Badge's API contract.
-# For now, focusing on core badge attributes.
+from pydantic import Field, AnyHttpUrl
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт базових схем
+from backend.app.src.schemas.base import BaseSchema, BaseMainSchema  # IDSchemaMixin, TimestampedSchemaMixin вже в BaseMainSchema
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-# --- Badge Schemas ---
+# TODO: Замінити Any на конкретну схему GroupSchema (коротка версія), коли вона буде готова.
+# from backend.app.src.schemas.groups.group import GroupBriefSchema
+GroupBriefSchema = Any  # Тимчасовий заповнювач
 
-class BadgeBase(BaseModel):
+BADGE_NAME_MAX_LENGTH = 255
+BADGE_ICON_URL_MAX_LENGTH = 512  # Збігається з моделлю
+
+
+class BadgeBaseSchema(
+    BaseSchema):  # Не успадковує BaseMainSchema, оскільки ID/timestamps не потрібні для Create/Update базових полів
     """
-    Base schema for badges.
-    Contains common attributes for all badge-related schemas.
+    Базова схема для полів бейджа, спільних для створення та оновлення.
     """
     name: str = Field(
         ...,
-        min_length=2,
-        max_length=100,
-        description="The name of the badge. Should be unique."
-    )
-    description: str = Field(
-        ...,
-        max_length=500,
-        description="A detailed description of how the badge is earned and what it represents."
-    )
-    icon_url: Optional[HttpUrl] = Field(
-        None,
-        description="URL to an image/icon representing the badge. Must be a valid HTTP/HTTPS URL."
-    )
-    # group_id: Optional[UUID] = Field(None, description="Identifier of the group this badge is specific to, if applicable. If null, it's a system-wide badge.")
-    # criteria: Optional[str] = Field(None, max_length=1000, description="Textual description of the criteria to earn the badge, if not covered by description.")
-    # state: Optional[str] = Field(None, description="State of the badge (e.g., active, retired). From BaseMainModel concept.")
-
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        anystr_strip_whitespace = True
-        title = "Badge"
-        json_schema_extra = {
-            "example": {
-                "name": "Early Bird",
-                "description": "Awarded for completing a task before 8 AM.",
-                "icon_url": "https://example.com/icons/early_bird.png",
-                # "group_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef"
-            }
-        }
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"BadgeBase instance created with data: {data}")
-
-class BadgeCreate(BadgeBase):
-    """
-    Schema for creating a new badge.
-    Inherits all fields from BadgeBase.
-    """
-    pass
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.info(f"BadgeCreate instance created for badge '{self.name}'.")
-
-class BadgeUpdate(BaseModel):
-    """
-    Schema for updating an existing badge.
-    All fields are optional for partial updates.
-    """
-    name: Optional[str] = Field(
-        None,
-        min_length=2,
-        max_length=100,
-        description="The new name of the badge."
+        max_length=BADGE_NAME_MAX_LENGTH,
+        description="Назва бейджа гейміфікації.",
+        examples=["Першопроходець", "Командний Гравець"]
     )
     description: Optional[str] = Field(
         None,
-        max_length=500,
-        description="The new description of the badge."
+        description="Опис умов отримання або значення цього бейджа."
     )
-    icon_url: Optional[HttpUrl] = Field(
+    icon_url: Optional[AnyHttpUrl] = Field(
         None,
-        description="New URL for the badge icon."
+        description="URL або шлях до іконки, що представляє бейдж."
     )
-    # group_id: Optional[UUID] = Field(None, description="New group identifier if the badge's scope is changed.")
-    # criteria: Optional[str] = Field(None, max_length=1000, description="New criteria description.")
-    # state: Optional[str] = Field(None, description="New state of the badge.")
+    group_id: Optional[int] = Field(
+        None,
+        description="ID групи, до якої належить цей бейдж. NULL, якщо бейдж глобальний/системний."
+    )
+    state: Optional[str] = Field(
+        None,  # Або default="active"
+        max_length=50,
+        description="Стан бейджа (наприклад, 'active', 'archived').",
+        examples=["active"]
+    )
+    notes: Optional[str] = Field(  # Додаємо notes, оскільки Badge модель успадковує NotesMixin через BaseMainModel
+        None,
+        description="Додаткові нотатки щодо бейджа."
+    )
 
 
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        anystr_strip_whitespace = True
-        title = "BadgeUpdate"
-        json_schema_extra = {
-            "example": {
-                "name": "Super Early Bird",
-                "icon_url": "https://example.com/icons/super_early_bird_v2.png"
-            }
-        }
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.info(f"BadgeUpdate instance created with update data: {data}")
-
-class BadgeResponse(BadgeBase, BaseDBRead):
+class BadgeCreateSchema(BadgeBaseSchema):
     """
-    Schema for representing a badge in API responses.
-    Includes all fields from BadgeBase and common database read fields.
+    Схема для створення нового бейджа гейміфікації.
+    Успадковує всі поля від `BadgeBaseSchema`.
     """
-    # id: UUID # From BaseDBRead
-    # created_at: datetime # From BaseDBRead
-    # updated_at: datetime # From BaseDBRead
+    pass
 
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        title = "BadgeResponse"
-        json_schema_extra = {
-            "example": {
-                "id": "d4e5f6a7-b8c9-0123-4567-890abcdef0123",
-                "name": "Early Bird",
-                "description": "Awarded for completing a task before 8 AM.",
-                "icon_url": "https://example.com/icons/early_bird.png",
-                # "group_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                # "state": "active",
-                "created_at": "2023-01-05T10:00:00Z",
-                "updated_at": "2023-01-05T10:00:00Z"
-            }
-        }
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"BadgeResponse instance created for badge ID '{self.id}'.")
+class BadgeUpdateSchema(BadgeBaseSchema):
+    """
+    Схема для оновлення існуючого бейджа гейміфікації.
+    Всі поля, успадковані з `BadgeBaseSchema`, стають опціональними.
+    """
+    name: Optional[str] = Field(None, max_length=BADGE_NAME_MAX_LENGTH)
+    description: Optional[str] = None
+    icon_url: Optional[AnyHttpUrl] = None
+    group_id: Optional[int] = Field(None,
+                                    description="Зміна групи для бейджа (зазвичай не дозволяється або обробляється окремо).")
+    state: Optional[str] = Field(None, max_length=50)
+    notes: Optional[str] = None
 
-logger.info("Badge schemas (BadgeBase, BadgeCreate, BadgeUpdate, BadgeResponse) defined successfully.")
+
+class BadgeSchema(BaseMainSchema):  # Успадковує id, name, description, state, notes, group_id, timestamps
+    """
+    Схема для представлення даних про бейдж гейміфікації у відповідях API.
+    Успадковує стандартні поля з `BaseMainSchema`.
+    """
+    # id, name, description, state, notes, group_id, created_at, updated_at, deleted_at - успадковані
+
+    # Специфічні поля моделі Badge
+    icon_url: Optional[AnyHttpUrl] = Field(None, description="URL іконки бейджа.")
+
+    # Пов'язані об'єкти
+    # TODO: Замінити Any на GroupBriefSchema, коли вона буде імпортована.
+    group: Optional[GroupBriefSchema] = Field(None,
+                                              description="Коротка інформація про групу, до якої належить бейдж (якщо є).")
+
+    # model_config успадковується з BaseMainSchema -> BaseSchema (from_attributes=True)
+
+
+if __name__ == "__main__":
+    # Демонстраційний блок для схем бейджів.
+    logger.info("--- Pydantic Схеми для Бейджів Гейміфікації (Badge) ---")
+
+    logger.info("\nBadgeCreateSchema (приклад для створення):")
+    create_badge_data = {
+        "name": "Зірка Спільноти",  # TODO i18n
+        "description": "Надається за активну допомогу іншим учасникам.",  # TODO i18n
+        "icon_url": "https://example.com/icons/community_star.png",
+        "state": "active"
+        # group_id може бути None для глобального бейджа
+    }
+    create_badge_instance = BadgeCreateSchema(**create_badge_data)
+    logger.info(create_badge_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nBadgeUpdateSchema (приклад для оновлення):")
+    update_badge_data = {
+        "description": "Оновлений опис для Зірки Спільноти: надається за 100 корисних відповідей.",  # TODO i18n
+        "icon_url": "https://example.com/icons/community_star_v2.png"
+    }
+    update_badge_instance = BadgeUpdateSchema(**update_badge_data)
+    logger.info(update_badge_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nBadgeSchema (приклад відповіді API):")
+    badge_response_data = {
+        "id": 1,
+        "name": "Ранній Птах",  # TODO i18n
+        "description": "Надається за реєстрацію в перший тиждень роботи системи.",  # TODO i18n
+        "state": "active",
+        "group_id": None,  # Глобальний бейдж
+        "created_at": datetime.now(),
+        "updated_at": datetime.now(),
+        "icon_url": "https://example.com/icons/early_bird.png",
+    }
+    badge_response_instance = BadgeSchema(**badge_response_data)
+    logger.info(badge_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nПримітка: Схема для `group` наразі є заповнювачем (Any).")
+    logger.info("Її потрібно буде замінити на `GroupBriefSchema` після її визначення.")

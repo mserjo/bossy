@@ -47,7 +47,7 @@ def confirm_action(prompt: str) -> bool:
         elif response == "ні":
             return False
         else:
-            print("Будь ласка, введіть 'так' або 'ні'.")
+            logger.info("Будь ласка, введіть 'так' або 'ні'.")
 
 def main():
     parser = argparse.ArgumentParser(description="Скрипт для відновлення бази даних PostgreSQL з резервної копії.")

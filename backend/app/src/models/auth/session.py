@@ -1,102 +1,114 @@
 # backend/app/src/models/auth/session.py
-
 """
-SQLAlchemy model for storing User Session information.
-This can be used for tracking active user sessions, especially for web applications
-or if you need server-side session management beyond stateless JWTs.
+Модель SQLAlchemy для сутності "Сесія Користувача".
+
+Цей модуль визначає модель `Session`, яка використовується для відстеження
+активних сесій користувачів. Це може бути корисно для моніторингу,
+примусового завершення сесій, аналізу активності тощо.
 """
+from datetime import datetime
+from typing import TYPE_CHECKING, Optional
 
-import logging
-from typing import Optional, TYPE_CHECKING
-from datetime import datetime, timezone, timedelta # Added timezone, timedelta for __main__
-
-from sqlalchemy import String, DateTime, ForeignKey, Text, Integer # Added Integer for FK
+from sqlalchemy import String, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.src.models.base import BaseModel
-
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+from backend.app.src.models.base import Base  # Успадковуємо від Base
+from backend.app.src.models.mixins import TimestampedMixin  # Додаємо часові мітки
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
-    from backend.app.src.models.auth.user import User
+    from backend.app.src.models.auth.user import User  # Для зв'язку user
 
-class UserSession(BaseModel):
+
+class Session(Base, TimestampedMixin):
     """
-    Represents an active user session.
-    This can be used to track user activity, manage server-side sessions,
-    or provide features like 'log out from other devices'.
+    Модель сесії користувача.
 
-    Attributes:
-        user_id (int): Foreign key to the user this session belongs to.
-        session_id_hash (str): A securely hashed version of the session ID.
-                               The actual session ID might be stored in a client-side cookie.
-        ip_address (Optional[str]): IP address where the session originated.
-        user_agent (Optional[str]): User agent string of the client.
-        last_activity_at (datetime): Timestamp of the last known activity for this session (UTC).
-        expires_at (datetime): Timestamp when this session is set to expire (UTC).
-        # `id`, `created_at`, `updated_at` are inherited from BaseModel.
+    Зберігає інформацію про активні сесії, включаючи ключ сесії,
+    пов'язаного користувача, час закінчення терміну дії, User-Agent та IP-адресу.
+
+    Атрибути:
+        id (Mapped[int]): Унікальний ідентифікатор запису сесії.
+        session_key (Mapped[str]): Унікальний ключ сесії (наприклад, може бути JWT JTI або інший ідентифікатор).
+        user_id (Mapped[int]): Зовнішній ключ до користувача, якому належить сесія.
+        expires_at (Mapped[datetime]): Дата та час закінчення терміну дії сесії.
+        user_agent (Mapped[Optional[str]]): User-Agent клієнта, з якого створено сесію.
+        ip_address (Mapped[Optional[str]]): IP-адреса клієнта, з якого створено сесію.
+        user (Mapped["User"]): Зв'язок з моделлю User.
+        created_at, updated_at: Успадковано від `TimestampedMixin`.
     """
     __tablename__ = "user_sessions"
 
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True, comment="The user this session belongs to")
+    id: Mapped[int] = mapped_column(
+        primary_key=True, index=True, autoincrement=True, comment="Унікальний ідентифікатор сесії"
+    )
+    session_key: Mapped[str] = mapped_column(
+        String(255), unique=True, index=True, nullable=False, comment="Унікальний ключ сесії"
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey('users.id', name='fk_session_user_id', ondelete='CASCADE'),
+        nullable=False,
+        comment="ID користувача, якому належить сесія"
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        nullable=False, comment="Час закінчення терміну дії сесії"
+    )
+    user_agent: Mapped[Optional[str]] = mapped_column(
+        String(512), nullable=True, comment="User-Agent клієнта сесії"
+    )
+    ip_address: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True, comment="IP-адреса клієнта сесії"
+    )
+    last_active_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(),
+        comment="Час останньої активності сесії"
+    )
 
-    # Store a hash of the session ID, not the session ID itself, if the actual ID is client-side (e.g., in a secure cookie)
-    # If this table IS the session store, then session_id_hash could just be session_id and be the primary lookup key.
-    session_id_hash: Mapped[str] = mapped_column(String(128), unique=True, index=True, nullable=False, comment="Hashed identifier of the session (e.g., hash of a cookie value)")
+    # Зв'язок з користувачем
+    user: Mapped["User"] = relationship(back_populates="sessions", lazy="selectin")
 
-    ip_address: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="IP address from which the session originated")
-    user_agent: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="User agent string of the client for this session") # Text for potentially long UA strings
+    # Поля для __repr__
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
+    _repr_fields = ["id", "user_id", "expires_at", "ip_address", "last_active_at"]
 
-    last_activity_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True, comment="Timestamp of the last recorded activity for this session (UTC)")
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True, comment="Timestamp when this session will/did expire (UTC)")
-
-    # --- Relationship ---
-    user: Mapped["User"] = relationship(back_populates="sessions")
-
-    def __repr__(self) -> str:
-        id_val = getattr(self, 'id', 'N/A')
-        return f"<UserSession(id={id_val}, user_id={self.user_id}, session_id_hash='{self.session_id_hash[:10]}...', expires_at='{self.expires_at.isoformat() if self.expires_at else 'N/A'}')>"
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для моделі Session.
+    from datetime import timezone, timedelta # Для прикладу нижче
+    logger.info("--- Модель Сесії Користувача (Session) ---")
+    logger.info(f"Назва таблиці: {Session.__tablename__}")
 
-    logger.info("--- UserSession Model --- Demonstration")
+    logger.info("\nОчікувані поля:")
+    expected_fields = [
+        'id', 'session_key', 'user_id', 'expires_at',
+        'user_agent', 'ip_address', 'created_at', 'updated_at'
+    ]
+    for field in expected_fields:
+        logger.info(f"  - {field}")
 
-    # from backend.app.src.models.auth.user import User # If needed for demo
-    # demo_user = User(id=1, email="session_user@example.com", name="Session User", hashed_password="xyz")
+    logger.info("\nОчікувані зв'язки (relationships):")
+    logger.info(f"  - user (до User)")
 
-    # Example UserSession instance
-    session_instance = UserSession(
-        user_id=1, # Assuming user with id=1 exists
-        session_id_hash="hashed_session_id_placeholder_abcdef123456",
-        ip_address="203.0.113.45",
+    # Приклад створення екземпляра (без взаємодії з БД)
+    from datetime import timedelta, timezone
+
+    example_session = Session(
+        id=1,
+        session_key="абсолютно_унікальний_ключ_сесії_12345",
+        user_id=101,
+        expires_at=datetime.now(timezone.utc) + timedelta(hours=2),
         user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
-        last_activity_at=datetime.now(timezone.utc) - timedelta(minutes=5),
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=8)
+        ip_address="192.168.1.100"
     )
-    session_instance.id = 1 # Simulate ORM-set ID
-    session_instance.created_at = datetime.now(timezone.utc) - timedelta(minutes=30)
-    session_instance.updated_at = datetime.now(timezone.utc) - timedelta(minutes=5)
+    # Імітуємо часові мітки
+    example_session.created_at = datetime.now(timezone.utc)
+    example_session.updated_at = datetime.now(timezone.utc)
 
-    logger.info(f"Example UserSession: {session_instance!r}")
-    logger.info(f"  User ID: {session_instance.user_id}")
-    logger.info(f"  IP Address: {session_instance.ip_address}")
-    logger.info(f"  Expires At: {session_instance.expires_at.isoformat() if session_instance.expires_at else 'N/A'}")
-    logger.info(f"  Last Activity: {session_instance.last_activity_at.isoformat() if session_instance.last_activity_at else 'N/A'}")
-    logger.info(f"  Created At: {session_instance.created_at.isoformat() if session_instance.created_at else 'N/A'}")
+    logger.info(f"\nПриклад екземпляра Session (без сесії):\n  {example_session}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <Session(id=1, user_id=101, ip_address='192.168.1.100', expires_at=..., created_at=..., updated_at=...)>
+    # Поле 'session_key' та 'user_agent' не включено в _repr_fields за замовчуванням через їх потенційну довжину.
 
-
-    expired_session = UserSession(
-        user_id=2,
-        session_id_hash="another_hashed_session_id_7890ghijk",
-        last_activity_at=datetime.now(timezone.utc) - timedelta(days=2, hours=1),
-        expires_at=datetime.now(timezone.utc) - timedelta(days=2) # Expired
-    )
-    expired_session.id = 2
-    logger.info(f"Example Expired UserSession: {expired_session!r}")
-
-    # The following line would error if run directly without SQLAlchemy engine and metadata setup for all related tables.
-    # logger.info(f"UserSession attributes (conceptual table columns): {[c.name for c in UserSession.__table__.columns if not c.name.startswith('_')]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

@@ -1,224 +1,195 @@
 # backend/app/src/repositories/system/monitoring_repository.py
-
 """
-Repository for SystemLog and PerformanceMetric entities.
-Provides CRUD operations and specific methods for managing system monitoring data.
+Репозиторії для моделей системного моніторингу (Системні Логи та Метрики Продуктивності).
+
+Цей модуль визначає:
+- `SystemLogRepository`: для роботи з записами системних логів (`SystemLog`).
+- `PerformanceMetricRepository`: для роботи з метриками продуктивності (`PerformanceMetric`).
 """
 
-import logging
-from typing import Optional, List, Dict, Any # Added List, Dict, Any
-from datetime import datetime # Added datetime
+from typing import List, Optional, Tuple, Any, Dict
 
+from sqlalchemy import select, func, delete as sqlalchemy_delete  # delete для можливих операцій очищення
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, desc, asc # Added desc, asc for ordering
+from pydantic import BaseModel as PydanticBaseModel  # Для UpdateSchemaType-заглушок
 
+# Абсолютний імпорт базового репозиторію
+from backend.app.src.repositories.base import BaseRepository
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
+
+# Абсолютний імпорт моделей та схем
 from backend.app.src.models.system.monitoring import SystemLog, PerformanceMetric
 from backend.app.src.schemas.system.monitoring import (
-    SystemLogCreate,
-    # Assuming SystemLogUpdate might not be common, or could use SystemLogBase/Dict for partial.
-    # If specific update logic is needed, a SystemLogUpdate schema would be imported.
-    PerformanceMetricCreate,
-    # Similarly for PerformanceMetricUpdate.
+    SystemLogCreateSchema,
+    PerformanceMetricCreateSchema
 )
-from backend.app.src.repositories.base import BaseRepository
 
-logger = logging.getLogger(__name__)
 
-# --- SystemLog Repository ---
-class SystemLogRepository(BaseRepository[SystemLog, SystemLogCreate, SystemLogCreate]): # Using SystemLogCreate for Update type for simplicity
+# TODO: Імпортувати Enums, наприклад, LogLevel, коли вони будуть визначені в core.dicts
+# from backend.app.src.core.dicts import LogLevel as LogLevelEnum
+
+# Системні логи та метрики зазвичай не оновлюються; вони є записами подій.
+# Тому UpdateSchema може бути простою заглушкою.
+class SystemLogUpdateSchema(PydanticBaseModel):
+    pass
+
+
+class PerformanceMetricUpdateSchema(PydanticBaseModel):
+    pass
+
+
+class SystemLogRepository(BaseRepository[SystemLog, SystemLogCreateSchema, SystemLogUpdateSchema]):
     """
-    Repository for managing SystemLog records.
-    System logs are typically append-only, so updates might be rare or restricted.
+    Репозиторій для управління записами системних логів (`SystemLog`).
+
+    Успадковує базові CRUD-методи. Надає методи для фільтрації логів
+    за рівнем, джерелом або користувачем.
     """
 
-    def __init__(self):
-        super().__init__(SystemLog)
+    def __init__(self, db_session: AsyncSession):
+        super().__init__(db_session=db_session, model=SystemLog)
 
     async def get_logs_by_level(
-        self, db: AsyncSession, *, level: str, skip: int = 0, limit: int = 100, newest_first: bool = True
-    ) -> List[SystemLog]:
-        """
-        Retrieves logs filtered by a specific log level, with pagination and ordering.
+            self,
+            level: str,  # Очікується значення з LogLevel Enum
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[SystemLog], int]:
+        """Отримує логи за вказаним рівнем."""
+        # TODO: Використовувати LogLevelEnum.LEVEL.value для порівняння
+        filters = [self.model.level == level]
+        order_by = [self.model.timestamp.desc()]
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
 
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            level: The log level to filter by (e.g., "INFO", "ERROR").
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
-            newest_first: If True, orders logs by creation date descending, otherwise ascending.
+    async def get_logs_by_source(
+            self,
+            source: str,
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[SystemLog], int]:
+        """Отримує логи за вказаним джерелом."""
+        filters = [self.model.source == source]
+        order_by = [self.model.timestamp.desc()]
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
 
-        Returns:
-            A list of SystemLog objects.
-        """
-        statement = select(self.model).where(self.model.level == level)
-        if newest_first:
-            statement = statement.order_by(desc(self.model.created_at)) # type: ignore[attr-defined]
-        else:
-            statement = statement.order_by(asc(self.model.created_at)) # type: ignore[attr-defined]
+    async def get_logs_for_user(
+            self,
+            user_id: int,
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[SystemLog], int]:
+        """Отримує логи, пов'язані з конкретним користувачем."""
+        filters = [self.model.user_id == user_id]
+        order_by = [self.model.timestamp.desc()]
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
 
-        statement = statement.offset(skip).limit(limit)
-        result = await db.execute(statement)
-        return list(result.scalars().all())
-
-    async def get_logs_by_date_range(
-        self,
-        db: AsyncSession,
-        *,
-        start_time: datetime,
-        end_time: datetime,
-        skip: int = 0,
-        limit: int = 100,
-        newest_first: bool = True
-    ) -> List[SystemLog]:
-        """
-        Retrieves logs within a specific date/time range, with pagination and ordering.
-
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            start_time: The beginning of the time range (inclusive).
-            end_time: The end of the time range (inclusive).
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
-            newest_first: If True, orders logs by creation date descending, otherwise ascending.
-
-        Returns:
-            A list of SystemLog objects.
-        """
-        statement = select(self.model).where(
-            self.model.created_at >= start_time, # type: ignore[attr-defined]
-            self.model.created_at <= end_time    # type: ignore[attr-defined]
-        )
-        if newest_first:
-            statement = statement.order_by(desc(self.model.created_at)) # type: ignore[attr-defined]
-        else:
-            statement = statement.order_by(asc(self.model.created_at)) # type: ignore[attr-defined]
-
-        statement = statement.offset(skip).limit(limit)
-        result = await db.execute(statement)
-        return list(result.scalars().all())
-
-    async def get_logs_by_logger_name(
-        self, db: AsyncSession, *, logger_name: str, skip: int = 0, limit: int = 100, newest_first: bool = True
-    ) -> List[SystemLog]:
-        """
-        Retrieves logs filtered by a specific logger name, with pagination and ordering.
-
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            logger_name: The name of the logger to filter by.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
-            newest_first: If True, orders logs by creation date descending, otherwise ascending.
-
-        Returns:
-            A list of SystemLog objects.
-        """
-        statement = select(self.model).where(self.model.logger_name == logger_name) # type: ignore[attr-defined]
-        if newest_first:
-            statement = statement.order_by(desc(self.model.created_at)) # type: ignore[attr-defined]
-        else:
-            statement = statement.order_by(asc(self.model.created_at)) # type: ignore[attr-defined]
-
-        statement = statement.offset(skip).limit(limit)
-        result = await db.execute(statement)
-        return list(result.scalars().all())
-
-    # Note: System logs are generally append-only.
-    # The base `update` and `remove` methods from BaseRepository are available
-    # but might be used sparingly or with caution for logs. Consider if they
-    # should be overridden to prevent usage or add specific logic if needed.
+    async def clear_old_logs(self, before_timestamp: datetime) -> int:
+        """Видаляє старі записи логів до вказаної дати."""
+        stmt = sqlalchemy_delete(self.model).where(self.model.timestamp < before_timestamp)
+        result = await self.db_session.execute(stmt)
+        await self.db_session.commit()
+        return result.rowcount
 
 
-# --- PerformanceMetric Repository ---
-class PerformanceMetricRepository(BaseRepository[PerformanceMetric, PerformanceMetricCreate, PerformanceMetricCreate]): # Using Create for Update type
+class PerformanceMetricRepository(
+    BaseRepository[PerformanceMetric, PerformanceMetricCreateSchema, PerformanceMetricUpdateSchema]):
     """
-    Repository for managing PerformanceMetric records.
-    Performance metrics are also typically append-only.
+    Репозиторій для управління метриками продуктивності (`PerformanceMetric`).
+
+    Успадковує базові CRUD-методи. Надає методи для фільтрації метрик
+    за назвою або тегами.
     """
 
-    def __init__(self):
-        super().__init__(PerformanceMetric)
+    def __init__(self, db_session: AsyncSession):
+        super().__init__(db_session=db_session, model=PerformanceMetric)
 
     async def get_metrics_by_name(
-        self, db: AsyncSession, *, metric_name: str, skip: int = 0, limit: int = 100, newest_first: bool = True
-    ) -> List[PerformanceMetric]:
+            self,
+            metric_name: str,
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[PerformanceMetric], int]:
+        """Отримує метрики за вказаною назвою."""
+        filters = [self.model.metric_name == metric_name]
+        order_by = [self.model.timestamp.desc()]
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
+
+    async def get_metrics_by_tag(
+            self,
+            tag_key: str,
+            tag_value: str,
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[PerformanceMetric], int]:
         """
-        Retrieves performance metrics filtered by metric name, with pagination and ordering.
-
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            metric_name: The name of the metric to filter by.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
-            newest_first: If True, orders metrics by recording date descending, otherwise ascending.
-
-        Returns:
-            A list of PerformanceMetric objects.
+        Отримує метрики, що містять вказаний тег (ключ-значення).
+        Потребує підтримки JSON операторів на рівні БД (наприклад, PostgreSQL JSONB).
         """
-        statement = select(self.model).where(self.model.metric_name == metric_name) # type: ignore[attr-defined]
-        if newest_first:
-            statement = statement.order_by(desc(self.model.created_at)) # type: ignore[attr-defined]
-        else:
-            statement = statement.order_by(asc(self.model.created_at)) # type: ignore[attr-defined]
+        # TODO: Адаптувати запит для конкретного діалекту БД та типу JSON поля.
+        #       Наведений приклад є концептуальним для PostgreSQL JSONB.
+        #       Для інших БД може знадобитися інший синтаксис або підхід.
+        #       Наприклад, self.model.tags[tag_key].astext == tag_value (для PostgreSQL)
+        #       Або self.model.tags.op('->>')(tag_key) == tag_value
+        #       Якщо використовується SQLite з JSON1 розширенням: json_extract(self.model.tags, '$.tag_key') == tag_value
 
-        statement = statement.offset(skip).limit(limit)
-        result = await db.execute(statement)
-        return list(result.scalars().all())
+        # Простий варіант, якщо теги неглибокі і можна шукати по частині рядка (менш точно):
+        # filters = [self.model.tags.cast(String).ilike(f'%"{tag_key}": "{tag_value}"%')]
 
-    async def get_metrics_by_date_range(
-        self,
-        db: AsyncSession,
-        *,
-        start_time: datetime,
-        end_time: datetime,
-        metric_name: Optional[str] = None, # Optional filter by metric name
-        tags_filter: Optional[Dict[str, Any]] = None, # Optional filter by tags (exact match for now)
-        skip: int = 0,
-        limit: int = 100,
-        newest_first: bool = True
-    ) -> List[PerformanceMetric]:
-        """
-        Retrieves performance metrics within a specific date/time range,
-        optionally filtered by metric name and tags, with pagination and ordering.
+        # Більш точний варіант для PostgreSQL (якщо поле tags є JSONB):
+        # filters = [self.model.tags[tag_key].as_string() == tag_value] # SQLAlchemy 2.0+
+        # Або для старіших версій / інших діалектів:
+        # from sqlalchemy.dialects.postgresql import JSONB
+        # filters = [self.model.tags.cast(JSONB)[tag_key].astext == tag_value]
 
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            start_time: The beginning of the time range (inclusive).
-            end_time: The end of the time range (inclusive).
-            metric_name: Optional. Filter by a specific metric name.
-            tags_filter: Optional. A dictionary of tags to filter by (exact match of key-value pairs within the JSONB tags).
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
-            newest_first: If True, orders metrics by recording date descending, otherwise ascending.
+        # Наразі, без конкретизації діалекту, залишимо це як TODO для реалізації
+        # або спростимо до пошуку, якщо це можливо без складних JSON операторів.
+        # Для демонстрації, повернемо порожній результат, вказуючи на потребу реалізації.
+        # logger.warning("Метод get_metrics_by_tag потребує реалізації специфічного для БД JSON-запиту.")
 
-        Returns:
-            A list of PerformanceMetric objects.
-        """
-        conditions = [
-            self.model.created_at >= start_time, # type: ignore[attr-defined]
-            self.model.created_at <= end_time    # type: ignore[attr-defined]
-        ]
-        if metric_name:
-            conditions.append(self.model.metric_name == metric_name) # type: ignore[attr-defined]
+        # Приклад фільтрації, якщо теги зберігаються як рядок JSON (неефективно):
+        # filters = [self.model.tags.isnot(None), self.model.tags.cast(String).contains(f'"{tag_key}":"{tag_value}"')]
 
-        if tags_filter:
-            # This is a basic way to filter JSON. For complex JSON queries,
-            # SQLAlchemy offers more specific functions like `jsonb_path_exists`, etc.
-            # This example assumes tags_filter provides key-value pairs that should exist at the top level of the 'tags' JSON.
-            for key, value in tags_filter.items():
-                conditions.append(self.model.tags[key].astext == str(value)) # type: ignore[attr-defined]
+        # Якщо припустити, що ми не можемо зробити ефективний SQL запит по JSON зараз:
+        # Повернемо всі і фільтруватимемо в Python (дуже неефективно для великих датасетів!)
+        # all_items, total = await self.get_multi(skip=0, limit=1_000_000) # Отримати все (погано)
+        # filtered_items = [item for item in all_items if item.tags and item.tags.get(tag_key) == tag_value]
+        # paginated_items = filtered_items[skip : skip + limit]
+        # return paginated_items, len(filtered_items)
+
+        # Поки що повертаємо помилку, що метод не реалізовано належним чином
+        raise NotImplementedError(
+            "Пошук за тегами в JSON потребує специфічної для БД реалізації або іншої стратегії зберігання тегів.")
+
+    async def clear_old_metrics(self, before_timestamp: datetime) -> int:
+        """Видаляє старі записи метрик до вказаної дати."""
+        stmt = sqlalchemy_delete(self.model).where(self.model.timestamp < before_timestamp)
+        result = await self.db_session.execute(stmt)
+        await self.db_session.commit()
+        return result.rowcount
 
 
-        statement = select(self.model).where(*conditions)
+if __name__ == "__main__":
+    # Демонстраційний блок для репозиторіїв моніторингу.
+    logger.info("--- Репозиторії Системного Моніторингу ---")
 
-        if newest_first:
-            statement = statement.order_by(desc(self.model.created_at)) # type: ignore[attr-defined]
-        else:
-            statement = statement.order_by(asc(self.model.created_at)) # type: ignore[attr-defined]
+    logger.info(f"\n--- Репозиторій Системних Логів ({SystemLogRepository.__name__}) ---")
+    logger.info(f"Модель: {SystemLog.__name__}, Схема створення: {SystemLogCreateSchema.__name__}")
+    logger.info("Специфічні методи:")
+    logger.info("  - get_logs_by_level(level: str, ...)")
+    logger.info("  - get_logs_by_source(source: str, ...)")
+    logger.info("  - get_logs_for_user(user_id: int, ...)")
+    logger.info("  - clear_old_logs(before_timestamp: datetime)")
+    logger.info("TODO: Інтегрувати Enum 'LogLevel' для аргументу `level`.")
 
-        statement = statement.offset(skip).limit(limit)
-        result = await db.execute(statement)
-        return list(result.scalars().all())
+    logger.info(f"\n--- Репозиторій Метрик Продуктивності ({PerformanceMetricRepository.__name__}) ---")
+    logger.info(f"Модель: {PerformanceMetric.__name__}, Схема створення: {PerformanceMetricCreateSchema.__name__}")
+    logger.info("Специфічні методи:")
+    logger.info("  - get_metrics_by_name(metric_name: str, ...)")
+    logger.info("  - get_metrics_by_tag(tag_key: str, tag_value: str, ...)")
+    logger.info("  - clear_old_metrics(before_timestamp: datetime)")
+    logger.info("TODO: Реалізувати `get_metrics_by_tag` з урахуванням діалекту БД для JSON запитів.")
 
-    # Note: Performance metrics are generally append-only.
-    # The base `update` and `remove` are available but likely not standard use cases.
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    from datetime import datetime  # Необхідно для clear_old_metrics

@@ -1,150 +1,109 @@
 # backend/app/src/schemas/tasks/event.py
 
 """
-Pydantic schemas for Events.
+Pydantic схеми для Подій.
 """
 
 import logging
-from typing import Optional, List # For potential future use with assignees or similar
-from datetime import datetime, timezone, timedelta # For examples and BaseResponseSchema
+from typing import Optional, List
+from datetime import datetime, timezone # timedelta for examples if needed
 
-from pydantic import Field, HttpUrl # HttpUrl not used here, but good to have if URLs were present
+from pydantic import Field
 
-from backend.app.src.schemas.base import BaseSchema, BaseMainResponseSchema
-# from backend.app.src.core.dicts import EventFrequency # If events have recurrence
+from backend.app.src.schemas.base import BaseSchema, BaseMainSchema # BaseMainSchema for response
+from backend.app.src.schemas.auth.user import UserPublicProfileSchema
+from backend.app.src.schemas.tasks.assignment import TaskAssignmentSchema
+from backend.app.src.schemas.tasks.completion import TaskCompletionSchema
+# from backend.app.src.core.dicts import EventFrequency # Якщо події мають повторюваність
 
-# Configure logger for this module
+# Налаштування логера для цього модуля
 logger = logging.getLogger(__name__)
 
-# --- Locally defined Basic Info schemas for demonstration ---
-# (Ideally, these would be imported from their respective schema files or a shared location)
-class GroupBasicInfo(BaseSchema):
-    id: int = Field(..., example=1)
-    name: str = Field(..., example="Marketing Department")
+# --- Локально визначені базові інформаційні схеми для демонстрації ---
+# TODO: Замінити на імпорти з відповідних файлів схем, коли вони будуть повністю визначені.
+class GroupBasicInfoSchema(BaseSchema):
+    """Мінімальна інформація про групу для вкладення в інші схеми."""
+    id: int = Field(..., example=1, description="Ідентифікатор групи.")
+    name: str = Field(..., example="Відділ маркетингу", description="Назва групи.")
 
-class EventTypeBasicInfo(BaseSchema): # Example if events have their own type dictionary
-    id: int = Field(..., example=2)
-    code: str = Field(..., example="WEBINAR")
-    name: str = Field(..., example="Webinar")
-# --- End of local Basic Info schemas ---
+# class EventTypeBasicInfoSchema(BaseSchema): # Приклад, якщо події мають власний довідник типів
+#     id: int = Field(..., example=2, description="Ідентифікатор типу події.")
+#     code: str = Field(..., example="WEBINAR", description="Код типу події.")
+#     name: str = Field(..., example="Вебінар", description="Назва типу події.")
+# --- Кінець локальних базових інформаційних схем ---
 
 
-# --- Event Schemas ---
+# --- Схеми Подій ---
 
-class EventBase(BaseSchema):
-    """Base schema for event data, common to create and update operations."""
-    name: str = Field(..., min_length=3, max_length=255, description="Name or title of the event.", example="Quarterly Review Meeting")
-    description: Optional[str] = Field(None, description="Detailed description of the event.", example="Review of Q3 performance and planning for Q4.")
-    # group_id is often a path parameter or set by service.
-    # group_id: Optional[int] = Field(None, description="ID of the group this event belongs to.")
-    # event_type_id: Optional[int] = Field(None, description="ID of the event type (e.g., from dict_event_types or dict_task_types).", example=1)
-    start_time: datetime = Field(..., description="Start date and time of the event (UTC).", example=datetime.now(timezone.utc) + timedelta(days=10))
-    end_time: Optional[datetime] = Field(None, description="Optional end date and time of the event (UTC).", example=datetime.now(timezone.utc) + timedelta(days=10, hours=2))
-    location: Optional[str] = Field(None, max_length=512, description="Physical or virtual location of the event.", example="Board Room / Zoom")
-    state: Optional[str] = Field("upcoming", max_length=50, description="State of the event (e.g., 'upcoming', 'ongoing', 'past', 'cancelled').", example="upcoming") # From BaseMainModel
-    notes: Optional[str] = Field(None, description="Internal notes for the event.") # From BaseMainModel
-    # Add recurrence fields here if events can be recurring, similar to TaskBase
-    # is_recurring: Optional[bool] = Field(False)
-    # recurrence_frequency: Optional[EventFrequency] = Field(None)
-    # recurrence_interval: Optional[int] = Field(None, ge=1)
+class EventBaseSchema(BaseSchema):
+    """Базова схема для даних події, спільна для операцій створення та оновлення."""
+    name: str = Field(..., min_length=3, max_length=255, description="Назва або заголовок події.", example="Щоквартальна зустріч-огляд")
+    description: Optional[str] = Field(None, description="Детальний опис події.", example="Огляд результатів 3-го кварталу та планування на 4-й квартал.")
+    # event_type_id: Optional[int] = Field(None, description="ID типу події (наприклад, з dict_event_types або dict_task_types).", example=1)
+    start_time: datetime = Field(..., description="Дата та час початку події (UTC).", example=datetime.now(timezone.utc)) # Removed timedelta for simplicity here
+    end_time: Optional[datetime] = Field(None, description="Необов'язкові дата та час закінчення події (UTC).", example=datetime.now(timezone.utc)) # Removed timedelta
+    location: Optional[str] = Field(None, max_length=512, description="Фізичне або віртуальне місцезнаходження події.", example="Кімната переговорів / Zoom")
+    state: Optional[str] = Field("upcoming", max_length=50, description="Стан події (наприклад, 'upcoming', 'ongoing', 'past', 'cancelled').", example="upcoming") # З BaseMainModel
+    notes: Optional[str] = Field(None, description="Внутрішні нотатки для події.") # З BaseMainModel
+    # Додайте сюди поля повторюваності, якщо події можуть бути повторюваними, аналогічно до TaskBase
+    # is_recurring: Optional[bool] = Field(False, description="Чи є подія повторюваною.")
+    # recurrence_frequency: Optional[EventFrequency] = Field(None, description="Частота повторення.")
+    # recurrence_interval: Optional[int] = Field(None, ge=1, description="Інтервал повторення.")
 
-class EventCreate(EventBase):
+class EventCreateSchema(EventBaseSchema):
     """
-    Schema for creating a new event.
-    `group_id` is assumed to be part of API path or context.
+    Схема для створення нової події.
+    `group_id` повинен бути наданий, оскільки подія належить групі.
+    `created_by_user_id` зазвичай встановлюється сервісом.
     """
-    name: str = Field(..., min_length=3, max_length=255, description="Name or title of the event.") # Ensure name is mandatory
-    start_time: datetime = Field(..., description="Start date and time of the event (UTC).") # Ensure start_time is mandatory
-    pass
+    group_id: int = Field(..., description="Ідентифікатор групи, до якої належить ця подія.")
+    # name та start_time є обов'язковими з EventBaseSchema.
 
-class EventUpdate(BaseSchema): # Does not inherit EventBase to make all fields truly optional
+class EventUpdateSchema(BaseSchema): # Не успадковує EventBaseSchema, щоб зробити всі поля справді опціональними
     """
-    Schema for updating an existing event. All fields are optional for partial updates.
+    Схема для оновлення існуючої події. Всі поля є опціональними для часткових оновлень.
     """
-    name: Optional[str] = Field(None, min_length=3, max_length=255, description="New name or title of the event.")
-    description: Optional[str] = Field(None, description="New detailed description of the event.")
-    # event_type_id: Optional[int] = Field(None, description="New ID of the event type.")
-    start_time: Optional[datetime] = Field(None, description="New start date and time of the event (UTC).")
-    end_time: Optional[datetime] = Field(None, description="New end date and time of the event (UTC).")
-    location: Optional[str] = Field(None, max_length=512, description="New physical or virtual location of the event.")
-    state: Optional[str] = Field(None, max_length=50, description="New state of the event.")
-    notes: Optional[str] = Field(None, description="Updated internal notes for the event.")
-    # Update recurrence fields if they exist
+    name: Optional[str] = Field(None, min_length=3, max_length=255, description="Нова назва або заголовок події.")
+    description: Optional[str] = Field(None, description="Новий детальний опис події.")
+    # event_type_id: Optional[int] = Field(None, description="Новий ID типу події.")
+    start_time: Optional[datetime] = Field(None, description="Нові дата та час початку події (UTC).")
+    end_time: Optional[datetime] = Field(None, description="Нові дата та час закінчення події (UTC).")
+    location: Optional[str] = Field(None, max_length=512, description="Нове фізичне або віртуальне місцезнаходження події.")
+    state: Optional[str] = Field(None, max_length=50, description="Новий стан події.")
+    notes: Optional[str] = Field(None, description="Оновлені внутрішні нотатки для події.")
+    # Оновлення полів повторюваності, якщо вони існують
 
-
-class EventResponse(BaseMainResponseSchema):
+class EventResponseSchema(BaseMainSchema): # Успадковує id, created_at, updated_at, deleted_at, name, description, state, notes, group_id
     """
-    Schema for representing an event in API responses.
-    Inherits common fields from BaseMainResponseSchema (id, created_at, updated_at, deleted_at, name, description, state, notes).
+    Схема для представлення події у відповідях API.
+    Успадковує спільні поля з BaseMainSchema.
     """
-    # name, description, state, notes are from BaseMainResponseSchema.
-    name: str = Field(..., description="Name of the event.", example="Product Launch Webinar")
-    description: Optional[str] = Field(None, description="Detailed description of the event.")
-    state: Optional[str] = Field(None, description="Lifecycle state of the event (e.g., 'upcoming', 'past').", example="upcoming")
+    # name, description, state, notes, group_id, id, created_at, updated_at, deleted_at - з BaseMainSchema.
+    # Потрібно переконатись, що поля BaseMainSchema відповідають потребам Event.
+    # name: str = Field(..., description="Назва події.", example="Вебінар з запуску продукту") # Вже є в BaseMainSchema
+    # description: Optional[str] = Field(None, description="Детальний опис події.") # Вже є в BaseMainSchema
+    # state: Optional[str] = Field(None, description="Життєвий цикл події (наприклад, 'upcoming', 'past').", example="upcoming") # Вже є в BaseMainSchema
 
-    group: Optional[GroupBasicInfo] = Field(None, description="Basic information about the group this event belongs to.") # Populated by service
-    # event_type: Optional[EventTypeBasicInfo] = Field(None, description="Information about the event type.") # Populated by service
+    # TODO: Замінити локальну GroupBasicInfoSchema на імпортовану з backend.app.src.schemas.groups.group
+    group: Optional[GroupBasicInfoSchema] = Field(None, description="Базова інформація про групу, до якої належить ця подія.") # Заповнюється сервісом
 
-    start_time: datetime = Field(..., description="Start date and time of the event.", example=(datetime.now(timezone.utc) + timedelta(days=1)).isoformat())
-    end_time: Optional[datetime] = Field(None, description="End date and time of the event.", example=(datetime.now(timezone.utc) + timedelta(days=1, hours=1)).isoformat())
-    location: Optional[str] = Field(None, description="Location of the event.", example="Main Conference Hall")
-    # Add recurrence fields if applicable
-    # is_recurring: bool = Field(...)
-    # recurrence_frequency: Optional[EventFrequency] = Field(None)
-    # recurrence_interval: Optional[int] = Field(None)
+    # event_type: Optional[EventTypeBasicInfoSchema] = Field(None, description="Інформація про тип події.") # Заповнюється сервісом
 
+    start_time: datetime = Field(..., description="Дата та час початку події.")
+    end_time: Optional[datetime] = Field(None, description="Дата та час закінчення події.")
+    location: Optional[str] = Field(None, description="Місцезнаходження події.", example="Головна конференц-зала")
 
-if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    created_by_user_id: Optional[int] = Field(None, description="ID користувача, який створив подію.")
+    created_by: Optional[UserPublicProfileSchema] = Field(None, description="Профіль користувача, який створив подію.")
 
-    logger.info("--- Event Schemas --- Demonstration")
+    assignments: List[TaskAssignmentSchema] = Field(default_factory=list, description="Список призначень, пов'язаних з подією.")
+    completions: List[TaskCompletionSchema] = Field(default_factory=list, description="Список виконань, пов'язаних з подією.")
 
-    # EventCreate Example
-    # Assume group_id=1 is context
-    event_create_data = {
-        "name": "Product Launch Webinar",
-        "description": "Webinar to launch the new Product X features.",
-        # "eventTypeId": 2, # If event types are used
-        "startTime": (datetime.now(timezone.utc) + timedelta(weeks=2)).isoformat(), # camelCase for start_time
-        "endTime": (datetime.now(timezone.utc) + timedelta(weeks=2, hours=1)).isoformat(),
-        "location": "Online - Webinar Platform",
-        "state": "upcoming"
-    }
-    try:
-        create_schema = EventCreate(**event_create_data) # type: ignore[call-arg]
-        logger.info(f"EventCreate valid: {create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating EventCreate: {e}")
+    # Додайте поля повторюваності, якщо застосовно
+    # is_recurring: bool = Field(..., description="Чи є подія повторюваною.")
+    # recurrence_frequency: Optional[EventFrequency] = Field(None, description="Частота повторення.")
+    # recurrence_interval: Optional[int] = Field(None, description="Інтервал повторення.")
 
-    # EventUpdate Example
-    event_update_data = {"location": "Online - Upgraded Webinar Platform", "state": "confirmed_upcoming"}
-    update_schema = EventUpdate(**event_update_data)
-    logger.info(f"EventUpdate (partial): {update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # EventResponse Example
-    group_info_data = {"id": 1, "name": "Marketing Department"}
-    # event_type_info_data = {"id": 2, "code": "WEBINAR", "name": "Webinar"}
-
-    response_data = {
-        "id": 201,
-        "createdAt": (datetime.now(timezone.utc) - timedelta(days=5)).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "name": "Product Launch Webinar",
-        "description": "Webinar to launch the new Product X features.",
-        "state": "confirmed_upcoming",
-        "notes": "Final attendee list pending.",
-        "deletedAt": None,
-        "group": group_info_data,
-        # "eventType": event_type_info,
-        "startTime": (datetime.now(timezone.utc) + timedelta(weeks=2)).isoformat(),
-        "endTime": (datetime.now(timezone.utc) + timedelta(weeks=2, hours=1)).isoformat(),
-        "location": "Online - Upgraded Webinar Platform"
-    }
-    try:
-        response_schema = EventResponse(**response_data) # type: ignore[call-arg]
-        logger.info(f"EventResponse: {response_schema.model_dump_json(by_alias=True, indent=2)}")
-        if response_schema.group:
-            logger.info(f"  Event group name: {response_schema.group.name}")
-    except Exception as e:
-        logger.error(f"Error creating EventResponse: {e}")
+    class Config:
+        from_attributes = True # Дозволяє мапити з моделі SQLAlchemy
+        populate_by_name = True # Дозволяє використовувати аліаси полів

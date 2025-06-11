@@ -1,114 +1,66 @@
 # backend/app/src/schemas/__init__.py
-
 """
-This package will contain Pydantic schemas used for data validation,
-serialization, and API request/response models.
+Pydantic схеми для програми Kudos.
+
+Цей пакет є кореневим для всіх схем Pydantic, що використовуються в додатку.
+Він експортує основні базові схеми та підпакети, які містять схеми
+для конкретних предметних областей (модулів) програми.
+
+Структура схем зазвичай включає:
+- Базові схеми (`...BaseSchema`) для спільних полів.
+- Схеми для створення записів (`...CreateSchema`).
+- Схеми для оновлення записів (`...UpdateSchema`).
+- Схеми для представлення даних у відповідях API (`...Schema`).
+- Деталізовані схеми для відповідей API, що включають пов'язані об'єкти (`...DetailSchema`).
+
+Використання Pydantic забезпечує валідацію даних, серіалізацію та автоматичну
+генерацію документації OpenAPI для API.
 """
 
-import logging
-
-logger = logging.getLogger(__name__)
-logger.debug("Schemas package initialized.")
-
-# It can be useful to re-export base schemas or common schemas from here, for example:
-# from .base import BaseSchema, PaginatedResponse, MessageResponse
-
-from .gamification import (
-    LevelBase,
-    LevelCreate,
-    LevelUpdate,
-    LevelResponse,
-    UserLevelBase,
-    UserLevelResponse,
-    BadgeBase,
-    BadgeCreate,
-    BadgeUpdate,
-    BadgeResponse,
-    UserAchievementBase,
-    UserAchievementResponse,
-    UserGroupRatingBase,
-    UserGroupRatingResponse,
-    GroupLeaderboardResponse,
+# Експорт основних базових схем для прямого доступу
+from .base import (
+    BaseSchema,
+    IDSchemaMixin,
+    TimestampedSchemaMixin,
+    SoftDeleteSchemaMixin,
+    BaseMainSchema,
+    MsgResponse,
+    DataResponse,
+    PaginatedResponse,
+    T as GenericTypeVar  # Експорт TypeVar T, перейменованого для уникнення конфліктів
 )
-from .notifications import (
-    NotificationBase,
-    NotificationCreateInternal,
-    NotificationUpdate,
-    NotificationResponse,
-    NotificationTemplateBase,
-    NotificationTemplateCreate,
-    NotificationTemplateUpdate,
-    NotificationTemplateResponse,
-    NotificationDeliveryAttemptBase,
-    NotificationDeliveryAttemptCreate,
-    NotificationDeliveryAttemptResponse,
-)
-from .files import (
-    FileRecordBase,
-    FileRecordCreate,
-    FileRecordResponse,
-    PresignedUrlRequest,
-    PresignedUrlResponse,
-    FileUploadInitiateRequest,
-    FileUploadInitiateResponse,
-    FileUploadCompleteRequest,
-    FileUploadResponse,
-    UserAvatarBase,
-    UserAvatarCreate,
-    UserAvatarUpdate,
-    UserAvatarResponse,
-)
+
+# Експорт підпакетів, що містять специфічні схеми
+from . import auth
+from . import bonuses
+from . import dictionaries
+from . import files
+from . import gamification
+from . import groups
+from . import notifications
+from . import system
+from . import tasks
 
 __all__ = [
-    # Base schemas (example, uncomment if you have them in .base)
-    # "BaseSchema",
-    # "PaginatedResponse",
-    # "MessageResponse",
-
-    # Gamification Schemas
-    "LevelBase",
-    "LevelCreate",
-    "LevelUpdate",
-    "LevelResponse",
-    "UserLevelBase",
-    "UserLevelResponse",
-    "BadgeBase",
-    "BadgeCreate",
-    "BadgeUpdate",
-    "BadgeResponse",
-    "UserAchievementBase",
-    "UserAchievementResponse",
-    "UserGroupRatingBase",
-    "UserGroupRatingResponse",
-    "GroupLeaderboardResponse",
-
-    # Notification Schemas
-    "NotificationBase",
-    "NotificationCreateInternal",
-    "NotificationUpdate",
-    "NotificationResponse",
-    "NotificationTemplateBase",
-    "NotificationTemplateCreate",
-    "NotificationTemplateUpdate",
-    "NotificationTemplateResponse",
-    "NotificationDeliveryAttemptBase",
-    "NotificationDeliveryAttemptCreate",
-    "NotificationDeliveryAttemptResponse",
-
-    # File Schemas
-    "FileRecordBase",
-    "FileRecordCreate",
-    "FileRecordResponse",
-    "PresignedUrlRequest",
-    "PresignedUrlResponse",
-    "FileUploadInitiateRequest",
-    "FileUploadInitiateResponse",
-    "FileUploadCompleteRequest",
-    "FileUploadResponse",
-    "UserAvatarBase",
-    "UserAvatarCreate",
-    "UserAvatarUpdate",
-    "UserAvatarResponse",
+    # Базові схеми та міксини
+    "BaseSchema",
+    "IDSchemaMixin",
+    "TimestampedSchemaMixin",
+    "SoftDeleteSchemaMixin",
+    "BaseMainSchema",
+    # Узагальнені відповіді
+    "MsgResponse",
+    "DataResponse",
+    "PaginatedResponse",
+    "GenericTypeVar", # Раніше T
+    # Підпакети зі схемами
+    "auth",
+    "bonuses",
+    "dictionaries",
+    "files",
+    "gamification",
+    "groups",
+    "notifications",
+    "system",
+    "tasks",
 ]
-
-logger.info(f"Successfully exported schemas: {__all__}")

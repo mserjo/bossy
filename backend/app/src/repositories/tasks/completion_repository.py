@@ -1,212 +1,120 @@
 # backend/app/src/repositories/tasks/completion_repository.py
-
 """
-Repository for TaskCompletion entities.
-Provides CRUD operations and specific methods for managing task completions.
+Репозиторій для моделі "Виконання Завдання" (TaskCompletion).
+
+Цей модуль визначає клас `TaskCompletionRepository`, який успадковує `BaseRepository`
+та надає специфічні методи для роботи з записами про виконання завдань.
 """
 
-import logging
-from typing import Optional, List
-from datetime import datetime, timezone
+from typing import List, Optional, Tuple, Any
 
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update # Added update for verification
+# from sqlalchemy.orm import selectinload
 
-from backend.app.src.models.tasks.completion import TaskCompletion
-from backend.app.src.schemas.tasks.completion import TaskCompletionCreate, TaskCompletionVerify # Using TaskCompletionVerify for updates
+# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+# Абсолютний імпорт моделі та схем
+from backend.app.src.models.tasks.completion import TaskCompletion
+from backend.app.src.schemas.tasks.completion import TaskCompletionCreateSchema, TaskCompletionUpdateSchema
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-logger = logging.getLogger(__name__)
 
-class TaskCompletionRepository(BaseRepository[TaskCompletion, TaskCompletionCreate, TaskCompletionVerify]):
+class TaskCompletionRepository(BaseRepository[TaskCompletion, TaskCompletionCreateSchema, TaskCompletionUpdateSchema]):
     """
-    Repository for managing TaskCompletion records.
+    Репозиторій для управління записами про виконання завдань (`TaskCompletion`).
+
+    Успадковує базові CRUD-методи від `BaseRepository` та надає
+    додаткові методи для отримання виконань за парою завдання-користувач
+    та списку всіх виконань для конкретного завдання.
     """
 
-    def __init__(self):
-        super().__init__(TaskCompletion)
-
-    async def get_completions_for_task(
-        self,
-        db: AsyncSession,
-        *,
-        task_id: int,
-        user_id: Optional[int] = None,
-        is_verified: Optional[bool] = None,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[TaskCompletion]:
+    def __init__(self, db_session: AsyncSession):
         """
-        Retrieves all completion records for a specific task,
-        optionally filtered by user and verification status.
+        Ініціалізує репозиторій для моделі `TaskCompletion`.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            task_id: The ID of the task.
-            user_id: Optional. Filter by a specific user who completed the task.
-            is_verified: Optional. Filter by verification status.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
+        """
+        super().__init__(db_session=db_session, model=TaskCompletion)
+
+    async def get_by_task_and_user(self, task_id: int, user_id: int) -> Optional[TaskCompletion]:
+        """
+        Отримує останній запис про виконання завдання конкретним користувачем.
+        Якщо завдання може бути виконано кілька разів (наприклад, рекурентне),
+        цей метод поверне останню за часом спробу/виконання.
+
+        Args:
+            task_id (int): ID завдання.
+            user_id (int): ID користувача.
 
         Returns:
-            A list of TaskCompletion objects.
+            Optional[TaskCompletion]: Екземпляр моделі `TaskCompletion`, якщо знайдено, інакше None.
         """
-        conditions = [self.model.task_id == task_id] # type: ignore[attr-defined]
-        if user_id is not None:
-            conditions.append(self.model.user_id == user_id) # type: ignore[attr-defined]
-        if is_verified is not None:
-            conditions.append(self.model.is_verified == is_verified) # type: ignore[attr-defined]
-
-        statement = (
+        stmt = (
             select(self.model)
-            .where(*conditions)
-            .order_by(self.model.completed_at.desc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
+            .where(self.model.task_id == task_id, self.model.user_id == user_id)
+            .order_by(self.model.created_at.desc())  # Останнє виконання/спроба першим
         )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
+        result = await self.db_session.execute(stmt)
+        return result.scalars().first()  # Повертає перший результат або None
 
-    async def get_completions_by_user(
-        self,
-        db: AsyncSession,
-        *,
-        user_id: int,
-        is_verified: Optional[bool] = None,
-        task_id: Optional[int] = None, # Optional filter by task
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[TaskCompletion]:
+    async def get_all_by_task_and_user(self, task_id: int, user_id: int, skip: int = 0, limit: int = 100) -> Tuple[
+        List[TaskCompletion], int]:
         """
-        Retrieves all task completions submitted by a specific user,
-        optionally filtered by verification status and task.
+        Отримує всі записи про виконання завдання конкретним користувачем з пагінацією.
+        Корисно для рекурентних завдань.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            user_id: The ID of the user.
-            is_verified: Optional. Filter by verification status.
-            task_id: Optional. Filter by a specific task ID.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            task_id (int): ID завдання.
+            user_id (int): ID користувача.
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            A list of TaskCompletion objects.
+            Tuple[List[TaskCompletion], int]: Кортеж зі списком виконань та їх загальною кількістю.
         """
-        conditions = [self.model.user_id == user_id] # type: ignore[attr-defined]
-        if is_verified is not None:
-            conditions.append(self.model.is_verified == is_verified) # type: ignore[attr-defined]
-        if task_id is not None:
-            conditions.append(self.model.task_id == task_id) # type: ignore[attr-defined]
+        filters = [
+            self.model.task_id == task_id,
+            self.model.user_id == user_id
+        ]
+        order_by = [self.model.created_at.desc()]
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
 
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.completed_at.desc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
-
-    async def verify_completion(
-        self,
-        db: AsyncSession,
-        *,
-        completion_id: int,
-        verifier_id: int,
-        awarded_points: Optional[int] = None,
-        verification_notes: Optional[str] = None
-    ) -> Optional[TaskCompletion]:
+    async def get_completions_for_task(self, task_id: int, skip: int = 0, limit: int = 100) -> Tuple[
+        List[TaskCompletion], int]:
         """
-        Marks a task completion as verified.
+        Отримує список всіх виконань для вказаного завдання з пагінацією.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            completion_id: The ID of the TaskCompletion record.
-            verifier_id: The ID of the user verifying the completion.
-            awarded_points: Optional. Points to award for this completion.
-            verification_notes: Optional. Notes from the verifier.
+            task_id (int): ID завдання.
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            The updated TaskCompletion object if found, otherwise None.
+            Tuple[List[TaskCompletion], int]: Кортеж зі списком виконань та їх загальною кількістю.
         """
-        db_obj = await self.get(db, id=completion_id)
-        if db_obj:
-            db_obj.is_verified = True # type: ignore[union-attr]
-            db_obj.verified_at = datetime.now(timezone.utc) # type: ignore[union-attr]
-            db_obj.verifier_id = verifier_id # type: ignore[union-attr]
-            if awarded_points is not None:
-                db_obj.awarded_points = awarded_points # type: ignore[union-attr]
-            if verification_notes is not None:
-                db_obj.verification_notes = verification_notes # type: ignore[union-attr]
+        filters = [self.model.task_id == task_id]
+        order_by = [self.model.created_at.desc()]
+        # options = [selectinload(self.model.user), selectinload(self.model.verifier)] # Приклад жадібного завантаження
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)  # , options=options)
 
-            db.add(db_obj)
-            await db.commit()
-            await db.refresh(db_obj)
-            return db_obj
-        return None
 
-    async def reject_completion(
-        self,
-        db: AsyncSession,
-        *,
-        completion_id: int,
-        verifier_id: int,
-        verification_notes: Optional[str] = None
-    ) -> Optional[TaskCompletion]:
-        """
-        Marks a task completion as not verified (e.g., rejected).
+if __name__ == "__main__":
+    # Демонстраційний блок для TaskCompletionRepository.
+    logger.info("--- Репозиторій Виконань Завдань (TaskCompletionRepository) ---")
 
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            completion_id: The ID of the TaskCompletion record.
-            verifier_id: The ID of the user marking as not verified.
-            verification_notes: Optional. Notes explaining the rejection/change.
+    logger.info("Для тестування TaskCompletionRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {TaskCompletion.__name__}.")
+    logger.info(f"  Очікує схему створення: {TaskCompletionCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {TaskCompletionUpdateSchema.__name__}")
 
-        Returns:
-            The updated TaskCompletion object if found, otherwise None.
-        """
-        db_obj = await self.get(db, id=completion_id)
-        if db_obj:
-            db_obj.is_verified = False # type: ignore[union-attr]
-            db_obj.verified_at = datetime.now(timezone.utc) # type: ignore[union-attr]
-            db_obj.verifier_id = verifier_id # type: ignore[union-attr]
-            if verification_notes is not None:
-                db_obj.verification_notes = verification_notes # type: ignore[union-attr]
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_task_and_user(task_id: int, user_id: int) -> Optional[TaskCompletion] (повертає останнє)")
+    logger.info(
+        "  - get_all_by_task_and_user(task_id: int, user_id: int, skip: int = 0, limit: int = 100) -> Tuple[List[TaskCompletion], int]")
+    logger.info("  - get_completions_for_task(task_id: int, skip: int = 0, limit: int = 100)")
 
-            db.add(db_obj)
-            await db.commit()
-            await db.refresh(db_obj)
-            return db_obj
-        return None
-
-    async def get_completion_for_task_and_user(
-        self, db: AsyncSession, *, task_id: int, user_id: int
-    ) -> Optional[TaskCompletion]:
-        """
-        Retrieves a specific completion record for a task by a user.
-        Returns the most recent one if multiple exist.
-
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            task_id: The ID of the task.
-            user_id: The ID of the user.
-
-        Returns:
-            The TaskCompletion object if found (typically the latest if multiple), otherwise None.
-        """
-        statement = (
-            select(self.model)
-            .where(
-                self.model.task_id == task_id, # type: ignore[attr-defined]
-                self.model.user_id == user_id  # type: ignore[attr-defined]
-            )
-            .order_by(self.model.completed_at.desc()) # type: ignore[attr-defined]
-        )
-        result = await db.execute(statement)
-        return result.scalars().first() # Use .first() to get one or None
-
-    # BaseRepository methods create, get, update, remove are inherited.
-    # `create` uses TaskCompletionCreate. `task_id` and `user_id` set by service.
-    # `update` (generic) uses TaskCompletionVerify schema for this repo.
-    # `remove` hard deletes a completion record.
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

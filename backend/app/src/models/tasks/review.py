@@ -1,101 +1,115 @@
 # backend/app/src/models/tasks/review.py
-
 """
-SQLAlchemy model for Task Reviews, allowing users to provide feedback or ratings on tasks.
+Модель SQLAlchemy для сутності "Відгук на Завдання" (TaskReview).
+
+Цей модуль визначає модель `TaskReview`, яка дозволяє користувачам
+залишати відгуки (рейтинг та коментар) на виконані завдання.
 """
+from datetime import datetime, timezone  # timezone для __main__
+from typing import TYPE_CHECKING, Optional
 
-import logging
-from typing import Optional, TYPE_CHECKING
-from datetime import datetime, timezone # Added timezone for __main__
-
-from sqlalchemy import ForeignKey, Text, Integer, CheckConstraint # Added Integer for FKs
+from sqlalchemy import String, ForeignKey, Text, CheckConstraint, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-# from sqlalchemy.sql import func # Not strictly needed here unless using server_default for review_date
 
-from backend.app.src.models.base import BaseModel
-
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт базових класів
+from backend.app.src.models.base import Base
+from backend.app.src.models.mixins import TimestampedMixin  # Для created_at, updated_at
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
     from backend.app.src.models.tasks.task import Task
 
-class TaskReview(BaseModel):
-    """
-    Represents a review or feedback provided by a user for a specific task.
-    This could be a star rating, a comment, or both.
 
-    Attributes:
-        task_id (int): Foreign key to the task being reviewed.
-        user_id (int): Foreign key to the user who submitted the review.
-        rating (Optional[int]): A numerical rating (e.g., 1 to 5 stars).
-        comment (Optional[str]): Textual feedback or comment from the user.
-        # `id`, `created_at` (review_date), `updated_at` are inherited from BaseModel.
-        # `created_at` can effectively serve as `review_date`.
+class TaskReview(Base, TimestampedMixin):
+    """
+    Модель відгуку на завдання.
+
+    Зберігає рейтинг та коментар, залишений користувачем щодо конкретного завдання.
+
+    Атрибути:
+        id (Mapped[int]): Унікальний ідентифікатор відгуку.
+        task_id (Mapped[int]): ID завдання, до якого залишено відгук.
+        user_id (Mapped[int]): ID користувача, який залишив відгук.
+        rating (Mapped[Optional[int]]): Числовий рейтинг (наприклад, від 1 до 5).
+        comment (Mapped[Optional[str]]): Текстовий коментар відгуку.
+
+        task (Mapped["Task"]): Зв'язок з моделлю `Task`.
+        user (Mapped["User"]): Зв'язок з моделлю `User` (автор відгуку).
+        created_at, updated_at: Успадковано від `TimestampedMixin`.
     """
     __tablename__ = "task_reviews"
 
-    task_id: Mapped[int] = mapped_column(Integer, ForeignKey("tasks.id"), nullable=False, index=True, comment="FK to the task being reviewed")
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True, comment="FK to the user who submitted the review")
-
-    rating: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="Numerical rating, e.g., 1-5 stars. Null if only comment provided.")
-    comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="Textual comment or feedback provided by the user")
-
-    # --- Relationships ---
-    task: Mapped["Task"] = relationship(back_populates="reviews")
-    user: Mapped["User"] = relationship() # One-way relationship to User, or add back_populates="task_reviews" to User model
-
-    # --- Table Arguments ---
-    __table_args__ = (
-        CheckConstraint('rating IS NULL OR (rating >= 1 AND rating <= 5)', name='chk_rating_range'),
-        # Potentially a UniqueConstraint to allow a user to review a task only once:
-        # from sqlalchemy import UniqueConstraint # Import if using
-        # UniqueConstraint('task_id', 'user_id', name='uq_user_task_review'),
+    id: Mapped[int] = mapped_column(
+        primary_key=True, index=True, autoincrement=True, comment="Унікальний ідентифікатор відгуку"
+    )
+    task_id: Mapped[int] = mapped_column(
+        ForeignKey('tasks.id', name='fk_task_review_task_id', ondelete="CASCADE"),
+        nullable=False,
+        comment="ID завдання, до якого залишено відгук"
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey('users.id', name='fk_task_review_user_id', ondelete="CASCADE"),
+        # Якщо користувач видаляється, його відгуки теж
+        nullable=False,
+        comment="ID користувача, який залишив відгук"
     )
 
-    def __repr__(self) -> str:
-        id_val = getattr(self, 'id', 'N/A')
-        return f"<TaskReview(id={id_val}, task_id={self.task_id}, user_id={self.user_id}, rating={self.rating})>"
+    rating: Mapped[Optional[int]] = mapped_column(
+        nullable=True, comment="Числовий рейтинг завдання (наприклад, 1-5)"
+    )
+    comment: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, comment="Текстовий коментар до відгуку"
+    )
+
+    # Обмеження таблиці
+    __table_args__ = (
+        CheckConstraint('rating IS NULL OR (rating >= 1 AND rating <= 5)', name='cc_task_review_rating_range'),
+        UniqueConstraint('task_id', 'user_id', name='uq_task_user_review')
+    # Користувач може залишити лише один відгук на завдання
+    )
+
+    # --- Зв'язки (Relationships) ---
+    task: Mapped["Task"] = relationship(back_populates="reviews", lazy="selectin")
+    # User relationship (автор відгуку)
+    user: Mapped["User"] = relationship(foreign_keys=[user_id],
+                                        lazy="selectin")  # back_populates="task_reviews" можна додати до User
+
+    # Поля для __repr__
+    _repr_fields = ["id", "task_id", "user_id", "rating"]
+
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для моделі TaskReview.
+    logger.info("--- Модель Відгуку на Завдання (TaskReview) ---")
+    logger.info(f"Назва таблиці: {TaskReview.__tablename__}")
 
-    logger.info("--- TaskReview Model --- Demonstration")
+    logger.info("\nОчікувані поля:")
+    expected_fields = ['id', 'task_id', 'user_id', 'rating', 'comment', 'created_at', 'updated_at']
+    for field in expected_fields:
+        logger.info(f"  - {field}")
 
-    # Example TaskReview instance
-    # Assume Task id=1, User id=1 exist
-    review1 = TaskReview(
+    logger.info("\nОчікувані зв'язки (relationships):")
+    expected_relationships = ['task', 'user']
+    for rel in expected_relationships:
+        logger.info(f"  - {rel}")
+
+    # Приклад створення екземпляра (без взаємодії з БД)
+    example_review = TaskReview(
+        id=1,
         task_id=1,
-        user_id=1,
+        user_id=101,
         rating=5,
-        comment="Excellent task, very clear instructions!"
+        comment="Чудове завдання, було цікаво виконувати!"  # TODO i18n
     )
-    review1.id = 1 # Simulate ORM-set ID
-    review1.created_at = datetime.now(timezone.utc) # Simulate BaseModel field
-    review1.updated_at = datetime.now(timezone.utc) # Simulate BaseModel field
+    # Імітуємо часові мітки
+    example_review.created_at = datetime.now(tz=timezone.utc)
+    example_review.updated_at = datetime.now(tz=timezone.utc)
 
-    logger.info(f"Example TaskReview: {review1!r}")
-    logger.info(f"  Task ID: {review1.task_id}, User ID: {review1.user_id}")
-    logger.info(f"  Rating: {review1.rating}")
-    logger.info(f"  Comment: {review1.comment}")
-    logger.info(f"  Review Date (created_at): {review1.created_at.isoformat() if review1.created_at else 'N/A'}")
+    logger.info(f"\nПриклад екземпляра TaskReview (без сесії):\n  {example_review}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <TaskReview(id=1, task_id=1, user_id=101, rating=5, created_at=...)>
 
-
-    review2_comment_only = TaskReview(
-        task_id=2, # Assuming task 2 exists
-        user_id=3, # Assuming user 3 exists
-        comment="This task was a bit confusing at first."
-    )
-    review2_comment_only.id = 2
-    logger.info(f"Example TaskReview (comment only): {review2_comment_only!r}")
-    logger.info(f"  Rating (should be None): {review2_comment_only.rating}")
-
-    # Example of a review that might fail a check constraint (if DB was active)
-    # review_invalid_rating = TaskReview(task_id=1, user_id=2, rating=0)
-    # logger.info(f"Example invalid rating (conceptual): {review_invalid_rating!r}")
-
-    # The following line would error if run directly without SQLAlchemy engine and metadata setup for all related tables.
-    # logger.info(f"TaskReview attributes (conceptual table columns): {[c.name for c in TaskReview.__table__.columns if not c.name.startswith('_')]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

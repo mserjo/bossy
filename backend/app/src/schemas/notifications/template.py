@@ -1,160 +1,142 @@
 # backend/app/src/schemas/notifications/template.py
-import logging
-from typing import Optional, Dict, Any, List, Literal
+"""
+Pydantic схеми для сутності "Шаблон Сповіщення" (NotificationTemplate).
 
-from pydantic import BaseModel, Field, field_validator
+Цей модуль визначає схеми для представлення, створення та оновлення
+шаблонів сповіщень, які використовуються для генерації повідомлень
+різними каналами (email, SMS, in-app).
+"""
+from typing import Optional
 
-from app.src.schemas.base import BaseDBRead # Common DB fields
+from pydantic import Field
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт базових схем для довідників
+from backend.app.src.schemas.dictionaries.base_dict import (
+    BaseDictionarySchema,
+    DictionaryCreateSchema,
+    DictionaryUpdateSchema
+)
 
-# --- Notification Template Type Enum (Example) ---
-TemplateTypeLiterals = Literal["email", "in_app", "sms", "push_notification", "messenger_bot"]
 
-# --- NotificationTemplate Schemas ---
+# TODO: Визначити та імпортувати Enum NotificationChannelType з core.dicts
+# from backend.app.src.core.dicts import NotificationChannelType
 
-class NotificationTemplateBase(BaseModel):
+# Заглушка для NotificationChannelType
+class TempNotificationChannelType:  # TODO: Видалити після імпорту Enum
+    EMAIL = "email"
+    SMS = "sms"
+    IN_APP = "in_app"
+
+
+TEMPLATE_SUBJECT_MAX_LENGTH = 500
+TEMPLATE_TYPE_MAX_LENGTH = 50
+
+
+class NotificationTemplateBaseSchema(BaseSchema):  # Не успадковує DictionaryCreateSchema напряму, щоб мати свої поля
     """
-    Base schema for notification templates.
+    Базова схема з полями, специфічними для шаблону сповіщення,
+    використовується для Create та Update схем.
     """
-    name: str = Field(
+    subject_template: str = Field(
         ...,
-        min_length=3,
-        max_length=100,
-        description="Unique name/identifier for the template (e.g., 'user_registration_welcome', 'task_completion_alert')."
-    )
-    description: Optional[str] = Field(
-        None,
-        max_length=255,
-        description="Brief description of the template's purpose."
-    )
-    template_type: TemplateTypeLiterals = Field(
-        ...,
-        description="The type of template (e.g., 'email', 'in_app', 'sms'). Determines which fields (subject/body) are relevant."
-    )
-    subject_template: Optional[str] = Field(
-        None,
-        max_length=255,
-        description="Template for the notification subject (e.g., for emails). Uses Jinja2-like syntax for variables: 'Welcome, {{ username }}!'."
+        max_length=TEMPLATE_SUBJECT_MAX_LENGTH,
+        description="Шаблон теми сповіщення. Може містити плейсхолдери (наприклад, {{user_name}})."
     )
     body_template: str = Field(
         ...,
-        description="Template for the notification body/content. Uses Jinja2-like syntax: 'Your task {{ task_name }} is due on {{ due_date }}'."
+        description="Шаблон тіла сповіщення. Може містити плейсхолдери та HTML/Markdown/текст залежно від типу."
     )
-    default_vars: Optional[Dict[str, Any]] = Field(
-        None,
-        description="Default variables and their values for this template. Can be overridden at notification generation time."
+    # TODO: Замінити str на NotificationChannelType та додати валідатор на основі Enum.
+    template_type: str = Field(
+        ...,
+        max_length=TEMPLATE_TYPE_MAX_LENGTH,
+        description=f"Тип/канал шаблону (наприклад, '{TempNotificationChannelType.EMAIL}', '{TempNotificationChannelType.SMS}')."
     )
-    required_vars: Optional[List[str]] = Field(
-        None,
-        description="List of variable names that MUST be provided when using this template to generate a notification."
-    )
-    # language_code: Optional[str] = Field("en", max_length=10, description="Language code for this template (e.g., 'en', 'uk'). Allows for localized templates.")
 
 
-    @field_validator('subject_template', mode='before')
-    @classmethod
-    def check_subject_for_email(cls, v, values):
-        # For Pydantic V2, `values` is a `ValidationInfo` object, access data via `values.data`
-        # For Pydantic V1, `values` is a dict
-        data = values.data if hasattr(values, 'data') else values
-        if data.get('template_type') == 'email' and not v:
-            logger.warning(f"Subject template is recommended for email templates. Name: {data.get('name')}")
-            # raise ValueError('subject_template is required for email templates') # Or just log a warning
-        return v
-
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        anystr_strip_whitespace = True
-        title = "NotificationTemplateBase"
-        json_schema_extra = {
-            "example": {
-                "name": "task_reminder_email",
-                "description": "Email reminder for an upcoming task deadline.",
-                "template_type": "email",
-                "subject_template": "Reminder: Task '{{ task_name }}' is due soon!",
-                "body_template": "Hello {{ user_name }},\n\nThis is a reminder that your task '{{ task_name }}' is due on {{ due_date }}.\n\nDetails: {{ task_details }}\n\nThank you,\nKudos System",
-                "default_vars": {"system_name": "Kudos Platform"},
-                "required_vars": ["user_name", "task_name", "due_date", "task_details"]
-            }
-        }
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"NotificationTemplateBase instance created with data: {data}")
-
-
-class NotificationTemplateCreate(NotificationTemplateBase):
+class NotificationTemplateCreateSchema(DictionaryCreateSchema, NotificationTemplateBaseSchema):
     """
-    Schema for creating a new notification template.
+    Схема для створення нового шаблону сповіщення.
+    Успадковує поля `name`, `code`, `description`, `state`, `notes` з `DictionaryCreateSchema`
+    та додає `subject_template`, `body_template`, `template_type` з `NotificationTemplateBaseSchema`.
     """
+    # name, code, description, state, notes - з DictionaryCreateSchema
+    # subject_template, body_template, template_type - з NotificationTemplateBaseSchema
     pass
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.info(f"NotificationTemplateCreate instance created for template '{self.name}'.")
 
-
-class NotificationTemplateUpdate(BaseModel):
+class NotificationTemplateUpdateSchema(DictionaryUpdateSchema, NotificationTemplateBaseSchema):
     """
-    Schema for updating an existing notification template. All fields are optional.
+    Схема для оновлення існуючого шаблону сповіщення.
+    Всі поля є опціональними.
     """
-    name: Optional[str] = Field(None, min_length=3, max_length=100)
-    description: Optional[str] = Field(None, max_length=255)
-    template_type: Optional[TemplateTypeLiterals] = None
-    subject_template: Optional[str] = Field(None, max_length=255)
+    # name, code, description, state, notes - опціональні з DictionaryUpdateSchema
+    # subject_template, body_template, template_type - робимо опціональними тут
+    subject_template: Optional[str] = Field(None, max_length=TEMPLATE_SUBJECT_MAX_LENGTH)
     body_template: Optional[str] = None
-    default_vars: Optional[Dict[str, Any]] = None
-    required_vars: Optional[List[str]] = None
-    # language_code: Optional[str] = Field(None, max_length=10)
-
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        anystr_strip_whitespace = True
-        title = "NotificationTemplateUpdate"
-        json_schema_extra = {
-            "example": {
-                "description": "Updated email reminder for task deadlines with more details.",
-                "body_template": "Hi {{ user_name }},\n\nJust a friendly reminder that your task '{{ task_name }}' is approaching its deadline on {{ due_date }}.\n\nPlease ensure it's completed on time.\n\nTask Details: {{ task_details }}\n\nBest regards,\nKudos System Team"
-            }
-        }
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.info(f"NotificationTemplateUpdate instance created with update data: {data}")
+    template_type: Optional[str] = Field(None, max_length=TEMPLATE_TYPE_MAX_LENGTH)
 
 
-class NotificationTemplateResponse(NotificationTemplateBase, BaseDBRead):
+class NotificationTemplateSchema(BaseDictionarySchema):
     """
-    Schema for representing a notification template in API responses.
+    Схема для представлення даних шаблону сповіщення у відповідях API.
+    Успадковує `id`, `code`, `name`, `description`, `state`, `notes`, `group_id`,
+    `created_at`, `updated_at`, `deleted_at` від `BaseDictionarySchema` (який успадковує `BaseMainSchema`).
     """
-    # id: UUID # From BaseDBRead
-    # created_at: datetime # From BaseDBRead
-    # updated_at: datetime # From BaseDBRead
+    subject_template: str = Field(description="Шаблон теми сповіщення.")
+    body_template: str = Field(description="Шаблон тіла сповіщення.")
+    # TODO: Замінити str на NotificationChannelType Enum або схему, що його представляє.
+    template_type: str = Field(description="Тип/канал шаблону.")
 
-    class Config(NotificationTemplateBase.Config):
-        title = "NotificationTemplateResponse"
-        json_schema_extra = { # Override or extend example
-            "example": {
-                "id": "c1d2e3f4-a5b6-c7d8-e9f0-a1b2c3d4e5f6",
-                "name": "task_reminder_email",
-                "description": "Email reminder for an upcoming task deadline.",
-                "template_type": "email",
-                "subject_template": "Reminder: Task '{{ task_name }}' is due soon!",
-                "body_template": "Hello {{ user_name }},\n\nThis is a reminder that your task '{{ task_name }}' is due on {{ due_date }}.\n\nDetails: {{ task_details }}\n\nThank you,\nKudos System",
-                "default_vars": {"system_name": "Kudos Platform"},
-                "required_vars": ["user_name", "task_name", "due_date", "task_details"],
-                # "language_code": "en",
-                "created_at": "2023-06-01T14:00:00Z",
-                "updated_at": "2023-06-05T11:30:00Z"
-            }
-        }
+    # model_config успадковується з BaseDictionarySchema
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"NotificationTemplateResponse instance created for template ID '{self.id}'.")
 
-logger.info("NotificationTemplate schemas (NotificationTemplateBase, NotificationTemplateCreate, NotificationTemplateUpdate, NotificationTemplateResponse) defined successfully.")
+if __name__ == "__main__":
+    # Демонстраційний блок для схем шаблонів сповіщень.
+    logger.info("--- Pydantic Схеми для Шаблонів Сповіщень (NotificationTemplate) ---")
+    from datetime import datetime  # Потрібно для прикладів з BaseDictionarySchema
+
+    logger.info("\nNotificationTemplateCreateSchema (приклад для створення):")
+    create_template_data = {
+        "name": "Вітальний Email",  # TODO i18n
+        "code": "WELCOME_EMAIL_V2",
+        "description": "Шаблон для вітального email при реєстрації.",  # TODO i18n
+        "subject_template": "Ласкаво просимо до {project_name}, {{user_name}}!",  # TODO i18n (плейсхолдери окремо)
+        "body_template": "<h1>Привіт, {{user_name}}!</h1><p>Дякуємо за реєстрацію.</p>",
+        # TODO i18n (плейсхолдери окремо)
+        "template_type": TempNotificationChannelType.EMAIL,  # TODO: замінити на Enum.value
+        "state": "active"
+    }
+    create_template_instance = NotificationTemplateCreateSchema(**create_template_data)
+    logger.info(create_template_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nNotificationTemplateUpdateSchema (приклад для оновлення):")
+    update_template_data = {
+        "subject_template": "Ласкаво просимо до оновленого {project_name}, {{user_name}}!",  # TODO i18n
+        "state": "inactive"
+    }
+    update_template_instance = NotificationTemplateUpdateSchema(**update_template_data)
+    logger.info(update_template_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nNotificationTemplateSchema (приклад відповіді API):")
+    template_response_data = {
+        "id": 1,
+        "code": "TASK_REMINDER_SMS",
+        "name": "SMS: Нагадування про завдання",  # TODO i18n
+        "description": "Надсилає SMS-нагадування про наближення терміну виконання завдання.",  # TODO i18n
+        "subject_template": "Kudos: Нагадування про завдання",  # SMS не має теми, але поле може бути для уніфікації
+        "body_template": "Нагадуємо: термін виконання вашого завдання '{{task_name}}' спливає {{due_date}}.",
+        # TODO i18n
+        "template_type": TempNotificationChannelType.SMS,  # TODO: замінити на Enum.value
+        "state": "active",
+        "created_at": datetime.now(),
+        "updated_at": datetime.now()
+    }
+    template_response_instance = NotificationTemplateSchema(**template_response_data)
+    logger.info(template_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних шаблонів сповіщень.")
+    logger.info("TODO: Інтегрувати Enum 'NotificationChannelType' з core.dicts для поля 'template_type'.")

@@ -1,167 +1,101 @@
-# backend/app/src/repositories/auth/session_repository.py
-
 """
-Repository for UserSession entities.
-Provides CRUD operations and specific methods for managing user sessions.
+Репозиторій для моделі "Сесія Користувача" (Session).
+
+Цей модуль визначає клас `SessionRepository`, який успадковує `BaseRepository`
+та надає специфічні методи для роботи з сесіями користувачів, такі як
+отримання сесії за її ключем та видалення прострочених сесій.
 """
 
-import logging
-from typing import Optional, List, Any # Added Any
+from typing import Optional, Any
 from datetime import datetime, timezone
 
+from sqlalchemy import select, delete as sqlalchemy_delete
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, delete
+from pydantic import BaseModel as PydanticBaseModel  # Для UpdateSchemaType, якщо не потрібна специфічна схема
 
-from backend.app.src.models.auth.session import UserSession
-# Assuming UserSessionCreate and UserSessionUpdate schemas would be defined if needed.
-# For now, using PydanticBaseModel as placeholders if direct manipulation is complex.
-# Often, session creation is implicit with login, and updates are minimal (e.g., last_activity_at).
-from pydantic import BaseModel as PydanticBaseModel # For placeholder schemas
-
+# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+# Абсолютний імпорт моделі Session та схеми SessionCreateSchema
+from backend.app.src.models.auth.session import Session
+from backend.app.src.schemas.auth.session import SessionCreateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-logger = logging.getLogger(__name__)
+# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
 
-# Placeholder Create/Update schemas for UserSession if not explicitly defined in schemas/auth/session.py
-# A UserSessionCreate schema would typically be used by the system internally when a session starts.
-class UserSessionCreateSchema(PydanticBaseModel):
-    user_id: int
-    session_id_hash: str
-    ip_address: Optional[str] = None
-    user_agent: Optional[str] = None
-    last_activity_at: datetime
-    expires_at: datetime
+# logger = get_logger(__name__)
 
-class UserSessionUpdateSchema(PydanticBaseModel): # For updating things like last_activity_at
-    last_activity_at: Optional[datetime] = None
-    # Other fields like expires_at could be updatable if session extension is allowed.
+# Для SessionUpdateSchema, якщо оновлення не передбачено, можна використати PydanticBaseModel або Any.
+class SessionUpdateSchema(PydanticBaseModel):  # Порожня схема, оскільки сесії зазвичай не оновлюються таким чином
+    pass
 
 
-class UserSessionRepository(BaseRepository[UserSession, UserSessionCreateSchema, UserSessionUpdateSchema]):
+class SessionRepository(BaseRepository[Session, SessionCreateSchema, SessionUpdateSchema]):
     """
-    Repository for managing UserSession records.
+    Репозиторій для управління записами сесій користувачів (`Session`).
+
+    Успадковує базові CRUD-методи від `BaseRepository` та надає
+    додаткові методи, специфічні для сесій.
     """
 
-    def __init__(self):
-        super().__init__(UserSession)
-
-    async def get_by_session_id_hash(self, db: AsyncSession, *, session_id_hash: str) -> Optional[UserSession]:
+    def __init__(self, db_session: AsyncSession):
         """
-        Retrieves a user session by its hashed session ID.
+        Ініціалізує репозиторій для моделі `Session`.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            session_id_hash: The hashed session ID.
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
+        """
+        super().__init__(db_session=db_session, model=Session)
+
+    async def get_by_session_key(self, session_key: str) -> Optional[Session]:
+        """
+        Отримує один запис сесії за її унікальним ключем.
+
+        Args:
+            session_key (str): Ключ сесії для пошуку.
 
         Returns:
-            The UserSession object if found, otherwise None.
+            Optional[Session]: Екземпляр моделі `Session`, якщо знайдено, інакше None.
         """
-        statement = select(self.model).where(self.model.session_id_hash == session_id_hash) # type: ignore[attr-defined]
-        result = await db.execute(statement)
+        stmt = select(self.model).where(self.model.session_key == session_key)
+        result = await self.db_session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_all_for_user(
-        self, db: AsyncSession, *, user_id: int, include_expired: bool = False, newest_first: bool = True
-    ) -> List[UserSession]:
+    async def remove_expired_sessions(self, user_id: Optional[int] = None) -> int:
         """
-        Retrieves all sessions for a specific user.
+        Видаляє прострочені сесії з бази даних.
+        Може видаляти сесії для конкретного користувача або всі прострочені сесії.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            user_id: The ID of the user.
-            include_expired: Whether to include sessions that have already expired.
-            newest_first: Order by last_activity_at descending if True.
+            user_id (Optional[int]): Якщо вказано, видаляє прострочені сесії лише
+                                     для цього користувача. Інакше – для всіх користувачів.
 
         Returns:
-            A list of UserSession objects.
+            int: Кількість видалених сесій.
         """
-        conditions = [self.model.user_id == user_id] # type: ignore[attr-defined]
-        if not include_expired:
-            conditions.append(self.model.expires_at > datetime.now(timezone.utc)) # type: ignore[attr-defined]
+        stmt = sqlalchemy_delete(self.model).where(self.model.expires_at < datetime.now(timezone.utc))
+        if user_id is not None:
+            stmt = stmt.where(self.model.user_id == user_id)
 
-        statement = select(self.model).where(*conditions)
-        if newest_first:
-            statement = statement.order_by(self.model.last_activity_at.desc()) # type: ignore[attr-defined]
-        else:
-            statement = statement.order_by(self.model.last_activity_at.asc()) # type: ignore[attr-defined]
+        result = await self.db_session.execute(stmt)
+        await self.db_session.commit()
+        # logger.info(f"Видалено {result.rowcount} прострочених сесій"
+        #             f"{' для користувача ID ' + str(user_id) if user_id else ''}.")
+        return result.rowcount
 
-        result = await db.execute(statement)
-        return list(result.scalars().all())
 
-    async def delete_session(self, db: AsyncSession, *, session_id_hash: str) -> Optional[UserSession]:
-        """
-        Deletes a specific user session by its hashed session ID.
-        This is equivalent to `remove` if an object is first fetched.
+if __name__ == "__main__":
+    # Демонстраційний блок для SessionRepository.
+    logger.info("--- Репозиторій Сесій Користувачів (SessionRepository) ---")
 
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            session_id_hash: The hashed session ID of the session to delete.
+    logger.info("Для тестування SessionRepository потрібна асинхронна сесія SQLAlchemy.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {Session.__name__}.")
+    logger.info(f"  Очікує схему створення: {SessionCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {SessionUpdateSchema.__name__} (зараз порожня)")
 
-        Returns:
-            The deleted UserSession object if found and deleted, otherwise None.
-        """
-        db_obj = await self.get_by_session_id_hash(db, session_id_hash=session_id_hash)
-        if db_obj:
-            await db.delete(db_obj)
-            await db.commit()
-            return db_obj
-        return None
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_session_key(session_key: str)")
+    logger.info("  - remove_expired_sessions(user_id: Optional[int] = None)")
 
-    async def delete_all_for_user(
-        self, db: AsyncSession, *, user_id: int, exclude_session_id_hash: Optional[str] = None
-    ) -> int:
-        """
-        Deletes all sessions for a specific user, with an option to exclude one (e.g., the current session).
-
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            user_id: The ID of the user whose sessions are to be deleted.
-            exclude_session_id_hash: Optional. If provided, sessions with this
-                                     hashed ID will not be deleted.
-        Returns:
-            The number of sessions successfully deleted.
-        """
-        conditions = [self.model.user_id == user_id] # type: ignore[attr-defined]
-        if exclude_session_id_hash:
-            conditions.append(self.model.session_id_hash != exclude_session_id_hash) # type: ignore[attr-defined]
-
-        statement = delete(self.model).where(*conditions).execution_options(synchronize_session=False)
-        result = await db.execute(statement)
-        await db.commit()
-        return result.rowcount # type: ignore[no-any-return]
-
-    async def delete_expired_sessions(self, db: AsyncSession) -> int:
-        """
-        Deletes all user sessions that have passed their 'expires_at' timestamp.
-
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-
-        Returns:
-            The number of expired sessions successfully deleted.
-        """
-        now = datetime.now(timezone.utc)
-        statement = delete(self.model).where(self.model.expires_at < now).execution_options(synchronize_session=False) # type: ignore[attr-defined]
-        result = await db.execute(statement)
-        await db.commit()
-        return result.rowcount # type: ignore[no-any-return]
-
-    async def update_last_activity(self, db: AsyncSession, *, session_id_hash: str) -> Optional[UserSession]:
-        """
-        Updates the last_activity_at timestamp for a given session.
-
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            session_id_hash: The hashed session ID.
-
-        Returns:
-            The updated UserSession object if found, otherwise None.
-        """
-        db_obj = await self.get_by_session_id_hash(db, session_id_hash=session_id_hash)
-        if db_obj:
-            db_obj.last_activity_at = datetime.now(timezone.utc) # type: ignore[union-attr]
-            db.add(db_obj)
-            await db.commit()
-            await db.refresh(db_obj)
-            return db_obj
-        return None
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

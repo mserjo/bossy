@@ -1,24 +1,25 @@
 # backend/app/src/models/bonuses/__init__.py
-
 """
-This package contains SQLAlchemy models related to bonuses, user accounts (for points/currency),
-rewards, and transactions.
+Пакет моделей SQLAlchemy для сутностей, пов'язаних з "Бонусами".
+
+Цей пакет містить моделі для представлення правил нарахування бонусів,
+рахунків користувачів, транзакцій по цих рахунках та нагород,
+які можна отримати за бонуси в програмі Kudos.
+
+Моделі експортуються для зручного доступу з інших частин програми.
 """
 
-import logging
+from .bonus_rule import BonusRule
+from .account import UserAccount
+from .transaction import AccountTransaction
+from .reward import Reward
 
-logger = logging.getLogger(__name__)
-logger.debug("Bonus models package initialized.")
+__all__ = [
+    "BonusRule",
+    "UserAccount",
+    "AccountTransaction",
+    "Reward",
+]
 
-# Example of re-exporting for easier access:
-# from .bonus_rule import BonusRule
-# from .account import UserAccount
-# from .transaction import AccountTransaction
-# from .reward import Reward
-
-# __all__ = [
-#     "BonusRule",
-#     "UserAccount",
-#     "AccountTransaction",
-#     "Reward",
-# ]
+# Майбутні моделі, пов'язані з бонусною системою (наприклад, BonusAccrualLog),
+# також можуть бути додані сюди для експорту.

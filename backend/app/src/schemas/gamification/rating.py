@@ -1,149 +1,128 @@
 # backend/app/src/schemas/gamification/rating.py
-import logging
-from uuid import UUID
-from datetime import datetime
-from typing import Optional, List
+"""
+Pydantic схеми для сутності "Рейтинг Користувача в Групі" (UserGroupRating).
 
-from pydantic import BaseModel, Field
+Цей модуль визначає схеми для:
+- Базового представлення запису про рейтинг (`UserGroupRatingBaseSchema`).
+- Створення нового запису про рейтинг (зазвичай виконується сервісом) (`UserGroupRatingCreateSchema`).
+- Оновлення існуючого запису про рейтинг (`UserGroupRatingUpdateSchema`).
+- Представлення даних про рейтинг користувача у відповідях API (`UserGroupRatingSchema`).
+"""
+from datetime import datetime, date  # date для period_start_date, period_end_date
+from typing import Optional, Any  # Any для тимчасових полів
 
-from app.src.schemas.base import BaseDBRead # Common DB fields
-# from app.src.schemas.auth.user import UserPublicProfile # For user details in rating entry
-# from app.src.schemas.groups.group import GroupResponse # For group details
+from pydantic import Field
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт базових схем та міксинів
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-# --- UserGroupRating Schemas ---
+# TODO: Визначити та імпортувати RatingType Enum з core.dicts
+# from backend.app.src.core.dicts import RatingType
 
-class UserGroupRatingBase(BaseModel):
+# TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
+# from backend.app.src.schemas.auth.user import UserPublicProfileSchema
+# from backend.app.src.schemas.groups.group import GroupBriefSchema
+
+UserPublicProfileSchema = Any  # Тимчасовий заповнювач
+GroupBriefSchema = Any  # Тимчасовий заповнювач
+
+
+class UserGroupRatingBaseSchema(BaseSchema):
     """
-    Base schema for user ratings within a group.
-    This represents a user's score or rank in a specific group's leaderboard or rating system.
+    Базова схема для полів запису про рейтинг користувача в групі.
     """
-    user_id: UUID = Field(..., description="The unique identifier of the user.")
-    group_id: UUID = Field(..., description="The unique identifier of the group for which this rating applies.")
-    rating_score: int = Field(
-        ...,
-        description="The calculated rating or score for the user in this group. Can be points, rank, etc."
-    )
-    # rank: Optional[int] = Field(None, ge=1, description="The user's rank within the group based on the rating_score.")
-    period_start_date: Optional[datetime] = Field(
+    user_id: int = Field(description="Ідентифікатор користувача.")
+    group_id: int = Field(description="Ідентифікатор групи, в якій розраховано рейтинг.")
+    rating_score: int = Field(default=0, description="Розрахований рейтинг або кількість балів користувача.")
+    period_start_date: Optional[date] = Field(None,
+                                              description="Дата початку періоду, за який розраховано рейтинг (якщо застосовно).")
+    period_end_date: Optional[date] = Field(None,
+                                            description="Дата кінця періоду, за який розраховано рейтинг (якщо застосовно).")
+    # TODO: Замінити str на RatingType Enum та додати валідатор.
+    rating_type: Optional[str] = Field(
         None,
-        description="Start date of the period for which this rating is valid (e.g., weekly, monthly ratings)."
+        max_length=50,
+        description="Тип рейтингу (наприклад, 'monthly', 'overall', 'weekly').",
+        examples=["monthly", "overall"]
     )
-    period_end_date: Optional[datetime] = Field(
-        None,
-        description="End date of the period for which this rating is valid."
-    )
-    # season_id: Optional[UUID] = Field(None, description="Identifier for a 'season' or specific rating cycle, if applicable.")
+    # model_config успадковується з BaseSchema (from_attributes=True)
 
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        anystr_strip_whitespace = True
-        title = "UserGroupRating"
-        json_schema_extra = {
-            "example": {
-                "user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                "group_id": "b2c3d4e5-f6a7-8901-2345-67890abcdef01",
-                "rating_score": 1500,
-                # "rank": 1,
-                "period_start_date": "2023-05-01T00:00:00Z",
-                "period_end_date": "2023-05-31T23:59:59Z"
-            }
-        }
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"UserGroupRatingBase instance created with data: {data}")
-
-# UserGroupRatingCreate and UserGroupRatingUpdate are likely managed by internal processes
-# that calculate ratings periodically or based on events. Direct API manipulation might not be standard.
-# If needed, they would be defined here. For example:
-# class UserGroupRatingCreate(UserGroupRatingBase):
-#     pass
-#
-# class UserGroupRatingUpdate(BaseModel):
-#     rating_score: Optional[int] = None
-#     rank: Optional[int] = Field(None, ge=1)
-#     # etc.
-
-class UserGroupRatingResponse(UserGroupRatingBase, BaseDBRead):
+class UserGroupRatingCreateSchema(UserGroupRatingBaseSchema):
     """
-    Schema for representing a user's group rating in API responses.
-    Includes all fields from UserGroupRatingBase, common DB read fields,
-    and can nest user and group details.
+    Схема для створення нового запису про рейтинг користувача.
+    Зазвичай цей запис створюється або оновлюється автоматично сервісом гейміфікації.
     """
-    # id: UUID # From BaseDBRead
-    # created_at: datetime # From BaseDBRead
-    # updated_at: datetime # From BaseDBRead
+    # Успадковує всі поля від UserGroupRatingBaseSchema.
+    # `updated_at` (як час останнього розрахунку) буде встановлено автоматично.
+    pass
 
-    # user: Optional[UserPublicProfile] = Field(None, description="Public profile information of the user.")
-    # group: Optional[GroupResponse] = Field(None, description="Detailed information about the group.")
 
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        title = "UserGroupRatingResponse"
-        json_schema_extra = {
-            "example": {
-                "id": "f6a7b8c9-d0e1-2345-6789-0abcdef012345",
-                "user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                "group_id": "b2c3d4e5-f6a7-8901-2345-67890abcdef01",
-                "rating_score": 1500,
-                # "rank": 1,
-                "period_start_date": "2023-05-01T00:00:00Z",
-                "period_end_date": "2023-05-31T23:59:59Z",
-                "created_at": "2023-05-01T00:05:00Z",
-                "updated_at": "2023-05-28T10:15:00Z"
-                # "user": { "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef", "username": "top_player", "avatar_url": "..." },
-                # "group": { "id": "b2c3d4e5-f6a7-8901-2345-67890abcdef01", "name": "Elite Gamers Club" }
-            }
-        }
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"UserGroupRatingResponse instance created for UserGroupRating ID '{self.id}'.")
-
-# Schema for a leaderboard or a list of ratings
-class GroupLeaderboardResponse(BaseModel):
+class UserGroupRatingUpdateSchema(
+    BaseSchema):  # Не успадковує UserGroupRatingBaseSchema, щоб дозволити часткове оновлення
     """
-    Schema for representing a group leaderboard.
+    Схема для оновлення рейтингу користувача (наприклад, лише `rating_score`).
     """
-    group_id: UUID = Field(..., description="The unique identifier of the group for this leaderboard.")
-    # group_name: Optional[str] = Field(None, description="Name of the group.") # Could be fetched and added by the service
-    ratings: List[UserGroupRatingResponse] = Field(..., description="List of user ratings in the group, typically sorted.")
-    total_participants: int = Field(..., ge=0, description="Total number of participants in this rating period/group.")
-    # generated_at: datetime = Field(default_factory=datetime.utcnow, description="Timestamp when this leaderboard snapshot was generated.")
-
-    class Config:
-        orm_mode = True # if this schema might be mapped from an ORM model directly (less likely for this aggregate)
-        # from_attributes = True # For Pydantic V2
-        title = "GroupLeaderboardResponse"
-        json_schema_extra = {
-            "example": {
-                "group_id": "b2c3d4e5-f6a7-8901-2345-67890abcdef01",
-                # "group_name": "Elite Gamers Club",
-                "ratings": [
-                    {
-                        "id": "f6a7b8c9-d0e1-2345-6789-0abcdef012345",
-                        "user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                        "group_id": "b2c3d4e5-f6a7-8901-2345-67890abcdef01",
-                        "rating_score": 1500,
-                        # "rank": 1,
-                        "period_start_date": "2023-05-01T00:00:00Z",
-                        "period_end_date": "2023-05-31T23:59:59Z",
-                        "created_at": "2023-05-01T00:05:00Z",
-                        "updated_at": "2023-05-28T10:15:00Z"
-                    }
-                ],
-                "total_participants": 1,
-                # "generated_at": "2023-05-29T00:00:00Z"
-            }
-        }
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"GroupLeaderboardResponse instance created for group ID '{self.group_id}'.")
+    rating_score: Optional[int] = Field(None, description="Нове значення рейтингу/балів.")
+    # Інші поля, такі як period_start_date, period_end_date, rating_type зазвичай не оновлюються
+    # для існуючого запису рейтингу; замість цього створюється новий запис для нового періоду/типу.
 
 
-logger.info("UserGroupRating schemas (UserGroupRatingBase, UserGroupRatingResponse, GroupLeaderboardResponse) defined successfully.")
+class UserGroupRatingSchema(UserGroupRatingBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+    """
+    Схема для представлення даних про рейтинг користувача в групі у відповідях API.
+    Поле `updated_at` (з `TimestampedSchemaMixin`) позначає час останнього розрахунку рейтингу.
+    """
+    # id, created_at, updated_at успадковані.
+    # user_id, group_id, rating_score, period_start_date, period_end_date, rating_type успадковані.
+
+    # TODO: Замінити Any на відповідні схеми.
+    user: Optional[UserPublicProfileSchema] = Field(None, description="Публічний профіль користувача.")
+    group: Optional[GroupBriefSchema] = Field(None, description="Коротка інформація про групу.")
+
+
+if __name__ == "__main__":
+    # Демонстраційний блок для схем рейтингів користувачів у групах.
+    logger.info("--- Pydantic Схеми для Рейтингів Користувачів в Групах (UserGroupRating) ---")
+
+    logger.info("\nUserGroupRatingCreateSchema (приклад для створення сервісом):")
+    create_rating_data = {
+        "user_id": 101,
+        "group_id": 1,
+        "rating_score": 1500,
+        "rating_type": "overall"  # TODO: Замінити на RatingType.OVERALL.value
+    }
+    create_rating_instance = UserGroupRatingCreateSchema(**create_rating_data)
+    logger.info(create_rating_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nUserGroupRatingUpdateSchema (приклад для оновлення):")
+    update_rating_data = {"rating_score": 1550}
+    update_rating_instance = UserGroupRatingUpdateSchema(**update_rating_data)
+    logger.info(update_rating_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nUserGroupRatingSchema (приклад відповіді API):")
+    rating_response_data = {
+        "id": 1,
+        "user_id": 101,
+        "group_id": 1,
+        "rating_score": 1550,
+        "rating_type": "overall",  # TODO: Замінити на RatingType.OVERALL.value
+        "period_start_date": None,
+        "period_end_date": None,
+        "created_at": datetime.now() - timedelta(days=30),  # Коли запис було вперше створено
+        "updated_at": datetime.now(),  # Коли рейтинг було востаннє оновлено/перераховано
+        # "user": {"id": 101, "name": "Лідер Рейтингу"}, # Приклад UserPublicProfileSchema
+        # "group": {"id": 1, "name": "Головна Ліга"}  # Приклад GroupBriefSchema
+    }
+    rating_response_instance = UserGroupRatingSchema(**rating_response_data)
+    logger.info(rating_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, GroupBriefSchema)")
+    logger.info("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
+    logger.info("TODO: Інтегрувати Enum 'RatingType' з core.dicts для поля 'rating_type'.")
+
+# Потрібно для timedelta в __main__
+from datetime import timedelta

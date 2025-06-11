@@ -2,65 +2,80 @@
 import logging
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from uuid import UUID, uuid4
-import secrets # For generating secure random tokens
+from uuid import UUID
+import secrets # Для генерації безпечних випадкових токенів
 
-from sqlalchemy.ext.asyncio import AsyncSession # Needed if interacting with User model directly
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.dialects.postgresql import insert as pg_insert # For potential upsert logic if needed
+# sqlalchemy.dialects.postgresql.insert import pg_insert # Для потенційної логіки upsert, якщо потрібно (наразі не використовується)
 
-from app.src.services.base import BaseService # For db_session if needed for token storage or user updates
-from app.src.models.auth.user import User # To update user's password
-from app.src.models.auth.password_reset_token import PasswordResetToken # SQLAlchemy model for reset tokens
-from app.src.core.security import get_password_hash, verify_password # Core password utilities
-# from app.src.services.auth.user import UserService # Avoid direct import if possible to prevent circularity
-# from app.src.config.settings import settings # For token expiry times if configured globally
+# Виправлені повні шляхи імпорту
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.auth.user import User # Модель користувача SQLAlchemy
+from backend.app.src.models.auth.password_reset_token import PasswordResetToken # Модель токена скидання пароля SQLAlchemy
+from backend.app.src.core.security import get_password_hash, verify_password # Ключові утиліти для паролів
+from backend.app.src.config import settings # Імпорт конфігурації
+from backend.app.src.config.logging import logger # Використання централізованого логера
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# Конфігурація часу дії токена скидання пароля перенесена до settings.py
+# PASSWORD_RESET_TOKEN_EXPIRE_HOURS = 1 # Години -- видалено, використовуємо settings
 
-# Configuration for password reset token expiry (can be moved to settings.py)
-PASSWORD_RESET_TOKEN_EXPIRE_HOURS = 1
-
-class PasswordService(BaseService): # Inherits BaseService for db_session
+class PasswordService(BaseService):
     """
-    Service for handling password-related operations such as hashing, verification,
-    and password reset token management.
+    Сервіс для обробки операцій, пов'язаних з паролями, таких як хешування,
+    перевірка та управління токенами скидання пароля.
     """
 
-    def __init__(self, db_session: AsyncSession): # db_session for PasswordResetToken model
+    def __init__(self, db_session: AsyncSession):
+        """
+        Ініціалізація сервісу паролів.
+
+        :param db_session: Асинхронна сесія бази даних.
+        """
         super().__init__(db_session)
-        logger.info("PasswordService initialized.")
+        logger.info("PasswordService ініціалізовано.")
 
     def get_hashed_password(self, password: str) -> str:
-        """Hashes a plain password using the configured algorithm."""
+        """
+        Хешує звичайний пароль за допомогою налаштованого алгоритму.
+
+        :param password: Звичайний пароль для хешування.
+        :return: Хешований пароль.
+        """
         hashed_password = get_password_hash(password)
-        logger.info("Password hashed successfully.")
+        logger.info("Пароль успішно хешовано.")
         return hashed_password
 
     def verify_password(self, plain_password: str, hashed_password: str) -> bool:
-        """Verifies a plain password against a hashed password."""
+        """
+        Перевіряє звичайний пароль відносно хешованого пароля.
+
+        :param plain_password: Звичайний пароль.
+        :param hashed_password: Хешований пароль.
+        :return: True, якщо пароль вірний, інакше False.
+        """
         is_valid = verify_password(plain_password, hashed_password)
         if is_valid:
-            logger.info("Password verification successful.")
+            logger.info("Перевірка пароля успішна.")
         else:
-            logger.warning("Password verification failed.")
+            logger.warning("Перевірка пароля не вдалася.")
         return is_valid
 
     async def create_password_reset_token(self, user_id: UUID) -> str:
         """
-        Generates a secure password reset token, stores its hash, and returns the plain token.
-        The plain token is for sending to the user (e.g., via email) and should be short-lived.
-        The hash is stored in the database to verify the token later.
+        Генерує безпечний токен скидання пароля, зберігає його хеш та повертає звичайний токен.
+        Звичайний токен призначений для надсилання користувачеві (наприклад, електронною поштою) і має бути короткотривалим.
+        Хеш зберігається в базі даних для подальшої перевірки токена.
+
+        :param user_id: ID користувача, для якого створюється токен.
+        :return: Звичайний токен скидання пароля.
+        :raises ValueError: Якщо користувача не знайдено. # i18n
         """
-        # Check if user exists
         user = await self.db_session.get(User, user_id)
         if not user:
-            logger.error(f"User with ID '{user_id}' not found. Cannot create password reset token.")
-            raise ValueError(f"User with ID '{user_id}' not found.")
+            logger.error(f"Користувача з ID '{user_id}' не знайдено. Неможливо створити токен скидання пароля.")
+            raise ValueError(f"Користувача з ID '{user_id}' не знайдено.") # i18n
 
-        # Invalidate any existing, non-expired, non-used tokens for this user
-        # This is good practice to ensure only the latest token is valid.
         update_stmt = (
             PasswordResetToken.__table__.update()
             .where(
@@ -68,16 +83,16 @@ class PasswordService(BaseService): # Inherits BaseService for db_session
                 PasswordResetToken.expires_at > datetime.now(timezone.utc),
                 PasswordResetToken.is_used == False
             )
-            .values(is_used=True, used_at=datetime.now(timezone.utc)) # Mark as used instead of deleting
+            .values(is_used=True, used_at=datetime.now(timezone.utc))
         )
         await self.db_session.execute(update_stmt)
-        logger.info(f"Existing active password reset tokens for user ID '{user_id}' marked as used.")
-        # No commit here yet, will be part of the transaction for creating the new token.
+        logger.info(f"Існуючі активні токени скидання пароля для користувача ID '{user_id}' позначено як використані.")
 
-        plain_token = secrets.token_urlsafe(32) # Generate a secure, URL-safe plain token
-        hashed_token = get_password_hash(plain_token) # Hash the plain token for DB storage
+        plain_token = secrets.token_urlsafe(32)
+        hashed_token = self.get_hashed_password(plain_token)
 
-        expires_at = datetime.now(timezone.utc) + timedelta(hours=PASSWORD_RESET_TOKEN_EXPIRE_HOURS)
+        # Використання значення з settings.py
+        expires_at = datetime.now(timezone.utc) + timedelta(hours=settings.PASSWORD_RESET_TOKEN_EXPIRE_HOURS)
 
         reset_token_db = PasswordResetToken(
             user_id=user_id,
@@ -87,81 +102,79 @@ class PasswordService(BaseService): # Inherits BaseService for db_session
         )
 
         self.db_session.add(reset_token_db)
-        await self.commit() # Commit both invalidation of old tokens and creation of new one
+        await self.commit()
 
-        logger.info(f"Password reset token created for user ID '{user_id}'. Plain token (first 8 chars for log): {plain_token[:8]}...")
-        return plain_token # Return the plain token to be sent to the user
+        logger.info(f"Токен скидання пароля створено для користувача ID '{user_id}'. Звичайний токен (перші 8 символів для логу): {plain_token[:8]}...")
+        return plain_token
 
     async def _get_valid_reset_token_db(self, plain_token: str, user_id: UUID) -> Optional[PasswordResetToken]:
         """
-        Internal helper: Finds a non-expired, non-used password reset token record
-        by matching the hash of the plain_token for a specific user.
+        Внутрішній допоміжний метод: знаходить не прострочений, невикористаний запис токена скидання пароля,
+        зіставляючи хеш plain_token для конкретного користувача.
+        УВАГА: Цей метод може бути неефективним, якщо у користувача багато активних токенів.
+        Розглянути оптимізацію, якщо очікується велика кількість токенів на користувача.
         """
-        # Iterate through tokens for the user to find a match for the plain_token's hash.
-        # This is necessary because we only store hashes.
-        # To optimize, we could add a selector (first few chars of hash) if many tokens per user are expected.
-
         stmt = select(PasswordResetToken).where(
             PasswordResetToken.user_id == user_id,
             PasswordResetToken.is_used == False,
             PasswordResetToken.expires_at > datetime.now(timezone.utc)
-        ).order_by(PasswordResetToken.created_at.desc()) # Check newest first
+        ).order_by(PasswordResetToken.created_at.desc())
 
         potential_tokens_db = (await self.db_session.execute(stmt)).scalars().all()
 
         for token_db in potential_tokens_db:
-            if verify_password(plain_token, token_db.token_hash):
+            if self.verify_password(plain_token, token_db.token_hash):
+                logger.debug(f"Знайдено валідний хеш токена для користувача ID '{user_id}'.")
                 return token_db
+        logger.debug(f"Валідний хеш токена не знайдено для користувача ID '{user_id}' серед {len(potential_tokens_db)} потенційних токенів.")
         return None
 
 
     async def validate_password_reset_token(self, plain_token: str, user_id: UUID) -> bool:
         """
-        Validates a plain password reset token for a user.
-        Checks if it matches a stored hash, is not expired, and not already used.
+        Перевіряє звичайний токен скидання пароля для користувача.
         """
-        logger.debug(f"Validating password reset token for user ID '{user_id}'. Token (first 8 chars): {plain_token[:8]}...")
-
+        logger.debug(f"Перевірка токена скидання пароля для користувача ID '{user_id}'. Токен (перші 8 символів): {plain_token[:8]}...")
         token_db = await self._get_valid_reset_token_db(plain_token, user_id)
-
         if token_db:
-            logger.info(f"Password reset token for user ID '{user_id}' is valid.")
+            logger.info(f"Токен скидання пароля для користувача ID '{user_id}' валідний.")
             return True
-
-        logger.warning(f"Password reset token for user ID '{user_id}' is invalid, expired, used, or not found.")
+        logger.warning(f"Токен скидання пароля для користувача ID '{user_id}' невалідний, прострочений, використаний або не знайдений.")
         return False
 
     async def reset_password_with_token(self, plain_token: str, user_id: UUID, new_password: str) -> bool:
         """
-        Resets a user's password using a valid plain reset token.
-        The token must be valid (not expired, not used).
-        Marks the token as used after successful password reset.
+        Скидає пароль користувача за допомогою валідного токена. Токен позначається як використаний.
+        Якщо новий пароль збігається зі старим, операція вважається успішною, токен використовується.
         """
-        logger.info(f"Attempting to reset password for user ID '{user_id}' using token (first 8 chars): {plain_token[:8]}...")
+        logger.info(f"Спроба скидання пароля для користувача ID '{user_id}' за допомогою токена (перші 8 символів): {plain_token[:8]}...")
 
         token_db = await self._get_valid_reset_token_db(plain_token, user_id)
         if not token_db:
-            logger.warning(f"Invalid, expired, or used password reset token provided for user ID '{user_id}'. Password not reset.")
-            return False # Or raise an error
+            logger.warning(f"Надано невалідний, прострочений або використаний токен скидання пароля для користувача ID '{user_id}'. Пароль не скинуто.") # i18n
+            return False
 
-        # Token is valid, proceed to fetch user and update password
-        user_db = await self.db_session.get(User, user_id) # User should exist if token was created for them
+        user_db = await self.db_session.get(User, user_id)
         if not user_db:
-            # This case should be rare if token validation implies user existence.
-            logger.error(f"User with ID '{user_id}' not found during password reset, though a valid token existed. Inconsistency detected.")
-            # Mark token as used anyway to prevent reuse with a now-orphaned token
+            logger.error(f"Користувача з ID '{user_id}' не знайдено під час скидання пароля, хоча існував валідний токен. Виявлено неузгодженість.") # i18n
             token_db.is_used = True
             token_db.used_at = datetime.now(timezone.utc)
             self.db_session.add(token_db)
             await self.commit()
-            return False # Or raise
+            return False
 
-        # Update user's password
-        user_db.hashed_password = self.get_hashed_password(new_password)
-        # Optionally, update a 'password_last_changed_at' field on the User model
-        # user_db.password_last_changed_at = datetime.now(timezone.utc)
+        password_changed = False
+        if self.verify_password(new_password, user_db.hashed_password):
+            logger.info(f"Користувач ID '{user_id}': Новий пароль для скидання збігається зі старим. Пароль не буде змінено, але токен буде використано.")
+            # Згідно з політикою, це вважається успішним скиданням, токен використовується.
+        else:
+            user_db.hashed_password = self.get_hashed_password(new_password)
+            password_changed = True
+            logger.info(f"Пароль для користувача ID '{user_id}' буде змінено.")
 
-        # Mark the reset token as used
+        # Оновлюємо password_changed_at незалежно від того, чи змінився сам хеш пароля,
+        # оскільки операція скидання пароля була успішно авторизована і виконана.
+        user_db.password_changed_at = datetime.now(timezone.utc)
         token_db.is_used = True
         token_db.used_at = datetime.now(timezone.utc)
 
@@ -170,56 +183,46 @@ class PasswordService(BaseService): # Inherits BaseService for db_session
 
         try:
             await self.commit()
-            logger.info(f"Password for user ID '{user_id}' successfully reset and token marked as used.")
-
-            # Optional: After successful password reset, one might want to invalidate all active refresh tokens
-            # for this user to log them out of other sessions. This would require TokenService.
-            # from app.src.services.auth.token import TokenService # Local import to avoid circularity at module level
-            # token_service = TokenService(self.db_session)
-            # await token_service.revoke_all_refresh_tokens_for_user(user_id)
-            # logger.info(f"All refresh tokens for user ID '{user_id}' revoked after password reset.")
-
+            if password_changed:
+                logger.info(f"Пароль для користувача ID '{user_id}' успішно скинуто і змінено, токен позначено як використаний.")
+            else:
+                logger.info(f"Пароль для користувача ID '{user_id}' не змінено (збігається зі старим), але токен успішно позначено як використаний.")
             return True
         except Exception as e:
             await self.rollback()
-            logger.error(f"Error during password reset commit for user ID '{user_id}': {e}", exc_info=True)
-            # Do not mark token as used if commit fails, so user can retry with same token (if still valid)
-            return False # Or re-raise
+            logger.error(f"Помилка під час комміту скидання пароля для користувача ID '{user_id}': {e}", exc_info=True)
+            return False
 
     async def change_password(self, user_id: UUID, old_password: str, new_password: str) -> bool:
         """
-        Allows an authenticated user to change their current password.
-        Requires provision of the old password for verification.
+        Дозволяє автентифікованому користувачеві змінити свій поточний пароль.
+        Новий пароль не може збігатися зі старим.
         """
-        logger.info(f"User ID '{user_id}' attempting to change password.")
+        logger.info(f"Користувач ID '{user_id}' намагається змінити пароль.")
         user_db = await self.db_session.get(User, user_id)
         if not user_db:
-            logger.warning(f"User ID '{user_id}' not found for password change.")
-            return False # Or raise error
+            logger.warning(f"Користувача ID '{user_id}' не знайдено для зміни пароля.")
+            raise ValueError(f"Користувача ID '{user_id}' не знайдено.") # i18n
 
         if not self.verify_password(old_password, user_db.hashed_password):
-            logger.warning(f"Old password verification failed for user ID '{user_id}'.")
-            return False # Or raise error indicating incorrect old password
+            logger.warning(f"Перевірка старого пароля не вдалася для користувача ID '{user_id}'.")
+            raise ValueError("Старий пароль невірний.") # i18n
 
-        if old_password == new_password:
-            logger.warning(f"User ID '{user_id}': New password is the same as the old password. No change made.")
-            # Depending on policy, this could be an error or a silent success.
-            # For now, let's treat it as "no change needed", so effectively success.
-            return True
-
+        if self.verify_password(new_password, user_db.hashed_password):
+            logger.warning(f"Користувач ID '{user_id}': Новий пароль не може бути таким самим, як старий пароль. Зміна не відбулася.")
+            raise ValueError("Новий пароль не може бути таким самим, як старий пароль.") # i18n
 
         user_db.hashed_password = self.get_hashed_password(new_password)
-        # user_db.password_last_changed_at = datetime.now(timezone.utc) # Update timestamp
+        user_db.password_changed_at = datetime.now(timezone.utc) # Оновити позначку часу
 
         self.db_session.add(user_db)
-        await self.commit()
+        try:
+            await self.commit()
+            logger.info(f"Пароль успішно змінено для користувача ID '{user_id}'.")
+            return True
+        except Exception as e:
+            await self.rollback()
+            logger.error(f"Помилка під час комміту зміни пароля для користувача ID '{user_id}': {e}", exc_info=True)
+            return False
 
-        logger.info(f"Password successfully changed for user ID '{user_id}'.")
-        # Optional: Invalidate refresh tokens for security
-        # from app.src.services.auth.token import TokenService # Local import
-        # token_service = TokenService(self.db_session)
-        # await token_service.revoke_all_refresh_tokens_for_user(user_id)
-        # logger.info(f"All refresh tokens for user ID '{user_id}' revoked after password change.")
-        return True
-
-logger.info("PasswordService class defined.")
+logger.debug("PasswordService клас визначено та завантажено.")

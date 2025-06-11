@@ -1,114 +1,96 @@
 # backend/app/src/schemas/dictionaries/bonus_types.py
-
 """
-Pydantic schemas for BonusType dictionary entries.
+Pydantic схеми для довідника "Типи Бонусів".
+
+Цей модуль визначає схеми для представлення, створення та оновлення
+записів у довіднику типів бонусів (наприклад, "Нагорода", "Штраф").
 """
 
-import logging
-from typing import Optional # For optional custom fields if any
-from datetime import datetime, timezone # For example values in __main__ and BaseResponseSchema
+from typing import Optional
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-from pydantic import Field
+# Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    DictionaryBase,
-    # DictionaryCreate as BaseDictionaryCreate, # Not directly used if BonusTypeCreate inherits BonusTypeBase
-    # DictionaryUpdate as BaseDictionaryUpdate, # Not directly used if BonusTypeUpdate inherits BonusTypeBase
-    DictionaryResponse as BaseDictionaryResponse
+    BaseDictionarySchema,
+    DictionaryCreateSchema,
+    DictionaryUpdateSchema
 )
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
 
-# --- BonusType Schemas ---
+# from pydantic import Field
 
-class BonusTypeBase(DictionaryBase):
-    """Base schema for BonusType, inherits all fields from DictionaryBase."""
-    # Example of custom fields if BonusType model had them:
-    # is_penalty_type: Optional[bool] = Field(None,
-    #                                            description="Is this type typically a penalty (negative points)?",
-    #                                            example=False)
-    # default_point_impact: Optional[int] = Field(None,
-    #                                               description="Default points impact (positive or negative).",
-    #                                               example=20)
+# Схема для представлення запису Типу Бонусу (у відповідях API)
+class BonusTypeSchema(BaseDictionarySchema):
+    """
+    Pydantic схема для представлення запису довідника "Тип Бонусу".
+    Успадковує всі поля від `BaseDictionarySchema`.
+    """
+    # Специфічні поля для BonusTypeSchema, якщо є, додаються тут.
+    # Наприклад, чи є цей тип бонусу позитивним чи негативним за замовчуванням
+    # is_positive_by_default: bool = Field(True, description="Чи є цей тип бонусу зазвичай нарахуванням.")
     pass
 
-class BonusTypeCreate(BonusTypeBase):
+
+# Схема для створення нового запису Типу Бонусу
+class BonusTypeCreateSchema(DictionaryCreateSchema):
     """
-    Schema for creating a new BonusType.
-    Inherits fields from BonusTypeBase. 'code' and 'name' are effectively required.
+    Pydantic схема для створення нового запису в довіднику "Тип Бонусу".
+    Успадковує всі поля від `DictionaryCreateSchema`.
     """
+    # Специфічні поля для створення BonusType, якщо є, додаються тут.
     pass
 
-class BonusTypeUpdate(BonusTypeBase):
-    """
-    Schema for updating an existing BonusType.
-    All fields from BonusTypeBase are made optional here for partial updates.
-    """
-    code: Optional[str] = Field(None, min_length=1, max_length=100, description="Unique code or short identifier.")
-    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Human-readable name.")
-    description: Optional[str] = Field(None)
-    state: Optional[str] = Field(None, max_length=50)
-    is_default: Optional[bool] = Field(None)
-    display_order: Optional[int] = Field(None)
-    notes: Optional[str] = Field(None)
-    # If custom fields were in BonusTypeBase:
-    # is_penalty_type: Optional[bool] = Field(None)
-    # default_point_impact: Optional[int] = Field(None)
 
-class BonusTypeResponse(BaseDictionaryResponse):
+# Схема для оновлення існуючого запису Типу Бонусу
+class BonusTypeUpdateSchema(DictionaryUpdateSchema):
     """
-    Schema for representing a BonusType in API responses.
-    Inherits all fields from BaseDictionaryResponse.
-    Add any BonusType-specific response fields here if BonusTypeBase had custom fields.
+    Pydantic схема для оновлення існуючого запису в довіднику "Тип Бонусу".
+    Успадковує всі поля від `DictionaryUpdateSchema`.
     """
-    # If custom fields were in BonusTypeBase and should be in response:
-    # is_penalty_type: Optional[bool] = Field(None, description="Is this a penalty type?")
-    # default_point_impact: Optional[int] = Field(None, description="Default point impact.")
+    # Специфічні поля для оновлення BonusType, якщо є, додаються тут.
     pass
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем BonusType.
+    logger.info("--- Pydantic Схеми для Довідника: BonusType ---")
 
-    logger.info("--- BonusType Schemas (Dictionary) --- Demonstration")
-
-    # BonusTypeCreate Example
-    type_create_data = {
-        "code": "STREAK_BONUS",
-        "name": "Streak Bonus",
-        "description": "Bonus awarded for completing a streak of tasks.",
-        "state": "active",
-        # "isPenaltyType": False, # camelCase alias if field existed
-        # "defaultPointImpact": 50
-    }
-    try:
-        type_create_schema = BonusTypeCreate(**type_create_data)
-        logger.info(f"BonusTypeCreate valid: {type_create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating BonusTypeCreate: {e}")
-
-    # BonusTypeUpdate Example
-    type_update_data = {"description": "Bonus awarded for completing a 7-day streak of tasks."}
-    type_update_schema = BonusTypeUpdate(**type_update_data)
-    logger.info(f"BonusTypeUpdate (partial): {type_update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # BonusTypeResponse Example
-    type_response_data = {
+    logger.info("\nBonusTypeSchema (приклад для відповіді API):")
+    bonus_type_data_from_db = {
         "id": 1,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "code": "LATE_PENALTY",
-        "name": "Late Submission Penalty",
-        "description": "Penalty applied for late task submissions.",
+        "name": "Бонус за активність",  # TODO i18n
+        "code": "ACTIVITY_REWARD",
+        "description": "Нараховується за регулярну участь у групових активностях.",  # TODO i18n
         "state": "active",
-        "isDefault": False,
-        "displayOrder": 10,
-        # "isPenaltyType": True, # If field existed
-        # "defaultPointImpact": -10
+        "created_at": "2023-06-01T10:00:00Z",
+        "updated_at": "2023-06-01T12:30:00Z",
     }
-    try:
-        type_response_schema = BonusTypeResponse(**type_response_data) # type: ignore[call-arg]
-        logger.info(f"BonusTypeResponse: {type_response_schema.model_dump_json(by_alias=True, indent=2)}")
-    except Exception as e:
-        logger.error(f"Error creating BonusTypeResponse: {e}")
+    from datetime import datetime  # Потрібно для конвертації рядків у datetime
+
+    bonus_type_data_from_db['created_at'] = datetime.fromisoformat(
+        bonus_type_data_from_db['created_at'].replace('Z', '+00:00'))
+    bonus_type_data_from_db['updated_at'] = datetime.fromisoformat(
+        bonus_type_data_from_db['updated_at'].replace('Z', '+00:00'))
+
+    bonus_type_schema_instance = BonusTypeSchema(**bonus_type_data_from_db)
+    logger.info(bonus_type_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nBonusTypeCreateSchema (приклад для створення):")
+    create_data = {
+        "name": "Штраф за запізнення",  # TODO i18n
+        "code": "LATE_PENALTY",
+        "description": "Списується за запізнення на командні зустрічі."  # TODO i18n
+    }
+    create_schema_instance = BonusTypeCreateSchema(**create_data)
+    logger.info(create_schema_instance.model_dump_json(indent=2))
+
+    logger.info("\nBonusTypeUpdateSchema (приклад для оновлення):")
+    update_data = {
+        "description": "Оновлений опис для штрафу за запізнення."  # TODO i18n
+    }
+    update_schema_instance = BonusTypeUpdateSchema(**update_data)
+    logger.info(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")

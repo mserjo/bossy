@@ -1,142 +1,199 @@
 # backend/app/src/schemas/system/monitoring.py
-
 """
-Pydantic schemas for System Monitoring, including System Logs and Performance Metrics.
+Pydantic схеми для сутностей системного моніторингу.
+
+Цей модуль визначає схеми для:
+- `SystemLogSchema`, `SystemLogCreateSchema`: для записів системного логу.
+- `PerformanceMetricSchema`, `PerformanceMetricCreateSchema`: для метрик продуктивності.
 """
+from datetime import datetime
+from typing import Optional, Dict, Any, List  # List може знадобитися для відповідей зі списками
 
-import logging
-from typing import Optional, Dict, Any
-from datetime import datetime, timezone # Added timezone for __main__ example
+from pydantic import Field
 
-from pydantic import Field, BaseModel # BaseModel needed if not inheriting from BaseSchema for Create schemas
+# Абсолютний імпорт базових схем та міксинів
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin  # TimestampedSchemaMixin тут не потрібен, бо timestamp є власним полем
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-from backend.app.src.schemas.base import BaseSchema, BaseResponseSchema
+# TODO: Визначити та імпортувати Enum LogLevel з core.dicts
+# from backend.app.src.core.dicts import LogLevel as LogLevelEnum
+# TODO: Замінити Any на UserPublicProfileSchema, коли вона буде доступна/рефакторена.
+# from backend.app.src.schemas.auth.user import UserPublicProfileSchema
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+UserPublicProfileSchema = Any  # Тимчасовий заповнювач
 
-# --- SystemLog Schemas ---
 
-class SystemLogBase(BaseSchema):
-    """Base schema for system log entries."""
-    level: str = Field(..., max_length=50, description="Log level (e.g., INFO, WARNING, ERROR)", example="INFO")
-    message: str = Field(..., description="The main log message", example="User authentication successful.")
-    logger_name: Optional[str] = Field(None, max_length=255, description="Name of the logger that produced this entry", example="auth.service")
-    module: Optional[str] = Field(None, max_length=255, description="Python module where the log originated", example="backend.app.src.services.auth")
-    func_name: Optional[str] = Field(None, max_length=255, description="Function name where the log originated", example="login_user")
-    line_no: Optional[int] = Field(None, ge=0, description="Line number where the log originated", example=101)
-    exception_info: Optional[str] = Field(None, description="Traceback information if the log entry is associated with an exception.")
-    context: Optional[Dict[str, Any]] = Field(None, description="Additional contextual information (JSON)", example={"user_id": 123, "request_id": "xyz789"})
+# Заглушка для LogLevel Enum
+class TempLogLevel:  # TODO: Видалити після імпорту Enum
+    INFO = "INFO"
+    ERROR = "ERROR"
+    WARNING = "WARNING"
+    DEBUG = "DEBUG"
 
-class SystemLogCreate(SystemLogBase):
+
+LOG_LEVEL_MAX_LENGTH = 50
+LOG_MESSAGE_MAX_LENGTH_DISPLAY = 1000  # Для відображення, Text в моделі може бути довшим
+LOG_SOURCE_MAX_LENGTH = 255
+METRIC_NAME_MAX_LENGTH = 255
+METRIC_UNIT_MAX_LENGTH = 50
+
+
+# --- Схеми для Системного Логу (SystemLog) ---
+
+class SystemLogBaseSchema(BaseSchema):
     """
-    Schema for creating a new system log entry.
-    Typically used internally by the application's logging handlers.
-    Timestamps (`created_at`, `updated_at`) will be set by the database via `BaseModel` in ORM.
+    Базова схема для полів запису системного логу.
     """
-    pass # All fields inherited from SystemLogBase are suitable for creation
+    # timestamp встановлюється сервером за замовчуванням (default=func.now() в моделі)
+    timestamp: Optional[datetime] = Field(
+        default_factory=datetime.now,  # Клієнт може надати, але сервер може перезаписати
+        description="Час виникнення події логу."
+    )
+    # TODO: Замінити str на LogLevelEnum та додати валідатор.
+    level: str = Field(
+        max_length=LOG_LEVEL_MAX_LENGTH,
+        description=f"Рівень логу (наприклад, '{TempLogLevel.INFO}', '{TempLogLevel.ERROR}')."
+    )
+    message: str = Field(description="Основне повідомлення логу.")
+    source: Optional[str] = Field(
+        None,
+        max_length=LOG_SOURCE_MAX_LENGTH,
+        description="Джерело події (наприклад, назва сервісу, модуля, функції).",
+        examples=["auth_service", "task_scheduler"]
+    )
+    details: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Додаткові структуровані деталі у форматі JSON."
+    )
+    user_id: Optional[int] = Field(
+        None,
+        description="ID користувача, пов'язаного з подією логу (якщо є)."
+    )
+    # model_config успадковується з BaseSchema (from_attributes=True)
 
-class SystemLogResponse(BaseResponseSchema, SystemLogBase):
+
+class SystemLogCreateSchema(SystemLogBaseSchema):
     """
-    Schema for representing a system log entry in API responses.
-    Includes 'id', 'created_at', 'updated_at' from BaseResponseSchema.
+    Схема для створення нового запису системного логу.
+    Зазвичай використовується внутрішніми сервісами для запису подій.
     """
-    # `created_at` from BaseResponseSchema serves as the log timestamp.
+    # Успадковує всі поля від SystemLogBaseSchema.
+    # `timestamp` може бути встановлено автоматично сервером, якщо не надано.
     pass
 
 
-# --- PerformanceMetric Schemas ---
+class SystemLogSchema(SystemLogBaseSchema, IDSchemaMixin):
+    """
+    Схема для представлення даних запису системного логу у відповідях API.
+    Успадковує `id` від `IDSchemaMixin`.
+    """
+    # id успадковано.
+    # timestamp, level, message, source, details, user_id успадковані.
 
-class PerformanceMetricBase(BaseSchema):
-    """Base schema for performance metric entries."""
-    metric_name: str = Field(..., max_length=255, description="Name of the metric", example="api_response_time")
-    value: float = Field(..., description="The value of the metric", example=123.45)
-    unit: Optional[str] = Field(None, max_length=50, description="Unit of the metric (e.g., 'ms', 'seconds', '%', 'count')", example="ms")
-    tags: Optional[Dict[str, Any]] = Field(None, description="Key-value pairs for additional context or dimensions (JSON)", example={"endpoint": "/api/v1/users", "method": "POST"})
+    # TODO: Замінити Any на UserPublicProfileSchema.
+    user: Optional[UserPublicProfileSchema] = Field(None,
+                                                    description="Інформація про користувача, пов'язаного з логом (якщо є).")
 
-class PerformanceMetricCreate(PerformanceMetricBase):
-    """
-    Schema for creating a new performance metric entry.
-    Timestamps (`created_at`, `updated_at`) will be set by the database.
-    """
-    pass # All fields from PerformanceMetricBase are suitable
 
-class PerformanceMetricResponse(BaseResponseSchema, PerformanceMetricBase):
+# --- Схеми для Метрик Продуктивності (PerformanceMetric) ---
+
+class PerformanceMetricBaseSchema(BaseSchema):
     """
-    Schema for representing a performance metric entry in API responses.
-    Includes 'id', 'created_at', 'updated_at' from BaseResponseSchema.
-    `created_at` serves as the metric recording timestamp.
+    Базова схема для полів метрики продуктивності.
     """
+    # timestamp встановлюється сервером за замовчуванням (default=func.now() в моделі)
+    timestamp: Optional[datetime] = Field(
+        default_factory=datetime.now,
+        description="Час запису метрики."
+    )
+    metric_name: str = Field(
+        ...,
+        max_length=METRIC_NAME_MAX_LENGTH,
+        description="Назва метрики (наприклад, 'api_response_time', 'db_query_duration')."
+    )
+    value: float = Field(description="Значення метрики.")
+    unit: Optional[str] = Field(
+        None,
+        max_length=METRIC_UNIT_MAX_LENGTH,
+        description="Одиниця виміру метрики (наприклад, 'ms', 's', 'count', 'MB').",
+        examples=["ms", "count"]
+    )
+    tags: Optional[Dict[str, str]] = Field(
+        None,
+        description="Теги/мітки для групування або фільтрації метрик (у форматі ключ-значення)."
+    )
+    # model_config успадковується з BaseSchema (from_attributes=True)
+
+
+class PerformanceMetricCreateSchema(PerformanceMetricBaseSchema):
+    """
+    Схема для створення нового запису метрики продуктивності.
+    """
+    # Успадковує всі поля від PerformanceMetricBaseSchema.
+    pass
+
+
+class PerformanceMetricSchema(PerformanceMetricBaseSchema, IDSchemaMixin):
+    """
+    Схема для представлення даних метрики продуктивності у відповідях API.
+    Успадковує `id` від `IDSchemaMixin`.
+    """
+    # id успадковано.
+    # timestamp, metric_name, value, unit, tags успадковані.
     pass
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем моніторингу.
+    logger.info("--- Pydantic Схеми для Моніторингу (SystemLog, PerformanceMetric) ---")
 
-    logger.info("--- System Monitoring Schemas --- Demonstration")
-
-    # SystemLog Examples
-    log_create_data = {
-        "level": "ERROR",
-        "message": "Database connection failed after 3 retries.",
-        "loggerName": "db.connector", # camelCase alias for logger_name
-        "module": "backend.app.src.db.session",
-        "funcName": "get_db_session_with_retry",
-        "lineNo": 55,
-        "exceptionInfo": "Traceback (most recent call last):\n  ConnectionRefusedError: [Errno 111] Connection refused",
-        "context": {"retry_attempts": 3, "db_host": "postgres-prod"}
+    logger.info("\nSystemLogCreateSchema (приклад для створення логу):")
+    create_log_data = {
+        "level": TempLogLevel.INFO,  # TODO: Замінити на Enum.value
+        "message": "Користувач user@example.com успішно оновив профіль.",  # TODO i18n
+        "source": "user_profile_service",
+        "user_id": 101,
+        "details": {"profile_fields_updated": ["last_name", "phone_number"]}
     }
-    try:
-        log_create_schema = SystemLogCreate(**log_create_data) # type: ignore[call-arg] # Pydantic allows alias in constructor
-        logger.info(f"SystemLogCreate valid: {log_create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating SystemLogCreate: {e}")
+    create_log_instance = SystemLogCreateSchema(**create_log_data)
+    # timestamp буде додано автоматично default_factory, якщо не передано
+    logger.info(create_log_instance.model_dump_json(indent=2, exclude_none=True))
 
+    logger.info("\nSystemLogSchema (приклад відповіді API):")
     log_response_data = {
-        "id": 101,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "level": "ERROR",
-        "message": "Database connection failed after 3 retries.",
-        "loggerName": "db.connector",
-        "module": "backend.app.src.db.session",
-        "funcName": "get_db_session_with_retry",
-        "lineNo": 55,
-        "exceptionInfo": "Traceback (most recent call last):\n  ConnectionRefusedError: [Errno 111] Connection refused",
-        "context": {"retry_attempts": 3, "db_host": "postgres-prod"}
+        "id": 1,
+        "timestamp": datetime.now(),
+        "level": TempLogLevel.ERROR,  # TODO: Замінити на Enum.value
+        "message": "Не вдалося підключитися до зовнішнього сервісу 'X'.",  # TODO i18n
+        "source": "integration_module",
+        # "user": {"id": 101, "name": "Ініціатор Дії"} # Приклад UserPublicProfileSchema
     }
-    try:
-        log_response_schema = SystemLogResponse(**log_response_data) # type: ignore[call-arg]
-        logger.info(f"SystemLogResponse: {log_response_schema.model_dump_json(by_alias=True, indent=2)}")
-    except Exception as e:
-        logger.error(f"Error creating SystemLogResponse: {e}")
+    log_response_instance = SystemLogSchema(**log_response_data)
+    logger.info(log_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-
-    # PerformanceMetric Examples
-    metric_create_data = {
-        "metricName": "cpu_utilization", # camelCase alias for metric_name
-        "value": 75.5,
-        "unit": "%",
-        "tags": {"host": "server-1", "service": "user_api"}
+    logger.info("\nPerformanceMetricCreateSchema (приклад для створення метрики):")
+    create_metric_data = {
+        "metric_name": "login_api_response_time",
+        "value": 125.5,
+        "unit": "ms",
+        "tags": {"endpoint": "/api/v1/auth/login", "method": "POST"}
     }
-    try:
-        metric_create_schema = PerformanceMetricCreate(**metric_create_data) # type: ignore[call-arg]
-        logger.info(f"PerformanceMetricCreate valid: {metric_create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating PerformanceMetricCreate: {e}")
+    create_metric_instance = PerformanceMetricCreateSchema(**create_metric_data)
+    logger.info(create_metric_instance.model_dump_json(indent=2, exclude_none=True))
 
+    logger.info("\nPerformanceMetricSchema (приклад відповіді API):")
     metric_response_data = {
-        "id": 202,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "metricName": "cpu_utilization",
-        "value": 75.5,
-        "unit": "%",
-        "tags": {"host": "server-1", "service": "user_api"}
+        "id": 1,
+        "timestamp": datetime.now(),
+        "metric_name": "active_users_count",
+        "value": 1500.0,
+        "unit": "count"
     }
-    try:
-        metric_response_schema = PerformanceMetricResponse(**metric_response_data) # type: ignore[call-arg]
-        logger.info(f"PerformanceMetricResponse: {metric_response_schema.model_dump_json(by_alias=True, indent=2)}")
-    except Exception as e:
-        logger.error(f"Error creating PerformanceMetricResponse: {e}")
+    metric_response_instance = PerformanceMetricSchema(**metric_response_data)
+    logger.info(metric_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних системного моніторингу.")
+    logger.info("TODO: Інтегрувати Enum 'LogLevel' з core.dicts для поля 'level' в SystemLog.")
+    logger.info("TODO: Замінити Any на UserPublicProfileSchema в SystemLogSchema.")

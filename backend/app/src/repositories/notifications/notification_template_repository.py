@@ -1,107 +1,99 @@
 # backend/app/src/repositories/notifications/notification_template_repository.py
-
 """
-Repository for NotificationTemplate entities.
-Provides CRUD operations and specific methods for managing notification templates.
+Репозиторій для моделі "Шаблон Сповіщення" (NotificationTemplate).
+
+Цей модуль визначає клас `NotificationTemplateRepository`, який успадковує
+`BaseDictionaryRepository` та надає методи для роботи з шаблонами сповіщень.
 """
 
-import logging
-from typing import Optional, List
+from typing import List, Optional, Tuple
 
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
 
-from backend.app.src.models.notifications.template import NotificationTemplate, NotificationChannelEnum
-from backend.app.src.schemas.notifications.template import NotificationTemplateCreate, NotificationTemplateUpdate
-from backend.app.src.repositories.base import BaseRepository
+# Абсолютний імпорт базового репозиторію для довідників
+from backend.app.src.repositories.dictionaries.base_dict_repository import BaseDictionaryRepository
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт моделі та схем
+from backend.app.src.models.notifications.template import NotificationTemplate
+from backend.app.src.schemas.notifications.template import (
+    NotificationTemplateCreateSchema,
+    NotificationTemplateUpdateSchema
+)
 
-class NotificationTemplateRepository(BaseRepository[NotificationTemplate, NotificationTemplateCreate, NotificationTemplateUpdate]):
+
+# TODO: Імпортувати Enum NotificationChannelType з core.dicts, коли він буде визначений,
+#       для використання у get_by_template_type.
+# from backend.app.src.core.dicts import NotificationChannelType
+
+
+class NotificationTemplateRepository(
+    BaseDictionaryRepository[NotificationTemplate, NotificationTemplateCreateSchema, NotificationTemplateUpdateSchema]):
     """
-    Repository for managing NotificationTemplate records.
-    Templates are unique by (template_type_code, channel, language_code).
+    Репозиторій для управління шаблонами сповіщень (`NotificationTemplate`).
+
+    Успадковує методи від `BaseDictionaryRepository` (включаючи `get_by_code`, `get_by_name`)
+    та може містити специфічні методи для роботи з шаблонами.
     """
 
-    def __init__(self):
-        super().__init__(NotificationTemplate)
-
-    async def get_template_by_code_channel_lang(
-        self,
-        db: AsyncSession,
-        *,
-        template_type_code: str,
-        channel: NotificationChannelEnum,
-        language_code: str = "en"
-    ) -> Optional[NotificationTemplate]:
+    def __init__(self, db_session: AsyncSession):
         """
-        Retrieves a notification template by its type code, channel, and language.
-        Filters for active, non-deleted templates by default.
+        Ініціалізує репозиторій для моделі `NotificationTemplate`.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            template_type_code: The unique code for the template's purpose.
-            channel: The NotificationChannelEnum member.
-            language_code: The language code (e.g., 'en', 'uk').
-
-        Returns:
-            The NotificationTemplate object if found, otherwise None.
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        conditions = [
-            self.model.template_type_code == template_type_code, # type: ignore[attr-defined]
-            self.model.channel == channel, # type: ignore[attr-defined]
-            self.model.language_code == language_code # type: ignore[attr-defined]
-        ]
-        if hasattr(self.model, "state"):
-             conditions.append(self.model.state == "active") # type: ignore[attr-defined]
+        super().__init__(db_session=db_session, model=NotificationTemplate)
 
-        if hasattr(self.model, "deleted_at"):
-            conditions.append(self.model.deleted_at.is_(None)) # type: ignore[attr-defined]
-
-        statement = select(self.model).where(*conditions)
-        result = await db.execute(statement)
-        return result.scalar_one_or_none()
-
-    async def get_templates_by_code(
-        self,
-        db: AsyncSession,
-        *,
-        template_type_code: str,
-        channel: Optional[NotificationChannelEnum] = None,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[NotificationTemplate]:
+    async def get_by_template_type(
+            self,
+            template_type: str,  # Очікується значення з NotificationChannelType Enum
+            active_only: bool = True,
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[NotificationTemplate], int]:
         """
-        Retrieves all language versions of a template for a specific type code,
-        optionally filtered by channel. Fetches active, non-deleted templates by default.
+        Отримує список шаблонів сповіщень за вказаним типом/каналом з пагінацією.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            template_type_code: The unique code for the template's purpose.
-            channel: Optional. Filter by a specific NotificationChannelEnum member.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            template_type (str): Тип/канал шаблону (значення з NotificationChannelType Enum).
+            active_only (bool): Якщо True, повертає лише активні шаблони (state='active').
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            A list of NotificationTemplate objects.
+            Tuple[List[NotificationTemplate], int]: Кортеж зі списком шаблонів та їх загальною кількістю.
         """
-        conditions = [self.model.template_type_code == template_type_code] # type: ignore[attr-defined]
-        if channel:
-            conditions.append(self.model.channel == channel) # type: ignore[attr-defined]
+        filters = [self.model.template_type == template_type]
+        if active_only:
+            # Модель NotificationTemplate успадковує BaseDictionaryModel -> BaseMainModel -> StateMixin
+            if hasattr(self.model, "state"):
+                filters.append(self.model.state == "active")  # TODO: Узгодити з Enum для станів
+            # else:
+            # logger.warning(f"Модель {self.model.__name__} не має поля 'state' для фільтрації активних шаблонів.")
 
-        if hasattr(self.model, "state"):
-             conditions.append(self.model.state == "active") # type: ignore[attr-defined]
-        if hasattr(self.model, "deleted_at"):
-            conditions.append(self.model.deleted_at.is_(None)) # type: ignore[attr-defined]
+        order_by = [self.model.name.asc()]  # Сортувати за назвою
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
 
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.language_code) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
 
-    # BaseRepository methods create, get, update, remove are inherited.
+if __name__ == "__main__":
+    # Демонстраційний блок для NotificationTemplateRepository.
+    logger.info("--- Репозиторій Шаблонів Сповіщень (NotificationTemplateRepository) ---")
+
+    logger.info("Для тестування NotificationTemplateRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseDictionaryRepository для моделі {NotificationTemplate.__name__}.")
+    logger.info(f"  Очікує схему створення: {NotificationTemplateCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {NotificationTemplateUpdateSchema.__name__}")
+
+    logger.info("\nСпецифічні методи успадковані з BaseDictionaryRepository:")
+    logger.info("  - get_by_code(code: str)")
+    logger.info("  - get_by_name(name: str)")
+    logger.info("\nВласні специфічні методи:")
+    logger.info("  - get_by_template_type(template_type: str, active_only: bool = True, skip: int = 0, limit: int = 100)")
+
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("TODO: Інтегрувати Enum 'NotificationChannelType' для аргументу `template_type`.")
+    logger.info("TODO: Узгодити значення 'active' для фільтра `active_only` з можливим Enum для станів.")

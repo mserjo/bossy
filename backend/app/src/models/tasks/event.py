@@ -1,61 +1,63 @@
 # backend/app/src/models/tasks/event.py
 
 """
-SQLAlchemy model for Events.
-Events can be similar to tasks but might represent appointments, milestones, or informational items.
+SQLAlchemy модель для Подій.
+Події можуть бути схожі на завдання, але можуть представляти зустрічі, віхи або інформаційні елементи.
 """
 
 import logging
-from typing import Optional, List, TYPE_CHECKING # List and TYPE_CHECKING might not be needed if no new relationships
-from datetime import datetime, timezone, timedelta # Added timezone, timedelta for __main__
+from typing import Optional, List, TYPE_CHECKING
+from datetime import datetime
 
-from sqlalchemy import String, DateTime, ForeignKey, Integer # Added Integer for FKs
+from sqlalchemy import String, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.src.models.base import BaseGroupAffiliatedMainModel # Events are also group-affiliated main entities
-# from backend.app.src.core.dicts import EventFrequency # If events also have recurrence
+from backend.app.src.models.base import BaseGroupAffiliatedMainModel
+# from backend.app.src.core.dicts import EventFrequency # Якщо події також мають повторюваність
 
-# Configure logger for this module
+# Налаштування логера для цього модуля
 logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
-    # from backend.app.src.models.dictionaries.task_types import TaskType # If using task_types for event_type
-    # Or define a new dict_event_types table and model
-    # from backend.app.src.models.auth.user import User # For created_by_user_id if added
-    # from backend.app.src.models.tasks.assignment import TaskAssignment # If events can be assigned like tasks
-    pass # Add other forward references if needed
+    from backend.app.src.models.auth.user import User
+    from backend.app.src.models.tasks.assignment import TaskAssignment
+    from backend.app.src.models.tasks.completion import TaskCompletion
+    # from backend.app.src.models.dictionaries.task_types import TaskType # Якщо використовується task_types для event_type
+    # Або визначити нову таблицю та модель dict_event_types
 
-class Event(BaseGroupAffiliatedMainModel): # Inherits id, name, description, state, notes, group_id, created_at, updated_at, deleted_at
+
+class Event(BaseGroupAffiliatedMainModel): # Успадковує id, name, description, state, notes, group_id, created_at, updated_at, deleted_at
     """
-    Represents an event within a group (e.g., meeting, appointment, milestone, holiday).
-    Similar to a Task, but might have different emphasis on fields like start/end times and location.
+    Представляє подію в межах групи (наприклад, зустріч, призначення, віха, свято).
+    Схоже на Завдання, але може мати інший акцент на полях, таких як час початку/закінчення та місцезнаходження.
     """
     __tablename__ = "events"
 
-    # 'name', 'description', 'state', 'notes', 'group_id' are inherited.
-    # 'state' could represent 'upcoming', 'ongoing', 'past', 'cancelled'.
+    # 'name', 'description', 'state', 'notes', 'group_id' успадковані.
+    # 'state' може представляти 'майбутня', 'триваюча', 'минула', 'скасована'.
 
-    # It's possible that an 'event_type_id' (FK to dict_task_types or a new dict_event_types) could be useful.
-    # For now, we'll assume the distinction from Task is mainly semantic or through fewer specific Task fields.
-    # event_type_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("dict_event_types.id"), index=True, comment="FK to event_types dictionary")
+    # Можливо, 'event_type_id' (FK до dict_task_types або нового dict_event_types) був би корисним.
+    # Наразі припускаємо, що відмінність від Завдання є переважно семантичною або через меншу кількість специфічних полів Завдання.
+    # event_type_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("dict_event_types.id"), index=True, comment="FK до довідника типів подій")
 
-    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True, comment="Start date and time of the event (UTC)")
-    end_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True, comment="Optional end date and time of the event (UTC)")
-    location: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, comment="Physical or virtual location of the event")
+    start_time: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True, comment="Дата та час початку події (UTC)")
+    end_time: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True, comment="Необов'язкові дата та час закінчення події (UTC)")
+    location: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, comment="Фізичне або віртуальне місцезнаходження події")
 
-    # If events can be recurring, similar fields to Task model would be needed:
-    # is_recurring: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    # recurrence_frequency: Mapped[Optional[EventFrequency]] = mapped_column(SQLAlchemyEnum(EventFrequency), nullable=True)
-    # recurrence_interval: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Якщо події можуть бути повторюваними, знадобляться поля, схожі на модель Task:
+    # is_recurring: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, comment="Чи є подія повторюваною")
+    # recurrence_frequency: Mapped[Optional[EventFrequency]] = mapped_column(SQLAlchemyEnum(EventFrequency), nullable=True, comment="Частота повторення")
+    # recurrence_interval: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="Інтервал повторення")
 
-    # If events can be assigned or have completions/reviews, relationships similar to Task would be needed.
-    # For now, keeping Event simpler. Relationships can be added if requirements evolve.
-    # assignments: Mapped[List["TaskAssignment"]] = relationship(back_populates="event") # Requires TaskAssignment to also link to Event
+    # Зв'язки, якщо події можуть бути призначені або мати виконання/відгуки
+    assignments: Mapped[List["TaskAssignment"]] = relationship(back_populates="event", cascade="all, delete-orphan", lazy="selectin")
+    completions: Mapped[List["TaskCompletion"]] = relationship(back_populates="event", cascade="all, delete-orphan", lazy="selectin")
 
-    # created_by_user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, comment="User who created the event")
-    # created_by: Mapped[Optional["User"]] = relationship(foreign_keys=[created_by_user_id])
+    created_by_user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, comment="Користувач, який створив подію")
+    created_by: Mapped[Optional["User"]] = relationship(foreign_keys=[created_by_user_id], lazy="selectin")
 
     def __repr__(self) -> str:
+        # Представлення об'єкта для логування та відладки.
         id_val = getattr(self, 'id', 'N/A')
         group_id_val = getattr(self, 'group_id', 'N/A')
         start_time_val = self.start_time.isoformat() if self.start_time else 'N/A'

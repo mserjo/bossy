@@ -1,176 +1,325 @@
 # backend/app/src/schemas/tasks/task.py
-
 """
-Pydantic schemas for Tasks.
+Pydantic схеми для сутності "Завдання" (Task).
+
+Цей модуль визначає схеми для:
+- Базового представлення завдання (`TaskBaseSchema`) для спільних полів створення/оновлення.
+- Створення нового завдання (`TaskCreateSchema`).
+- Оновлення існуючого завдання (`TaskUpdateSchema`).
+- Представлення завдання у відповідях API (`TaskSchema`).
+- Деталізованого представлення завдання (`TaskDetailSchema`).
 """
+# TODO: Pydantic v1/v2 consistency: Review .dict() vs .model_dump(), .from_orm vs .model_validate
+from datetime import datetime, date, timedelta  # date для дат, timedelta для прикладів
+from typing import Optional, List, Any, Dict  # Dict для JSON
+from decimal import Decimal
 
-import logging
-from typing import Optional, List # For list of sub-tasks etc.
-from datetime import datetime, timezone, timedelta # For examples and BaseResponseSchema
+from pydantic import Field
 
-from pydantic import Field, HttpUrl # HttpUrl not used here, but good to have if URLs were present
+# Абсолютний імпорт базових схем та Enum
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin, BaseMainSchema
+from backend.app.src.core.dicts import TaskStatus as TaskStatusEnum  # Для значень за замовчуванням та валідації
+from backend.app.src.config.logging import get_logger
 
-from backend.app.src.schemas.base import BaseSchema, BaseMainResponseSchema
-from backend.app.src.core.dicts import EventFrequency # Enum for recurrence
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+# TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
+# from backend.app.src.schemas.dictionaries.task_types import TaskTypeSchema
+# from backend.app.src.schemas.dictionaries.statuses import StatusSchema
+# from backend.app.src.schemas.auth.user import UserPublicProfileSchema # Для прикладів, якщо потрібно
+# from .assignment import TaskAssignmentSchema # Потрібно буде створити
+# from .completion import TaskCompletionSchema # Потрібно буде створити
+# from .review import TaskReviewSchema # Потрібно буде створити
+# from backend.app.src.schemas.bonuses.bonus_rule import BonusRuleSchema # Потрібно буде створити
 
-# --- Locally defined Basic Info schemas for demonstration ---
-# (Ideally, these would be imported from their respective schema files or a shared location)
-class GroupBasicInfo(BaseSchema):
-    id: int = Field(..., example=1)
-    name: str = Field(..., example="Household Chores")
+TaskTypeSchema = Any  # Тимчасовий заповнювач
+StatusSchema = Any  # Тимчасовий заповнювач
+TaskAssignmentSchema = Any  # Тимчасовий заповнювач
+TaskCompletionSchema = Any  # Тимчасовий заповнювач
+TaskReviewSchema = Any  # Тимчасовий заповнювач
+BonusRuleSchema = Any  # Тимчасовий заповнювач
 
-class TaskTypeBasicInfo(BaseSchema):
-    id: int = Field(..., example=1)
-    code: str = Field(..., example="CHORE")
-    name: str = Field(..., example="Chore")
-
-class StatusBasicInfo(BaseSchema):
-    id: int = Field(..., example=2)
-    code: str = Field(..., example="IN_PROGRESS")
-    name: str = Field(..., example="In Progress")
-
-class ParentTaskBasicInfo(BaseSchema):
-    id: int = Field(..., example=5)
-    name: str = Field(..., example="Spring Cleaning Project")
-# --- End of local Basic Info schemas ---
+TASK_NAME_MAX_LENGTH = 255
+TASK_RECURRENCE_PATTERN_MAX_LENGTH = 255
+TASK_EVENT_LOCATION_MAX_LENGTH = 255
 
 
-# --- Task Schemas ---
-
-class TaskBase(BaseSchema):
-    """Base schema for task data, common to create and update operations."""
-    name: str = Field(..., min_length=3, max_length=255, description="Name or title of the task.", example="Organize Project Files")
-    description: Optional[str] = Field(None, description="Detailed description of the task.", example="Organize all project-related files into a new directory structure.")
-    task_type_id: int = Field(..., description="ID of the task type (from dict_task_types).", example=1)
-    status_id: int = Field(..., description="ID of the task's current status (from dict_statuses).", example=1)
-    points_value: Optional[int] = Field(0, ge=0, description="Points awarded or deducted for this task.", example=50)
-    due_date: Optional[datetime] = Field(None, description="Optional due date and time for the task (UTC).", example=datetime.now(timezone.utc) + timedelta(days=7))
-    is_recurring: Optional[bool] = Field(False, description="Is this a recurring task?")
-    recurrence_frequency: Optional[EventFrequency] = Field(None, description="Frequency of recurrence if is_recurring is True.", example=EventFrequency.WEEKLY)
-    recurrence_interval: Optional[int] = Field(None, ge=1, description="Interval for recurrence (e.g., every 2 if frequency is weekly).", example=1)
-    parent_task_id: Optional[int] = Field(None, description="ID of the parent task, if this is a subtask.", example=None)
-    state: Optional[str] = Field("active", max_length=50, description="State of the task (e.g. 'active', 'archived' - distinct from workflow status_id).", example="active") # From BaseMainModel
-    notes: Optional[str] = Field(None, description="Internal notes for the task.") # From BaseMainModel
-
-class TaskCreate(TaskBase):
+class TaskBaseSchema(BaseSchema):
     """
-    Schema for creating a new task.
-    `group_id` is assumed to be part of API path or context.
-    `status_id` might be defaulted by the service (e.g., to an 'Open' status).
+    Базова схема для полів завдання, спільних для створення та оновлення.
+    Не успадковує ID та часові мітки, оскільки вони не надаються клієнтом при створенні.
     """
-    name: str = Field(..., min_length=3, max_length=255, description="Name or title of the task.") # Ensure name is mandatory on create
-    task_type_id: int = Field(..., description="ID of the task type.") # Ensure type is mandatory
-    status_id: Optional[int] = Field(None, description="Initial status ID for the task. If None, service may set a default (e.g., 'Open').")
-    # group_id: int # If it must be in payload for some API design, make it mandatory here. Usually from path.
+    name: str = Field(
+        ...,
+        max_length=TASK_NAME_MAX_LENGTH,
+        description="Назва завдання або події.",
+        examples=["Розробити новий функціонал"]
+    )
+    description: Optional[str] = Field(
+        None,
+        description="Детальний опис завдання або події."
+    )
+    # TODO: Валідувати task_type_code на основі існуючих кодів в довіднику dict_task_types
+    task_type_code: str = Field(
+        description="Код типу завдання з довідника (наприклад, 'REGULAR_TASK', 'EVENT')."
+    )
+
+    # TODO: Узгодити status_code/status_id з полем state з BaseMainSchema.
+    # Якщо `state` з BaseMainSchema є основним полем статусу, то `status_code` тут може бути зайвим
+    # або використовуватися для передачі коду статусу, який сервіс перетворить на `state` або `status_id` моделі.
+    # Поки що залишимо `state` для схем Create/Update, а `status` (об'єкт) та `status_code` для Response.
+    state: Optional[str] = Field(
+        default=TaskStatusEnum.OPEN.value,
+        max_length=50,
+        description=f"Стан завдання (за замовчуванням '{TaskStatusEnum.OPEN.value}'). Використовуйте значення з TaskStatus Enum.",
+        examples=[ts.value for ts in TaskStatusEnum]
+    )
+    due_date: Optional[datetime] = Field(
+        None,
+        description="Термін виконання завдання (кінцева дата та час).",
+        examples=[(datetime.now() + timedelta(days=7)).isoformat()]
+    )
+    is_recurring: bool = Field(
+        default=False,
+        description="Прапорець: чи є завдання рекурентним."
+    )
+    recurrence_pattern: Optional[str] = Field(
+        None,
+        max_length=TASK_RECURRENCE_PATTERN_MAX_LENGTH,
+        description="Шаблон повторення (наприклад, RRULE або cron-вираз).",
+        examples=["RRULE:FREQ=WEEKLY;BYDAY=MO;INTERVAL=1"]
+    )
+    recurrence_start_date: Optional[date] = Field(  # Використовуємо date
+        None,
+        description="Дата початку повторення."
+    )
+    recurrence_end_date: Optional[date] = Field(  # Використовуємо date
+        None,
+        description="Дата завершення повторення (якщо є)."
+    )
+    reminder_config: Optional[Dict[str, Any]] = Field(
+        None,
+        description="Конфігурація нагадувань (JSON, наприклад, {'before_due': '1d', 'repeat': 'every_4h'})."
+    )
+
+    is_mandatory: bool = Field(
+        default=False,
+        description="Прапорець: чи є завдання обов'язковим для виконання."
+    )
+    parent_task_id: Optional[int] = Field(
+        None,
+        description="ID батьківського завдання (для створення підзавдання)."
+    )
+    points_reward: Optional[Decimal] = Field(
+        None,
+        ge=0,  # Бали не можуть бути від'ємними при прямому нарахуванні
+        description="Кількість балів за успішне виконання завдання (якщо застосовно, не може бути від'ємним).",
+        examples=[Decimal("10.00"), Decimal("50.50")]
+    )
+    penalty_amount: Optional[Decimal] = Field(
+        None,
+        ge=0,  # Штраф також вказується як позитивне число, а тип бонусу визначає списання.
+        description="Сума штрафу за невиконання або прострочення (якщо застосовно, не може бути від'ємним).",
+        examples=[Decimal("5.00")]
+    )
+    notes: Optional[str] = Field(
+        None,
+        description="Додаткові нотатки до завдання."
+    )
+
+    # Поля, специфічні для подій
+    event_start_time: Optional[datetime] = Field(
+        None,
+        description="Час початку події (якщо завдання є подією)."
+    )
+    event_end_time: Optional[datetime] = Field(
+        None,
+        description="Час закінчення події (якщо завдання є подією)."
+    )
+    event_location: Optional[str] = Field(
+        None,
+        max_length=TASK_EVENT_LOCATION_MAX_LENGTH,
+        description="Місце проведення події (якщо застосовно)."
+    )
+
+
+class TaskCreateSchema(TaskBaseSchema):
+    """
+    Схема для створення нового завдання.
+    `group_id` зазвичай передається як параметр шляху або встановлюється сервісом.
+    `creator_id` (якщо є) встановлюється сервісом на основі поточного користувача.
+    """
+    # Успадковує всі поля з TaskBaseSchema.
+    # group_id буде встановлено сервісом, якщо завдання створюється в контексті групи.
     pass
 
-class TaskUpdate(BaseSchema): # Does not inherit TaskBase to make all fields truly optional
+
+class TaskUpdateSchema(TaskBaseSchema):
     """
-    Schema for updating an existing task. All fields are optional for partial updates.
+    Схема для оновлення існуючого завдання.
+    Всі поля, успадковані з `TaskBaseSchema`, стають опціональними для оновлення.
     """
-    name: Optional[str] = Field(None, min_length=3, max_length=255, description="New name or title of the task.")
-    description: Optional[str] = Field(None, description="New detailed description of the task.")
-    task_type_id: Optional[int] = Field(None, description="New ID of the task type.")
-    status_id: Optional[int] = Field(None, description="New ID of the task's current status.")
-    points_value: Optional[int] = Field(None, ge=0, description="New points value for this task.")
-    due_date: Optional[datetime] = Field(None, description="New due date and time for the task (UTC).")
-    is_recurring: Optional[bool] = Field(None, description="Update if the task is recurring.")
-    recurrence_frequency: Optional[EventFrequency] = Field(None, description="New frequency of recurrence.")
-    recurrence_interval: Optional[int] = Field(None, ge=1, description="New interval for recurrence.")
-    parent_task_id: Optional[int] = Field(None, description="New ID of the parent task. Use null to remove parent.")
-    state: Optional[str] = Field(None, max_length=50, description="New state of the task (e.g. 'active', 'archived').")
-    notes: Optional[str] = Field(None, description="Updated internal notes for the task.")
+    # Робимо всі поля з TaskBaseSchema опціональними
+    name: Optional[str] = Field(None, max_length=TASK_NAME_MAX_LENGTH, description="Нова назва завдання.")
+    description: Optional[str] = Field(None, description="Новий опис завдання.")
+    task_type_code: Optional[str] = Field(None, description="Новий код типу завдання.")
+    state: Optional[str] = Field(None, max_length=50, description="Новий стан завдання.")
+    due_date: Optional[datetime] = Field(None, description="Новий термін виконання.")
+
+    is_recurring: Optional[bool] = Field(None, description="Оновити прапорець повторюваності екземпляра.")
+    is_recurring_template: Optional[bool] = Field(None,
+                                                  description="Оновити прапорець, чи є це шаблоном повторюваних завдань.")
+    recurrence_pattern: Optional[str] = Field(None, max_length=TASK_RECURRENCE_PATTERN_MAX_LENGTH,
+                                              description="Новий шаблон повторення.")
+    recurrence_start_date: Optional[date] = Field(None, description="Нова дата початку повторення.")
+    recurrence_end_date: Optional[date] = Field(None, description="Нова дата завершення повторення.")
+    reminder_config: Optional[Dict[str, Any]] = Field(None, description="Нова конфігурація нагадувань.")
+
+    is_mandatory: Optional[bool] = Field(None, description="Оновити прапорець обов'язковості завдання.")
+    parent_task_id: Optional[int] = Field(None,
+                                          description="Новий ID батьківського завдання (None для видалення зв'язку).")
+    points_reward: Optional[Decimal] = Field(None, ge=0, description="Нова кількість балів за виконання.")
+    penalty_amount: Optional[Decimal] = Field(None, ge=0, description="Нова сума штрафу.")
+    notes: Optional[str] = Field(None, description="Нові нотатки до завдання.")
+    event_start_time: Optional[datetime] = Field(None, description="Новий час початку події.")
+    event_end_time: Optional[datetime] = Field(None, description="Новий час закінчення події.")
+    event_location: Optional[str] = Field(None, max_length=TASK_EVENT_LOCATION_MAX_LENGTH,
+                                          description="Нове місце проведення події.")
 
 
-class TaskResponse(BaseMainResponseSchema):
+class TaskSchema(
+    BaseMainSchema):  # Успадковуємо від BaseMainSchema для id, timestamps, name, description, state, notes, group_id
     """
-    Schema for representing a task in API responses.
-    Inherits common fields from BaseMainResponseSchema (id, created_at, updated_at, deleted_at, name, description, state, notes).
+    Схема для представлення даних завдання у відповідях API.
     """
-    # name, description, state, notes are from BaseMainResponseSchema.
-    # Ensure their descriptions and examples here match or enhance the base.
-    name: str = Field(..., description="Name of the task.", example="Weekly Kitchen Cleaning")
-    description: Optional[str] = Field(None, description="Detailed description of the task.", example="Clean all surfaces, floor, and microwave.")
-    state: Optional[str] = Field(None, description="Lifecycle state of the task (e.g., 'active', 'archived').", example="active")
+    # id, name, description, state, notes, group_id, created_at, updated_at, deleted_at - успадковані
 
-    group: Optional[GroupBasicInfo] = Field(None, description="Basic information about the group this task belongs to.") # Populated by service
-    task_type: Optional[TaskTypeBasicInfo] = Field(None, description="Information about the task type.") # Populated by service
-    status: Optional[StatusBasicInfo] = Field(None, description="Information about the task's current workflow status.") # Populated by service
+    # Специфічні поля моделі Task, що не входять до BaseMainSchema або потребують іншого представлення
+    task_type_code: Optional[str] = Field(None, description="Код типу завдання.")
 
-    points_value: int = Field(..., description="Points for this task.", example=50)
-    due_date: Optional[datetime] = Field(None, description="Due date of the task.", example=(datetime.now(timezone.utc) + timedelta(days=3)).isoformat())
-    is_recurring: bool = Field(..., description="Is this task recurring?", example=False)
-    recurrence_frequency: Optional[EventFrequency] = Field(None, description="Frequency of recurrence.", example=EventFrequency.WEEKLY)
-    recurrence_interval: Optional[int] = Field(None, description="Interval for recurrence.", example=1)
+    status_code: Optional[str] = Field(None, description="Код поточного статусу завдання (з довідника dict_statuses).")
 
-    parent_task: Optional[ParentTaskBasicInfo] = Field(None, description="Basic info about the parent task, if this is a subtask.") # Populated by service
-    sub_task_ids: Optional[List[int]] = Field(None, description="List of IDs of subtasks.", example=[102, 103])
-    # assigned_users: Optional[List[UserBasicInfo]] = Field(None, description="Users assigned to this task.") # Populated via TaskAssignment
+    due_date: Optional[datetime] = Field(None, description="Термін виконання завдання.")
+
+    # Поля повторення та нагадувань
+    is_recurring: bool = Field(description="Чи є завдання екземпляром повторюваного (або старим полем шаблону).")
+    is_recurring_template: Optional[bool] = Field(None,
+                                                  description="Чи є це завдання шаблоном для повторюваних завдань.")
+    recurrence_pattern: Optional[str] = Field(None, description="Шаблон повторення.")
+    recurrence_start_date: Optional[date] = Field(None, description="Дата початку повторення.")
+    recurrence_end_date: Optional[date] = Field(None, description="Дата завершення повторення.")
+    last_instance_created_at: Optional[datetime] = Field(None,
+                                                         description="Час створення останнього екземпляру (для шаблонів).")
+    next_occurrence_at: Optional[datetime] = Field(None,
+                                                   description="Розрахунковий час наступного виконання (для шаблонів).")
+    last_reminder_sent_at: Optional[datetime] = Field(None, description="Час останнього надісланого нагадування.")
+    reminder_config: Optional[Dict[str, Any]] = Field(None, description="Конфігурація нагадувань.")
+
+    is_mandatory: bool = Field(description="Чи є завдання обов'язковим.")
+    parent_task_id: Optional[int] = Field(None, description="ID батьківського завдання.")
+    points_reward: Optional[Decimal] = Field(None, description="Бали за виконання.")
+    penalty_amount: Optional[Decimal] = Field(None, description="Штраф за невиконання.")
+    event_start_time: Optional[datetime] = Field(None, description="Час початку події.")
+    event_end_time: Optional[datetime] = Field(None, description="Час закінчення події.")
+    event_location: Optional[str] = Field(None, description="Місце проведення події.")
+
+    # Пов'язані об'єкти (для розширеної інформації)
+    task_type: Optional[TaskTypeSchema] = Field(None, description="Об'єкт типу завдання.")
+    status: Optional[StatusSchema] = Field(None, description="Об'єкт статусу завдання (з довідника).")
+
+    parent_task: Optional[Any] = Field(None,
+                                       description="Коротка інформація про батьківське завдання (може бути TaskSchema).")
+
+    # Обчислювані поля (зазвичай додаються сервісом)
+    sub_tasks_count: Optional[int] = Field(None, description="Кількість підзавдань.")
+    assignments_count: Optional[int] = Field(None, description="Кількість призначень цього завдання.")
+    completions_count: Optional[int] = Field(None, description="Кількість виконань цього завдання.")
+
+
+class TaskDetailSchema(TaskSchema):
+    """
+    Схема для деталізованого представлення завдання, включаючи пов'язані об'єкти.
+    """
+    # sub_tasks, assignments, completions, reviews, bonus_rules успадковуються з TaskSchema,
+    # але тут вони можуть бути визначені з більш конкретними типами або заповнені даними.
+
+    # TODO: Замінити Any на відповідні списки схем
+    sub_tasks: Optional[List[TaskSchema]] = Field(default_factory=list, description="Список підзавдань.")
+    assignments: Optional[List[TaskAssignmentSchema]] = Field(default_factory=list,
+                                                              description="Список призначень завдання.")
+    completions: Optional[List[TaskCompletionSchema]] = Field(default_factory=list,
+                                                              description="Список виконань завдання.")
+    reviews: Optional[List[TaskReviewSchema]] = Field(default_factory=list, description="Список відгуків на завдання.")
+    bonus_rules: Optional[List[BonusRuleSchema]] = Field(default_factory=list,
+                                                         description="Список правил нарахування бонусів, пов'язаних із завданням.")
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем завдань.
+    logger.info("--- Pydantic Схеми для Завдань (Task) ---")
+    from datetime import timedelta  # Для timedelta в прикладах
 
-    logger.info("--- Task Schemas --- Demonstration")
-
-    # TaskCreate Example
-    task_create_data = {
-        "name": "Wash the Dishes",
-        "description": "Load and run the dishwasher.",
-        "taskTypeId": 1, # camelCase for task_type_id
-        "pointsValue": 10,
-        "dueDate": (datetime.now(timezone.utc) + timedelta(hours=2)).isoformat(),
-        "isRecurring": False,
-        "state": "active"
-        # status_id is optional, service might set it to 'OPEN'
+    logger.info("\nTaskCreateSchema (приклад):")
+    create_data = {
+        "name": "Організувати корпоратив",  # TODO i18n
+        "description": "Підготувати та провести корпоративний захід для команди.",  # TODO i18n
+        "task_type_code": "EVENT",  # Має існувати в довіднику dict_task_types
+        "state": TaskStatusEnum.OPEN.value,
+        "due_date": (datetime.now() + timedelta(days=30)).isoformat(),
+        "event_start_time": (datetime.now() + timedelta(days=29)).isoformat(),
+        "event_end_time": (datetime.now() + timedelta(days=29, hours=4)).isoformat(),
+        "event_location": "Конференц-зал 'Київ'",  # TODO i18n
+        "points_reward": Decimal("100.00")
     }
-    try:
-        create_schema = TaskCreate(**task_create_data) # type: ignore[call-arg]
-        logger.info(f"TaskCreate valid: {create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating TaskCreate: {e}")
+    create_instance = TaskCreateSchema(**create_data)
+    logger.info(create_instance.model_dump_json(indent=2, exclude_none=True))
 
-    # TaskUpdate Example
-    task_update_data = {"pointsValue": 15, "statusId": 2}
-    update_schema = TaskUpdate(**task_update_data) # type: ignore[call-arg]
-    logger.info(f"TaskUpdate (partial): {update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # TaskResponse Example
-    group_info_data = {"id": 1, "name": "Household Chores"}
-    task_type_info_data = {"id": 1, "code": "CHORE", "name": "Chore"}
-    status_info_data = {"id": 2, "code": "IN_PROGRESS", "name": "In Progress"}
-    parent_task_info_data = {"id": 5, "name": "Spring Cleaning Project"}
-
-    response_data = {
-        "id": 101,
-        "createdAt": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "name": "Wash the Dishes",
-        "description": "Load and run the dishwasher.",
-        "state": "active",
-        "notes": "Remember to use the new detergent.",
-        "deletedAt": None,
-        "group": group_info_data,
-        "taskType": task_type_info_data,
-        "status": status_info_data,
-        "pointsValue": 15,
-        "dueDate": (datetime.now(timezone.utc) + timedelta(hours=1)).isoformat(),
-        "isRecurring": False,
-        "recurrenceFrequency": None, # Example if not recurring
-        "recurrenceInterval": None,
-        "parentTask": parent_task_info_data,
-        "subTaskIds": [102, 103]
+    logger.info("\nTaskUpdateSchema (приклад):")
+    update_data = {
+        "description": "Оновлений опис: Підготувати та провести корпоративний захід для команди до кінця кварталу.",
+        # TODO i18n
+        "state": TaskStatusEnum.IN_PROGRESS.value,
+        "is_mandatory": True
     }
-    try:
-        response_schema = TaskResponse(**response_data) # type: ignore[call-arg]
-        logger.info(f"TaskResponse: {response_schema.model_dump_json(by_alias=True, indent=2)}")
-        if response_schema.group:
-            logger.info(f"  Task group name: {response_schema.group.name}")
-        if response_schema.parent_task:
-            logger.info(f"  Parent task name: {response_schema.parent_task.name}")
-    except Exception as e:
-        logger.error(f"Error creating TaskResponse: {e}")
+    update_instance = TaskUpdateSchema(**update_data)
+    logger.info(update_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nTaskSchema (приклад відповіді API):")
+    task_response_data = {
+        "id": 1,
+        "name": "Завершити звіт",  # TODO i18n
+        "description": "Фіналізувати квартальний звіт по проекту Alpha.",  # TODO i18n
+        "state": TaskStatusEnum.IN_PROGRESS.value,
+        "group_id": 10,
+        "created_at": datetime.now() - timedelta(days=2),
+        "updated_at": datetime.now(),
+        "task_type_code": "REGULAR_TASK",
+        # "task_type": {"id": 1, "name": "Звичайне Завдання", "code": "REGULAR_TASK"}, # Приклад TaskTypeSchema
+        "due_date": datetime.now() + timedelta(days=5),
+        "is_recurring": False,
+        "is_mandatory": True,
+        "points_reward": Decimal("25.00"),
+        "assignments_count": 2,
+        "completions_count": 0,
+    }
+    task_response_instance = TaskSchema(**task_response_data)
+    logger.info(task_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nTaskDetailSchema (приклад деталізованої відповіді API):")
+    task_detail_data = {
+        **task_response_data,  # Успадковує поля з TaskSchema
+        "sub_tasks_count": 0,  # Замість повного списку, якщо він порожній
+        "assignments": [  # Приклад TaskAssignmentSchema
+            {"task_id": 1, "user_id": 101, "status": "accepted", "created_at": datetime.now() - timedelta(days=1)},
+            {"task_id": 1, "user_id": 102, "status": "assigned", "created_at": datetime.now()}
+        ],
+        # completions, reviews, bonus_rules можуть бути порожніми списками або заповненими
+    }
+    task_detail_instance = TaskDetailSchema(**task_detail_data)
+    logger.info(task_detail_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nПримітка: Схеми для пов'язаних об'єктів (TaskTypeSchema, StatusSchema, TaskAssignmentSchema і т.д.)")
+    logger.info("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
+    logger.info("Також, `task_type_code` та `status_code` потребують валідації на рівні сервісу або схеми.")
+    logger.info("Узгодження `status_code` та `state` залишається відкритим питанням (TODO).")

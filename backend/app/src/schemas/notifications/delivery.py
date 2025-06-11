@@ -1,117 +1,133 @@
 # backend/app/src/schemas/notifications/delivery.py
-import logging
-from uuid import UUID
+"""
+Pydantic схеми для сутності "Спроба Доставки Сповіщення" (NotificationDeliveryAttempt).
+
+Цей модуль визначає схеми для:
+- Базового представлення спроби доставки (`NotificationDeliveryAttemptBaseSchema`).
+- Створення нового запису про спробу доставки (зазвичай виконується сервісом) (`NotificationDeliveryAttemptCreateSchema`).
+- Представлення даних про спробу доставки у відповідях API (`NotificationDeliveryAttemptSchema`).
+"""
 from datetime import datetime
-from typing import Optional, Literal
+from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
-from app.src.schemas.base import BaseDBRead # Common DB fields
+# Абсолютний імпорт базових схем
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# TODO: Визначити та імпортувати Enums NotificationChannelType та DeliveryStatusType з core.dicts.
+# from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType
 
-# --- Notification Delivery Status Enum (Example) ---
-DeliveryChannelLiterals = Literal["email", "sms", "push_notification", "in_app_internal", "webhook", "messenger_bot"]
-DeliveryStatusLiterals = Literal["pending", "sent", "failed", "delivered", "read", "undeliverable", "skipped"]
+# Заглушки для Enums, поки вони не визначені в core.dicts
+class TempNotificationChannelType:  # TODO: Видалити
+    EMAIL = "email"
+    SMS = "sms"
 
-# --- NotificationDeliveryAttempt Schemas ---
 
-class NotificationDeliveryAttemptBase(BaseModel):
+class TempDeliveryStatusType:  # TODO: Видалити
+    PENDING = "pending"
+    SENT = "sent"
+    FAILED = "failed"
+
+
+CHANNEL_MAX_LENGTH = 50
+STATUS_MAX_LENGTH = 50
+EXTERNAL_ID_MAX_LENGTH = 255
+
+
+class NotificationDeliveryAttemptBaseSchema(BaseSchema):
     """
-    Base schema for tracking attempts to deliver a notification.
+    Базова схема для полів запису про спробу доставки сповіщення.
     """
-    notification_id: UUID = Field(..., description="The unique identifier of the notification being delivered.")
-    channel: DeliveryChannelLiterals = Field(
-        ...,
-        description="The delivery channel used for this attempt (e.g., 'email', 'sms', 'push_notification')."
+    notification_id: int = Field(description="Ідентифікатор сповіщення, яке намагалися доставити.")
+    # TODO: Замінити str на NotificationChannelType та додати валідатор.
+    channel: str = Field(
+        max_length=CHANNEL_MAX_LENGTH,
+        description=f"Канал доставки (наприклад, '{TempNotificationChannelType.EMAIL}', '{TempNotificationChannelType.SMS}')."
     )
-    status: DeliveryStatusLiterals = Field(
-        "pending",
-        description="Current status of this delivery attempt."
+    # TODO: Замінити str на DeliveryStatusType та додати валідатор.
+    status: str = Field(
+        max_length=STATUS_MAX_LENGTH,
+        description=f"Статус спроби доставки (наприклад, '{TempDeliveryStatusType.PENDING}', '{TempDeliveryStatusType.SENT}', '{TempDeliveryStatusType.FAILED}')."
     )
-    attempt_count: int = Field(
-        1,
-        ge=1,
-        description="The number of times delivery has been attempted via this channel for this notification."
-    )
-    sent_at: Optional[datetime] = Field(
+    error_message: Optional[str] = Field(None, description="Повідомлення про помилку, якщо доставка не вдалася.")
+    external_message_id: Optional[str] = Field(
         None,
-        description="Timestamp when the delivery attempt was initiated/sent. Can be None if still pending."
+        max_length=EXTERNAL_ID_MAX_LENGTH,
+        description="Зовнішній ID повідомлення від провайдера доставки (наприклад, SES Message ID, Twilio SID)."
     )
-    # delivered_at: Optional[datetime] = Field(None, description="Timestamp when the notification was confirmed delivered (if supported by channel).")
-    # read_at: Optional[datetime] = Field(None, description="Timestamp when the notification was confirmed read (if supported by channel).")
-    error_message: Optional[str] = Field(
-        None,
-        max_length=1000,
-        description="Error message if the delivery attempt failed."
-    )
-    # external_message_id: Optional[str] = Field(None, max_length=255, description="ID from the external service (e.g., SES Message ID, Twilio SID).")
-
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        anystr_strip_whitespace = True
-        title = "NotificationDeliveryAttemptBase"
-        json_schema_extra = {
-            "example": {
-                "notification_id": "b2c3d4e5-f6a7-8901-2345-67890abcdef01",
-                "channel": "email",
-                "status": "sent",
-                "attempt_count": 1,
-                "sent_at": "2023-06-10T10:00:05Z",
-                "error_message": None,
-                # "external_message_id": "0100017aabcdef01-01234567-0123-0123-0123-0123456789ab-000000"
-            }
-        }
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"NotificationDeliveryAttemptBase instance created with data: {data}")
+    # model_config успадковується з BaseSchema (from_attributes=True)
 
 
-class NotificationDeliveryAttemptCreate(NotificationDeliveryAttemptBase):
+class NotificationDeliveryAttemptCreateSchema(NotificationDeliveryAttemptBaseSchema):
     """
-    Schema for creating a new notification delivery attempt record.
-    Typically used internally by notification services.
+    Схема для створення нового запису про спробу доставки сповіщення.
+    Зазвичай використовується внутрішніми сервісами доставки.
     """
+    # Успадковує всі поля від NotificationDeliveryAttemptBaseSchema.
+    # `created_at` (як час спроби) буде встановлено автоматично через TimestampedMixin у відповіді.
     pass
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.info(f"NotificationDeliveryAttemptCreate instance for notification '{self.notification_id}' via '{self.channel}'.")
 
-# No Update schema is typically defined for delivery attempts, as they are usually immutable records of an attempt.
-# New attempts would create new records. Status updates might occur on the existing record via service logic.
-
-class NotificationDeliveryAttemptResponse(NotificationDeliveryAttemptBase, BaseDBRead):
+class NotificationDeliveryAttemptSchema(NotificationDeliveryAttemptBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
     """
-    Schema for representing a notification delivery attempt in API responses.
+    Схема для представлення даних про спробу доставки сповіщення у відповідях API.
+    Поле `created_at` (з `TimestampedSchemaMixin`) позначає час здійснення спроби.
     """
-    # id: UUID # From BaseDBRead
-    # created_at: datetime # From BaseDBRead
-    # updated_at: datetime # From BaseDBRead (reflects last status change)
+    # id, created_at, updated_at успадковані.
+    # notification_id, channel, status, error_message, external_message_id успадковані.
 
-    class Config(NotificationDeliveryAttemptBase.Config):
-        title = "NotificationDeliveryAttemptResponse"
-        json_schema_extra = { # Override or extend example
-            "example": {
-                "id": "d4e5f6a7-b8c9-0123-4567-890abcdef0123",
-                "notification_id": "b2c3d4e5-f6a7-8901-2345-67890abcdef01",
-                "channel": "email",
-                "status": "delivered", # Example of a later status
-                "attempt_count": 1,
-                "sent_at": "2023-06-10T10:00:05Z",
-                # "delivered_at": "2023-06-10T10:01:15Z",
-                "error_message": None,
-                # "external_message_id": "0100017aabcdef01-01234567-0123-0123-0123-0123456789ab-000000",
-                "created_at": "2023-06-10T10:00:04Z",
-                "updated_at": "2023-06-10T10:01:15Z" # Updated when status changed to 'delivered'
-            }
-        }
+    # Можна додати зв'язок з NotificationSchema, якщо потрібно повертати деталі сповіщення разом зі спробою,
+    # але зазвичай це не потрібно, оскільки спроби є частиною об'єкта сповіщення.
+    # notification: Optional[NotificationSchema] = None
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"NotificationDeliveryAttemptResponse instance created for attempt ID '{self.id}'.")
 
-logger.info("NotificationDeliveryAttempt schemas (NotificationDeliveryAttemptBase, NotificationDeliveryAttemptCreate, NotificationDeliveryAttemptResponse) defined successfully.")
+if __name__ == "__main__":
+    # Демонстраційний блок для схем спроб доставки сповіщень.
+    logger.info("--- Pydantic Схеми для Спроб Доставки Сповіщень (NotificationDeliveryAttempt) ---")
+
+    logger.info("\nNotificationDeliveryAttemptCreateSchema (приклад для створення):")
+    create_attempt_data = {
+        "notification_id": 101,
+        "channel": TempNotificationChannelType.EMAIL,  # TODO: Замінити на Enum.value
+        "status": TempDeliveryStatusType.PENDING,  # TODO: Замінити на Enum.value
+    }
+    create_attempt_instance = NotificationDeliveryAttemptCreateSchema(**create_attempt_data)
+    logger.info(create_attempt_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nNotificationDeliveryAttemptSchema (приклад відповіді API):")
+    attempt_response_data = {
+        "id": 1,
+        "notification_id": 101,
+        "channel": TempNotificationChannelType.EMAIL,  # TODO: Замінити на Enum.value
+        "status": TempDeliveryStatusType.SENT,  # TODO: Замінити на Enum.value
+        "external_message_id": "ses-msg-id-xyz789",
+        "created_at": datetime.now() - timedelta(seconds=30),
+        "updated_at": datetime.now() - timedelta(seconds=30)
+        # Може бути таким же, як created_at, якщо статус не змінювався
+    }
+    attempt_response_instance = NotificationDeliveryAttemptSchema(**attempt_response_data)
+    logger.info(attempt_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    # Приклад з помилкою
+    attempt_failed_data = {
+        "id": 2,
+        "notification_id": 102,
+        "channel": TempNotificationChannelType.SMS,  # TODO: Замінити на Enum.value
+        "status": TempDeliveryStatusType.FAILED,  # TODO: Замінити на Enum.value
+        "error_message": "Неправильний номер телефону отримувача",  # TODO i18n
+        "created_at": datetime.now(),
+        "updated_at": datetime.now()
+    }
+    attempt_failed_instance = NotificationDeliveryAttemptSchema(**attempt_failed_data)
+    logger.info(f"\nПриклад невдалої спроби:\n{attempt_failed_instance.model_dump_json(indent=2, exclude_none=True)}")
+
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних спроб доставки.")
+    logger.info(
+        "TODO: Інтегрувати Enum 'NotificationChannelType' та 'DeliveryStatusType' з core.dicts для полів 'channel' та 'status'.")
+
+# Потрібно для timedelta в __main__
+from datetime import timedelta

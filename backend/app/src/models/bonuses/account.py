@@ -1,108 +1,125 @@
 # backend/app/src/models/bonuses/account.py
-
 """
-SQLAlchemy model for User Accounts, which store the balance of points/currency for users.
+Модель SQLAlchemy для сутності "Рахунок Користувача" (UserAccount).
+
+Цей модуль визначає модель `UserAccount`, яка представляє баланс бонусів
+(або іншої внутрішньої валюти) для кожного користувача в межах кожної групи.
 """
+from datetime import datetime  # Необхідно для TYPE_CHECKING та __main__
+from typing import TYPE_CHECKING, List, Optional
+from decimal import Decimal
 
-import logging
-from typing import Optional, List, TYPE_CHECKING # For Mapped type hints
-from datetime import datetime, timezone, timedelta # Added timezone, timedelta for __main__
-from decimal import Decimal # For balance field
-
-from sqlalchemy import ForeignKey, String, Numeric, DateTime, UniqueConstraint, Integer # Added Integer for FKs
+from sqlalchemy import String, ForeignKey, Numeric, UniqueConstraint, Index, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.src.models.base import BaseModel # Accounts are simpler than full BaseMainModel
-
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт базових класів та міксинів
+from backend.app.src.models.base import Base
+from backend.app.src.models.mixins import TimestampedMixin  # Для відстеження часу створення/оновлення рахунку
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
-    from backend.app.src.models.groups.group import Group # If accounts are per-group
+    from backend.app.src.models.groups.group import Group
     from backend.app.src.models.bonuses.transaction import AccountTransaction
 
-class UserAccount(BaseModel):
-    """
-    Represents a user's account for bonuses/points/currency.
-    A user might have one global account or one account per group they are a member of.
-    This implementation supports one account per user per group.
 
-    Attributes:
-        user_id (int): Foreign key to the user who owns this account.
-        group_id (int): Foreign key to the group this account is associated with.
-                       If set to a special 'system' group_id or made nullable, can represent a global account.
-        balance (Decimal): The current balance of points/currency in the account. Using Numeric for precision.
-        currency_name (str): The name of the currency held in this account (e.g., 'points', 'kudos', 'stars').
-                             This might be inherited from group settings in practice.
-        last_transaction_at (Optional[datetime]): Timestamp of the last transaction on this account.
-        # `id`, `created_at`, `updated_at` from BaseModel.
+class UserAccount(Base, TimestampedMixin):
+    """
+    Модель Рахунку Користувача.
+
+    Зберігає поточний баланс користувача в певній групі, а також валюту цього балансу.
+    Кожен користувач має окремий рахунок для кожної групи, до якої він належить.
+
+    Атрибути:
+        id (Mapped[int]): Унікальний ідентифікатор рахунку.
+        user_id (Mapped[int]): ID користувача, якому належить рахунок.
+        group_id (Mapped[int]): ID групи, в межах якої ведеться цей рахунок.
+        balance (Mapped[Decimal]): Поточний баланс на рахунку.
+        currency (Mapped[str]): Назва валюти/одиниць виміру бонусів (наприклад, "бали").
+
+        user (Mapped["User"]): Зв'язок з моделлю `User`.
+        group (Mapped["Group"]): Зв'язок з моделлю `Group`.
+        transactions (Mapped[List["AccountTransaction"]]): Список транзакцій по цьому рахунку.
+        created_at, updated_at: Успадковано від `TimestampedMixin`.
     """
     __tablename__ = "user_accounts"
 
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True, comment="FK to the user owning this account")
-    group_id: Mapped[int] = mapped_column(Integer, ForeignKey("groups.id"), nullable=False, index=True, comment="FK to the group this account belongs to. Ensures account is group-specific.")
+    id: Mapped[int] = mapped_column(
+        primary_key=True, index=True, autoincrement=True, comment="Унікальний ідентифікатор рахунку користувача"
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey('users.id', name='fk_user_account_user_id', ondelete="CASCADE"),
+        nullable=False,
+        comment="ID користувача, якому належить рахунок"
+    )
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey('groups.id', name='fk_user_account_group_id', ondelete="CASCADE"),
+        nullable=False,
+        comment="ID групи, до якої прив'язаний рахунок"
+    )
+    balance: Mapped[Decimal] = mapped_column(
+        Numeric(12, 2), default=Decimal("0.00"), nullable=False, comment="Поточний баланс на рахунку"
+    )
+    # TODO i18n: default value 'бали' for currency
+    currency: Mapped[str] = mapped_column(
+        String(10), default='бали', nullable=False, comment="Валюта рахунку (наприклад, бали, очки)"
+    )
 
-    # Using Numeric for currency/points to handle precision properly, avoiding float issues.
-    # Precision and scale can be adjusted based on requirements (e.g., if fractional points are allowed).
-    balance: Mapped[Decimal] = mapped_column(Numeric(10, 2), default=Decimal('0.00'), nullable=False, comment="Current balance of points/currency. Precision 10, 2 decimal places.")
-
-    currency_name: Mapped[str] = mapped_column(String(50), default="points", nullable=False, comment="Name of the currency (e.g., 'points', 'kudos')")
-
-    last_transaction_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, comment="Timestamp of the last transaction on this account (UTC)")
-
-    # --- Relationships ---
-    user: Mapped["User"] = relationship(back_populates="accounts")
-    group: Mapped["Group"] = relationship() # One-way or add back_populates="user_accounts" to Group
-    transactions: Mapped[List["AccountTransaction"]] = relationship(back_populates="account", cascade="all, delete-orphan", order_by="AccountTransaction.created_at.desc()")
-
-    # --- Table Arguments ---
-    # A user should have only one account per group.
+    # Обмеження та індекси
     __table_args__ = (
         UniqueConstraint('user_id', 'group_id', name='uq_user_group_account'),
+        # Кожен користувач має лише один рахунок на групу
+        Index('ix_user_accounts_user_group_balance', 'user_id', 'group_id', 'balance'),
+    # Індекс для швидкого пошуку балансу
     )
 
-    def __repr__(self) -> str:
-        id_val = getattr(self, 'id', 'N/A')
-        return f"<UserAccount(id={id_val}, user_id={self.user_id}, group_id={self.group_id}, balance={self.balance} {self.currency_name})>"
+    # --- Зв'язки (Relationships) ---
+    user: Mapped["User"] = relationship(lazy="selectin")  # back_populates="accounts" можна додати до User
+    group: Mapped["Group"] = relationship(lazy="selectin")  # back_populates="user_accounts" можна додати до Group
+
+    transactions: Mapped[List["AccountTransaction"]] = relationship(
+        back_populates="account", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+    # Поля для __repr__
+    _repr_fields = ["id", "user_id", "group_id", "balance", "currency"]
+
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для моделі UserAccount.
+    logger.info("--- Модель Рахунку Користувача (UserAccount) ---")
+    logger.info(f"Назва таблиці: {UserAccount.__tablename__}")
 
-    logger.info("--- UserAccount Model --- Demonstration")
+    logger.info("\nОчікувані поля:")
+    expected_fields = [
+        'id', 'user_id', 'group_id', 'balance', 'currency',
+        'created_at', 'updated_at'
+    ]
+    for field in expected_fields:
+        logger.info(f"  - {field}")
 
-    # Example UserAccount instance
-    # Assume User id=1 and Group id=1 exist
-    account1 = UserAccount(
-        user_id=1,
-        group_id=1,
-        balance=Decimal('100.50'),
-        currency_name="Kudos Points",
-        last_transaction_at=datetime.now(timezone.utc) - timedelta(hours=1)
+    logger.info("\nОчікувані зв'язки (relationships):")
+    expected_relationships = ['user', 'group', 'transactions']
+    for rel in expected_relationships:
+        logger.info(f"  - {rel}")
+
+    # Приклад створення екземпляра (без взаємодії з БД)
+    example_account = UserAccount(
+        id=1,
+        user_id=101,
+        group_id=202,
+        balance=Decimal("150.75"),
+        currency="бали"
     )
-    account1.id = 1 # Simulate ORM-set ID
-    account1.created_at = datetime.now(timezone.utc) - timedelta(days=1)
-    account1.updated_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    # Імітуємо часові мітки
+    example_account.created_at = datetime.now(
+        tz=datetime.now().astimezone().tzinfo)  # Використовуємо локальний часовий пояс для прикладу
+    example_account.updated_at = datetime.now(tz=datetime.now().astimezone().tzinfo)
 
-    logger.info(f"Example UserAccount: {account1!r}")
-    logger.info(f"  User ID: {account1.user_id}, Group ID: {account1.group_id}")
-    logger.info(f"  Balance: {account1.balance} {account1.currency_name}")
-    logger.info(f"  Last Transaction At: {account1.last_transaction_at.isoformat() if account1.last_transaction_at else 'N/A'}")
-    logger.info(f"  Created At: {account1.created_at.isoformat() if account1.created_at else 'N/A'}")
+    logger.info(f"\nПриклад екземпляра UserAccount (без сесії):\n  {example_account}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <UserAccount(id=1, user_id=101, group_id=202, balance=Decimal('150.75'), currency='бали', created_at=...)>
 
-
-    account2_zero_balance = UserAccount(
-        user_id=2, # User 2
-        group_id=1, # Same Group 1
-        currency_name="Stars"
-        # balance defaults to 0.00
-    )
-    account2_zero_balance.id = 2
-    logger.info(f"Example UserAccount (zero balance): {account2_zero_balance!r}")
-    logger.info(f"  Balance (defaulted): {account2_zero_balance.balance}")
-
-
-    # The following line would error if run directly without SQLAlchemy engine and metadata setup for all related tables.
-    # logger.info(f"UserAccount attributes (conceptual table columns): {[c.name for c in UserAccount.__table__.columns if not c.name.startswith('_')]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

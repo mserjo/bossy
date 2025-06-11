@@ -1,134 +1,117 @@
 # backend/app/src/models/dictionaries/base_dict.py
-
 """
-Визначає базову модель для всіх таблиць-довідників (lookup tables).
+Базовий клас для моделей-довідників SQLAlchemy.
+
+Цей модуль визначає `BaseDictionaryModel`, який успадковує `BaseMainModel`
+та додає спільне поле `code`, характерне для довідникових моделей.
+Всі конкретні моделі-довідники (наприклад, Статуси, Типи користувачів)
+повинні успадковувати цей клас.
 """
 
-import logging
-from typing import Optional
+from sqlalchemy import String
+from sqlalchemy.orm import Mapped, mapped_column
 
-from sqlalchemy.orm import Mapped, mapped_column, declared_attr
-from sqlalchemy import String, Boolean, Integer # Для is_active, display_order
+# Абсолютний імпорт базової моделі з основного модуля моделей
+from backend.app.src.models.base import BaseMainModel
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-from backend.app.src.models.base import BaseMainModel # Використання BaseMainModel для name, description, state, notes, soft_delete, timestamps
-from backend.app.src.models.mixins import CodeMixin # Для унікального поля 'code'
 
-# Налаштувати логер для цього модуля
-logger = logging.getLogger(__name__)
-
-class BaseDictionaryModel(BaseMainModel, CodeMixin):
+class BaseDictionaryModel(BaseMainModel):
     """
-    Базовий клас для моделей-довідників.
-    Успадковує від BaseMainModel для отримання загальних полів, таких як id, name, description,
-    state, notes, created_at, updated_at, deleted_at.
-    Додає поле `code` з CodeMixin для унікального, людиночитаного ідентифікатора.
-    Також включає `is_default` та `display_order` для типової поведінки довідників.
+    Абстрактний базовий клас для всіх моделей-довідників.
 
-    Загальні поля для моделей-довідників:
-    - id: Первинний ключ (з BaseModel -> BaseMainModel).
-    - code: Унікальний рядковий ідентифікатор (з CodeMixin).
-    - name: Людиночитана назва (з NameDescriptionMixin -> BaseMainModel).
-    - description: Опціональний детальний опис (з NameDescriptionMixin -> BaseMainModel).
-    - state: Опціональний стан (наприклад, 'active', 'inactive') (зі StateMixin -> BaseMainModel).
-    - is_default: Булеве значення, чи є це значенням за замовчуванням для типу довідника.
-    - display_order: Ціле число для впорядкування елементів у списках UI.
-    - created_at, updated_at: Часові мітки (з TimestampedMixin -> BaseModel -> BaseMainModel).
-    - deleted_at: Для м'якого видалення (з SoftDeleteMixin -> BaseMainModel).
-    - notes: Опціональні внутрішні нотатки (з NotesMixin -> BaseMainModel).
+    Успадковує всі поля від `BaseMainModel` (включаючи `id`, `name`, `description`,
+    часові мітки, м'яке видалення, стан, нотатки та опціональний `group_id`)
+    і додає обов'язкове, унікальне, індексоване поле `code`.
+
+    Атрибути:
+        code (Mapped[str]): Унікальний текстовий код для запису довідника (наприклад, "active", "admin_role").
+                            Максимальна довжина 100 символів.
     """
-    __abstract__ = True
+    __abstract__ = True  # Вказує SQLAlchemy, що це не таблиця, а базовий клас для інших таблиць.
 
-    # `code` успадковується з CodeMixin (унікальний, індексований рядок)
-    # `name`, `description` успадковуються з NameDescriptionMixin (через BaseMainModel)
-    # `state` успадковується зі StateMixin (через BaseMainModel)
-    # `notes` успадковується з NotesMixin (через BaseMainModel)
-    # `created_at`, `updated_at`, `deleted_at`, `is_deleted` успадковуються через BaseMainModel
-
-    is_default: Mapped[Optional[bool]] = mapped_column(
-        Boolean,
-        default=False,
-        nullable=True, # Може бути True, False або Null, якщо не застосовується/не встановлено
-        comment="Вказує, чи є це значенням за замовчуванням для типу довідника."
+    code: Mapped[str] = mapped_column(
+        String(100),  # Довжина 100 є прикладом, можна налаштувати.
+        unique=True,
+        index=True,
+        nullable=False,
+        comment="Унікальний текстовий код запису довідника"
     )
 
-    display_order: Mapped[Optional[int]] = mapped_column(
-        Integer,
-        default=0,
-        nullable=True, # Може бути впорядковано або Null, якщо не застосовується/не встановлено
-        comment="Порядок, у якому цей елемент повинен відображатися у списках/випадаючих списках."
-    )
+    # _repr_fields успадковуються з BaseMainModel та його міксинів.
+    # Додаємо 'code' до списку полів для __repr__ цього конкретного класу.
+    # Важливо, щоб це не був список, а кортеж або змінна класу, щоб уникнути проблем з mutable defaults.
+    # Однак, оскільки __repr__ в Base збирає поля динамічно, ми можемо просто додати до списку.
+    # Якщо _repr_fields ще не існує в батьківських класах (що малоймовірно з BaseMainModel),
+    # його потрібно ініціалізувати як список.
+    # Краще, щоб __repr__ метод динамічно збирав _repr_fields з усіх предків, що він і робить.
+    # Тому тут ми визначаємо _repr_fields, специфічні для цього рівня ієрархії.
+    _repr_fields = ["code"]
 
-    # Перевизначити генерацію назви таблиці, якщо таблиці довідників повинні мати специфічний префікс або суфікс
-    # Наприклад, якщо всі таблиці довідників повинні називатися 'dict_statuses', 'dict_user_roles'
-    # @declared_attr
-    # def __tablename__(cls) -> str:
-    #     import re
-    #     # Генерація назви таблиці за замовчуванням з BaseModel: ClassName -> class_names
-    #     # Для довідників ми можемо віддати перевагу dict_class_names
-    #     base_tablename = super().__tablename__
-    #     return f"dict_{base_tablename}"
-    # Наразі буде використовуватися значення за замовчуванням з BaseModel (наприклад, UserRole -> user_roles)
-    # що часто є нормальним.
-
-    def __repr__(self) -> str:
-        # Перевірки hasattr для запобігання помилок, якщо підклас якимось чином не має цих полів (хоча повинен)
-        _id = getattr(self, 'id', 'N/A')
-        _code = getattr(self, 'code', 'N/A')
-        _name = getattr(self, 'name', 'N/A')
-        return f"<{self.__class__.__name__}(id={_id}, code='{_code}', name='{_name}')>"
 
 if __name__ == "__main__":
-    # Цей блок призначений для демонстрації структури BaseDictionaryModel.
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Цей блок для демонстрації та базового тестування при прямому запуску модуля.
+    logger.info("--- Базова модель для довідників (BaseDictionaryModel) ---")
+    logger.info(f"Клас BaseDictionaryModel: {BaseDictionaryModel}")
+    logger.info(f"Абстрактний: {getattr(BaseDictionaryModel, '__abstract__', False)}")
 
-    logger.info("--- BaseDictionaryModel --- Демонстрація")
+    # Демонстрація очікуваних атрибутів (для цього потрібне відображення SQLAlchemy)
+    # У реальному сценарії це перевіряється через інстанціювання конкретної моделі-довідника.
+    expected_attrs_from_basemainmodel = [
+        'id', 'created_at', 'updated_at', 'deleted_at', 'name',
+        'description', 'state', 'group_id', 'notes'
+    ]
+    expected_attrs_own = ['code']
 
-    # Показати, як конкретна модель довідника успадковуватиме поля
-    class ExampleStatus(BaseDictionaryModel):
-        # Якщо __tablename__ не встановлено, за замовчуванням це буде 'example_statuss' з логіки BaseModel
-        # або 'dict_example_statuss', якби розкоментований __tablename__ у BaseDictionaryModel був активним.
-        __tablename__ = "example_statuses" # Явна назва таблиці для наочності прикладу
+    logger.info("\nОчікувані атрибути, успадковані від BaseMainModel:")
+    for attr in expected_attrs_from_basemainmodel:
+        logger.info(f"  - {attr}")
+    logger.info("\nВласні атрибути BaseDictionaryModel:")
+    for attr in expected_attrs_own:
+        logger.info(f"  - {attr}")
 
-        # Автоматично отримує id, code, name, description, state, is_default, display_order,
-        # created_at, updated_at, deleted_at, notes.
-        custom_field_for_status: Mapped[Optional[str]] = mapped_column(String(100))
-
-    logger.info(f"BaseDictionaryModel успадковує від: {BaseDictionaryModel.__mro__}")
-    logger.info(f"ExampleStatus успадковує від: {ExampleStatus.__mro__}")
-    logger.info(f"Назва таблиці ExampleStatus за замовчуванням, якщо не перевизначено: {ExampleStatus.__tablename__}")
-
-
-    # Щоб перевірити фактичні стовпці, вам потрібно було б ініціалізувати Base.metadata за допомогою engine
-    # а потім отримати доступ до ExampleStatus.__table__.columns
-    # from sqlalchemy import create_engine
-    # from backend.app.src.config.database import Base # Переконайтеся, що Base - це той, що використовується моделями
-    # engine = create_engine("sqlite:///:memory:")
-    # Base.metadata.create_all(engine) # Це створить усі таблиці, визначені за допомогою цього Base
-    # logger.info(f"Стовпці в ExampleStatus: {[c.name for c in ExampleStatus.__table__.columns]}")
-    # Цей список включав би: id, created_at, updated_at, name, description, state, deleted_at, notes,
-    # code, is_default, display_order, custom_field_for_status
-    logger.info("Щоб побачити фактичні стовпці таблиці, метадані SQLAlchemy потрібно ініціалізувати за допомогою engine (наприклад, Base.metadata.create_all(engine)).")
+    # Приклад того, як __repr__ може виглядати для моделі, що успадковує BaseDictionaryModel
+    # (спрощена імітація без реальної інженерії SQLAlchemy)
+    from backend.app.src.models.base import Base
+    from datetime import datetime
 
 
-    status_instance = ExampleStatus(
-        code="ACTIVE",
-        name="Активний статус",
-        description="Елемент активний і придатний до використання.",
-        is_default=True,
-        display_order=1,
-        custom_field_for_status="Деякі власні дані"
-    )
-    # Імітація полів, встановлених ORM, для демонстрації
-    status_instance.id = 1 # Зазвичай встановлюється БД
-    # status_instance.created_at, .updated_at встановлювалися б БД/ORM або значеннями за замовчуванням TimestampedMixin
+    class DummyStatus(BaseDictionaryModel):
+        __tablename__ = "dummy_statuses"  # Потрібно для @declared_attr в міксинах
+        # Імітація __mapper__ для __repr__
+        __mapper__ = type('Mapper', (), {'columns': {
+            'id': None, 'name': None, 'code': None, 'created_at': None,
+            'description': None, 'state': None,  # Додаємо state, оскільки він у BaseMainModel
+        }})()
+        # _repr_fields для DummyStatus, якщо він не додає нових полів до repr
+        # _repr_fields = [] # Це б означало, що тільки поля з BaseDictionaryModel та його предків будуть в repr
 
-    logger.info(f"Приклад екземпляра: {status_instance!r}")
-    logger.info(f"  Код: {status_instance.code}")
-    logger.info(f"  Назва: {status_instance.name}")
-    logger.info(f"  За замовчуванням: {status_instance.is_default}")
-    logger.info(f"  Порядок відображення: {status_instance.display_order}")
-    logger.info(f"  Власне поле: {status_instance.custom_field_for_status}")
-    logger.info(f"  Стан (з BaseMainModel): {status_instance.state}") # Початковий стан буде None, якщо не встановлено
-    status_instance.state = "ОПУБЛІКОВАНО"
-    logger.info(f"  Оновлений стан: {status_instance.state}")
+
+    # Встановлюємо _repr_fields для міксинів, щоб __repr__ їх підхопив
+    # (це потрібно лише для цього демонстраційного блоку __main__)
+    from backend.app.src.models import mixins
+
+    mixins.TimestampedMixin._repr_fields = ['created_at']
+    mixins.NameDescriptionMixin._repr_fields = ['name']
+    mixins.StateMixin._repr_fields = ['state']
+
+    dummy_status_instance = DummyStatus()
+    dummy_status_instance.id = 1
+    dummy_status_instance.name = "Активний"
+    dummy_status_instance.code = "ACTIVE"
+    dummy_status_instance.created_at = datetime(2023, 1, 1, 12, 0, 0)
+    dummy_status_instance.description = "Статус активного елемента"
+    dummy_status_instance.state = "enabled"  # Приклад стану для самого довідника
+
+    logger.info(f"\nПриклад __repr__ для екземпляра DummyStatus:\n  {dummy_status_instance}")
+    # Очікуваний вивід (порядок може відрізнятися):
+    # <DummyStatus(id=1, name='Активний', code='ACTIVE', created_at=datetime.datetime(2023, 1, 1, 12, 0), state='enabled')>
+
+    # Повертаємо _repr_fields до початкових значень, щоб не впливати на інші можливі тести/використання
+    mixins.TimestampedMixin._repr_fields = ['created_at', 'updated_at']
+    mixins.NameDescriptionMixin._repr_fields = ['name']
+    mixins.StateMixin._repr_fields = ['state']
+
+    logger.info("\nПримітка: Поля `group_id` та `notes` також успадковуються, але не показані в цьому простому __repr__ прикладі.")

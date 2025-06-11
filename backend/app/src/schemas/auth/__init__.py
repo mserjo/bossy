@@ -1,26 +1,53 @@
 # backend/app/src/schemas/auth/__init__.py
-
 """
-This package contains Pydantic schemas related to user authentication,
-authorization, user profiles, tokens, and session management.
+Pydantic схеми для автентифікації та управління користувачами.
+
+Цей пакет містить схеми Pydantic, що використовуються для валідації
+даних запитів та формування відповідей API, пов'язаних з користувачами,
+їх автентифікацією, токенами, сесіями та процесами відновлення паролю.
 """
 
-import logging
+# Схеми, пов'язані з користувачем
+from .user import (
+    UserBaseSchema,
+    UserCreateSchema,
+    UserUpdateSchema,
+    UserSchema,
+    UserPublicProfileSchema
+)
 
-logger = logging.getLogger(__name__)
-logger.debug("Authentication schemas package initialized.")
+# Схеми, пов'язані з токенами
+from .token import (
+    TokenPayload,
+    TokenResponse,
+    RefreshTokenRequest
+)
 
-# Example of re-exporting for easier access:
-# from .user import UserResponse, UserCreate, UserUpdate
-# from .token import TokenResponse, TokenPayload
-# from .login import LoginRequest
+# Схеми, пов'язані з процесом входу та відновлення паролю
+from .login import (
+    LoginRequest,
+    PasswordResetRequestSchema,
+    PasswordResetConfirmSchema
+)
 
-# __all__ = [
-#     "UserResponse",
-#     "UserCreate",
-#     "UserUpdate",
-#     "TokenResponse",
-#     "TokenPayload",
-#     "LoginRequest",
-#     # ... other auth schemas
-# ]
+# Схеми, пов'язані з сесіями користувачів
+from .session import SessionSchema
+
+__all__ = [
+    # User schemas
+    "UserBaseSchema",
+    "UserCreateSchema",
+    "UserUpdateSchema",
+    "UserSchema",
+    "UserPublicProfileSchema",
+    # Token schemas
+    "TokenPayload",
+    "TokenResponse",
+    "RefreshTokenRequest",
+    # Login/Password Reset schemas
+    "LoginRequest",
+    "PasswordResetRequestSchema",
+    "PasswordResetConfirmSchema",
+    # Session schemas
+    "SessionSchema",
+]

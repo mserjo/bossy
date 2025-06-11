@@ -1,113 +1,97 @@
 # backend/app/src/schemas/dictionaries/messengers.py
-
 """
-Pydantic schemas for MessengerPlatform dictionary entries.
+Pydantic схеми для довідника "Платформи Месенджерів".
+
+Цей модуль визначає схеми для представлення, створення та оновлення
+записів у довіднику платформ месенджерів (наприклад, Telegram, Viber, Slack).
 """
 
-import logging
-from typing import Optional # For optional custom fields if any
-from datetime import datetime, timezone # For example values in __main__ and BaseResponseSchema
+from typing import Optional
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-from pydantic import Field
+# Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    DictionaryBase,
-    # DictionaryCreate as BaseDictionaryCreate, # Not directly used if MessengerPlatformCreate inherits MessengerPlatformBase
-    # DictionaryUpdate as BaseDictionaryUpdate, # Not directly used if MessengerPlatformUpdate inherits MessengerPlatformBase
-    DictionaryResponse as BaseDictionaryResponse
+    BaseDictionarySchema,
+    DictionaryCreateSchema,
+    DictionaryUpdateSchema
 )
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
 
-# --- MessengerPlatform Schemas ---
+# from pydantic import Field
 
-class MessengerPlatformBase(DictionaryBase):
-    """Base schema for MessengerPlatform, inherits all fields from DictionaryBase."""
-    # Example of custom fields if MessengerPlatform model had them:
-    # supports_rich_text: Optional[bool] = Field(None,
-    #                                               description="Does this platform support rich text formatting?",
-    #                                               example=True)
-    # api_docs_url: Optional[str] = Field(None, max_length=512,
-    #                                      description="URL to API documentation for this platform.")
+# Схема для представлення запису Платформи Месенджера (у відповідях API)
+class MessengerPlatformSchema(BaseDictionarySchema):
+    """
+    Pydantic схема для представлення запису довідника "Платформа Месенджера".
+    Успадковує всі поля від `BaseDictionarySchema`.
+    """
+    # Специфічні поля для MessengerPlatformSchema, якщо є, додаються тут.
+    # Наприклад:
+    # supports_markdown: bool = Field(True, description="Чи підтримує платформа форматування Markdown у повідомленнях.")
     pass
 
-class MessengerPlatformCreate(MessengerPlatformBase):
+
+# Схема для створення нового запису Платформи Месенджера
+class MessengerPlatformCreateSchema(DictionaryCreateSchema):
     """
-    Schema for creating a new MessengerPlatform.
-    Inherits fields from MessengerPlatformBase. 'code' and 'name' are effectively required.
+    Pydantic схема для створення нового запису в довіднику "Платформа Месенджера".
+    Успадковує всі поля від `DictionaryCreateSchema`.
     """
+    # Специфічні поля для створення MessengerPlatform, якщо є, додаються тут.
     pass
 
-class MessengerPlatformUpdate(MessengerPlatformBase):
-    """
-    Schema for updating an existing MessengerPlatform.
-    All fields from MessengerPlatformBase are made optional here for partial updates.
-    """
-    code: Optional[str] = Field(None, min_length=1, max_length=100, description="Unique code or short identifier.")
-    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Human-readable name.")
-    description: Optional[str] = Field(None)
-    state: Optional[str] = Field(None, max_length=50)
-    is_default: Optional[bool] = Field(None)
-    display_order: Optional[int] = Field(None)
-    notes: Optional[str] = Field(None)
-    # If custom fields were in MessengerPlatformBase:
-    # supports_rich_text: Optional[bool] = Field(None)
-    # api_docs_url: Optional[str] = Field(None)
 
-
-class MessengerPlatformResponse(BaseDictionaryResponse):
+# Схема для оновлення існуючого запису Платформи Месенджера
+class MessengerPlatformUpdateSchema(DictionaryUpdateSchema):
     """
-    Schema for representing a MessengerPlatform in API responses.
-    Inherits all fields from BaseDictionaryResponse.
-    Add any MessengerPlatform-specific response fields here if MessengerPlatformBase had custom fields.
+    Pydantic схема для оновлення існуючого запису в довіднику "Платформа Месенджера".
+    Успадковує всі поля від `DictionaryUpdateSchema`.
     """
-    # If custom fields were in MessengerPlatformBase and should be in response:
-    # supports_rich_text: Optional[bool] = Field(None, description="Supports rich text formatting?")
-    # api_docs_url: Optional[str] = Field(None, description="Link to API documentation.")
+    # Специфічні поля для оновлення MessengerPlatform, якщо є, додаються тут.
     pass
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем MessengerPlatform.
+    logger.info("--- Pydantic Схеми для Довідника: MessengerPlatform ---")
 
-    logger.info("--- MessengerPlatform Schemas (Dictionary) --- Demonstration")
-
-    # MessengerPlatformCreate Example
-    platform_create_data = {
-        "code": "TELEGRAM_BOT",
-        "name": "Telegram Bot",
-        "description": "Notifications via a Telegram Bot integration.",
-        "state": "active",
-        # "supportsRichText": True, # camelCase alias if field existed
-        # "apiDocsUrl": "https://core.telegram.org/bots/api"
-    }
-    try:
-        platform_create_schema = MessengerPlatformCreate(**platform_create_data)
-        logger.info(f"MessengerPlatformCreate valid: {platform_create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating MessengerPlatformCreate: {e}")
-
-    # MessengerPlatformUpdate Example
-    platform_update_data = {"description": "Notifications and interactions via a Telegram Bot."}
-    platform_update_schema = MessengerPlatformUpdate(**platform_update_data)
-    logger.info(f"MessengerPlatformUpdate (partial): {platform_update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # MessengerPlatformResponse Example
-    platform_response_data = {
+    logger.info("\nMessengerPlatformSchema (приклад для відповіді API):")
+    messenger_platform_data_from_db = {
         "id": 1,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "code": "SLACK_WEBHOOK",
-        "name": "Slack Webhook",
-        "description": "Notifications sent to Slack via Incoming Webhooks.",
+        "name": "Telegram",  # TODO i18n
+        "code": "TELEGRAM",
+        "description": "Платформа для обміну повідомленнями Telegram.",  # TODO i18n
         "state": "active",
-        "isDefault": False,
-        "displayOrder": 2,
-        # "supportsRichText": True # If field existed
+        "created_at": "2023-08-01T10:00:00Z",
+        "updated_at": "2023-08-01T12:30:00Z",
     }
-    try:
-        platform_response_schema = MessengerPlatformResponse(**platform_response_data) # type: ignore[call-arg]
-        logger.info(f"MessengerPlatformResponse: {platform_response_schema.model_dump_json(by_alias=True, indent=2)}")
-    except Exception as e:
-        logger.error(f"Error creating MessengerPlatformResponse: {e}")
+    from datetime import datetime  # Потрібно для конвертації рядків у datetime
+
+    messenger_platform_data_from_db['created_at'] = datetime.fromisoformat(
+        messenger_platform_data_from_db['created_at'].replace('Z', '+00:00'))
+    messenger_platform_data_from_db['updated_at'] = datetime.fromisoformat(
+        messenger_platform_data_from_db['updated_at'].replace('Z', '+00:00'))
+
+    messenger_platform_schema_instance = MessengerPlatformSchema(**messenger_platform_data_from_db)
+    logger.info(messenger_platform_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nMessengerPlatformCreateSchema (приклад для створення):")
+    create_data = {
+        "name": "Viber",  # TODO i18n
+        "code": "VIBER",
+        "description": "Платформа для обміну повідомленнями Viber."  # TODO i18n
+    }
+    create_schema_instance = MessengerPlatformCreateSchema(**create_data)
+    logger.info(create_schema_instance.model_dump_json(indent=2))
+
+    logger.info("\nMessengerPlatformUpdateSchema (приклад для оновлення):")
+    update_data = {
+        "description": "Оновлений опис для платформи Viber.",  # TODO i18n
+        "state": "beta"  # TODO i18n
+    }
+    update_schema_instance = MessengerPlatformUpdateSchema(**update_data)
+    logger.info(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")

@@ -1,191 +1,168 @@
 # backend/app/src/schemas/files/upload.py
-import logging
-from typing import Optional, Dict, Any
-from uuid import UUID
-from datetime import datetime # Required for FileUploadInitiateResponse example
+"""
+Pydantic схеми для процесу завантаження файлів.
 
-from pydantic import BaseModel, Field, HttpUrl
+Цей модуль визначає схеми для:
+- Ініціації завантаження файлу (`FileUploadInitiateRequestSchema`).
+- Відповіді з URL для прямого завантаження (наприклад, presigned URL S3) (`PresignedUploadURLResponse`).
+- Підтвердження успішного завантаження (`FileUploadCompleteRequestSchema`).
+- Фінальної відповіді з інформацією про завантажений файл (`FileUploadResponse`).
+"""
+from typing import Optional, Dict
 
-from app.src.schemas.files.file import FileRecordResponse # To return file details after successful upload
+from pydantic import Field, AnyHttpUrl, field_validator
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт базової схеми та Enum
+from backend.app.src.schemas.base import BaseSchema
+from backend.app.src.core.dicts import FileType as FileTypeEnum # Enum для призначення файлу
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-# --- File Upload Schemas ---
+FILE_NAME_MAX_LENGTH_UPLOAD = 255 # Збігається з FileRecord
+MIME_TYPE_MAX_LENGTH_UPLOAD = 100 # Збігається з FileRecord
+PURPOSE_MAX_LENGTH_UPLOAD = 50    # Збігається з FileRecord
 
-class FileUploadInitiateRequest(BaseModel):
+
+class FileUploadInitiateRequestSchema(BaseSchema):
     """
-    Schema for requesting to initiate a file upload.
-    Client provides metadata about the file they intend to upload.
+    Схема для запиту на ініціацію завантаження файлу.
+    Клієнт надсилає метадані файлу, щоб отримати URL для завантаження.
     """
-    file_name: str = Field(..., min_length=1, max_length=255, description="The name of the file to be uploaded.")
-    mime_type: str = Field(..., min_length=3, max_length=100, description="MIME type of the file.")
-    size_bytes: int = Field(..., gt=0, description="Total size of the file in bytes.")
-    # entity_type: Optional[str] = Field(None, max_length=50, description="Optional: Type of entity this file is for (e.g., 'user_avatar', 'group_icon'). Helps in applying specific limits or storage rules.")
-    # entity_id: Optional[UUID] = Field(None, description="Optional: ID of the entity, if relevant for pre-upload checks or linking.")
-    # group_id: Optional[UUID] = Field(None, description="Optional: Group ID if the file is associated with a specific group context.")
+    file_name: str = Field(
+        ...,
+        max_length=FILE_NAME_MAX_LENGTH_UPLOAD,
+        description="Ім'я файлу, що завантажується.",
+        examples=["my_document.pdf", "profile_image.jpg"]
+    )
+    mime_type: str = Field(
+        ...,
+        max_length=MIME_TYPE_MAX_LENGTH_UPLOAD,
+        description="MIME-тип файлу.",
+        examples=["application/pdf", "image/jpeg"]
+    )
+    file_size: int = Field(
+        ...,
+        ge=0, # Розмір не може бути від'ємним
+        # TODO: Додати максимальний розмір файлу з налаштувань settings.MAX_FILE_SIZE_MB
+        # le=settings.MAX_FILE_SIZE_MB * 1024 * 1024,
+        description="Розмір файлу в байтах."
+    )
+    # TODO: Додати валідатор для purpose на основі Enum FileTypeEnum
+    purpose: str = Field(
+        ...,
+        max_length=PURPOSE_MAX_LENGTH_UPLOAD,
+        description=f"Призначення файлу (наприклад, '{FileTypeEnum.AVATAR.value}', '{FileTypeEnum.TASK_ATTACHMENT.value}'). Визначає подальшу обробку та зберігання."
+    )
 
-    class Config:
-        orm_mode = True # Though not directly mapping to DB, useful for consistency
-        # from_attributes = True # For Pydantic V2
-        anystr_strip_whitespace = True
-        title = "FileUploadInitiateRequest"
-        json_schema_extra = {
-            "example": {
-                "file_name": "new_avatar.png",
-                "mime_type": "image/png",
-                "size_bytes": 51200, # 50KB
-                # "entity_type": "user_avatar"
-            }
-        }
+    @field_validator('purpose')
+    @classmethod
+    def validate_purpose(cls, value: str) -> str:
+        """Перевіряє, чи надане значення призначення є допустимим членом Enum FileType."""
+        allowed_purposes = {ft.value for ft in FileTypeEnum}
+        if value not in allowed_purposes:
+            # TODO i18n: Translatable error message
+            raise ValueError(f"Недопустиме призначення файлу '{value}'. Дозволені: {', '.join(allowed_purposes)}")
+        return value
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"FileUploadInitiateRequest instance created: {data}")
 
-class FileUploadInitiateResponse(BaseModel):
+class PresignedUploadURLResponse(BaseSchema):
     """
-    Response after successfully initiating an upload.
-    May contain a temporary upload ID or token, and potentially a presigned URL if direct-to-storage.
+    Схема відповіді, що містить URL для прямого завантаження файлу (наприклад, presigned URL для S3)
+    та ідентифікатор створеного запису файлу.
     """
-    upload_id: UUID = Field(..., description="A unique identifier for this upload session/transaction.")
-    # presigned_url: Optional[HttpUrl] = Field(None, description="A presigned URL for direct client upload to cloud storage (e.g., S3). If None, upload might be chunked through server.")
-    # chunk_size_bytes: Optional[int] = Field(None, description="Recommended or required chunk size if using chunked upload through the server.")
-    # expires_at: Optional[datetime] = Field(None, description="Timestamp when the upload_id or presigned_url expires.")
-    message: str = Field("Upload initiated successfully. Proceed with file data.", description="User-friendly message.")
+    upload_url: AnyHttpUrl = Field(description="URL, на який клієнт має завантажити файл (PUT або POST).")
+    fields: Optional[Dict[str, str]] = Field(
+        None,
+        description="Додаткові поля, які потрібно включити в тіло POST-запиту (для S3 presigned POST)."
+    )
+    file_record_id: int = Field(description="ID створеного запису FileRecord, що очікує на завантаження файлу.")
 
 
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        title = "FileUploadInitiateResponse"
-        json_schema_extra = {
-            "example": {
-                "upload_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                # "presigned_url": "https://s3.amazonaws.com/bucket/path?signature...",
-                # "expires_at": "2023-07-15T12:30:00Z",
-                "message": "Upload session created. Use the upload_id for subsequent requests."
-            }
-        }
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"FileUploadInitiateResponse instance created: {data}")
-
-
-class PresignedUrlRequest(BaseModel):
+class FileUploadCompleteRequestSchema(BaseSchema):
     """
-    Schema for requesting a presigned URL for a specific file upload.
-    This might be used if the upload process is separate from initiation, or for chunked uploads.
+    Схема для запиту на підтвердження успішного завантаження файлу.
+    Клієнт надсилає цей запит після того, як файл було успішно завантажено за наданим URL.
     """
-    upload_id: UUID = Field(..., description="The upload session ID obtained from initiation.")
-    # part_number: Optional[int] = Field(None, ge=1, description="For S3 multipart uploads, the part number being uploaded.")
-    # content_md5: Optional[str] = Field(None, description="MD5 hash of the part/file being uploaded, if required by storage.")
-
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        anystr_strip_whitespace = True
-        title = "PresignedUrlRequest"
-        json_schema_extra = {
-            "example": {
-                "upload_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                # "part_number": 1
-            }
-        }
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"PresignedUrlRequest instance created: {data}")
+    file_record_id: int = Field(description="ID запису FileRecord, для якого підтверджується завантаження.")
+    # Наступні поля можуть бути специфічними для провайдера сховища (наприклад, S3)
+    upload_key: Optional[str] = Field(
+        None,
+        description="Ключ об'єкта в сховищі, якщо він відрізняється від початкового file_path (необов'язково)."
+    )
+    e_tag: Optional[str] = Field(
+        None,
+        description="ETag об'єкта зі сховища, використовується для перевірки цілісності (наприклад, для S3)."
+    )
+    # Можна додати інші поля, такі як version_id для S3.
 
 
-class PresignedUrlResponse(BaseModel):
+class FileUploadResponse(BaseSchema):
     """
-    Response containing a presigned URL for file upload.
+    Схема відповіді після успішного завершення всього процесу завантаження файлу.
+    Містить фінальну інформацію про завантажений файл.
     """
-    presigned_url: HttpUrl = Field(..., description="The presigned URL to use for uploading the file/part.")
-    # expires_in_seconds: Optional[int] = Field(None, description="Duration for which the URL is valid.")
-    # required_headers: Optional[Dict[str, str]] = Field(None, description="Any specific headers that must be sent with the PUT request to the presigned URL.")
+    file_id: int = Field(description="ID запису файлу (синонім file_record_id).", alias="fileRecordId")
+    file_name: str = Field(description="Ім'я завантаженого файлу.")
+    url: AnyHttpUrl = Field(description="Фінальний URL для доступу до завантаженого файлу.")
+    mime_type: str = Field(description="MIME-тип файлу.")
+    file_size: int = Field(description="Розмір файлу в байтах.")
+    purpose: Optional[str] = Field(None, description="Призначення файлу.")
 
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        title = "PresignedUrlResponse"
-        json_schema_extra = {
-            "example": {
-                "presigned_url": "https://s3.example.com/uploads/some_file?AWSAccessKeyId=...&Expires=...&Signature=...",
-                # "expires_in_seconds": 300
-            }
-        }
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"PresignedUrlResponse instance created with URL: {self.presigned_url}")
+    class Config: # Використовуємо вкладений Config для Pydantic v2, а не model_config на рівні класу
+        populate_by_name = True # Дозволяє використовувати аліас fileRecordId
 
 
-class FileUploadCompleteRequest(BaseModel): # Added based on common patterns for confirming upload
-    """
-    Request to confirm that file parts (if multipart) or the entire file has been uploaded.
-    This triggers final processing and FileRecord creation by the server.
-    """
-    upload_id: UUID = Field(..., description="The upload session ID.")
-    file_name: str = Field(..., min_length=1, max_length=255, description="Original name of the file being confirmed.")
-    mime_type: str = Field(..., min_length=3, max_length=100, description="MIME type of the file.")
-    size_bytes: int = Field(..., gt=0, description="Total size of the uploaded file in bytes.")
-    # For S3 multipart uploads, a list of eTags and part numbers might be needed here.
-    # e.g., parts: List[Dict[str, Any]] = Field(None, description="List of part numbers and ETags for multipart uploads.")
-    # entity_type: Optional[str] = Field(None, description="Type of entity this file is linked to, passed from initiation or here.")
-    # entity_id: Optional[UUID] = Field(None, description="ID of the entity this file is linked to.")
-    # group_id: Optional[UUID] = Field(None, description="Group ID if relevant.")
+if __name__ == "__main__":
+    # Демонстраційний блок для схем процесу завантаження файлів.
+    logger.info("--- Pydantic Схеми для Процесу Завантаження Файлів ---")
 
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        title = "FileUploadCompleteRequest"
-        json_schema_extra = {
-            "example": {
-                "upload_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                "file_name": "final_report.pdf",
-                "mime_type": "application/pdf",
-                "size_bytes": 1234567
-            }
-        }
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"FileUploadCompleteRequest instance created: {data}")
+    logger.info("\nFileUploadInitiateRequestSchema (приклад запиту на ініціацію):")
+    initiate_data = {
+        "file_name": "contract_final.docx", # TODO i18n example
+        "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "file_size": 256000, # 250KB
+        "purpose": FileTypeEnum.GENERAL_DOCUMENT.value
+    }
+    initiate_instance = FileUploadInitiateRequestSchema(**initiate_data)
+    logger.info(initiate_instance.model_dump_json(indent=2))
+    try:
+        FileUploadInitiateRequestSchema(file_name="test.txt", mime_type="text/plain", file_size=10, purpose="INVALID_PURPOSE")
+    except ValueError as e:
+        logger.info(f"Помилка валідації FileUploadInitiateRequestSchema (очікувано для purpose): {e}")
 
 
-class FileUploadResponse(BaseModel):
-    """
-    Response after a file upload is fully processed and confirmed.
-    Returns the details of the created file record.
-    """
-    message: str = Field("File uploaded and processed successfully.", description="User-friendly confirmation message.")
-    file_record: FileRecordResponse = Field(..., description="Details of the created file record.")
+    logger.info("\nPresignedUploadURLResponse (приклад відповіді з URL для завантаження):")
+    presigned_data = {
+        "upload_url": "https://s3.example.com/bucket-name/user_xyz/contract_final.docx?AWSAccessKeyId=...",
+        "fields": {"key": "user_xyz/contract_final.docx", "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
+        "file_record_id": 101
+    }
+    presigned_instance = PresignedUploadURLResponse(**presigned_data)
+    logger.info(presigned_instance.model_dump_json(indent=2, exclude_none=True))
 
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        title = "FileUploadResponse"
-        json_schema_extra = {
-            "example": {
-                "message": "File 'final_report.pdf' uploaded successfully.",
-                "file_record": { # This is an example of FileRecordResponse
-                    "id": "f0e1d2c3-b4a5-6789-0123-456789abcdef01",
-                    "file_name": "final_report.pdf",
-                    "mime_type": "application/pdf",
-                    "size_bytes": 1234567,
-                    "file_url": "https://kudos-cdn.example.com/files/f0e1d2c3-b4a5-6789-0123-456789abcdef01/final_report.pdf",
-                    "uploader_user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                    "created_at": "2023-07-15T10:00:00Z",
-                    "updated_at": "2023-07-15T10:00:00Z"
-                }
-            }
-        }
+    logger.info("\nFileUploadCompleteRequestSchema (приклад запиту на підтвердження):")
+    complete_data = {
+        "file_record_id": 101,
+        "upload_key": "user_xyz/contract_final.docx_completed", # Може змінитися, якщо на сервері інша логіка
+        "e_tag": "\"abcdef1234567890fedcba0987654321\""
+    }
+    complete_instance = FileUploadCompleteRequestSchema(**complete_data)
+    logger.info(complete_instance.model_dump_json(indent=2, exclude_none=True))
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.info(f"FileUploadResponse created for file: {self.file_record.file_name}")
+    logger.info("\nFileUploadResponse (приклад фінальної відповіді):")
+    final_response_data = {
+        "file_id": 101, # Або fileRecordId, якщо використовується аліас при серіалізації
+        "file_name": "contract_final.docx",
+        "url": "https://cdn.example.com/files/user_xyz/contract_final.docx_completed",
+        "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        "file_size": 256000,
+        "purpose": FileTypeEnum.GENERAL_DOCUMENT.value
+    }
+    # Для демонстрації аліасу при створенні екземпляра
+    final_response_instance_alias = FileUploadResponse(fileRecordId=101, **{k:v for k,v in final_response_data.items() if k != 'file_id'})
+    logger.info(final_response_instance_alias.model_dump_json(indent=2, by_alias=True, exclude_none=True)) # by_alias=True для використання аліасів при серіалізації
 
-logger.info("File upload schemas (Initiate, PresignedUrl, Complete, Response) defined successfully.")
+    logger.info("\nПримітка: Ці схеми описують кроки процесу завантаження файлів.")
+    logger.info("TODO: Додати валідацію 'purpose' на основі Enum FileTypeEnum в FileUploadInitiateRequestSchema.")
+    logger.info("TODO: Додати обмеження на 'file_size' в FileUploadInitiateRequestSchema згідно з налаштуваннями.")

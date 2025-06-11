@@ -1,129 +1,98 @@
 # backend/app/src/api/v1/auth/profile.py
+# -*- coding: utf-8 -*-
+"""
+Ендпоінти для управління профілем поточного користувача.
+"""
+# import logging # Замінено на централізований логер
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession # Не використовується прямо, якщо сесія інкапсульована в сервісах
 
-from app.src.core.dependencies import get_db_session, get_current_active_user
-from app.src.models.auth import User as UserModel
-from app.src.schemas.auth.user import UserResponse, UserUpdate # UserUpdate може потребувати специфічних полів для профілю
-from app.src.services.auth.user import UserService
+# Повні шляхи імпорту
+from backend.app.src.api.dependencies import get_api_db_session, get_current_active_user, get_user_service
+from backend.app.src.models.auth.user import User as UserModel # Модель SQLAlchemy
+from backend.app.src.schemas.auth.user import UserResponse, UserUpdate # Схеми Pydantic
+from backend.app.src.services.auth.user import UserService
+from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import settings as global_settings # Для доступу до DEBUG тощо
 
 router = APIRouter()
 
 @router.get(
     "/me",
     response_model=UserResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Отримання профілю поточного користувача",
-    description="Повертає дані профілю для поточного аутентифікованого та активного користувача."
+    summary="Отримання профілю поточного користувача", # i18n
+    description="Повертає дані профілю для поточного автентифікованого та активного користувача." # i18n
 )
-async def read_users_me(
-    current_user: UserModel = Depends(get_current_active_user)
+async def read_current_user_profile( # Перейменовано для уникнення конфлікту з FastAPI Users (якщо буде)
+    current_user: UserModel = Depends(get_current_active_user) # Залежність для отримання поточного активного користувача
 ):
-    '''
-    Надає інформацію профілю поточного аутентифікованого користувача.
-    '''
+    """
+    Надає інформацію профілю поточного автентифікованого користувача.
+    Дані користувача (модель SQLAlchemy) автоматично перетворюються на відповідь
+    за допомогою Pydantic схеми `UserResponse`.
+    """
+    logger.info(f"Запит профілю для користувача: {current_user.username} (ID: {current_user.id})")
     # UserModel вже містить всі необхідні дані, Pydantic модель UserResponse відфільтрує потрібні.
+    # Pydantic v2 .model_validate() використовується неявно FastAPI при поверненні ORM моделі з response_model
     return current_user
 
 @router.put(
     "/me",
     response_model=UserResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Оновлення профілю поточного користувача",
-    description="Дозволяє поточному аутентифікованому користувачу оновити дані свого профілю."
+    summary="Оновлення профілю поточного користувача", # i18n
+    description="Дозволяє поточному аутентифікованому користувачу оновити дані свого профілю." # i18n
 )
-async def update_users_me(
-    user_update_data: UserUpdate, # Схема для оновлення, може містити тільки дозволені поля
-    db: AsyncSession = Depends(get_db_session),
+async def update_current_user_profile( # Перейменовано
+    user_update_data: UserUpdate, # Схема для оновлення, містить тільки дозволені поля
     current_user: UserModel = Depends(get_current_active_user),
-    user_service: UserService = Depends() # Або user_service = UserService(db)
+    user_service: UserService = Depends(get_user_service) # Ін'єкція UserService
 ):
-    '''
-    Оновлює профіль поточного аутентифікованого користувача.
-    Дозволяє змінювати такі поля, як ім'я, прізвище, тощо.
-    Email та пароль зазвичай змінюються через окремі ендпоінти.
+    """
+    Оновлює профіль поточного автентифікованого користувача.
+    Дозволяє змінювати такі поля, як ім'я, прізвище тощо.
+    Зміна email та пароля зазвичай відбувається через окремі, більш захищені ендпоінти.
 
-    - **first_name**: Нове ім'я користувача (опціонально).
-    - **last_name**: Нове прізвище користувача (опціонально).
-    - **username**: Новий нікнейм (опціонально, якщо дозволено змінювати і він унікальний).
-    - ... інші дозволені поля ...
-    '''
-    if not hasattr(user_service, 'db_session') or user_service.db_session is None:
-         user_service.db_session = db
+    Приклад полів в `UserUpdate` (визначається в `schemas/auth/user.py`):
+    - `first_name: Optional[str]`
+    - `last_name: Optional[str]`
+    - `username: Optional[constr(min_length=3)]` (якщо дозволено змінювати і має бути унікальним)
+    - `phone_number: Optional[str]`
+    - `avatar_file_id: Optional[UUID]` (для встановлення нового аватара)
+    """
+    logger.info(f"Користувач ID '{current_user.id}' намагається оновити свій профіль з даними: {user_update_data.model_dump(exclude_unset=True)}")
 
-    # Перевірка, чи новий email (якщо дозволено змінювати) не зайнятий
-    # Зазвичай email змінюється окремо або потребує підтвердження.
-    # Якщо UserUpdate дозволяє зміну email:
-    if user_update_data.email and user_update_data.email != current_user.email:
-        existing_user = await user_service.user_repo.get_by_email(email=user_update_data.email)
-        if existing_user and existing_user.id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Email '{user_update_data.email}' вже використовується іншим користувачем."
-            )
-
-    # Перевірка, чи новий username (якщо дозволено змінювати) не зайнятий
-    if hasattr(user_update_data, 'username') and user_update_data.username and user_update_data.username != current_user.username:
-         # Припускаючи, що UserUpdate може містити username і він має бути унікальним
-        existing_username = await user_service.user_repo.get_by_username(username=user_update_data.username)
-        if existing_username and existing_username.id != current_user.id:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Нікнейм '{user_update_data.username}' вже використовується іншим користувачем."
-            )
+    # TODO: Уточнити, які саме поля дозволено оновлювати користувачу через UserUpdate.
+    #  Наприклад, зміна email або username може вимагати окремих потоків або додаткових перевірок,
+    #  які краще інкапсулювати в UserService.update_user.
 
     try:
-        updated_user = await user_service.update_user(
-            user=current_user,
-            user_update_schema=user_update_data
+        # UserService.update_user має обробляти логіку валідації (наприклад, унікальність username/email, якщо вони змінюються)
+        # та повертати оновлену ORM модель користувача або кидати ValueError/HTTPException.
+        updated_user_orm = await user_service.update_user(
+            user_id=current_user.id,
+            user_update_data=user_update_data,
+            # current_user_id=current_user.id # Якщо сервіс потребує знати, хто виконує оновлення (для аудиту)
+            is_admin_update=False # Користувач оновлює свій профіль, не адмін
         )
-    except Exception as e: # Обробка можливих помилок від сервісу
-        # Логування помилки e
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Помилка оновлення профілю: {str(e)}"
-        )
+        if not updated_user_orm: # Малоймовірно, якщо сервіс кидає винятки при помилках
+            logger.error(f"Оновлення профілю для ID '{current_user.id}' повернуло None з сервісу.")
+            # i18n
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Не вдалося оновити профіль.")
 
-    if not updated_user:
-        # Малоймовірно, якщо сервіс кидає виняток або повертає оновленого користувача
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Не вдалося оновити профіль користувача."
-        )
+        logger.info(f"Профіль користувача ID '{current_user.id}' успішно оновлено.")
+        # Pydantic v2 .model_validate() використовується неявно FastAPI
+        return updated_user_orm
+    except ValueError as e: # Обробка помилок валідації з сервісного шару (наприклад, email/username зайнято)
+        logger.warning(f"Помилка валідації при оновленні профілю ID '{current_user.id}': {e}")
+        # i18n (повідомлення `e` вже має бути інтернаціоналізоване або зрозумілим для користувача)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))
+    except PermissionError as e: # Якщо сервіс кидає PermissionError
+        logger.warning(f"Спроба неавторизованого оновлення профілю ID '{current_user.id}': {e}")
+        # i18n
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+    except Exception as e:
+        logger.error(f"Неочікувана помилка при оновленні профілю ID '{current_user.id}': {e}", exc_info=global_settings.DEBUG)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Виникла помилка сервера при оновленні профілю.")
 
-    return UserResponse.model_validate(updated_user)
-
-# Міркування:
-# 1. Схеми:
-#    - `UserResponse`: Для повернення даних профілю (має виключати пароль та інші чутливі дані).
-#    - `UserUpdate`: Схема для оновлення профілю. Важливо, щоб ця схема містила тільки ті поля,
-#      які користувач може безпечно змінювати (наприклад, не is_active, is_superuser).
-#      Зміна email та пароля зазвичай виноситься в окремі, більш захищені процеси.
-#      Якщо `UserUpdate` дозволяє змінювати email, потрібна додаткова логіка (наприклад, підтвердження нового email).
-# 2. Сервіс `UserService`:
-#    - Метод `update_user(user: UserModel, user_update_schema: UserUpdate) -> UserModel`.
-#      Цей метод повинен безпечно оновлювати поля користувача.
-# 3. Безпека:
-#    - Користувач може редагувати тільки свій профіль (забезпечується `get_current_active_user`).
-#    - Поля, які не можна змінювати користувачем напряму (ролі, статус активації), не повинні бути в `UserUpdate`.
-# 4. Унікальність полів: Якщо `UserUpdate` дозволяє змінювати поля, які мають бути унікальними (email, username),
-#    потрібна перевірка на унікальність перед оновленням (як показано в прикладі).
-# 5. Коментарі: Українською мовою.
-# 6. Залежності: `get_current_active_user` для отримання поточного користувача.
-# 7. `UserUpdate` схема:
-#    Потрібно ретельно визначити, які поля можуть бути в `UserUpdate`. Наприклад:
-'''
-# В app/src/schemas/auth/user.py
-# ...
-class UserUpdate(BaseModel):
-    first_name: Optional[str] = None
-    last_name: Optional[str] = None
-    username: Optional[constr(min_length=3)] = None # Якщо username можна змінювати
-    email: Optional[EmailStr] = None # Якщо email можна змінювати (потребує обережності та, можливо, підтвердження)
-    # НЕ додавати сюди: is_active, is_superuser, hashed_password, user_role_id тощо.
-    # Ці поля мають керуватися адміністраторами або через спеціальні процеси.
-
-    class Config:
-        extra = "forbid" # Забороняє передачу полів, не визначених у схемі
-'''
-# Ця частина з визначенням схеми UserUpdate є контекстом.
+logger.info("Роутер для профілю користувача (`/profile`) визначено.")

@@ -1,126 +1,153 @@
 # backend/app/src/schemas/bonuses/account.py
-
 """
-Pydantic schemas for User Accounts (points/currency balances).
-"""
+Pydantic схеми для сутності "Рахунок Користувача" (UserAccount).
 
-import logging
-from typing import Optional, List # List for potential transactions in a detailed response
-from datetime import datetime, timezone, timedelta # For examples and BaseResponseSchema
-from decimal import Decimal # For balance field
+Цей модуль визначає схеми для:
+- Базового представлення рахунку користувача (`UserAccountBaseSchema`).
+- Створення нового рахунку (зазвичай виконується сервісом) (`UserAccountCreateSchema`).
+- Оновлення балансу рахунку (для адміністративних коригувань) (`UserAccountUpdateSchema`).
+- Представлення даних про рахунок у відповідях API (`UserAccountSchema`).
+- Представлення рахунку разом з історією транзакцій (`UserAccountTransactionHistorySchema`).
+"""
+from datetime import datetime
+from typing import Optional, List, Any  # Any для тимчасових полів
+from decimal import Decimal
 
 from pydantic import Field
 
-from backend.app.src.schemas.base import BaseSchema, BaseResponseSchema
-# For nested responses
-# from ..auth.user import UserPublicProfileResponse # Or UserBasicInfo
-# from ..groups.group import GroupResponse # Or GroupBasicInfo
-# from .transaction import AccountTransactionResponse # For list of transactions
+# Абсолютний імпорт базових схем та міксинів
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+# TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
+# from backend.app.src.schemas.auth.user import UserPublicProfileSchema
+# from backend.app.src.schemas.groups.group import GroupSchema # Або GroupBriefSchema
+# from .transaction import AccountTransactionSchema # Для історії транзакцій
 
-# --- Locally defined Basic Info schemas for demonstration ---
-class UserBasicInfo(BaseSchema): # Inherit BaseSchema for consistent config (e.g. camelCase)
-    id: int = Field(..., example=1)
-    name: Optional[str] = Field(None, example="John Doe")
-
-class GroupBasicInfo(BaseSchema): # Inherit BaseSchema
-    id: int = Field(..., example=1)
-    name: str = Field(..., example="Kudos Team")
-# --- End of local Basic Info schemas ---
+UserPublicProfileSchema = Any  # Тимчасовий заповнювач
+GroupSchema = Any  # Тимчасовий заповнювач
+AccountTransactionSchema = Any  # Тимчасовий заповнювач
 
 
-# --- UserAccount Schemas ---
-
-class UserAccountBase(BaseSchema):
-    """Base schema for user account data."""
-    # user_id and group_id are typically set by the system or derived from context (e.g., path parameters)
-    # and might not be part of a generic create/update payload directly handled by user input for these fields.
-    # user_id: int = Field(..., description="ID of the user who owns this account.")
-    # group_id: int = Field(..., description="ID of the group this account is associated with.")
-    balance: Decimal = Field(default=Decimal('0.00'), max_digits=10, decimal_places=2, description="Current balance of points/currency.", example=Decimal("125.50"))
-    currency_name: str = Field(default="points", max_length=50, description="Name of the currency held in this account.", example="Kudos Points")
-    last_transaction_at: Optional[datetime] = Field(None, description="Timestamp of the last transaction on this account (UTC).", example=datetime.now(timezone.utc))
-
-class UserAccountCreate(UserAccountBase):
+class UserAccountBaseSchema(BaseSchema):
     """
-    Schema for creating a new user account.
-    Accounts are often created automatically when a user joins a group or when the system initializes a user.
-    This schema might be used by an admin or system process.
-    Requires user_id and group_id.
+    Базова схема для полів рахунку користувача.
     """
-    user_id: int = Field(..., description="ID of the user for whom the account is being created.")
-    group_id: int = Field(..., description="ID of the group for which the account is being created.")
-    # Balance and currency_name can use defaults from UserAccountBase or be overridden here if needed.
-    balance: Optional[Decimal] = Field(default=Decimal('0.00'), max_digits=10, decimal_places=2, description="Initial balance.")
-    currency_name: Optional[str] = Field(default="points", max_length=50, description="Currency name.")
+    user_id: int = Field(description="Ідентифікатор користувача, якому належить рахунок.")
+    group_id: int = Field(description="Ідентифікатор групи, в межах якої існує цей рахунок.")
+    balance: Decimal = Field(
+        default=Decimal("0.00"),
+        description="Поточний баланс на рахунку."
+    )
+    # TODO i18n: default value 'бали'
+    currency: str = Field(
+        default="бали",
+        max_length=50,  # Збільшено з 10 до 50 для гнучкості
+        description="Валюта або одиниця виміру бонусів на рахунку (наприклад, 'бали', 'очки')."
+    )
+    # model_config успадковується з BaseSchema (from_attributes=True)
 
-class UserAccountUpdate(BaseSchema): # Does not inherit UserAccountBase to make all fields explicitly optional
-    """
-    Schema for updating a user account (e.g., by an admin for corrections).
-    Direct balance updates are generally discouraged; transactions should be used.
-    This schema is for limited cases like correcting currency name or admin notes if added.
-    """
-    currency_name: Optional[str] = Field(None, max_length=50, description="New currency name for the account.")
-    # last_transaction_at is updated by transactions, not directly here.
-    # balance: Optional[Decimal] = Field(None, max_digits=10, decimal_places=2, description="Corrected balance. Use with extreme caution; prefer transactions.")
 
-class UserAccountResponse(BaseResponseSchema, UserAccountBase):
+class UserAccountCreateSchema(UserAccountBaseSchema):
     """
-    Schema for representing a user account in API responses.
-    Includes 'id', 'created_at', 'updated_at' from BaseResponseSchema.
+    Схема для створення нового рахунку користувача.
+    Зазвичай рахунки створюються автоматично сервісом при додаванні користувача до групи
+    або при першій бонусній операції.
     """
-    # Fields from UserAccountBase are: balance, currency_name, last_transaction_at
-    # Fields from BaseResponseSchema: id, created_at, updated_at
-    user: UserBasicInfo = Field(..., description="Basic information about the account owner.")
-    group: GroupBasicInfo = Field(..., description="Basic information about the group this account is associated with.")
-    # For a more detailed response, could include recent transactions:
-    # from .transaction import AccountTransactionResponse # Import when available
-    # recent_transactions: Optional[List[AccountTransactionResponse]] = Field(None, description="List of recent transactions.")
+    # Успадковує user_id, group_id, balance (з default=0), currency (з default='бали').
+    # Можна додати поля, специфічні для створення, якщо такі є.
+    pass
+
+
+class UserAccountUpdateSchema(BaseSchema):
+    """
+    Схема для оновлення балансу рахунку (наприклад, для адміністративних коригувань).
+    Дозволяє оновлювати лише баланс. Інші поля (user_id, group_id, currency) зазвичай незмінні.
+    """
+    balance: Optional[Decimal] = Field(None, description="Нове значення балансу для адміністративного коригування.")
+    # Якщо потрібно оновлювати валюту (що малоймовірно для існуючого рахунку):
+    # currency: Optional[str] = Field(None, max_length=50, description="Нова валюта рахунку.")
+
+
+class UserAccountSchema(UserAccountBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+    """
+    Схема для представлення даних про рахунок користувача у відповідях API.
+    """
+    # id, created_at, updated_at успадковані з міксинів.
+    # user_id, group_id, balance, currency успадковані з UserAccountBaseSchema.
+
+    # TODO: Замінити Any на відповідні схеми.
+    user: Optional[UserPublicProfileSchema] = Field(None,
+                                                    description="Публічний профіль користувача, власника рахунку.")
+    group: Optional[GroupSchema] = Field(None, description="Коротка інформація про групу, до якої належить рахунок.")
+
+
+class UserAccountTransactionHistorySchema(UserAccountSchema):
+    """
+    Розширена схема для представлення рахунку користувача разом з історією транзакцій.
+    """
+    # TODO: Замінити Any на AccountTransactionSchema.
+    transactions: List[AccountTransactionSchema] = Field(default_factory=list,
+                                                         description="Список транзакцій по цьому рахунку.")
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем рахунків користувачів.
+    logger.info("--- Pydantic Схеми для Рахунків Користувачів (UserAccount) ---")
 
-    logger.info("--- UserAccount Schemas --- Demonstration")
-
-    # UserAccountCreate Example
-    account_create_data = {
-        "userId": 101, # camelCase for user_id
-        "groupId": 1,  # camelCase for group_id
-        "balance": Decimal("50.00"),
-        "currencyName": "Merit Points"
+    logger.info("\nUserAccountBaseSchema (приклад):")
+    base_account_data = {
+        "user_id": 1,
+        "group_id": 10,
+        "balance": Decimal("125.50"),
+        "currency": "кредити"  # TODO i18n
     }
-    try:
-        create_schema = UserAccountCreate(**account_create_data) # type: ignore[call-arg]
-        logger.info(f"UserAccountCreate valid: {create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating UserAccountCreate: {e}")
+    base_account_instance = UserAccountBaseSchema(**base_account_data)
+    logger.info(base_account_instance.model_dump_json(indent=2))
 
-    # UserAccountUpdate Example
-    account_update_data = {"currencyName": "Super Merits"}
-    update_schema = UserAccountUpdate(**account_update_data) # type: ignore[call-arg]
-    logger.info(f"UserAccountUpdate (partial): {update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # UserAccountResponse Example
-    user_info_data = {"id": 101, "name": "Jane Doe"}
-    group_info_data = {"id": 1, "name": "Sales Team Q1"}
-    response_data = {
-        "id": 201, # ID of the UserAccount record
-        "createdAt": (datetime.now(timezone.utc) - timedelta(days=30)).isoformat(),
-        "updatedAt": (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat(),
-        "user": user_info_data,
-        "group": group_info_data,
-        "balance": Decimal("1250.75"),
-        "currencyName": "Sales Bucks",
-        "lastTransactionAt": (datetime.now(timezone.utc) - timedelta(minutes=30)).isoformat()
+    logger.info("\nUserAccountCreateSchema (приклад для створення):")
+    create_account_data = {
+        "user_id": 2,
+        "group_id": 10
+        # balance та currency візьмуться за замовчуванням
     }
-    try:
-        response_schema = UserAccountResponse(**response_data) # type: ignore[call-arg]
-        logger.info(f"UserAccountResponse: {response_schema.model_dump_json(by_alias=True, indent=2)}")
-        if response_schema.user and response_schema.group:
-            logger.info(f"  Account for User: '{response_schema.user.name}' in Group: '{response_schema.group.name}'")
-    except Exception as e:
-        logger.error(f"Error creating UserAccountResponse: {e}")
+    create_account_instance = UserAccountCreateSchema(**create_account_data)
+    logger.info(create_account_instance.model_dump_json(indent=2))
+
+    logger.info("\nUserAccountUpdateSchema (приклад для оновлення балансу):")
+    update_account_data = {"balance": Decimal("200.00")}
+    update_account_instance = UserAccountUpdateSchema(**update_account_data)
+    logger.info(update_account_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nUserAccountSchema (приклад відповіді API):")
+    account_response_data = {
+        "id": 1,
+        "user_id": 1,
+        "group_id": 10,
+        "balance": Decimal("150.75"),
+        "currency": "бали",  # TODO i18n
+        "created_at": datetime.now(),
+        "updated_at": datetime.now(),
+        # "user": {"id": 1, "name": "Власник Рахунку"}, # Приклад UserPublicProfileSchema
+        # "group": {"id": 10, "name": "Група Тестування"}  # Приклад GroupSchema (коротка версія)
+    }
+    account_response_instance = UserAccountSchema(**account_response_data)
+    logger.info(account_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nUserAccountTransactionHistorySchema (приклад відповіді API з транзакціями):")
+    history_response_data = {
+        **account_response_data,  # Успадковує поля з UserAccountSchema
+        "transactions": [  # Приклад AccountTransactionSchema
+            {"id": 1001, "transaction_type": "credit", "amount": Decimal("50.00"), "description": "Бонус за завдання",
+             "created_at": datetime.now()},  # TODO i18n
+            {"id": 1002, "transaction_type": "debit", "amount": Decimal("10.25"), "description": "Покупка нагороди",
+             "created_at": datetime.now()}  # TODO i18n
+        ]
+    }
+    history_response_instance = UserAccountTransactionHistorySchema(**history_response_data)
+    logger.info(history_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, GroupSchema, AccountTransactionSchema)")
+    logger.info("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")

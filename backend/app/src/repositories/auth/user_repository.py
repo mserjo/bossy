@@ -1,157 +1,188 @@
 # backend/app/src/repositories/auth/user_repository.py
-
 """
-Repository for User entities.
-Provides CRUD operations and specific methods for managing user accounts.
+Репозиторій для моделі "Користувач" (User).
+
+Цей модуль визначає клас `UserRepository`, який успадковує `BaseRepository`
+та надає специфічні методи для роботи з користувачами, такі як отримання
+користувача за email або номером телефону, а також кастомізовані методи
+створення та оновлення, що враховують хешування паролю.
 """
 
-import logging
-from typing import Optional, List, Any # Added List, Any
-
+from typing import Optional, Dict, Any
+from sqlalchemy import select  # update as sqlalchemy_update не потрібен, оскільки оновлення йде через setattr
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_ # Added or_
 
-from backend.app.src.models.auth.user import User
-from backend.app.src.schemas.auth.user import UserCreate, UserAdminUpdate # Using UserAdminUpdate for broader update capabilities by admin
+# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+# Абсолютний імпорт моделі User та схем UserCreateSchema, UserUpdateSchema
+from backend.app.src.models.auth.user import User
+from backend.app.src.schemas.auth.user import UserCreateSchema, UserUpdateSchema
+# Абсолютний імпорт функції хешування паролю
+from backend.app.src.config.security import get_password_hash
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-logger = logging.getLogger(__name__)
+# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
 
-class UserRepository(BaseRepository[User, UserCreate, UserAdminUpdate]):
+# logger = get_logger(__name__)
+
+class UserRepository(BaseRepository[User, UserCreateSchema, UserUpdateSchema]):
     """
-    Repository for managing User records.
+    Репозиторій для управління записами користувачів (`User`).
+
+    Успадковує базові CRUD-методи від `BaseRepository` та надає
+    додаткові методи для пошуку користувачів за унікальними полями,
+    а також перевантажує методи створення та оновлення для обробки паролів.
     """
 
-    def __init__(self):
-        super().__init__(User)
-
-    async def get_by_email(self, db: AsyncSession, *, email: str) -> Optional[User]:
+    def __init__(self, db_session: AsyncSession):
         """
-        Retrieves a user by their email address.
-        Email is expected to be unique.
+        Ініціалізує репозиторій для моделі `User`.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            email: The email address of the user.
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
+        """
+        super().__init__(db_session=db_session, model=User)
+
+    async def get_by_email(self, email: str) -> Optional[User]:
+        """
+        Отримує одного користувача за його електронною поштою.
+
+        Args:
+            email (str): Електронна пошта користувача для пошуку.
 
         Returns:
-            The User object if found, otherwise None.
+            Optional[User]: Екземпляр моделі `User`, якщо знайдено, інакше None.
         """
-        statement = select(self.model).where(self.model.email == email) # type: ignore[attr-defined]
-        result = await db.execute(statement)
+        stmt = select(self.model).where(self.model.email == email)
+        result = await self.db_session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_phone_number(self, db: AsyncSession, *, phone_number: str) -> Optional[User]:
+    async def get_by_phone_number(self, phone_number: str) -> Optional[User]:
         """
-        Retrieves a user by their phone number.
-        Phone number is expected to be unique if provided.
+        Отримує одного користувача за його номером телефону.
+        Припускає, що номери телефонів зберігаються в унікальному форматі.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            phone_number: The phone number of the user.
+            phone_number (str): Номер телефону користувача для пошуку.
 
         Returns:
-            The User object if found, otherwise None.
+            Optional[User]: Екземпляр моделі `User`, якщо знайдено, інакше None.
         """
-        statement = select(self.model).where(self.model.phone_number == phone_number) # type: ignore[attr-defined]
-        result = await db.execute(statement)
+        stmt = select(self.model).where(self.model.phone_number == phone_number)
+        result = await self.db_session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_by_email_or_phone(self, db: AsyncSession, *, email: Optional[str] = None, phone_number: Optional[str] = None) -> Optional[User]:
+    async def create(self, obj_in: UserCreateSchema) -> User:
         """
-        Retrieves a user by their email address OR phone number.
-        Useful for login where user can use either.
+        Створює нового користувача в базі даних.
+        Пароль з вхідної схеми хешується перед збереженням.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            email: The email address of the user (optional).
-            phone_number: The phone number of the user (optional).
+            obj_in (UserCreateSchema): Pydantic схема з даними для створення користувача.
 
         Returns:
-            The User object if found by either identifier, otherwise None.
-            Returns None if neither email nor phone_number is provided.
+            User: Створений екземпляр моделі `User`.
         """
-        if not email and not phone_number:
-            return None
+        create_data = obj_in.model_dump()
 
-        conditions = []
-        if email:
-            conditions.append(self.model.email == email) # type: ignore[attr-defined]
-        if phone_number:
-            conditions.append(self.model.phone_number == phone_number) # type: ignore[attr-defined]
+        # Хешування пароля
+        create_data["hashed_password"] = get_password_hash(obj_in.password)
+        del create_data["password"]  # Видаляємо пароль у відкритому вигляді
 
-        statement = select(self.model).where(or_(*conditions))
-        result = await db.execute(statement)
-        return result.scalar_one_or_none()
+        # TODO: Обробка user_type_code та system_role_code
+        # Якщо ці коди передаються, потрібно отримати відповідні ID з довідників
+        # і записати їх у user_type_id та system_role_id.
+        # Наприклад:
+        # if obj_in.user_type_code:
+        #     user_type = await UserTypeRepository(self.db_session).get_by_code(obj_in.user_type_code)
+        #     if user_type:
+        #         create_data["user_type_id"] = user_type.id
+        #     # else: обробити помилку або встановити значення за замовчуванням
+        # if "user_type_code" in create_data: del create_data["user_type_code"]
+        # Аналогічно для system_role_code.
+        # Наразі, якщо модель User має user_type_id/system_role_id, а схема - *code,
+        # то пряме **create_data не спрацює без перетворення code в id.
+        # Припускаємо, що модель User очікує user_type_id та system_role_id.
+        # Або ж ці поля в UserCreateSchema мають бути *_id.
+        # Поки що, для простоти, припускаємо, що модель User приймає *_code напряму,
+        # або ці поля будуть оброблені на рівні сервісу.
+        # Якщо модель User має user_type_id, а схема user_type_code, то це поле треба видалити з create_data
+        # перед розпакуванням в модель, якщо воно не є полем моделі.
+        # Наприклад:
+        # if "user_type_code" in create_data: del create_data["user_type_code"]
+        # if "system_role_code" in create_data: del create_data["system_role_code"]
 
-    def is_active(self, user: User) -> bool:
+        db_obj = self.model(**create_data)
+        self.db_session.add(db_obj)
+        await self.db_session.commit()
+        await self.db_session.refresh(db_obj)
+        # logger.info(f"Створено користувача: {db_obj.email}")
+        return db_obj
+
+    async def update(self, *, db_obj: User, obj_in: UserUpdateSchema) -> User:
         """
-        Checks if a user account is active.
+        Оновлює існуючий запис користувача в базі даних.
+        Якщо надано новий пароль, він хешується перед збереженням.
 
         Args:
-            user: The User object.
+            db_obj (User): Екземпляр моделі `User`, який потрібно оновити.
+            obj_in (UserUpdateSchema): Pydantic схема з даними для оновлення.
 
         Returns:
-            True if the user is active, False otherwise.
+            User: Оновлений екземпляр моделі `User`.
         """
-        return user.is_active
+        update_data = obj_in.model_dump(exclude_unset=True)
 
-    def is_superuser(self, user: User) -> bool:
-        """
-        Checks if a user has superuser privileges.
+        if "password" in update_data and update_data["password"] is not None:
+            # Якщо пароль надано для оновлення
+            update_data["hashed_password"] = get_password_hash(update_data["password"])
+            del update_data["password"]
+        elif "password" in update_data:  # Якщо password є, але None (це не типовий випадок для оновлення паролю)
+            del update_data["password"]  # Просто видаляємо, щоб не намагатися встановити None в hashed_password
 
-        Args:
-            user: The User object.
+        # TODO: Аналогічна обробка для user_type_code та system_role_code, як у методі create,
+        #       якщо ці поля дозволено оновлювати через коди.
+        # if "user_type_code" in update_data: del update_data["user_type_code"]
+        # if "system_role_code" in update_data: del update_data["system_role_code"]
 
-        Returns:
-            True if the user is a superuser, False otherwise.
-        """
-        return user.is_superuser
+        for field, value in update_data.items():
+            if hasattr(db_obj, field):
+                setattr(db_obj, field, value)
+            # else:
+            # logger.warning(f"Спроба оновити неіснуюче поле '{field}' для користувача ID {db_obj.id}")
 
-    async def search_users(
-        self,
-        db: AsyncSession,
-        *,
-        search_term: str,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[User]:
-        """
-        Searches for users by a search term matching against email, name, first_name, or last_name.
+        self.db_session.add(db_obj)
+        await self.db_session.commit()
+        await self.db_session.refresh(db_obj)
+        # logger.info(f"Оновлено користувача: {db_obj.email}")
+        return db_obj
 
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            search_term: The term to search for.
-            skip: Number of records to skip for pagination.
-            limit: Maximum number of records to return.
 
-        Returns:
-            A list of User objects matching the search criteria.
-        """
-        search_filter = f"%{search_term.lower()}%"
-        conditions = or_(
-            self.model.email.ilike(search_filter), # type: ignore[attr-defined]
-            self.model.name.ilike(search_filter), # type: ignore[attr-defined]
-            self.model.first_name.ilike(search_filter), # type: ignore[attr-defined]
-            self.model.last_name.ilike(search_filter) # type: ignore[attr-defined]
-        )
+if __name__ == "__main__":
+    # Демонстраційний блок для UserRepository.
+    # Потребує макетів для AsyncSession, UserCreateSchema, UserUpdateSchema, User моделі.
+    logger.info("--- Репозиторій Користувачів (UserRepository) ---")
 
-        statement = select(self.model).where(conditions).offset(skip).limit(limit)
-        result = await db.execute(statement)
-        return list(result.scalars().all())
+    # Концептуальна демонстрація. Реальне тестування потребує інтеграційних тестів.
+    # from backend.app.src.core.dependencies import UserModel as User # Використання UserModel-заповнювача
 
-    # Note: Password hashing is NOT handled here. It should be done in the service layer
-    # before passing data to `create` or `update` methods.
-    # The `create` and `update` methods inherited from BaseRepository will be used.
-    # `UserCreate` schema is used for creation.
-    # `UserAdminUpdate` schema is used for updates, allowing admins more control.
-    # If user self-update needs a different, more restricted schema, a separate
-    # repository method or service layer logic would enforce that.
+    logger.info(f"Репозиторій працює з моделлю: {User.__name__}")
+    logger.info(f"  Очікує схему створення: {UserCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {UserUpdateSchema.__name__}")
 
-    # Example of a more specific update method if needed:
-    # async def update_profile(self, db: AsyncSession, *, db_obj: User, obj_in: UserUpdate) -> User:
-    #     """
-    #     Allows a user to update their own profile with restricted fields.
-    #     """
-    #     # This would call the base update method, but with UserUpdate schema
-    #     return await super().update(db, db_obj=db_obj, obj_in=obj_in)
+    logger.info("\nОсновні методи:")
+    logger.info("  - get_by_email(email: str)")
+    logger.info("  - get_by_phone_number(phone_number: str)")
+    logger.info("  - create(obj_in: UserCreateSchema) -> User (з хешуванням паролю)")
+    logger.info("  - update(*, db_obj: User, obj_in: UserUpdateSchema) -> User (з хешуванням паролю, якщо надано)")
+    logger.info("  - get(record_id: Any) (успадковано)")
+    logger.info("  - get_multi(...) (успадковано)")
+    logger.info("  - delete(record_id: Any) (успадковано)")
+    logger.info("  - soft_delete(db_obj: User) (успадковано, якщо модель User підтримує)")
+    logger.info("  - count(filters: List) (успадковано)")
+
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info(
+        "TODO: Реалізувати логіку перетворення *code (напр. user_type_code) на *_id в методах create/update, або перенести це на сервісний рівень.")

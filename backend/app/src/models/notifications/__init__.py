@@ -1,22 +1,23 @@
 # backend/app/src/models/notifications/__init__.py
-
 """
-This package contains SQLAlchemy models related to notifications, including
-the notifications themselves, templates for generating them, and delivery statuses.
+Пакет моделей SQLAlchemy для сутностей, пов'язаних зі "Сповіщеннями".
+
+Цей пакет містить моделі для представлення шаблонів сповіщень,
+самих сповіщень, надісланих користувачам, та спроб їх доставки
+в програмі Kudos.
+
+Моделі експортуються для зручного доступу з інших частин програми.
 """
 
-import logging
+from .template import NotificationTemplate
+from .notification import Notification
+from .delivery import NotificationDeliveryAttempt
 
-logger = logging.getLogger(__name__)
-logger.debug("Notification models package initialized.")
+__all__ = [
+    "NotificationTemplate",
+    "Notification",
+    "NotificationDeliveryAttempt",
+]
 
-# Example of re-exporting for easier access:
-# from .notification import Notification
-# from .template import NotificationTemplate
-# from .delivery import NotificationDeliveryAttempt
-
-# __all__ = [
-#     "Notification",
-#     "NotificationTemplate",
-#     "NotificationDeliveryAttempt",
-# ]
+# Майбутні моделі, пов'язані зі сповіщеннями (наприклад, UserNotificationPreferences),
+# також можуть бути додані сюди для експорту.

@@ -1,144 +1,140 @@
 # backend/app/src/models/notifications/delivery.py
-
 """
-SQLAlchemy model for Notification Delivery Attempts.
-Tracks the status of attempts to deliver a notification via different channels.
+Модель SQLAlchemy для сутності "Спроба Доставки Сповіщення" (NotificationDeliveryAttempt).
+
+Цей модуль визначає модель `NotificationDeliveryAttempt`, яка відстежує
+спроби доставки конкретного сповіщення через різні канали (наприклад, email, SMS)
+та їх результат.
 """
+from datetime import datetime, timezone  # timezone для __main__
+from typing import TYPE_CHECKING, Optional
 
-import logging
-from typing import Optional, TYPE_CHECKING, Dict, Any # For Mapped type hints
-from datetime import datetime, timezone, timedelta # Added timezone, timedelta for __main__
-from enum import Enum as PythonEnum # For Enum definitions
-
-from sqlalchemy import ForeignKey, Text, DateTime, String, Enum as SQLAlchemyEnum, Integer, JSON # Added Integer, JSON
+from sqlalchemy import String, ForeignKey, Text, func  # func для server_default в TimestampedMixin
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func # For server_default on attempted_at
 
-from backend.app.src.models.base import BaseModel
-# Assuming NotificationChannelEnum is defined in template.py or a central dicts module.
-# For robust imports, centralize enums, e.g., in backend.app.src.core.dicts
-try:
-    from backend.app.src.models.notifications.template import NotificationChannelEnum
-except ImportError:
-    # Fallback if template.py is not yet created or enum moved, define locally for this file to be self-contained for now
-    logger.warning("NotificationChannelEnum not found in template.py, using local definition for NotificationDeliveryAttempt.")
-    class NotificationChannelEnum(PythonEnum):
-        IN_APP = "in_app"
-        EMAIL = "email"
-        SMS = "sms"
-        PUSH = "push"
+# Абсолютний імпорт базових класів
+from backend.app.src.models.base import Base
+from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час спроби доставки
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
-
-class DeliveryStatusEnum(PythonEnum): # Changed to inherit from PythonEnum
-    """ Defines the status of a notification delivery attempt. """
-    PENDING = "pending"     # Attempt has not been made yet / is queued.
-    SENT = "sent"           # Notification was successfully sent to the provider (e.g., email server, SMS gateway).
-    FAILED = "failed"         # Attempt to send failed (e.g., connection error, invalid address before send).
-    DELIVERED = "delivered"   # Confirmed delivery (if supported by provider, e.g., push notification acknowledged).
-    UNDELIVERABLE = "undeliverable" # Confirmed undeliverable (e.g., hard bounce email, invalid phone number from provider).
-    # READ = "read"           # Read status is usually on the Notification model itself by user action.
+# TODO: Визначити Enums NotificationChannelType та DeliveryStatusType в core.dicts.py
+# Наприклад:
+# class NotificationChannelType(str, Enum):
+#     EMAIL = "email"
+#     SMS = "sms"
+#     IN_APP = "in_app" # Внутрішнє сповіщення в додатку
+#     PUSH_NOTIFICATION = "push_notification" # Мобільний пуш
+#     WEBHOOK = "webhook" # Виклик зовнішнього вебхука
+#
+# class DeliveryStatusType(str, Enum):
+#     PENDING = "pending"    # Очікує на відправку
+#     SENT = "sent"        # Успішно надіслано провайдеру/сервісу
+#     FAILED = "failed"      # Не вдалося надіслати (помилка на нашому боці або у провайдера)
+#     DELIVERED = "delivered"  # Підтверджено доставку (якщо провайдер це підтримує)
+#     READ = "read"          # Прочитано (для деяких каналів, як email, якщо є трекінг)
+#     ERROR = "error"        # Загальна помилка під час спроби
+# Потім імпортувати їх.
 
 if TYPE_CHECKING:
     from backend.app.src.models.notifications.notification import Notification
 
-class NotificationDeliveryAttempt(BaseModel):
-    """
-    Represents an attempt to deliver a specific notification via a particular channel.
-    A single notification might have multiple delivery attempts if retries occur or if sent via multiple channels.
 
-    Attributes:
-        notification_id (int): Foreign key to the notification being delivered.
-        channel (NotificationChannelEnum): The channel used for this delivery attempt (e.g., email, sms).
-        status (DeliveryStatusEnum): The outcome of this delivery attempt.
-        attempted_at (datetime): Timestamp when the delivery attempt was made.
-        external_message_id (Optional[str]): ID from the external provider (e.g., email Message-ID, SMS gateway transaction ID).
-        error_message (Optional[str]): Error message if the delivery attempt failed.
-        provider_response (Optional[Dict]): Raw response or details from the delivery provider (stored as JSON).
-        # `id`, `created_at`, `updated_at` from BaseModel.
-        # `created_at` can indicate when this attempt record was created/queued.
+class NotificationDeliveryAttempt(Base, TimestampedMixin):
+    """
+    Модель Спроби Доставки Сповіщення.
+
+    Зберігає інформацію про кожну спробу доставки сповіщення, канал, статус
+    та можливі повідомлення про помилки. Поле `created_at` з `TimestampedMixin`
+    використовується як час здійснення спроби (`attempted_at`).
+
+    Атрибути:
+        id (Mapped[int]): Унікальний ідентифікатор спроби доставки.
+        notification_id (Mapped[int]): ID сповіщення, яке намагалися доставити.
+        channel (Mapped[str]): Канал доставки (наприклад, "email", "sms").
+                               TODO: Використовувати Enum `NotificationChannelType`.
+        status (Mapped[str]): Статус спроби доставки (наприклад, "sent", "failed").
+                              TODO: Використовувати Enum `DeliveryStatusType`.
+        error_message (Mapped[Optional[str]]): Повідомлення про помилку, якщо доставка не вдалася.
+        external_message_id (Mapped[Optional[str]]): ID повідомлення від зовнішнього провайдера (якщо є).
+
+        notification (Mapped["Notification"]): Зв'язок з моделлю `Notification`.
+        created_at, updated_at: Успадковано. `created_at` - час спроби.
     """
     __tablename__ = "notification_delivery_attempts"
 
-    notification_id: Mapped[int] = mapped_column(Integer, ForeignKey("notifications.id"), nullable=False, index=True, comment="FK to the notification being delivered")
-
-    channel: Mapped[NotificationChannelEnum] = mapped_column(
-        SQLAlchemyEnum(NotificationChannelEnum, name="delivery_notificationchannelenum", native_enum=False, create_constraint=True),
+    id: Mapped[int] = mapped_column(
+        primary_key=True, index=True, autoincrement=True, comment="Унікальний ідентифікатор спроби доставки"
+    )
+    notification_id: Mapped[int] = mapped_column(
+        ForeignKey('notifications.id', name='fk_delivery_attempt_notification_id', ondelete="CASCADE"),
         nullable=False,
         index=True,
-        comment="Channel used for this delivery attempt (e.g., email, sms)"
+        comment="ID сповіщення, яке доставлялося"
     )
 
-    status: Mapped[DeliveryStatusEnum] = mapped_column(
-        SQLAlchemyEnum(DeliveryStatusEnum, name="deliverystatusenum", native_enum=False, create_constraint=True),
-        nullable=False,
-        default=DeliveryStatusEnum.PENDING,
-        index=True,
-        comment="Outcome of this delivery attempt (e.g., sent, failed, delivered)"
+    # TODO: Замінити String на Enum NotificationChannelType, коли він буде визначений в core.dicts.py
+    # channel: Mapped[NotificationChannelType] = mapped_column(SQLEnum(NotificationChannelType), nullable=False, index=True)
+    channel: Mapped[str] = mapped_column(
+        String(50), nullable=False, index=True, comment="Канал доставки (email, sms, in_app тощо)"
     )
 
-    attempted_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        server_default=func.now(),
-        nullable=False,
-        comment="Timestamp when the delivery attempt was made/initiated (UTC)"
+    # TODO: Замінити String на Enum DeliveryStatusType, коли він буде визначений в core.dicts.py
+    # status: Mapped[DeliveryStatusType] = mapped_column(SQLEnum(DeliveryStatusType), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(
+        String(50), nullable=False, index=True, comment="Статус спроби доставки (pending, sent, failed)"
     )
 
-    external_message_id: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, index=True, comment="ID from the external provider (e.g., email Message-ID)")
-    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="Error message if the delivery attempt failed")
-    provider_response: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True, comment="Raw response or details from the delivery provider (JSON)")
+    error_message: Mapped[Optional[str]] = mapped_column(
+        Text, nullable=True, comment="Повідомлення про помилку у випадку невдалої доставки"
+    )
+    external_message_id: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True, index=True,
+        comment="Зовнішній ID повідомлення від провайдера (напр. SES Message ID)"
+    )
 
-    # --- Relationships ---
-    notification: Mapped["Notification"] = relationship(back_populates="delivery_attempts")
+    # --- Зв'язки (Relationships) ---
+    notification: Mapped["Notification"] = relationship(back_populates="delivery_attempts", lazy="selectin")
 
-    def __repr__(self) -> str:
-        id_val = getattr(self, 'id', 'N/A')
-        # Ensure channel and status are accessed correctly, especially if they are Enum objects
-        channel_val = self.channel.value if isinstance(self.channel, PythonEnum) else self.channel
-        status_val = self.status.value if isinstance(self.status, PythonEnum) else self.status
-        return f"<NotificationDeliveryAttempt(id={id_val}, notification_id={self.notification_id}, channel='{channel_val}', status='{status_val}')>"
+    # Поля для __repr__
+    _repr_fields = ["id", "notification_id", "channel", "status"]  # created_at з TimestampedMixin
+
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для моделі NotificationDeliveryAttempt.
+    logger.info("--- Модель Спроби Доставки Сповіщення (NotificationDeliveryAttempt) ---")
+    logger.info(f"Назва таблиці: {NotificationDeliveryAttempt.__tablename__}")
 
-    logger.info("--- NotificationDeliveryAttempt Model --- Demonstration")
+    logger.info("\nОчікувані поля:")
+    expected_fields = [
+        'id', 'notification_id', 'channel', 'status',
+        'error_message', 'external_message_id', 'created_at', 'updated_at'
+    ]
+    for field in expected_fields:
+        logger.info(f"  - {field}")
 
-    # Example NotificationDeliveryAttempt instances
-    # Assume Notification id=1 exists
-    attempt1_email_sent = NotificationDeliveryAttempt(
-        notification_id=1,
-        channel=NotificationChannelEnum.EMAIL, # Use the Enum member here
-        status=DeliveryStatusEnum.SENT,       # Use the Enum member here
-        attempted_at=datetime.now(timezone.utc) - timedelta(seconds=30),
-        external_message_id="<CAOjp2BFk...@mail.gmail.com>"
+    logger.info("\nОчікувані зв'язки (relationships):")
+    expected_relationships = ['notification']
+    for rel in expected_relationships:
+        logger.info(f"  - {rel}")
+
+    # Приклад створення екземпляра (без взаємодії з БД)
+    example_attempt = NotificationDeliveryAttempt(
+        id=1,
+        notification_id=1,  # ID сповіщення
+        channel="email",  # TODO: Замінити на NotificationChannelType.EMAIL.value
+        status="sent",  # TODO: Замінити на DeliveryStatusType.SENT.value
+        external_message_id="ses-message-id-12345"
     )
-    attempt1_email_sent.id = 1 # Simulate ORM-set ID
-    attempt1_email_sent.created_at = datetime.now(timezone.utc) - timedelta(minutes=1)
-    attempt1_email_sent.updated_at = datetime.now(timezone.utc) - timedelta(seconds=30)
+    # Імітуємо часові мітки (created_at - час спроби)
+    example_attempt.created_at = datetime.now(tz=timezone.utc)
+    example_attempt.updated_at = datetime.now(tz=timezone.utc)
 
-    logger.info(f"Example Successful Email Delivery Attempt: {attempt1_email_sent!r}")
-    logger.info(f"  Notification ID: {attempt1_email_sent.notification_id}, Channel: {attempt1_email_sent.channel.value}") # Access .value for Enum
-    logger.info(f"  Status: {attempt1_email_sent.status.value}") # Access .value for Enum
-    logger.info(f"  External ID: {attempt1_email_sent.external_message_id}")
-    logger.info(f"  Attempted At: {attempt1_email_sent.attempted_at.isoformat() if attempt1_email_sent.attempted_at else 'N/A'}")
-    logger.info(f"  Created At: {attempt1_email_sent.created_at.isoformat() if attempt1_email_sent.created_at else 'N/A'}")
+    logger.info(f"\nПриклад екземпляра NotificationDeliveryAttempt (без сесії):\n  {example_attempt}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <NotificationDeliveryAttempt(id=1, notification_id=1, channel='email', status='sent', created_at=...)>
 
-
-    attempt2_sms_failed = NotificationDeliveryAttempt(
-        notification_id=2, # Assume Notification id=2 exists
-        channel=NotificationChannelEnum.SMS,
-        status=DeliveryStatusEnum.FAILED,
-        attempted_at=datetime.now(timezone.utc) - timedelta(minutes=2),
-        error_message="Invalid phone number format or number not reachable.",
-        provider_response={"gateway_error_code": "E-203"}
-    )
-    attempt2_sms_failed.id = 2
-    logger.info(f"Example Failed SMS Delivery Attempt: {attempt2_sms_failed!r}")
-    logger.info(f"  Error: {attempt2_sms_failed.error_message}")
-    logger.info(f"  Provider Response: {attempt2_sms_failed.provider_response}")
-
-    # The following line would error if run directly without SQLAlchemy engine and metadata setup for all related tables.
-    # logger.info(f"NotificationDeliveryAttempt attributes (conceptual table columns): {[c.name for c in NotificationDeliveryAttempt.__table__.columns if not c.name.startswith('_')]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info(
+        "TODO: Не забудьте визначити Enum 'NotificationChannelType' та 'DeliveryStatusType' в core.dicts.py та оновити відповідні поля.")

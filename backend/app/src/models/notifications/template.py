@@ -1,124 +1,95 @@
 # backend/app/src/models/notifications/template.py
-
 """
-SQLAlchemy model for Notification Templates.
-Templates are used to generate consistent notification messages for various channels.
+Модель SQLAlchemy для сутності "Шаблон Сповіщення" (NotificationTemplate).
+
+Цей модуль визначає модель `NotificationTemplate`, яка зберігає шаблони
+для різних типів сповіщень (наприклад, email, SMS, внутрішні сповіщення).
+Шаблони містять тему та тіло, які можуть включати плейсхолдери для динамічних даних.
 """
+from typing import TYPE_CHECKING, Optional
 
-import logging
-from typing import Optional, TYPE_CHECKING, Dict, Any # For Mapped type hints
-from datetime import datetime, timezone # Added for __main__
-from enum import Enum as PythonEnum # For NotificationChannelEnum
+from sqlalchemy import String, Text
+from sqlalchemy.orm import Mapped, mapped_column  # relationship тут не потрібен, якщо немає зворотніх зв'язків
 
-from sqlalchemy import String, Text, Enum as SQLAlchemyEnum, UniqueConstraint, JSON # Added JSON
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+# Абсолютний імпорт базової моделі для довідників
+from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-from backend.app.src.models.base import BaseMainModel # Templates are managed entities
+# TODO: Визначити Enum NotificationChannelType в core.dicts.py (наприклад, EMAIL, SMS, IN_APP, PUSH)
+# from backend.app.src.core.dicts import NotificationChannelType
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
-
-class NotificationChannelEnum(PythonEnum): # Changed to inherit from PythonEnum
-    """ Defines the channels through which a notification can be sent. """
-    IN_APP = "in_app"       # In-application notification system
-    EMAIL = "email"         # Email notification
-    SMS = "sms"             # SMS text message
-    PUSH = "push"           # Mobile or web push notification
-    # SLACK = "slack"       # Example: Slack message
-    # TELEGRAM = "telegram" # Example: Telegram message
-
-if TYPE_CHECKING:
-    # No direct relationships from template to other main tables typically, but could link to a category or similar dict table.
-    pass
-
-class NotificationTemplate(BaseMainModel): # Inherits id, name, description, state, notes, created_at, updated_at, deleted_at
+class NotificationTemplate(BaseDictionaryModel):
     """
-    Represents a template for generating notification messages.
-    This allows for consistent messaging and easier management of notification content.
-    The 'name' field from BaseMainModel can be used as a human-readable template name.
-    The 'description' can explain the purpose or context of the template.
+    Модель Шаблону Сповіщення.
+
+    Успадковує `BaseDictionaryModel` (id, code, name, description, state, etc.).
+    Поле `code` - унікальний код шаблону (наприклад, "new_task_assigned_email").
+    Поле `name` - людиночитана назва шаблону (наприклад, "Email: Нове завдання призначено").
+    Поле `description` - детальний опис призначення шаблону.
+    Поле `state` - чи активний шаблон для використання.
+
+    Атрибути:
+        subject_template (Mapped[str]): Шаблон теми сповіщення (може містити плейсхолдери).
+        body_template (Mapped[str]): Шаблон тіла сповіщення (HTML для email, текст для SMS/push, Markdown/JSON для in-app).
+        template_type (Mapped[str]): Тип/канал сповіщення (наприклад, "email", "sms", "in_app").
+                                     TODO: Замінити на Enum `NotificationChannelType`.
     """
     __tablename__ = "notification_templates"
 
-    # 'name' (e.g., "Welcome Email Template", "Task Assigned In-App Notification") inherited.
-    # 'description' (e.g., "Template used when a new user registers and verifies their email.") inherited.
-    # 'state' can be 'active', 'draft', 'archived'.
-
-    template_type_code: Mapped[str] = mapped_column(String(100), nullable=False, index=True, comment="Unique code identifying the template's purpose (e.g., 'USER_REGISTRATION_WELCOME', 'TASK_ASSIGNED_ALERT')")
-    # This is not globally unique, but unique per channel+language. See UniqueConstraint.
-
-    channel: Mapped[NotificationChannelEnum] = mapped_column(
-        SQLAlchemyEnum(NotificationChannelEnum, name="notificationchannelenum", create_constraint=True, native_enum=False), # native_enum=False for string storage
-        nullable=False,
-        index=True,
-        comment="The communication channel this template is designed for (e.g., email, sms, in_app)"
+    # --- Специфічні поля для Шаблону Сповіщення ---
+    subject_template: Mapped[str] = mapped_column(
+        String(500), nullable=False, comment="Шаблон теми сповіщення (з плейсхолдерами)"
+    )
+    body_template: Mapped[str] = mapped_column(
+        Text, nullable=False, comment="Шаблон тіла сповіщення (з плейсхолдерами, може бути HTML/Markdown/Text)"
     )
 
-    language_code: Mapped[str] = mapped_column(String(10), default="en", nullable=False, index=True, comment="Language code for this template version (e.g., 'en', 'uk', 'es')")
-    # This allows for multiple language versions of the same template_type_code and channel.
-
-    subject_template: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="Template for the notification subject (e.g., for emails). Uses templating engine syntax (e.g., Jinja2 vars like {{ user_name }})")
-    body_template: Mapped[str] = mapped_column(Text, nullable=False, comment="Template for the notification body/content. Uses templating engine syntax.")
-
-    # Example of storing rendering hints or required variables as JSON
-    template_variables_schema: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True, comment="JSON schema or list of expected variables for this template (e.g., ['user_name', 'task_title'])")
-
-    # --- Relationships ---
-    # No direct ORM relationships defined from here in this basic setup.
-    # Could potentially link to a dictionary table for categories if templates are numerous.
-
-    # --- Table Arguments ---
-    # A template should be unique for its type, channel, and language.
-    __table_args__ = (
-        UniqueConstraint('template_type_code', 'channel', 'language_code', name='uq_notification_template_type_channel_lang'),
+    # TODO: Замінити String на Enum NotificationChannelType, коли він буде визначений в core.dicts.py
+    # template_type: Mapped[NotificationChannelType] = mapped_column(SQLEnum(NotificationChannelType), nullable=False, index=True)
+    template_type: Mapped[str] = mapped_column(
+        String(50), nullable=False, index=True, comment="Тип/канал шаблону (наприклад, email, sms, in_app)"
     )
 
-    def __repr__(self) -> str:
-        id_val = getattr(self, 'id', 'N/A')
-        return f"<NotificationTemplate(id={id_val}, type_code='{self.template_type_code}', channel='{self.channel.value}', lang='{self.language_code}')>"
+    # _repr_fields успадковуються та збираються з BaseDictionaryModel та його предків.
+    # Додаємо специфічні для NotificationTemplate поля.
+    _repr_fields = ["template_type"]  # 'id', 'code', 'name' вже будуть з BaseDictionaryModel
+
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для моделі NotificationTemplate.
+    logger.info("--- Модель Шаблону Сповіщення (NotificationTemplate) ---")
+    logger.info(f"Назва таблиці: {NotificationTemplate.__tablename__}")
 
-    logger.info("--- NotificationTemplate Model --- Demonstration")
+    logger.info("\nОчікувані поля (успадковані та власні):")
+    expected_fields = [
+        'id', 'code', 'name', 'description', 'state', 'group_id', 'notes',
+        'created_at', 'updated_at', 'deleted_at',
+        'subject_template', 'body_template', 'template_type'
+    ]
+    for field in expected_fields:
+        logger.info(f"  - {field}")
 
-    # Example NotificationTemplate instances
-    welcome_email_en = NotificationTemplate(
-        name="Welcome Email (English)",
-        description="Standard welcome email sent to new users upon successful registration.",
-        template_type_code="USER_WELCOME",
-        channel=NotificationChannelEnum.EMAIL,
-        language_code="en",
-        subject_template="Welcome to {{ project_name }}, {{ user_name }}!",
-        body_template="Hello {{ user_name }},\n\nWelcome aboard! We're excited to have you at {{ project_name }}.\n\nTo get started, please verify your email by clicking here: {{ verification_link }}\n\nThanks,\nThe {{ project_name }} Team",
-        state="active", # from BaseMainModel
-        template_variables_schema={"project_name": "string", "user_name": "string", "verification_link": "url"}
-    )
-    welcome_email_en.id = 1 # Simulate ORM-set ID
-    welcome_email_en.created_at = datetime.now(timezone.utc) # Simulate timestamp
-    welcome_email_en.updated_at = datetime.now(timezone.utc) # Simulate timestamp
+    # Приклад створення екземпляра (без взаємодії з БД)
+    from datetime import datetime, timezone
 
-    logger.info(f"Example Email Template (EN): {welcome_email_en!r}")
-    logger.info(f"  Subject: {welcome_email_en.subject_template}")
-    logger.info(f"  Variables Schema: {welcome_email_en.template_variables_schema}")
-    logger.info(f"  Created At: {welcome_email_en.created_at.isoformat() if welcome_email_en.created_at else 'N/A'}")
-
-
-    task_assigned_in_app_uk = NotificationTemplate(
-        name="Task Assigned In-App (Ukrainian)",
-        description="In-app notification when a task is assigned to a user.",
-        template_type_code="TASK_ASSIGNED",
-        channel=NotificationChannelEnum.IN_APP,
-        language_code="uk",
-        subject_template="Нове завдання: {{ task_title }}",
-        body_template="Вам призначено нове завдання: '{{ task_title }}' у групі '{{ group_name }}'. Дедлайн: {{ due_date }}.",
+    example_template = NotificationTemplate(
+        id=1,
+        code="WELCOME_EMAIL",
+        name="Вітальне Email Сповіщення",  # TODO i18n
+        description="Шаблон для вітального листа, що надсилається новому користувачеві.",  # TODO i18n
+        subject_template="Ласкаво просимо до {project_name}, {{user_name}}!",  # TODO i18n (плейсхолдери окремо)
+        body_template="<p>Привіт, {{user_name}}!</p><p>Дякуємо за реєстрацію в {project_name}.</p>",
+        # TODO i18n (плейсхолдери окремо)
+        template_type="email",  # TODO: Замінити на NotificationChannelType.EMAIL.value
         state="active"
     )
-    task_assigned_in_app_uk.id = 2
-    logger.info(f"Example In-App Template (UK): {task_assigned_in_app_uk!r}")
-    logger.info(f"  Body: {task_assigned_in_app_uk.body_template}")
+    example_template.created_at = datetime.now(tz=timezone.utc)
 
-    # The following line would error if run directly without SQLAlchemy engine and metadata setup for all related tables.
-    # logger.info(f"NotificationTemplate attributes (conceptual table columns): {[c.name for c in NotificationTemplate.__table__.columns if not c.name.startswith('_')]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    logger.info(f"\nПриклад екземпляра NotificationTemplate (без сесії):\n  {example_template}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <NotificationTemplate(id=1, name='Вітальне Email Сповіщення', code='WELCOME_EMAIL', state='active', template_type='email', created_at=...)>
+
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("TODO: Не забудьте визначити Enum 'NotificationChannelType' в core.dicts.py та оновити поле 'template_type'.")

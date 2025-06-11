@@ -1,138 +1,162 @@
 # backend/app/src/schemas/gamification/level.py
-import logging
-from typing import Optional
-from uuid import UUID
+"""
+Pydantic схеми для сутності "Рівень" (Level) в системі гейміфікації.
 
-from pydantic import BaseModel, Field
+Цей модуль визначає схеми для:
+- Створення нового рівня (`LevelCreateSchema`).
+- Оновлення існуючого рівня (`LevelUpdateSchema`).
+- Представлення даних про рівень у відповідях API (`LevelSchema`).
+"""
+from datetime import datetime  # Потрібен для TimestampedSchemaMixin через BaseMainSchema
+from typing import Optional, Any  # Any для тимчасових полів
 
-from app.src.schemas.base import BaseDBRead # Assuming you have a BaseDBRead schema for common DB fields like id, created_at, updated_at
+from pydantic import Field, AnyHttpUrl
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт базових схем
+from backend.app.src.schemas.base import BaseSchema, BaseMainSchema  # IDSchemaMixin, TimestampedSchemaMixin вже в BaseMainSchema
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-# --- Level Schemas ---
+# TODO: Замінити Any на конкретну схему GroupSchema (коротка версія), коли вона буде готова.
+# from backend.app.src.schemas.groups.group import GroupBriefSchema
+GroupBriefSchema = Any  # Тимчасовий заповнювач
 
-class LevelBase(BaseModel):
+LEVEL_NAME_MAX_LENGTH = 255
+LEVEL_ICON_URL_MAX_LENGTH = 512
+
+
+class LevelBaseSchema(BaseSchema):
     """
-    Base schema for game levels.
-    Contains common attributes for all level-related schemas.
+    Базова схема для полів рівня, спільних для створення та оновлення.
     """
     name: str = Field(
         ...,
-        min_length=2,
-        max_length=50,
-        description="The name of the level. Must be unique within a group if group-specific, or globally if system-wide."
+        max_length=LEVEL_NAME_MAX_LENGTH,
+        description="Назва рівня гейміфікації.",
+        examples=["Новачок", "Досвідчений Гравець"]
     )
     description: Optional[str] = Field(
         None,
-        max_length=255,
-        description="A brief description of the level and its criteria or benefits."
+        description="Опис умов або переваг цього рівня."
     )
-    min_points: int = Field(
+    required_points: int = Field(
         ...,
         ge=0,
-        description="The minimum number of points required to reach this level."
+        description="Кількість балів, необхідна для досягнення цього рівня."
     )
-    # Example of a field that might be group-specific, if levels can be customized per group
-    # group_id: Optional[UUID] = Field(None, description="Identifier of the group this level belongs to, if applicable.")
+    level_number: Optional[int] = Field(
+        None,
+        ge=0,
+        description="Порядковий номер рівня (наприклад, 1, 2, 3). Використовується для сортування та визначення прогресу."
+    )
+    icon_url: Optional[AnyHttpUrl] = Field(  # Використовуємо AnyHttpUrl для валідації URL
+        None,
+        # max_length не потрібен для AnyHttpUrl, валідація формату важливіша
+        description="URL або шлях до іконки, що представляє рівень."
+    )
+    group_id: Optional[int] = Field(
+        None,
+        description="ID групи, до якої належить цей рівень. NULL, якщо рівень глобальний/системний."
+    )
+    # state успадковується в LevelSchema через BaseMainSchema, але може бути вказаний при створенні/оновленні
+    state: Optional[str] = Field(
+        None,  # Або default="active"
+        max_length=50,
+        description="Стан рівня (наприклад, 'active', 'inactive').",
+        examples=["active"]
+    )
+    notes: Optional[str] = Field(  # Додаємо notes, оскільки Level модель успадковує NotesMixin через BaseMainModel
+        None,
+        description="Додаткові нотатки щодо рівня."
+    )
 
-    class Config:
-        orm_mode = True
-        # Example for Pydantic V2, if you are using it
-        # from_attributes = True
-        anystr_strip_whitespace = True
-        title = "Level"
-        json_schema_extra = {
-            "example": {
-                "name": "Novice",
-                "description": "Achieved by earning the first 100 points.",
-                "min_points": 100,
-                # "group_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef"
-            }
-        }
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"LevelBase instance created with data: {data}")
-
-class LevelCreate(LevelBase):
+class LevelCreateSchema(LevelBaseSchema):
     """
-    Schema for creating a new level.
-    Inherits all fields from LevelBase.
-    No additional fields are required for creation beyond what's in LevelBase.
+    Схема для створення нового рівня гейміфікації.
+    Успадковує всі поля від `LevelBaseSchema`.
     """
     pass
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.info(f"LevelCreate instance created for level '{self.name}'.")
 
-class LevelUpdate(BaseModel):
+class LevelUpdateSchema(LevelBaseSchema):
     """
-    Schema for updating an existing level.
-    All fields are optional for partial updates.
+    Схема для оновлення існуючого рівня гейміфікації.
+    Всі поля, успадковані з `LevelBaseSchema`, стають опціональними.
     """
-    name: Optional[str] = Field(
-        None,
-        min_length=2,
-        max_length=50,
-        description="The new name of the level."
-    )
-    description: Optional[str] = Field(
-        None,
-        max_length=255,
-        description="The new description of the level."
-    )
-    min_points: Optional[int] = Field(
-        None,
-        ge=0,
-        description="The new minimum number of points for this level."
-    )
-    # group_id: Optional[UUID] = Field(None, description="New group identifier if the level is being moved or its scope changed.")
+    name: Optional[str] = Field(None, max_length=LEVEL_NAME_MAX_LENGTH)
+    description: Optional[str] = None
+    required_points: Optional[int] = Field(None, ge=0)
+    level_number: Optional[int] = Field(None, ge=0)
+    icon_url: Optional[AnyHttpUrl] = None
+    group_id: Optional[int] = Field(None,
+                                    description="Зміна групи для рівня (зазвичай не дозволяється або обробляється окремо).")  # Зазвичай group_id не змінюється
+    state: Optional[str] = Field(None, max_length=50)
+    notes: Optional[str] = None
 
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        anystr_strip_whitespace = True
-        title = "LevelUpdate"
-        json_schema_extra = {
-            "example": {
-                "name": "Apprentice",
-                "min_points": 250
-            }
-        }
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.info(f"LevelUpdate instance created with update data: {data}")
-
-class LevelResponse(LevelBase, BaseDBRead):
+class LevelSchema(BaseMainSchema):  # Успадковує id, name, description, state, notes, group_id, timestamps
     """
-    Schema for representing a level in API responses.
-    Includes all fields from LevelBase and common database read fields (id, created_at, updated_at) from BaseDBRead.
+    Схема для представлення даних про рівень гейміфікації у відповідях API.
+    Успадковує стандартні поля з `BaseMainSchema`.
     """
-    # id: UUID # Already in BaseDBRead
-    # created_at: datetime # Already in BaseDBRead
-    # updated_at: datetime # Already in BaseDBRead
+    # id, name, description, state, notes, group_id, created_at, updated_at, deleted_at - успадковані
 
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        title = "LevelResponse"
-        json_schema_extra = {
-            "example": {
-                "id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                "name": "Novice",
-                "description": "Achieved by earning the first 100 points.",
-                "min_points": 100,
-                # "group_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                "created_at": "2023-01-01T12:00:00Z",
-                "updated_at": "2023-01-01T12:00:00Z"
-            }
-        }
+    # Специфічні поля моделі Level
+    required_points: int = Field(description="Кількість балів, необхідна для досягнення рівня.")
+    level_number: Optional[int] = Field(description="Порядковий номер рівня.")
+    icon_url: Optional[AnyHttpUrl] = Field(None, description="URL іконки рівня.")
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"LevelResponse instance created for level ID '{self.id}'.")
+    # Пов'язані об'єкти
+    # TODO: Замінити Any на GroupBriefSchema, коли вона буде імпортована.
+    group: Optional[GroupBriefSchema] = Field(None,
+                                              description="Коротка інформація про групу, до якої належить рівень (якщо є).")
 
-logger.info("Level schemas (LevelBase, LevelCreate, LevelUpdate, LevelResponse) defined successfully.")
+    # model_config успадковується з BaseMainSchema -> BaseSchema (from_attributes=True)
+
+
+if __name__ == "__main__":
+    # Демонстраційний блок для схем рівнів.
+    logger.info("--- Pydantic Схеми для Рівнів Гейміфікації (Level) ---")
+
+    logger.info("\nLevelCreateSchema (приклад для створення):")
+    create_level_data = {
+        "name": "Золотий Рівень",  # TODO i18n
+        "description": "Визначний рівень для найактивніших учасників.",  # TODO i18n
+        "required_points": 10000,
+        "level_number": 5,
+        "icon_url": "https://example.com/icons/gold_level.png",
+        "group_id": 1,  # Припустимо, специфічний для групи 1
+        "state": "active"
+    }
+    create_level_instance = LevelCreateSchema(**create_level_data)
+    logger.info(create_level_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nLevelUpdateSchema (приклад для оновлення):")
+    update_level_data = {
+        "description": "Оновлений опис для Золотого Рівня, тепер вимагає більше балів.",  # TODO i18n
+        "required_points": 12000
+    }
+    update_level_instance = LevelUpdateSchema(**update_level_data)
+    logger.info(update_level_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nLevelSchema (приклад відповіді API):")
+    level_response_data = {
+        "id": 1,
+        "name": "Срібний Рівень",  # TODO i18n
+        "description": "Рівень для активних учасників.",  # TODO i18n
+        "state": "active",
+        "group_id": 1,
+        "created_at": datetime.now(),
+        "updated_at": datetime.now(),
+        "required_points": 5000,
+        "level_number": 3,
+        "icon_url": "https://example.com/icons/silver_level.png",
+        # "group": {"id": 1, "name": "Команда Альфа"} # Приклад GroupBriefSchema
+    }
+    level_response_instance = LevelSchema(**level_response_data)
+    logger.info(level_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nПримітка: Схема для `group` наразі є заповнювачем (Any).")
+    logger.info("Її потрібно буде замінити на `GroupBriefSchema` після її визначення.")

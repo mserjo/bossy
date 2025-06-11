@@ -1,24 +1,24 @@
 # backend/app/src/models/system/__init__.py
-
 """
-This package contains system-level SQLAlchemy models, such as those for
-system settings, monitoring, logs, and health checks.
+Пакет моделей SQLAlchemy для системних сутностей.
+
+Цей пакет містить моделі, що представляють системні налаштування,
+записи моніторингу (логи, метрики продуктивності) та стан здоров'я
+різних компонентів системи Kudos.
+
+Моделі експортуються для зручного доступу з інших частин програми.
 """
 
-import logging
+from .settings import SystemSetting
+from .monitoring import SystemLog, PerformanceMetric
+from .health import ServiceHealthStatus
 
-logger = logging.getLogger(__name__)
-logger.debug("System models package initialized.")
+__all__ = [
+    "SystemSetting",
+    "SystemLog",
+    "PerformanceMetric",
+    "ServiceHealthStatus",
+]
 
-# You can choose to expose specific models directly from the package level for convenience,
-# e.g., from .settings import SystemSetting
-# This makes imports shorter: from backend.app.src.models.system import SystemSetting
-
-# For now, we'll keep it simple and require explicit imports from the submodules.
-
-# __all__ = [
-#     "SystemSetting",
-#     "SystemLog",
-#     "PerformanceMetric",
-#     "ServiceHealthStatus",
-# ] # Example if you were to re-export them here
+# Майбутні моделі, пов'язані з системними функціями (наприклад, AuditLog),
+# також можуть бути додані сюди для експорту.

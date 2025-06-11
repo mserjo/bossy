@@ -1,145 +1,158 @@
 # backend/app/src/schemas/files/file.py
-import logging
-from uuid import UUID
+"""
+Pydantic схеми для сутності "Запис Файлу" (FileRecord).
+
+Цей модуль визначає схеми для:
+- Базового представлення запису файлу (`FileRecordBaseSchema`).
+- Створення нового запису файлу (зазвичай виконується сервісом після завантаження) (`FileRecordCreateSchema`).
+- Представлення даних про запис файлу у відповідях API (`FileRecordSchema`).
+"""
 from datetime import datetime
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any  # Any для тимчасових полів
 
-from pydantic import BaseModel, Field, HttpUrl
+from pydantic import Field, AnyHttpUrl, field_validator
 
-from app.src.schemas.base import BaseDBRead # Common DB fields
+# Абсолютний імпорт базових схем та Enum
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.core.dicts import FileType as FileTypeEnum
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# TODO: Замінити Any на UserPublicProfileSchema, коли вона буде доступна/рефакторена.
+# from backend.app.src.schemas.auth.user import UserPublicProfileSchema
+UserPublicProfileSchema = Any  # Тимчасовий заповнювач
 
-# --- FileRecord Schemas ---
+FILE_NAME_MAX_LENGTH = 255
+MIME_TYPE_MAX_LENGTH = 100
+PURPOSE_MAX_LENGTH = 50
 
-class FileRecordBase(BaseModel):
+
+class FileRecordBaseSchema(BaseSchema):
     """
-    Base schema for file records. Represents metadata about a stored file.
+    Базова схема для полів запису файлу.
     """
     file_name: str = Field(
         ...,
-        min_length=1,
-        max_length=255,
-        description="Original name of the file."
+        max_length=FILE_NAME_MAX_LENGTH,
+        description="Оригінальне або згенероване ім'я файлу.",
+        examples=["profile_picture.jpg", "документ_завдання.pdf"]
     )
     mime_type: str = Field(
         ...,
-        min_length=3,
-        max_length=100,
-        description="MIME type of the file (e.g., 'image/jpeg', 'application/pdf')."
+        max_length=MIME_TYPE_MAX_LENGTH,
+        description="MIME-тип файлу.",
+        examples=["image/jpeg", "application/pdf"]
     )
-    size_bytes: int = Field(
+    file_size: int = Field(
         ...,
-        gt=0,
-        description="Size of the file in bytes."
+        ge=0,
+        description="Розмір файлу в байтах."
     )
-    # storage_path: str = Field(..., description="Internal storage path or key in the storage system (e.g., S3 key). Not typically exposed directly to clients.")
-    file_url: Optional[HttpUrl] = Field(
+    # TODO: Додати валідатор для purpose на основі Enum FileTypeEnum
+    purpose: Optional[str] = Field(
         None,
-        description="Publicly accessible URL for the file. This might be generated on demand or stored if static."
+        max_length=PURPOSE_MAX_LENGTH,
+        description=f"Призначення файлу (наприклад, '{FileTypeEnum.AVATAR.value}', '{FileTypeEnum.TASK_ATTACHMENT.value}')."
     )
-    uploader_user_id: Optional[UUID] = Field(
-        None,
-        description="Identifier of the user who uploaded the file."
-    )
-    group_id: Optional[UUID] = Field(
-        None,
-        description="Identifier of the group this file is associated with (e.g., group icon, group-specific file)."
-    )
-    # entity_type: Optional[str] = Field(None, max_length=50, description="Type of entity this file is linked to (e.g., 'user_avatar', 'group_icon', 'task_attachment').")
-    # entity_id: Optional[UUID] = Field(None, description="ID of the entity this file is linked to.")
     metadata: Optional[Dict[str, Any]] = Field(
         None,
-        description="Optional dictionary for additional metadata (e.g., image dimensions, EXIF data)."
+        description="Додаткові метадані файлу у форматі JSON (наприклад, розміри зображення, тривалість аудіо/відео)."
     )
 
-    class Config:
-        orm_mode = True
-        # from_attributes = True # For Pydantic V2
-        anystr_strip_whitespace = True
-        title = "FileRecordBase"
-        json_schema_extra = {
-            "example": {
-                "file_name": "profile_picture.jpg",
-                "mime_type": "image/jpeg",
-                "size_bytes": 102400, # 100KB
-                "file_url": "https://example.com/storage/profile_picture.jpg",
-                "uploader_user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                "group_id": None,
-                "metadata": {"width": 800, "height": 600}
-            }
-        }
+    @field_validator('purpose')
+    @classmethod
+    def validate_purpose(cls, value: Optional[str]) -> Optional[str]:
+        """Перевіряє, чи надане значення призначення є допустимим членом Enum FileType."""
+        if value is None:
+            return value
+        allowed_purposes = {ft.value for ft in FileTypeEnum}
+        if value not in allowed_purposes:
+            # TODO i18n: Translatable error message
+            raise ValueError(f"Недопустиме призначення файлу '{value}'. Дозволені: {', '.join(allowed_purposes)}")
+        return value
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"FileRecordBase instance created with data: {data}")
+    # model_config успадковується з BaseSchema (from_attributes=True)
 
 
-class FileRecordCreate(FileRecordBase):
+class FileRecordCreateSchema(FileRecordBaseSchema):
     """
-    Schema for creating a new file record.
-    This is typically used internally by a service after a file has been successfully uploaded and processed.
-    It includes the internal storage_path.
+    Схема для створення нового запису файлу.
+    `uploader_user_id` та `file_path` зазвичай встановлюються сервісом.
     """
-    storage_path: str = Field(
-        ...,
-        description="Internal storage path or key in the storage system (e.g., S3 key)."
-    )
-    # Fields from FileRecordBase are inherited.
-    # file_url might be set by the service after creation if it's dynamically generated.
-
-    class Config(FileRecordBase.Config):
-        title = "FileRecordCreate"
-        json_schema_extra = { # Extend or override example
-            "example": {
-                "file_name": "important_document.pdf",
-                "mime_type": "application/pdf",
-                "size_bytes": 2048000, # 2MB
-                "storage_path": "secure_files/user_xyz/important_document_uuid.pdf",
-                "uploader_user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                "metadata": {"pages": 10}
-            }
-        }
-
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.info(f"FileRecordCreate instance for file '{self.file_name}' at path '{self.storage_path}'.")
+    # Успадковує поля з FileRecordBaseSchema.
+    # Ці поля встановлюються сервісом після фактичного завантаження файлу:
+    # uploader_user_id: Optional[int] = None
+    # file_path: str
+    # Тому вони не тут, а очікуються як аргументи сервісного методу.
+    pass
 
 
-class FileRecordResponse(FileRecordBase, BaseDBRead):
+class FileRecordSchema(FileRecordBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
     """
-    Schema for representing a file record in API responses.
-    Excludes sensitive internal fields like `storage_path` if it's not meant to be public.
-    `file_url` should be present if the file is accessible.
+    Схема для представлення даних про запис файлу у відповідях API.
     """
-    # id: UUID # From BaseDBRead
-    # created_at: datetime # From BaseDBRead
-    # updated_at: datetime # From BaseDBRead
+    # id, created_at, updated_at успадковані.
+    # file_name, mime_type, file_size, purpose, metadata успадковані.
 
-    # Ensure file_url is always present in response if the file is meant to be accessible
-    file_url: HttpUrl = Field(..., description="Publicly accessible URL for the file.")
+    file_path: str = Field(
+        description="Шлях до файлу на сервері або ключ в об'єктному сховищі (зазвичай не повертається клієнту напряму).")
+    uploader_user_id: Optional[int] = Field(None, description="ID користувача, який завантажив файл.")
+
+    # TODO: URL має генеруватися сервісом (наприклад, presigned URL для S3 або статичний URL).
+    #       Це поле може бути @computed_field в Pydantic v2, якщо логіка генерації URL проста
+    #       і не потребує асинхронних операцій або доступу до request.
+    #       Або ж воно заповнюється на рівні сервісу перед поверненням відповіді.
+    url: Optional[AnyHttpUrl] = Field(None, description="Публічний URL для доступу до файлу (якщо застосовно).")
+
+    # TODO: Замінити Any на UserPublicProfileSchema.
+    uploader: Optional[UserPublicProfileSchema] = Field(None,
+                                                        description="Інформація про користувача, який завантажив файл.")
 
 
-    class Config(FileRecordBase.Config):
-        title = "FileRecordResponse"
-        json_schema_extra = { # Override or extend example
-            "example": {
-                "id": "f0e1d2c3-b4a5-6789-0123-456789abcdef01",
-                "file_name": "profile_picture.jpg",
-                "mime_type": "image/jpeg",
-                "size_bytes": 102400,
-                "file_url": "https://kudos-cdn.example.com/files/f0e1d2c3-b4a5-6789-0123-456789abcdef01/profile_picture.jpg",
-                "uploader_user_id": "a1b2c3d4-e5f6-7890-1234-567890abcdef",
-                "group_id": None,
-                "metadata": {"width": 800, "height": 600, "source": "upload"},
-                "created_at": "2023-07-15T09:30:00Z",
-                "updated_at": "2023-07-15T09:30:00Z"
-            }
-        }
+if __name__ == "__main__":
+    # Демонстраційний блок для схем записів файлів.
+    logger.info("--- Pydantic Схеми для Записів Файлів (FileRecord) ---")
 
-    def __init__(self, **data):
-        super().__init__(**data)
-        logger.debug(f"FileRecordResponse instance created for file ID '{self.id}'.")
+    logger.info("\nFileRecordBaseSchema (приклад валідних даних):")
+    base_file_data = {
+        "file_name": "мій_документ.pdf",  # TODO i18n
+        "mime_type": "application/pdf",
+        "file_size": 102400,  # 100KB
+        "purpose": FileTypeEnum.GENERAL_DOCUMENT.value,
+        "metadata": {"pages": 10, "author": "Іван Іваненко"}  # TODO i18n
+    }
+    base_file_instance = FileRecordBaseSchema(**base_file_data)
+    logger.info(base_file_instance.model_dump_json(indent=2, exclude_none=True))
+    try:
+        FileRecordBaseSchema(file_name="test.txt", mime_type="text/plain", file_size=10, purpose="INVALID_PURPOSE")
+    except ValueError as e:
+        logger.info(f"Помилка валідації FileRecordBaseSchema (очікувано для purpose): {e}")
 
-logger.info("FileRecord schemas (FileRecordBase, FileRecordCreate, FileRecordResponse) defined successfully.")
+    logger.info("\nFileRecordCreateSchema (приклад використання):")
+    # FileRecordCreateSchema успадковує від FileRecordBaseSchema, тому використовуємо ті ж дані.
+    # `uploader_user_id` та `file_path` додаються сервісом.
+    create_file_instance = FileRecordCreateSchema(**base_file_data)
+    logger.info(create_file_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nFileRecordSchema (приклад відповіді API):")
+    file_response_data = {
+        "id": 1,
+        "file_name": "аватар_користувача.png",  # TODO i18n
+        "mime_type": "image/png",
+        "file_size": 51200,  # 50KB
+        "purpose": FileTypeEnum.AVATAR.value,
+        "file_path": "s3://bucket-name/avatars/user_xyz/avatar.png",  # Приклад шляху
+        "uploader_user_id": 101,
+        "created_at": datetime.now(),
+        "updated_at": datetime.now(),
+        "url": "https://cdn.example.com/avatars/user_xyz/avatar.png",
+        # "uploader": {"id": 101, "name": "Завантажувач Користувач"} # Приклад UserPublicProfileSchema
+    }
+    file_response_instance = FileRecordSchema(**file_response_data)
+    logger.info(file_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nПримітка: Схеми для пов'язаних об'єктів (`uploader`) та поле `url`")
+    logger.info("потребують заповнення на рівні сервісу або через @computed_field (для URL).")
+    logger.info(
+        f"Поле 'purpose' використовує значення з Enum `FileType` (наприклад, '{FileTypeEnum.TASK_ATTACHMENT.value}').")

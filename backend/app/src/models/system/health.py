@@ -1,107 +1,100 @@
 # backend/app/src/models/system/health.py
-
 """
-SQLAlchemy model for storing the health status of various internal or external services
-that the application relies on or monitors.
+Модель SQLAlchemy для сутності "Стан Здоров'я Сервісу" (ServiceHealthStatus).
+
+Цей модуль визначає модель `ServiceHealthStatus`, яка використовується для
+відстеження стану здоров'я різних внутрішніх або зовнішніх сервісів,
+від яких залежить робота програми Kudos (наприклад, база даних, Redis,
+зовнішні API).
 """
+from datetime import datetime, timezone  # timezone для __main__
+from typing import TYPE_CHECKING, Optional
 
-import logging
-from typing import Optional, Dict, Any
-from datetime import datetime, timezone, timedelta # Added timedelta for __main__
-from enum import Enum as PythonEnum # For HealthStatusEnum definition
+from sqlalchemy import String, Text, func  # func для server_default в TimestampedMixin
+from sqlalchemy.orm import Mapped, mapped_column  # relationship тут не потрібен, якщо немає прямих зв'язків
 
-from sqlalchemy import String, Text, JSON, Enum as SQLAlchemyEnum, DateTime # Added DateTime
-from sqlalchemy.orm import Mapped, mapped_column
+# Абсолютний імпорт базових класів та міксинів
+from backend.app.src.models.base import Base
+from backend.app.src.models.mixins import TimestampedMixin  # `updated_at` як час останньої перевірки
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-from backend.app.src.models.base import BaseModel # Import your base model
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+# TODO: Визначити Enum HealthStatusType в core.dicts.py, наприклад:
+# class HealthStatusType(str, Enum):
+#     HEALTHY = "healthy"      # Сервіс працює нормально
+#     UNHEALTHY = "unhealthy"    # Сервіс не працює або не відповідає
+#     DEGRADED = "degraded"     # Сервіс працює, але з проблемами (повільно, частково)
+#     UNKNOWN = "unknown"      # Стан сервісу невідомий
+# Потім імпортувати: from backend.app.src.core.dicts import HealthStatusType
 
-class HealthStatusEnum(PythonEnum): # Changed to inherit from PythonEnum for clarity in definition
-    """ Defines the possible health statuses for a service. """
-    OK = "ok"             # Service is operating normally.
-    WARNING = "warning"   # Service is operational but has issues (e.g., degraded performance, minor errors).
-    ERROR = "error"       # Service is experiencing significant errors or is partially unavailable.
-    CRITICAL = "critical" # Service is down or completely unresponsive.
-    UNKNOWN = "unknown"     # Service health status cannot be determined.
-
-class ServiceHealthStatus(BaseModel):
+class ServiceHealthStatus(Base, TimestampedMixin):
     """
-    Represents the health status of a dependent service or component.
-    This can be used for a dashboard that shows the status of critical dependencies
-    like the database, Redis, external APIs, etc.
+    Модель Стану Здоров'я Сервісу.
 
-    Attributes:
-        service_name (str): A unique name identifying the service or component (e.g., 'Database', 'RedisCache', 'PaymentGatewayAPI').
-        status (HealthStatusEnum): The current health status of the service.
-        details (Optional[str]): A human-readable message providing more details about the status (e.g., error message, response time).
-        last_checked_at (datetime): Timestamp of when this health status was last checked/updated (should be UTC).
-        metadata (Optional[Dict]): Additional structured information about the check (e.g., specific check endpoint, duration).
-        # `created_at` and `updated_at` from BaseModel track the record itself.
+    Зберігає інформацію про останній відомий стан здоров'я певного сервісу.
+    Поле `updated_at` з `TimestampedMixin` використовується як час останньої перевірки
+    стану (`last_checked_at`).
+
+    Атрибути:
+        id (Mapped[int]): Унікальний ідентифікатор запису стану.
+        service_name (Mapped[str]): Унікальна назва сервісу (наприклад, "database", "redis_cache", "payment_gateway").
+        status (Mapped[str]): Поточний статус сервісу (наприклад, "healthy", "unhealthy").
+                              TODO: Використовувати Enum `HealthStatusType`.
+        details (Mapped[Optional[Text]]): Додаткові деталі про стан (наприклад, повідомлення про помилку).
+
+        created_at, updated_at: Успадковано. `updated_at` - час останньої перевірки.
     """
-    __tablename__ = "service_health_statuses"
+    __tablename__ = "service_health_status"
 
-    service_name: Mapped[str] = mapped_column(String(255), unique=True, nullable=False, index=True, comment="Unique name of the service being monitored")
-
-    status: Mapped[HealthStatusEnum] = mapped_column(
-        SQLAlchemyEnum(HealthStatusEnum, name="healthstatusenum", create_constraint=True, native_enum=False), # native_enum=False for string storage
-        nullable=False,
-        default=HealthStatusEnum.UNKNOWN,
-        index=True,
-        comment="Current health status of the service (e.g., ok, warning, error)"
+    id: Mapped[int] = mapped_column(
+        primary_key=True, index=True, autoincrement=True, comment="Унікальний ідентифікатор запису стану"
+    )
+    service_name: Mapped[str] = mapped_column(
+        String(100), unique=True, nullable=False, index=True, comment="Унікальна назва сервісу"
     )
 
-    details: Mapped[Optional[str]] = mapped_column(Text, nullable=True, comment="Detailed information about the health status")
+    # TODO: Замінити String на Enum HealthStatusType, коли він буде визначений в core.dicts.py
+    # status: Mapped[HealthStatusType] = mapped_column(SQLEnum(HealthStatusType), nullable=False, index=True)
+    status: Mapped[str] = mapped_column(
+        String(50), nullable=False, index=True, comment="Статус сервісу (healthy, unhealthy тощо)"
+    )
 
-    # last_checked_at is distinct from updated_at. updated_at is for the record in this table.
-    # last_checked_at is when the actual service health was probed.
-    last_checked_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, comment="Timestamp of the last health check (UTC)")
+    details: Mapped[Optional[str]] = mapped_column(  # Використовуємо Text для потенційно довгих деталей
+        Text, nullable=True, comment="Додаткові деталі про стан сервісу (напр., повідомлення про помилку)"
+    )
+    # `updated_at` з TimestampedMixin використовується як `last_checked_at`
 
-    metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSON, nullable=True, comment="Additional metadata from the health check (e.g., response time, error codes)")
+    # Поля для __repr__
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
+    _repr_fields = ["id", "service_name", "status"]
 
-    def __repr__(self) -> str:
-        id_val = getattr(self, 'id', 'N/A')
-        return f"<ServiceHealthStatus(id={id_val}, service_name='{self.service_name}', status='{self.status.value}')>"
 
 if __name__ == "__main__":
-    # This block is for demonstration and basic testing of model structure.
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для моделі ServiceHealthStatus.
+    logger.info("--- Модель Стану Здоров'я Сервісу (ServiceHealthStatus) ---")
+    logger.info(f"Назва таблиці: {ServiceHealthStatus.__tablename__}")
 
-    logger.info("--- ServiceHealthStatus Model --- Demonstration")
+    logger.info("\nОчікувані поля:")
+    expected_fields = ['id', 'service_name', 'status', 'details', 'created_at', 'updated_at']
+    for field in expected_fields:
+        logger.info(f"  - {field}")
 
-    db_health = ServiceHealthStatus(
-        service_name="PostgreSQL_DB",
-        status=HealthStatusEnum.OK,
-        details="Connection successful, latency normal.",
-        last_checked_at=datetime.now(timezone.utc),
-        metadata={"ping_latency_ms": 15}
+    # Приклад створення екземпляра (без взаємодії з БД)
+    example_health_status = ServiceHealthStatus(
+        id=1,
+        service_name="База даних PostgreSQL",  # TODO i18n
+        status="healthy",  # TODO: Замінити на HealthStatusType.HEALTHY.value
+        details="Успішне підключення та виконання тестового запиту."  # TODO i18n
     )
-    # Simulate ORM-set fields for demo
-    db_health.id = 1
-    db_health.created_at = datetime.now(timezone.utc) - timedelta(hours=1)
-    db_health.updated_at = datetime.now(timezone.utc)
-    logger.info(f"Example ServiceHealthStatus: {db_health!r}")
-    logger.info(f"  Details: {db_health.details}")
-    logger.info(f"  Metadata: {db_health.metadata}")
-    logger.info(f"  Last Checked: {db_health.last_checked_at.isoformat()}")
+    # Імітуємо часові мітки (updated_at - час останньої перевірки)
+    example_health_status.created_at = datetime.now(tz=timezone.utc) - timedelta(hours=1)
+    example_health_status.updated_at = datetime.now(tz=timezone.utc)
 
-    redis_health_error = ServiceHealthStatus(
-        service_name="Redis_Cache",
-        status=HealthStatusEnum.ERROR,
-        details="Failed to connect to Redis server: Connection timed out.",
-        last_checked_at=datetime.now(timezone.utc) - timedelta(minutes=5),
-        metadata={"error_code": "TIMEOUT"}
-    )
-    redis_health_error.id = 2
-    redis_health_error.created_at = datetime.now(timezone.utc) - timedelta(days=1)
-    redis_health_error.updated_at = datetime.now(timezone.utc) - timedelta(minutes=5)
-    logger.info(f"Example ServiceHealthStatus (Error): {redis_health_error!r}")
-    logger.info(f"  Details: {redis_health_error.details}")
-    logger.info(f"  Last Checked: {redis_health_error.last_checked_at.isoformat()}")
+    logger.info(f"\nПриклад екземпляра ServiceHealthStatus (без сесії):\n  {example_health_status}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <ServiceHealthStatus(id=1, service_name='База даних PostgreSQL', status='healthy', updated_at=...)>
 
-    # The following line would error if run directly without SQLAlchemy engine and metadata setup.
-    # It's here for illustrative purposes of what could be inspected.
-    # logger.info(f"ServiceHealthStatus attributes (conceptual table columns): {[c.name for c in ServiceHealthStatus.__table__.columns if not c.name.startswith('_')]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("TODO: Не забудьте визначити Enum 'HealthStatusType' в core.dicts.py та оновити поле 'status'.")

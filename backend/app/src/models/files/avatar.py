@@ -1,94 +1,120 @@
 # backend/app/src/models/files/avatar.py
-
 """
-SQLAlchemy model for User Avatars, linking a User to their avatar FileRecord.
-This acts as a one-to-one (or one-to-current-one) mapping.
+Модель SQLAlchemy для сутності "Аватар Користувача" (UserAvatar).
+
+Цей модуль визначає модель `UserAvatar`, яка пов'язує користувача (`User`)
+з його активним аватаром (`FileRecord`). Це дозволяє користувачам мати
+один основний аватар, а також потенційно зберігати історію аватарів (хоча
+поточна модель зосереджена на одному активному).
 """
+from datetime import datetime, timezone  # timezone для __main__
+from typing import TYPE_CHECKING
 
-import logging
-from typing import Optional, TYPE_CHECKING
-from datetime import datetime, timezone # Added timezone for __main__
-
-from sqlalchemy import ForeignKey, Boolean, Integer # Added Integer for FKs
+from sqlalchemy import ForeignKey, Boolean, func  # Boolean для is_active, func для server_default в TimestampedMixin
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-# from sqlalchemy.sql import func # Not strictly needed here
 
-from backend.app.src.models.base import BaseModel # Avatars are simpler entities
-
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт базових класів та міксинів
+from backend.app.src.models.base import Base
+from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час встановлення аватара
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
     from backend.app.src.models.files.file import FileRecord
 
-class UserAvatar(BaseModel):
-    """
-    Represents the association of a User with their avatar FileRecord.
-    Typically, a user has one active avatar.
 
-    Attributes:
-        user_id (int): Foreign key to the user. This is also the primary key, ensuring one avatar record per user.
-        file_record_id (int): Foreign key to the FileRecord that is the user's avatar.
-        is_active (bool): If multiple avatars were ever allowed historically, this could mark the current one.
-                        For a strict one-to-one, this might be redundant but can be useful for future flexibility.
-        # `id` from BaseModel is NOT used as the primary key for this table. `user_id` is.
-        # `created_at`, `updated_at` are inherited from BaseModel.
+class UserAvatar(Base, TimestampedMixin):
+    """
+    Модель Аватара Користувача.
+
+    Зберігає зв'язок між користувачем та файлом, що використовується як його аватар.
+    Поле `created_at` з `TimestampedMixin` використовується як час встановлення (`set_at`).
+    Поточна реалізація передбачає один активний аватар на користувача через `unique=True` на `user_id`.
+
+    Атрибути:
+        id (Mapped[int]): Унікальний ідентифікатор запису аватара.
+        user_id (Mapped[int]): ID користувача, якому належить аватар (унікальний, зовнішній ключ).
+        file_record_id (Mapped[int]): ID запису файлу, що є аватаром (унікальний, зовнішній ключ).
+        is_active (Mapped[bool]): Прапорець, чи є цей аватар поточним активним для користувача.
+                                  (З `unique=True` на `user_id`, це поле може бути менш критичним,
+                                  але корисне для логіки деактивації старого аватара при зміні).
+
+        user (Mapped["User"]): Зв'язок з моделлю `User`.
+        file_record (Mapped["FileRecord"]): Зв'язок з моделлю `FileRecord`.
+        created_at (Mapped[datetime]): Час встановлення аватара (успадковано).
+        updated_at (Mapped[datetime]): Час оновлення запису (успадковано).
     """
     __tablename__ = "user_avatars"
 
-    # user_id is the primary key to enforce one avatar record per user.
-    # BaseModel's 'id' is effectively shadowed by this explicit PK.
-    # If you wanted to use BaseModel's 'id' as the PK, then user_id would be a unique FK.
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), primary_key=True, index=True, comment="FK to the user. This is the PK for a one-to-one mapping.")
-    file_record_id: Mapped[int] = mapped_column(Integer, ForeignKey("file_records.id"), unique=True, nullable=False, index=True, comment="FK to the FileRecord that is the avatar. Unique ensures a file is only one user's current active avatar.")
+    id: Mapped[int] = mapped_column(
+        primary_key=True, index=True, autoincrement=True, comment="Унікальний ідентифікатор запису аватара"
+    )
+    # Один користувач має один запис UserAvatar, що вказує на поточний аватар.
+    # Якщо потрібна історія аватарів, unique=True слід прибрати та керувати is_active.
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey('users.id', name='fk_user_avatar_user_id', ondelete="CASCADE"),
+        unique=True,  # Гарантує, що користувач має лише один запис UserAvatar (один активний аватар)
+        nullable=False,
+        comment="ID користувача, якому належить аватар"
+    )
+    # Один файл може бути аватаром лише одного користувача (якщо файл не використовується повторно).
+    # Якщо один файл може бути аватаром для різних сутностей, unique=True тут не потрібен.
+    # Для аватарів користувачів зазвичай унікальність file_record_id є логічною.
+    file_record_id: Mapped[int] = mapped_column(
+        ForeignKey('file_records.id', name='fk_user_avatar_file_record_id', ondelete="RESTRICT"),
+        # Не дозволяти видаляти файл, якщо він є активним аватаром
+        unique=True,
+        # Гарантує, що один файл використовується лише як один аватар (запобігає спільному використанню одного FileRecord як аватара для різних UserAvatar записів)
+        nullable=False,
+        comment="ID запису файлу, що є аватаром"
+    )
+    is_active: Mapped[bool] = mapped_column(
+        Boolean, default=True, nullable=False, index=True, comment="Чи є цей аватар поточним активним"
+    )
+    # `created_at` з TimestampedMixin використовується як `set_at` (час встановлення аватара)
 
-    # is_active might be useful if users could upload multiple avatars but only one is current.
-    # For a simple one-to-one, this field might be less critical if changing avatar means replacing the record or file_record_id.
-    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, comment="Is this the currently active avatar for the user?")
+    # --- Зв'язки (Relationships) ---
+    user: Mapped["User"] = relationship(back_populates="avatar", lazy="selectin")
+    file_record: Mapped["FileRecord"] = relationship(
+        lazy="selectin")  # back_populates="user_avatar_link" можна додати до FileRecord
 
-    # --- Relationships ---
-    # This establishes a one-to-one relationship from User to UserAvatar,
-    # and via UserAvatar, to a specific FileRecord.
-    user: Mapped["User"] = relationship(back_populates="avatar") # Assumes User.avatar is defined with uselist=False and back_populates="user"
-    file_record: Mapped["FileRecord"] = relationship(back_populates="user_avatar_association") # Assumes FileRecord.user_avatar_association is defined with back_populates="file_record"
+    # Поля для __repr__
+    _repr_fields = ["id", "user_id", "file_record_id", "is_active"]  # created_at з TimestampedMixin
 
-    def __repr__(self) -> str:
-        # Since user_id is PK, BaseModel's id is not used here as the primary identifier.
-        return f"<UserAvatar(user_id={self.user_id}, file_record_id={self.file_record_id}, active={self.is_active})>"
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для моделі UserAvatar.
+    logger.info("--- Модель Аватара Користувача (UserAvatar) ---")
+    logger.info(f"Назва таблиці: {UserAvatar.__tablename__}")
 
-    logger.info("--- UserAvatar Model --- Demonstration")
+    logger.info("\nОчікувані поля:")
+    expected_fields = [
+        'id', 'user_id', 'file_record_id', 'is_active',
+        'created_at', 'updated_at'
+    ]
+    for field in expected_fields:
+        logger.info(f"  - {field}")
 
-    # Example UserAvatar instance
-    # Assume User id=1 and FileRecord id=1 exist
-    avatar_link = UserAvatar(
-        user_id=1,
-        file_record_id=1,
+    logger.info("\nОчікувані зв'язки (relationships):")
+    expected_relationships = ['user', 'file_record']
+    for rel in expected_relationships:
+        logger.info(f"  - {rel}")
+
+    # Приклад створення екземпляра (без взаємодії з БД)
+    example_avatar_link = UserAvatar(
+        id=1,
+        user_id=101,
+        file_record_id=1,  # ID запису FileRecord для файлу аватара
         is_active=True
     )
-    # This model uses user_id as PK, so BaseModel's 'id' is not the main identifier.
-    # For demonstration, we'll show how created_at/updated_at from BaseModel would still exist.
-    # The 'id' field from BaseModel would also exist but would not be the PK.
-    # If we want to avoid the separate 'id' column from BaseModel entirely for this table,
-    # UserAvatar would need to not inherit 'id' (e.g. inherit from a Base without 'id', or define all columns here).
-    # For now, assume BaseModel's 'id' is present but not the PK.
+    # Імітуємо часові мітки (created_at - час встановлення)
+    example_avatar_link.created_at = datetime.now(tz=timezone.utc)
+    example_avatar_link.updated_at = datetime.now(tz=timezone.utc)
 
-    # Manually setting created_at/updated_at for demo as they come from BaseModel
-    avatar_link.created_at = datetime.now(timezone.utc)
-    avatar_link.updated_at = datetime.now(timezone.utc)
-    # If BaseModel's 'id' column is still present (not shadowed by user_id as PK, which depends on SQLAlchemy version/behavior for inherited PKs):
-    # avatar_link.id = 101 # Example of the surrogate key from BaseModel if it were still active and distinct from user_id as PK.
+    logger.info(f"\nПриклад екземпляра UserAvatar (без сесії):\n  {example_avatar_link}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <UserAvatar(id=1, user_id=101, file_record_id=1, is_active=True, created_at=...)>
 
-    logger.info(f"Example UserAvatar: {avatar_link!r}")
-    logger.info(f"  User ID (PK): {avatar_link.user_id}")
-    logger.info(f"  File Record ID: {avatar_link.file_record_id}")
-    logger.info(f"  Is Active: {avatar_link.is_active}")
-    logger.info(f"  Record Created At (from BaseModel): {avatar_link.created_at.isoformat() if avatar_link.created_at else 'N/A'}")
-
-    # The following line would error if run directly without SQLAlchemy engine and metadata setup for all related tables.
-    # logger.info(f"UserAvatar attributes (conceptual table columns): {[c.name for c in UserAvatar.__table__.columns if not c.name.startswith('_')]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

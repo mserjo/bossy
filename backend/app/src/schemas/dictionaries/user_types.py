@@ -1,108 +1,94 @@
 # backend/app/src/schemas/dictionaries/user_types.py
-
 """
-Pydantic schemas for UserType dictionary entries.
+Pydantic схеми для довідника "Типи Користувачів".
+
+Цей модуль визначає схеми для представлення, створення та оновлення
+записів у довіднику типів користувачів (наприклад, "REGULAR_USER", "BOT_USER").
 """
 
-import logging
-from typing import Optional # For optional custom fields if any
-from datetime import datetime, timezone # For example values in __main__ and BaseResponseSchema
+from typing import Optional
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-from pydantic import Field
+# Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    DictionaryBase,
-    # DictionaryCreate as BaseDictionaryCreate, # Not directly used if UserTypeCreate inherits UserTypeBase
-    # DictionaryUpdate as BaseDictionaryUpdate, # Not directly used if UserTypeUpdate inherits UserTypeBase
-    DictionaryResponse as BaseDictionaryResponse
+    BaseDictionarySchema,
+    DictionaryCreateSchema,
+    DictionaryUpdateSchema
 )
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
 
-# --- UserType Schemas ---
+# from pydantic import Field
 
-class UserTypeBase(DictionaryBase):
-    """Base schema for UserType, inherits all fields from DictionaryBase."""
-    # Example of a custom field if UserType model had one:
-    # can_login_via_ui: Optional[bool] = Field(None,
-    #                                           description="Indicates if users of this type can typically log in via UI.",
-    #                                           example=True)
+# Схема для представлення запису Типу Користувача (у відповідях API)
+class UserTypeSchema(BaseDictionarySchema):
+    """
+    Pydantic схема для представлення запису довідника "Тип Користувача".
+    Успадковує всі поля від `BaseDictionarySchema`.
+    """
+    # Специфічні поля для UserTypeSchema, якщо є, додаються тут.
     pass
 
-class UserTypeCreate(UserTypeBase):
+
+# Схема для створення нового запису Типу Користувача
+class UserTypeCreateSchema(DictionaryCreateSchema):
     """
-    Schema for creating a new UserType.
-    Inherits fields from UserTypeBase. 'code' and 'name' are effectively required.
+    Pydantic схема для створення нового запису в довіднику "Тип Користувача".
+    Успадковує всі поля від `DictionaryCreateSchema`.
     """
+    # Специфічні поля для створення UserType, якщо є, додаються тут.
     pass
 
-class UserTypeUpdate(UserTypeBase):
-    """
-    Schema for updating an existing UserType.
-    All fields from UserTypeBase are made optional here for partial updates.
-    """
-    code: Optional[str] = Field(None, min_length=1, max_length=100, description="Unique code or short identifier.")
-    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Human-readable name.")
-    description: Optional[str] = Field(None)
-    state: Optional[str] = Field(None, max_length=50)
-    is_default: Optional[bool] = Field(None)
-    display_order: Optional[int] = Field(None)
-    notes: Optional[str] = Field(None)
-    # If 'can_login_via_ui' was in UserTypeBase:
-    # can_login_via_ui: Optional[bool] = Field(None)
 
-
-class UserTypeResponse(BaseDictionaryResponse):
+# Схема для оновлення існуючого запису Типу Користувача
+class UserTypeUpdateSchema(DictionaryUpdateSchema):
     """
-    Schema for representing a UserType in API responses.
-    Inherits all fields from BaseDictionaryResponse.
-    Add any UserType-specific response fields here if UserTypeBase had custom fields.
+    Pydantic схема для оновлення існуючого запису в довіднику "Тип Користувача".
+    Успадковує всі поля від `DictionaryUpdateSchema`.
     """
-    # If 'can_login_via_ui' was added to UserTypeBase and should be in the response:
-    # can_login_via_ui: Optional[bool] = Field(None, description="Can users of this type log in via UI?", example=True)
+    # Специфічні поля для оновлення UserType, якщо є, додаються тут.
     pass
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем UserType.
+    logger.info("--- Pydantic Схеми для Довідника: UserType ---")
 
-    logger.info("--- UserType Schemas (Dictionary) --- Demonstration")
-
-    # UserTypeCreate Example
-    type_create_data = {
-        "code": "HUMAN_USER",
-        "name": "Human User",
-        "description": "A standard human user account.",
-        "state": "active",
-        # "canLoginViaUi": True # Example if field was added and using alias
-    }
-    try:
-        type_create_schema = UserTypeCreate(**type_create_data)
-        logger.info(f"UserTypeCreate valid: {type_create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating UserTypeCreate: {e}")
-
-    # UserTypeUpdate Example
-    type_update_data = {"description": "A standard human user account with full system access."}
-    type_update_schema = UserTypeUpdate(**type_update_data)
-    logger.info(f"UserTypeUpdate (partial): {type_update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # UserTypeResponse Example
-    type_response_data = {
+    logger.info("\nUserTypeSchema (приклад для відповіді API):")
+    user_type_data_from_db = {
         "id": 1,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "code": "BOT_ACCOUNT",
-        "name": "Bot Account",
-        "description": "An automated service account.",
+        "name": "Зареєстрований Користувач",  # TODO i18n
+        "code": "REGULAR_USER",
+        "description": "Стандартний тип для користувачів, що пройшли реєстрацію.",  # TODO i18n
         "state": "active",
-        "isDefault": False,
-        "displayOrder": 5,
-        # "canLoginViaUi": False # If field existed
+        "created_at": "2023-03-01T10:00:00Z",
+        "updated_at": "2023-03-01T12:30:00Z",
     }
-    try:
-        type_response_schema = UserTypeResponse(**type_response_data) # type: ignore[call-arg]
-        logger.info(f"UserTypeResponse: {type_response_schema.model_dump_json(by_alias=True, indent=2)}")
-    except Exception as e:
-        logger.error(f"Error creating UserTypeResponse: {e}")
+    from datetime import datetime  # Потрібно для конвертації рядків у datetime
+
+    user_type_data_from_db['created_at'] = datetime.fromisoformat(
+        user_type_data_from_db['created_at'].replace('Z', '+00:00'))
+    user_type_data_from_db['updated_at'] = datetime.fromisoformat(
+        user_type_data_from_db['updated_at'].replace('Z', '+00:00'))
+
+    user_type_schema_instance = UserTypeSchema(**user_type_data_from_db)
+    logger.info(user_type_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nUserTypeCreateSchema (приклад для створення):")
+    create_data = {
+        "name": "Системний Бот",  # TODO i18n
+        "code": "BOT_USER",
+        "description": "Тип для автоматизованих системних облікових записів."  # TODO i18n
+    }
+    create_schema_instance = UserTypeCreateSchema(**create_data)
+    logger.info(create_schema_instance.model_dump_json(indent=2))
+
+    logger.info("\nUserTypeUpdateSchema (приклад для оновлення):")
+    update_data = {
+        "description": "Оновлений опис для типу Системний Бот."  # TODO i18n
+    }
+    update_schema_instance = UserTypeUpdateSchema(**update_data)
+    logger.info(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")

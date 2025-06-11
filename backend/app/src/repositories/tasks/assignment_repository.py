@@ -1,141 +1,145 @@
 # backend/app/src/repositories/tasks/assignment_repository.py
-
 """
-Repository for TaskAssignment entities.
-Provides CRUD operations and specific methods for managing task assignments.
+Репозиторій для моделі "Призначення Завдання" (TaskAssignment).
+
+Цей модуль визначає клас `TaskAssignmentRepository`, який успадковує `BaseRepository`
+та надає специфічні методи для роботи з призначеннями завдань користувачам.
 """
 
-import logging
-from typing import Optional, List
-from datetime import datetime, timezone # Added timezone
+from typing import List, Optional, Tuple, Any
 
+from sqlalchemy import select, func, join
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update # Added update
+# from sqlalchemy.orm import selectinload
 
-from backend.app.src.models.tasks.assignment import TaskAssignment, AssignmentStatusEnum
-from backend.app.src.schemas.tasks.assignment import TaskAssignmentCreate, TaskAssignmentUpdate
+# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт моделей та схем
+from backend.app.src.models.tasks.task import Task  # Для join в get_assignments_for_user_in_group
+from backend.app.src.models.tasks.assignment import TaskAssignment
+from backend.app.src.schemas.tasks.assignment import (
+    TaskAssignmentCreateSchema,
+    TaskAssignmentUpdateSchema  # Хоча оновлення призначень може бути обмеженим
+)
 
-class TaskAssignmentRepository(BaseRepository[TaskAssignment, TaskAssignmentCreate, TaskAssignmentUpdate]):
+
+class TaskAssignmentRepository(BaseRepository[TaskAssignment, TaskAssignmentCreateSchema, TaskAssignmentUpdateSchema]):
     """
-    Repository for managing TaskAssignment records.
+    Репозиторій для управління записами призначень завдань (`TaskAssignment`).
+
+    Успадковує базові CRUD-методи від `BaseRepository` та надає
+    додаткові методи для отримання призначень за парою завдання-користувач,
+    а також списків призначень для конкретного завдання або користувача.
     """
 
-    def __init__(self):
-        super().__init__(TaskAssignment)
-
-    async def get_assignments_for_task(
-        self, db: AsyncSession, *, task_id: int, status: Optional[AssignmentStatusEnum] = None, skip: int = 0, limit: int = 100
-    ) -> List[TaskAssignment]:
+    def __init__(self, db_session: AsyncSession):
         """
-        Retrieves all assignments for a specific task, optionally filtered by status.
+        Ініціалізує репозиторій для моделі `TaskAssignment`.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            task_id: The ID of the task.
-            status: Optional. Filter by a specific assignment status.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
-
-        Returns:
-            A list of TaskAssignment objects.
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        conditions = [self.model.task_id == task_id] # type: ignore[attr-defined]
-        if status:
-            conditions.append(self.model.status == status) # type: ignore[attr-defined]
+        super().__init__(db_session=db_session, model=TaskAssignment)
 
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.assigned_at.desc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
-
-    async def get_assignments_for_user(
-        self, db: AsyncSession, *, user_id: int, status: Optional[AssignmentStatusEnum] = None, skip: int = 0, limit: int = 100
-    ) -> List[TaskAssignment]:
+    async def get_by_task_and_user(self, task_id: int, user_id: int) -> Optional[TaskAssignment]:
         """
-        Retrieves all assignments for a specific user, optionally filtered by status.
+        Отримує запис про призначення за ID завдання та ID користувача.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            user_id: The ID of the user.
-            status: Optional. Filter by a specific assignment status.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            task_id (int): ID завдання.
+            user_id (int): ID користувача.
 
         Returns:
-            A list of TaskAssignment objects.
+            Optional[TaskAssignment]: Екземпляр моделі `TaskAssignment`, якщо знайдено, інакше None.
         """
-        conditions = [self.model.user_id == user_id] # type: ignore[attr-defined]
-        if status:
-            conditions.append(self.model.status == status) # type: ignore[attr-defined]
-
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.assigned_at.desc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
+        stmt = select(self.model).where(
+            self.model.task_id == task_id,
+            self.model.user_id == user_id
         )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
-
-    async def get_assignment_for_task_and_user(
-        self, db: AsyncSession, *, task_id: int, user_id: int
-    ) -> Optional[TaskAssignment]:
-        """
-        Retrieves a specific assignment for a task and user.
-        Relies on the UniqueConstraint('task_id', 'user_id') on the model.
-
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            task_id: The ID of the task.
-            user_id: The ID of the user.
-
-        Returns:
-            The TaskAssignment object if found, otherwise None.
-        """
-        statement = select(self.model).where(
-            self.model.task_id == task_id, # type: ignore[attr-defined]
-            self.model.user_id == user_id # type: ignore[attr-defined]
-        )
-        result = await db.execute(statement)
+        result = await self.db_session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def update_assignment_status(
-        self, db: AsyncSession, *, assignment_id: int, new_status: AssignmentStatusEnum
-    ) -> Optional[TaskAssignment]:
+    async def get_assignments_for_task(self, task_id: int, skip: int = 0, limit: int = 100) -> Tuple[
+        List[TaskAssignment], int]:
         """
-        Updates the status of a specific task assignment.
+        Отримує список призначень для вказаного завдання з пагінацією.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            assignment_id: The ID of the TaskAssignment record to update.
-            new_status: The new AssignmentStatusEnum value.
+            task_id (int): ID завдання.
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            The updated TaskAssignment object if found and updated, otherwise None.
+            Tuple[List[TaskAssignment], int]: Кортеж зі списком призначень та їх загальною кількістю.
         """
-        db_obj = await self.get(db, id=assignment_id)
-        if db_obj:
-            if db_obj.status == new_status: # type: ignore[union-attr]
-                return db_obj # No change needed
+        filters = [self.model.task_id == task_id]
+        # order_by = [self.model.created_at.desc()] # Можна сортувати за часом призначення
+        # options = [selectinload(self.model.user)] # Жадібне завантаження користувача
+        return await self.get_multi(skip=skip, limit=limit, filters=filters)  # , order_by=order_by, options=options)
 
-            db_obj.status = new_status # type: ignore[union-attr]
-            db_obj.updated_at = datetime.now(timezone.utc) # type: ignore[union-attr] # Manually update if not relying on super().update
-            db.add(db_obj)
-            await db.commit()
-            await db.refresh(db_obj)
-            return db_obj
-        return None
+    async def get_assignments_for_user(
+            self,
+            user_id: int,
+            group_id: Optional[int] = None,
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[TaskAssignment], int]:
+        """
+        Отримує список призначень для вказаного користувача, опціонально фільтруючи за групою, з пагінацією.
 
-    # BaseRepository methods create, get, update, remove are inherited.
-    # `create` uses TaskAssignmentCreate. `assigned_by_user_id` and `task_id` are expected to be set by service.
-    # `update` uses TaskAssignmentUpdate (mainly for status).
-    # `remove` hard deletes an assignment.
+        Args:
+            user_id (int): ID користувача.
+            group_id (Optional[int]): ID групи для фільтрації призначень (завдання в цій групі).
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
+
+        Returns:
+            Tuple[List[TaskAssignment], int]: Кортеж зі списком призначень та їх загальною кількістю.
+        """
+        filters = [self.model.user_id == user_id]
+
+        stmt = select(self.model)
+        count_stmt = select(func.count(self.model.task_id)).select_from(
+            self.model)  # Рахуємо по task_id, оскільки це частина PK
+
+        if group_id is not None:
+            # Приєднуємо таблицю Task для фільтрації за Task.group_id
+            stmt = stmt.join(Task, Task.id == self.model.task_id)
+            count_stmt = count_stmt.join(Task, Task.id == self.model.task_id)
+            filters.append(Task.group_id == group_id)
+
+        if filters:
+            stmt = stmt.where(*filters)
+            count_stmt = count_stmt.where(*filters)
+
+        total = (await self.db_session.execute(count_stmt)).scalar_one()
+
+        stmt = stmt.offset(skip).limit(limit).order_by(self.model.created_at.desc())
+        # options = [selectinload(self.model.task).selectinload(Task.group)] # Приклад складного жадібного завантаження
+
+        items_result = await self.db_session.execute(stmt)
+        items = list(items_result.scalars().all())
+
+        return items, total
+
+
+if __name__ == "__main__":
+    # Демонстраційний блок для TaskAssignmentRepository.
+    logger.info("--- Репозиторій Призначень Завдань (TaskAssignmentRepository) ---")
+
+    logger.info("Для тестування TaskAssignmentRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {TaskAssignment.__name__}.")
+    # TaskAssignmentUpdateSchema може бути дуже простою або не використовуватися, якщо оновлюється лише статус через сервіс
+    logger.info(f"  Очікує схему створення: {TaskAssignmentCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {TaskAssignmentUpdateSchema.__name__}")
+
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_task_and_user(task_id: int, user_id: int)")
+    logger.info("  - get_assignments_for_task(task_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("  - get_assignments_for_user(user_id: int, group_id: Optional[int] = None, skip: int = 0, limit: int = 100)")
+
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

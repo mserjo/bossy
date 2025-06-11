@@ -25,10 +25,11 @@ from fastapi.security import OAuth2PasswordBearer
 from pydantic import BaseModel, ValidationError # BaseModel для TokenPayload-заповнювача
 from datetime import datetime, timezone, timedelta # Використовується в __main__ для прикладу
 
+# Абсолютні імпорти з проекту
 from backend.app.src.config.settings import settings
 from backend.app.src.config.security import decode_token
 from backend.app.src.config.database import get_db, AsyncSession
-from backend.app.src.config.logging import get_logger
+from backend.app.src.config.logging import get_logger # Імпорт логера
 
 # Отримання логера для цього модуля
 logger = get_logger(__name__)

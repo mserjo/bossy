@@ -1,109 +1,129 @@
 # backend/app/src/schemas/auth/token.py
-
 """
-Pydantic schemas for JWT (JSON Web Tokens) and token responses.
+Pydantic схеми для JWT токенів.
+
+Цей модуль визначає схеми для:
+- `TokenPayload`: Корисне навантаження (claims) всередині JWT токена.
+- `TokenResponse`: Відповідь API, що містить токени доступу та оновлення.
+- `RefreshTokenRequest`: Запит на оновлення токена доступу за допомогою токена оновлення.
 """
+from datetime import datetime
+from typing import Optional, List
 
-import logging
-from typing import Optional, List # Added List for TokenPayload.roles
-from datetime import datetime, timedelta, timezone # Added timezone for examples
+from pydantic import Field
 
-from pydantic import Field, BaseModel, ConfigDict # BaseModel for TokenPayload if it doesn't need BaseSchema config like alias gen
+# Абсолютний імпорт базової схеми
+from backend.app.src.schemas.base import BaseSchema
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-from backend.app.src.schemas.base import BaseSchema # For TokenResponse
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
-
-# --- Token Schemas ---
-
-class TokenPayload(BaseModel):
+class TokenPayload(BaseSchema):
     """
-    Schema for the data encoded within a JWT.
-    This represents the standard claims plus any custom claims.
-    It's used when decoding a token to validate its structure.
+    Схема корисного навантаження (claims) JWT токена.
+    Визначає стандартні та кастомні поля, що очікуються всередині токена.
     """
-    sub: Optional[str] = Field(None, description="Subject of the token (usually user ID or email)", example="user@example.com or 123")
-    user_id: Optional[int] = Field(None, description="Explicit user ID if 'sub' is not the user ID itself.", example=123)
-    # Standard JWT claims (optional)
-    exp: Optional[int] = Field(None, description="Expiration time (Unix timestamp)", example=1678886400)
-    iat: Optional[int] = Field(None, description="Issued at time (Unix timestamp)", example=1678882800)
-    nbf: Optional[int] = Field(None, description="Not before time (Unix timestamp)", example=1678882800)
-    jti: Optional[str] = Field(None, description="JWT ID, for unique identification of the token", example="abcdef123456")
-    # Custom claims
-    token_type: Optional[str] = Field(None, alias="type", description="Type of token (e.g., 'access', 'refresh')", example="access")
-    roles: Optional[List[str]] = Field(None, description="List of user roles associated with the token", example=["user", "editor"])
-    # Add other custom claims as needed (e.g., permissions, session_id)
+    sub: Optional[str] = Field(None, description="Ідентифікатор суб'єкта токена (зазвичай ID користувача або email).")
+    user_id: Optional[int] = Field(None, description="Числовий ID користувача, якщо відрізняється від 'sub'.")
+    # Патерн для типу токена: тільки "access" або "refresh"
+    type: Optional[str] = Field(None, pattern=r"^(access|refresh)$", description="Тип токена ('access' або 'refresh').")
 
-    model_config = ConfigDict( # Updated to Pydantic V2 ConfigDict
-        populate_by_name=True, # Allows using 'type' as field name but 'token_type' as Python attribute
-        extra="ignore" # Ignore extra fields in payload not defined here
-    )
+    # Стандартні JWT claims (https://tools.ietf.org/html/rfc7519#section-4.1)
+    exp: Optional[datetime] = Field(None,
+                                    description="Час закінчення терміну дії токена (Unix timestamp). Pydantic автоматично конвертує int в datetime.")
+    iat: Optional[datetime] = Field(None, description="Час видачі токена (Unix timestamp).")
+    iss: Optional[str] = Field(None, description="Видавець токена (має відповідати налаштуванням).")
+    aud: Optional[str] = Field(None, description="Аудиторія токена (має відповідати налаштуванням).")
+
+    # Приклад кастомних полів (можуть бути додані за потребою)
+    roles: Optional[List[str]] = Field(default_factory=list,
+                                       description="Список рядкових ідентифікаторів ролей користувача.")
+    permissions: Optional[List[str]] = Field(default_factory=list,
+                                             description="Список рядкових ідентифікаторів дозволів користувача.")
+
+    # model_config успадковується з BaseSchema (from_attributes=True)
+
 
 class TokenResponse(BaseSchema):
     """
-    Schema for returning access and refresh tokens to the client upon successful authentication.
+    Схема відповіді API при успішному вході або оновленні токенів.
     """
-    access_token: str = Field(..., description="JWT access token for authenticating API requests.", example="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
-    refresh_token: Optional[str] = Field(None, description="JWT refresh token for obtaining new access tokens.", example="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
-    token_type: str = Field("bearer", description="Type of token (always 'bearer' for OAuth2).", example="bearer")
-    # Optional: expires_in (seconds until access_token expiry) or access_token_expires_at (datetime)
-    # access_token_expires_at: Optional[datetime] = Field(None, description="Exact expiry datetime of the access token")
-    # refresh_token_expires_at: Optional[datetime] = Field(None, description="Exact expiry datetime of the refresh token")
+    access_token: str = Field(description="JWT токен доступу.")
+    refresh_token: str = Field(description="JWT токен оновлення.")
+    token_type: str = Field("bearer", description="Тип токена (завжди 'bearer').")
 
-class RefreshTokenRequest(BaseModel): # Simple model, doesn't need BaseSchema config typically
+
+class RefreshTokenRequest(BaseSchema):
     """
-    Schema for the request body when refreshing an access token.
+    Схема запиту для оновлення токена доступу.
+    Очікує надання дійсного токена оновлення.
     """
-    refresh_token: str = Field(..., description="The refresh token issued during login.")
+    refresh_token: str = Field(description="Дійсний JWT токен оновлення.")
+
+
+class RefreshTokenCreateSchema(BaseSchema):
+    """
+    Схема для створення запису RefreshToken в базі даних.
+    Зазвичай використовується внутрішньо сервісом автентифікації.
+    """
+    user_id: int = Field(description="ID користувача, якому належить токен.")
+    token: str = Field(description="Рядкове представлення токена оновлення (або його хеш).")
+    expires_at: datetime = Field(description="Час закінчення терміну дії токена оновлення.")
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем токенів.
+    logger.info("--- Pydantic Схеми для Токенів (Token) ---")
 
-    logger.info("--- Token Schemas --- Demonstration")
-
-    # TokenPayload Example
+    logger.info("\nTokenPayload (приклад):")
     payload_data = {
-        "sub": "user123@example.com",
-        "user_id": 123, # Pydantic V2 will map this to user_id if populate_by_name is True and no alias on field. If alias is on field, use alias.
-        "exp": int((datetime.now(timezone.utc) + timedelta(minutes=15)).timestamp()),
-        "iat": int(datetime.now(timezone.utc).timestamp()),
-        "jti": "a_unique_jwt_id",
-        "type": "access", # This will map to token_type due to alias and populate_by_name
-        "roles": ["user", "premium_member"]
+        "sub": "user@example.com",
+        "user_id": 123,
+        "type": "access",
+        "exp": int((datetime.now() + timedelta(minutes=15)).timestamp()),
+        # Pydantic очікує int для datetime з timestamp
+        "iat": int(datetime.now().timestamp()),
+        "iss": "kudos.example.com",
+        "aud": "kudos.example.com",
+        "roles": ["user", "editor"],
+        "permissions": ["read_articles", "edit_articles"]
     }
     try:
-        token_payload_schema = TokenPayload(**payload_data)
-        logger.info(f"TokenPayload valid: {token_payload_schema.model_dump(by_alias=True)}") # by_alias=True will show 'type'
-        logger.info(f"  TokenPayload internal: {token_payload_schema.model_dump()}") # by_alias=False will show 'token_type'
-        logger.info(f"  Token subject (sub): {token_payload_schema.sub}")
-        logger.info(f"  Token user_id: {token_payload_schema.user_id}") # Access with Python name
-        logger.info(f"  Token type (token_type): {token_payload_schema.token_type}") # Access with Python name
-        if token_payload_schema.exp:
-            logger.info(f"  Token expires at (datetime): {datetime.fromtimestamp(token_payload_schema.exp, timezone.utc).isoformat()}")
-    except Exception as e:
-        logger.error(f"Error creating TokenPayload: {e}")
+        payload_instance = TokenPayload(**payload_data)
+        # Конвертуємо datetime назад в int для JSON серіалізації, якщо потрібно точне відтворення вхідних даних
+        # Або залишаємо як є, якщо ISO формат дати є прийнятним у JSON
+        # Для демонстрації `exp` та `iat` як datetime:
+        # dump_payload = payload_instance.model_dump(exclude_none=True)
+        # dump_payload['exp'] = dump_payload['exp'].isoformat()
+        # dump_payload['iat'] = dump_payload['iat'].isoformat()
+        # logger.info(json.dumps(dump_payload, indent=2))
+        logger.info(payload_instance.model_dump_json(indent=2, exclude_none=True))
 
-    # TokenResponse Example
+        invalid_payload_data = payload_data.copy()
+        invalid_payload_data["type"] = "invalid_type"
+        TokenPayload(**invalid_payload_data)  # Це має викликати помилку валідації
+    except Exception as e:
+        logger.info(f"Помилка валідації TokenPayload (очікувано для invalid_type): {e}")
+
+    logger.info("\nTokenResponse (приклад):")
     token_response_data = {
-        "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0dXNlciIsImV4cCI6MTYxNjQwNjQwMH0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
-        "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0dXNlciIsImV4cCI6MTYxNzAxODAwMH0.somethinglongeranddifferent",
-        "tokenType": "bearer"
+        "access_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJhY2Nlc3NfdXNlciIsImV4cCI6MTY3ODg4NjQwMH0.example_access_token",
+        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoX3VzZXIiLCJleHAiOjE2Nzk0OTEyMDB9.example_refresh_token",
+        # token_type має значення за замовчуванням "bearer"
     }
-    try:
-        token_response_schema = TokenResponse(**token_response_data) # type: ignore[call-arg]
-        logger.info(f"TokenResponse: {token_response_schema.model_dump_json(by_alias=True, indent=2)}")
-    except Exception as e:
-        logger.error(f"Error creating TokenResponse: {e}")
+    token_response_instance = TokenResponse(**token_response_data)
+    logger.info(token_response_instance.model_dump_json(indent=2))
 
-    # RefreshTokenRequest Example
+    logger.info("\nRefreshTokenRequest (приклад):")
     refresh_request_data = {
-        "refreshToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ0ZXN0dXNlciIsImV4cCI6MTYxNzAxODAwMH0.somethinglongeranddifferent"
+        "refresh_token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJyZWZyZXNoX3VzZXIiLCJleHAiOjE2Nzk0OTEyMDB9.example_refresh_token_for_request"
     }
-    try:
-        refresh_request_schema = RefreshTokenRequest(**refresh_request_data) # type: ignore[call-arg]
-        logger.info(f"RefreshTokenRequest: {refresh_request_schema.model_dump_json(by_alias=True, indent=2)}") # by_alias relevant if BaseSchema was used
-    except Exception as e:
-        logger.error(f"Error creating RefreshTokenRequest: {e}")
+    refresh_request_instance = RefreshTokenRequest(**refresh_request_data)
+    logger.info(refresh_request_instance.model_dump_json(indent=2))
+
+    logger.info("\nПримітка: Ці схеми використовуються для валідації даних, пов'язаних з JWT токенами.")
+
+# Потрібно для timedelta в __main__
+from datetime import timedelta
+# import json # Для кастомного дампу дат як int

@@ -1,48 +1,47 @@
 # backend/app/src/schemas/files/__init__.py
-import logging
+"""
+Pydantic схеми для сутностей, пов'язаних з "Файлами".
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+Цей пакет містить схеми Pydantic, що використовуються для валідації
+даних запитів та формування відповідей API, які стосуються файлів,
+їх метаданих, аватарів користувачів та процесу завантаження файлів
+в програмі Kudos.
+"""
 
-logger.info("File schemas package initialized.")
-
-# Import all schemas from this package to make them easily accessible
+# Схеми, пов'язані з Записами Файлів
 from .file import (
-    FileRecordBase,
-    FileRecordCreate,
-    FileRecordResponse,
+    FileRecordBaseSchema,
+    FileRecordCreateSchema,
+    FileRecordSchema
 )
-from .upload import (
-    PresignedUrlRequest,
-    PresignedUrlResponse,
-    FileUploadResponse,
-    FileUploadInitiateRequest, # Added based on common patterns
-    FileUploadInitiateResponse # Added based on common patterns
-)
+
+# Схеми, пов'язані з Аватарами Користувачів
 from .avatar import (
-    UserAvatarBase,
-    UserAvatarCreate,
-    UserAvatarResponse,
+    UserAvatarBaseSchema,
+    UserAvatarCreateSchema,
+    UserAvatarSchema
+)
+
+# Схеми, пов'язані з Процесом Завантаження Файлів
+from .upload import (
+    FileUploadInitiateRequestSchema,
+    PresignedUploadURLResponse,
+    FileUploadCompleteRequestSchema,
+    FileUploadResponse
 )
 
 __all__ = [
     # FileRecord schemas
-    "FileRecordBase",
-    "FileRecordCreate",
-    "FileRecordResponse",
-
-    # Upload process schemas
-    "PresignedUrlRequest", # May or may not be used depending on final upload strategy
-    "PresignedUrlResponse",
-    "FileUploadResponse",
-    "FileUploadInitiateRequest",
-    "FileUploadInitiateResponse",
-
-
+    "FileRecordBaseSchema",
+    "FileRecordCreateSchema",
+    "FileRecordSchema",
     # UserAvatar schemas
-    "UserAvatarBase",
-    "UserAvatarCreate",
-    "UserAvatarResponse",
+    "UserAvatarBaseSchema",
+    "UserAvatarCreateSchema",
+    "UserAvatarSchema",
+    # FileUpload process schemas
+    "FileUploadInitiateRequestSchema",
+    "PresignedUploadURLResponse",
+    "FileUploadCompleteRequestSchema",
+    "FileUploadResponse",
 ]
-
-logger.info(f"Successfully imported file schemas: {__all__}")

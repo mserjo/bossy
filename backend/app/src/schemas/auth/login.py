@@ -1,110 +1,91 @@
 # backend/app/src/schemas/auth/login.py
-
 """
-Pydantic schemas for user login and password management operations.
+Pydantic схеми для процесів, пов'язаних з логіном та відновленням паролю.
+
+Цей модуль визначає схеми для:
+- `LoginRequest`: Запит на вхід до системи (автентифікація).
+- `PasswordResetRequestSchema`: Запит на скидання паролю (зазвичай через email).
+- `PasswordResetConfirmSchema`: Підтвердження скидання паролю з новим паролем та токеном.
 """
 
-import logging
-from typing import Optional
+from pydantic import BaseModel, Field, EmailStr
 
-from pydantic import Field, EmailStr, BaseModel, model_validator # BaseModel for simple request objects
+# Абсолютний імпорт базової схеми
+from backend.app.src.schemas.base import BaseSchema
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-from backend.app.src.schemas.base import BaseSchema # For consistency if any response uses BaseSchema features
+# Імпорт констант для валідації, якщо потрібно (наприклад, PASSWORD_REGEX)
+# from backend.app.src.core.constants import PASSWORD_REGEX
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
-
-# --- Login Schemas ---
-
-class LoginRequest(BaseModel): # Does not necessarily need BaseSchema unless aliases or ORM mode are used
+class LoginRequest(BaseSchema):
     """
-    Schema for user login request.
-    Corresponds to what OAuth2PasswordRequestForm typically expects (username, password),
-    but defined as a Pydantic model for clarity and potential extensions (e.g., OTP code).
-    'username' here can be an email or a dedicated username string.
+    Схема запиту для входу користувача в систему.
+    Очікує email (як ім'я користувача) та пароль.
     """
-    username: str = Field(..., description="User's email or username for login.", example="user@example.com")
-    password: str = Field(..., description="User's password.", example="s3crEtP@sswOrd")
-    # otp_code: Optional[str] = Field(None, description="One-Time Password, if 2FA is enabled.") # Example extension
+    # Замість username: str, використовуємо email: EmailStr для логіну,
+    # оскільки модель User використовує email як унікальний ідентифікатор для входу.
+    # Якщо логін за нікнеймом також підтримується, можна додати поле username: str
+    # або зробити це поле Union[EmailStr, str].
+    username: EmailStr = Field(description="Електронна пошта користувача для входу.", examples=["user@example.com"])
+    password: str = Field(description="Пароль користувача.")
+    # model_config успадковується з BaseSchema
 
-# TokenResponse is already defined in schemas.auth.token and would be the typical response for a successful login.
 
-# --- Password Management Schemas ---
-
-class PasswordResetRequest(BaseModel):
+class PasswordResetRequestSchema(BaseSchema):
     """
-    Schema for requesting a password reset.
-    User provides their email to receive reset instructions.
+    Схема запиту для ініціації процедури скидання пароля.
+    Очікує email адресу користувача, для якого потрібно скинути пароль.
     """
-    email: EmailStr = Field(..., description="Email address of the user requesting password reset.", example="forgot.my.password@example.com")
+    email: EmailStr = Field(description="Електронна пошта користувача, для якого запитується скидання пароля.")
 
-class PasswordResetConfirm(BaseModel):
+
+class PasswordResetConfirmSchema(BaseSchema):
     """
-    Schema for confirming a password reset using a token and new password.
-    If this schema is used in an API that expects camelCase, it should inherit from BaseSchema
-    or define field aliases manually. For this example, using Pythonic names.
+    Схема для підтвердження скидання пароля.
+    Очікує токен скидання (отриманий користувачем, наприклад, по email) та новий пароль.
     """
-    reset_token: str = Field(..., description="The password reset token received by the user (e.g., via email).", alias="resetToken")
-    new_password: str = Field(..., min_length=8, description="The new desired password.", alias="newPassword")
-    new_password_confirm: str = Field(..., description="Confirmation of the new password.", alias="newPasswordConfirm")
+    token: str = Field(description="Токен скидання пароля, отриманий користувачем.")
+    # TODO: Додати валідацію надійного пароля за допомогою constr(pattern=PASSWORD_REGEX),
+    #       коли PASSWORD_REGEX буде доступний з констант.
+    new_password: str = Field(
+        ...,  # Обов'язкове поле
+        min_length=8,  # Мінімальна довжина пароля
+        description="Новий пароль користувача (мін. 8 символів, має відповідати політикам надійності)."
+    )
 
-    model_config = { # Pydantic V2 ConfigDict
-        "populate_by_name": True # Allows using aliases in input data
-    }
-
-    @model_validator(mode='after')
-    def check_new_passwords_match(self) -> 'PasswordResetConfirm':
-        if self.new_password is not None and self.new_password_confirm is not None:
-            if self.new_password != self.new_password_confirm:
-                raise ValueError("New passwords do not match")
-        return self
-
-# MessageResponse from schemas.base can be used for simple confirmation messages after these operations.
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем логіну та відновлення пароля.
+    logger.info("--- Pydantic Схеми для Логіну та Відновлення Паролю ---")
 
-    logger.info("--- Login & Password Management Schemas --- Demonstration")
-
-    # LoginRequest Example
-    login_data = {"username": "test@example.com", "password": "password123"}
+    logger.info("\nLoginRequest (приклад):")
+    login_data = {"username": "testlogin@example.com", "password": "securepassword123"}
+    login_instance = LoginRequest(**login_data)
+    logger.info(login_instance.model_dump_json(indent=2))
     try:
-        login_schema = LoginRequest(**login_data)
-        logger.info(f"LoginRequest valid: {login_schema.model_dump()}")
+        LoginRequest(username="not-an-email", password="pw")
     except Exception as e:
-        logger.error(f"Error creating LoginRequest: {e}")
+        logger.info(f"Помилка валідації LoginRequest (очікувано): {e}")
 
-    # PasswordResetRequest Example
-    pw_reset_req_data = {"email": "user.who.forgot@example.com"}
-    try:
-        pw_reset_req_schema = PasswordResetRequest(**pw_reset_req_data)
-        logger.info(f"PasswordResetRequest valid: {pw_reset_req_schema.model_dump()}")
-    except Exception as e:
-        logger.error(f"Error creating PasswordResetRequest: {e}")
+    logger.info("\nPasswordResetRequestSchema (приклад):")
+    password_reset_request_data = {"email": "forgotpassword@example.com"}
+    password_reset_request_instance = PasswordResetRequestSchema(**password_reset_request_data)
+    logger.info(password_reset_request_instance.model_dump_json(indent=2))
 
-    # PasswordResetConfirm Example
-    pw_reset_confirm_data_camel = { # Input with camelCase aliases
-        "resetToken": "a.valid.looking.reset.token.jwt",
-        "newPassword": "NewStrongP@ss1!",
-        "newPasswordConfirm": "NewStrongP@ss1!"
+    logger.info("\nPasswordResetConfirmSchema (приклад):")
+    password_reset_confirm_data = {
+        "token": "valid_reset_token_string_12345",
+        "new_password": "NewStrongPassword123!"
     }
+    password_reset_confirm_instance = PasswordResetConfirmSchema(**password_reset_confirm_data)
+    logger.info(password_reset_confirm_instance.model_dump_json(indent=2))
     try:
-        # PasswordResetConfirm now has model_config to handle camelCase aliases
-        pw_reset_confirm_schema = PasswordResetConfirm(**pw_reset_confirm_data_camel)
-        logger.info(f"PasswordResetConfirm valid (from camelCase): {pw_reset_confirm_schema.model_dump(exclude={'new_password', 'new_password_confirm'})}")
-        logger.info(f"  Internal attribute (reset_token): {pw_reset_confirm_schema.reset_token}")
-
+        PasswordResetConfirmSchema(token="t", new_password="short")
     except Exception as e:
-        logger.error(f"Error creating PasswordResetConfirm: {e}")
+        logger.info(f"Помилка валідації PasswordResetConfirmSchema (очікувано): {e}")
 
-    # PasswordResetConfirm mismatch example
-    pw_reset_mismatch_data_camel = {
-        "resetToken": "another.token",
-        "newPassword": "PassA",
-        "newPasswordConfirm": "PassB"
-    }
-    try:
-        PasswordResetConfirm(**pw_reset_mismatch_data_camel)
-    except ValueError as e:
-        logger.info(f"PasswordResetConfirm caught expected password mismatch: {e}")
+    logger.info(
+        "\nПримітка: Ці схеми використовуються для обробки запитів, пов'язаних з автентифікацією та відновленням доступу.")
+    logger.info("TODO: Для поля 'new_password' в PasswordResetConfirmSchema додати валідацію надійності пароля.")

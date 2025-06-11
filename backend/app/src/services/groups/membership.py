@@ -1,306 +1,302 @@
 # backend/app/src/services/groups/membership.py
-import logging
+# import logging # Замінено на централізований логер
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload #, joinedload # joinedload не використовується
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import func # Для агрегації, наприклад, func.count
 
-from app.src.services.base import BaseService
-from app.src.models.groups.membership import GroupMembership # SQLAlchemy GroupMembership model
-from app.src.models.groups.group import Group # For group context
-from app.src.models.auth.user import User # For user context
-from app.src.models.dictionaries.user_roles import UserRole # For roles within group
+# Повні шляхи імпорту
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.groups.membership import GroupMembership # Модель SQLAlchemy GroupMembership
+from backend.app.src.models.groups.group import Group # Для контексту групи
+from backend.app.src.models.auth.user import User # Для контексту користувача
+from backend.app.src.models.dictionaries.user_roles import UserRole # Для ролей в групі
 
-from app.src.schemas.groups.membership import ( # Pydantic Schemas
-    GroupMembershipCreate, # For adding a user to a group with a role
-    GroupMembershipUpdate, # For changing a user's role or status in a group
+from backend.app.src.schemas.groups.membership import ( # Схеми Pydantic
+    # GroupMembershipCreate, # Не використовується прямо, параметри передаються в метод
+    # GroupMembershipUpdate, # Не використовується прямо
     GroupMembershipResponse,
-    GroupMemberResponse # A schema that might include more user details
+    GroupMemberResponse # Схема, що може включати більше деталей про користувача
 )
-# from app.src.services.auth.user import UserService # For fetching user details if needed for validation
-# from app.src.services.groups.group import GroupService # For fetching group details if needed
+from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import settings # Для доступу до конфігурацій (наприклад, DEBUG)
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# TODO: Винести ADMIN_ROLE_CODE та USER_ROLE_CODE до спільного файлу констант або конфігурації.
+ADMIN_ROLE_CODE = "ADMIN"
+USER_ROLE_CODE = "USER" # Приклад коду для звичайної ролі користувача
 
 class GroupMembershipService(BaseService):
     """
-    Service for managing user memberships within groups, including their roles and status.
-    Handles adding users to groups, removing them, updating roles, and listing members.
+    Сервіс для управління членством користувачів у групах, включаючи їхні ролі та статус.
+    Обробляє додавання користувачів до груп, їх видалення, оновлення ролей та перелік членів.
     """
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        logger.info("GroupMembershipService initialized.")
+        logger.info("GroupMembershipService ініціалізовано.")
+
+    async def _get_membership_orm_with_relations(self, group_id: UUID, user_id: UUID) -> Optional[GroupMembership]:
+        """Внутрішній метод для отримання ORM моделі GroupMembership з завантаженими зв'язками."""
+        return (await self.db_session.execute(
+            select(GroupMembership).options(
+                selectinload(GroupMembership.user).options(selectinload(User.user_type)),
+                selectinload(GroupMembership.group).options(selectinload(Group.group_type)), # Група та її тип
+                selectinload(GroupMembership.role) # Роль в групі
+            ).where(
+                GroupMembership.group_id == group_id,
+                GroupMembership.user_id == user_id
+            )
+        )).scalar_one_or_none()
+
 
     async def add_member_to_group(
         self,
         group_id: UUID,
         user_id: UUID,
-        role_code: str, # e.g., "USER", "ADMIN"
-        added_by_user_id: Optional[UUID] = None # For audit trail
+        role_code: str, # наприклад, "USER", "ADMIN"
+        added_by_user_id: Optional[UUID] = None, # Для журналу аудиту
+        commit_session: bool = True # Дозволяє контролювати коміт ззовні (напр. з InvitationService)
     ) -> GroupMembershipResponse:
         """
-        Adds a user to a group with a specified role.
-        Prevents adding if the user is already an active member.
-        Reactivates and updates role if user is an inactive member.
+        Додає користувача до групи з вказаною роллю.
+        Запобігає додаванню, якщо користувач вже є активним членом.
+        Реактивує та оновлює роль, якщо користувач є неактивним членом.
 
-        Args:
-            group_id (UUID): The ID of the group.
-            user_id (UUID): The ID of the user to add.
-            role_code (str): The code of the role to assign to the user in this group.
-            added_by_user_id (Optional[UUID]): ID of the user performing the action.
-
-        Returns:
-            GroupMembershipResponse: The created or updated membership details.
-
-        Raises:
-            ValueError: If group, user, or role is not found, or if user is already an active member with the same role.
+        :param group_id: ID групи.
+        :param user_id: ID користувача для додавання.
+        :param role_code: Код ролі для призначення користувачеві в цій групі.
+        :param added_by_user_id: ID користувача, що виконує дію.
+        :param commit_session: Якщо True, сесія буде закомічена.
+        :return: Pydantic схема GroupMembershipResponse створеного або оновленого членства.
+        :raises ValueError: Якщо групу, користувача або роль не знайдено, або якщо виникає конфлікт. # i18n
         """
-        logger.debug(f"Attempting to add user ID '{user_id}' to group ID '{group_id}' with role code '{role_code}'.")
+        logger.debug(f"Спроба додати користувача ID '{user_id}' до групи ID '{group_id}' з роллю '{role_code}'.")
 
-        # Validate group, user, and role
         group = await self.db_session.get(Group, group_id)
-        if not group: raise ValueError(f"Group with ID '{group_id}' not found.")
+        if not group: raise ValueError(f"Групу з ID '{group_id}' не знайдено.") # i18n
 
         user = await self.db_session.get(User, user_id)
-        if not user: raise ValueError(f"User with ID '{user_id}' not found.")
+        if not user: raise ValueError(f"Користувача з ID '{user_id}' не знайдено.") # i18n
 
-        role_stmt = select(UserRole).where(UserRole.code == role_code)
-        role = (await self.db_session.execute(role_stmt)).scalar_one_or_none()
-        if not role: raise ValueError(f"UserRole with code '{role_code}' not found.")
+        role = (await self.db_session.execute(
+            select(UserRole).where(UserRole.code == role_code))
+        ).scalar_one_or_none()
+        if not role: raise ValueError(f"Роль з кодом '{role_code}' не знайдено.") # i18n
 
-        # Check for existing active membership
-        existing_active_membership_stmt = select(GroupMembership).options(
-            selectinload(GroupMembership.role) # Load role for comparison
-        ).where(
-            GroupMembership.group_id == group_id,
-            GroupMembership.user_id == user_id,
-            GroupMembership.is_active == True
-        )
-        existing_active_membership = (await self.db_session.execute(existing_active_membership_stmt)).scalar_one_or_none()
+        membership_db = await self._get_membership_orm_with_relations(group_id, user_id)
 
-        if existing_active_membership:
-            if existing_active_membership.user_role_id == role.id:
-                logger.info(f"User ID '{user_id}' is already an active member of group ID '{group_id}' with the role '{role_code}'. Returning existing membership.")
-                # return GroupMembershipResponse.model_validate(existing_active_membership) # Pydantic v2
-                return GroupMembershipResponse.from_orm(existing_active_membership) # Pydantic v1
-            else:
-                # User is active but role is different, proceed to update role via update_member_role logic
-                logger.info(f"User ID '{user_id}' is active in group ID '{group_id}' but with a different role. Proceeding to update role to '{role_code}'.")
-                # This effectively becomes an update operation.
-                # For clarity, one might redirect to update_member_role or raise an error asking to use update endpoint.
-                # Here, we'll let it be handled by the inactive check logic path if it were an update.
-                # However, since it's active, this path is an explicit update.
-                # For simplicity of this method's contract (add member), we can raise or update. Let's update.
-                return await self.update_member_role(group_id, user_id, role_code, added_by_user_id)
+        current_time = datetime.now(timezone.utc)
 
-
-        # Check for existing inactive membership - reactivate and update role
-        existing_inactive_membership_stmt = select(GroupMembership).where(
-            GroupMembership.group_id == group_id,
-            GroupMembership.user_id == user_id,
-            GroupMembership.is_active == False
-        )
-        membership_db = (await self.db_session.execute(existing_inactive_membership_stmt)).scalar_one_or_none()
-
-        if membership_db: # Was inactive member
-            logger.info(f"Reactivating and updating role for inactive member user ID '{user_id}' in group ID '{group_id}'.")
-            membership_db.is_active = True
-            membership_db.user_role_id = role.id
-            membership_db.joined_at = datetime.now(timezone.utc)
-            if hasattr(membership_db, 'added_by_user_id') and added_by_user_id:
-                 membership_db.added_by_user_id = added_by_user_id
-        else: # New member
-            create_data = {
-                "group_id": group_id,
-                "user_id": user_id,
-                "user_role_id": role.id,
-                "is_active": True,
-            }
-            if hasattr(GroupMembership, 'added_by_user_id') and added_by_user_id:
-                create_data['added_by_user_id'] = added_by_user_id
-
-            membership_db = GroupMembership(**create_data)
+        if membership_db: # Якщо запис членства існує
+            if membership_db.is_active:
+                if membership_db.user_role_id == role.id:
+                    logger.info(f"Користувач '{user_id}' вже активний член групи '{group_id}' з роллю '{role_code}'.")
+                    return GroupMembershipResponse.model_validate(membership_db) # Pydantic v2
+                else:
+                    # Користувач активний, але роль інша - оновлюємо роль
+                    logger.info(f"Користувач '{user_id}' активний в групі '{group_id}', але з іншою роллю. Оновлення ролі на '{role_code}'.")
+                    # Це фактично стає операцією оновлення ролі.
+                    return await self.update_member_role(group_id, user_id, role_code, updated_by_user_id=added_by_user_id, commit_session=commit_session)
+            else: # Був неактивним членом - реактивуємо та оновлюємо роль
+                logger.info(f"Реактивація та оновлення ролі для неактивного члена ID '{user_id}' в групі ID '{group_id}'.")
+                membership_db.is_active = True
+                membership_db.user_role_id = role.id
+                membership_db.joined_at = current_time # Оновлюємо дату приєднання при реактивації
+                membership_db.added_by_user_id = added_by_user_id # Хто додав/поновив
+                membership_db.removed_at = None # Очищаємо дані про попереднє видалення
+                membership_db.removed_by_user_id = None
+                # `updated_at` оновлюється автоматично моделлю
+        else: # Новий член
+            logger.info(f"Додавання нового члена ID '{user_id}' до групи ID '{group_id}' з роллю '{role_code}'.")
+            membership_db = GroupMembership(
+                group_id=group_id,
+                user_id=user_id,
+                user_role_id=role.id,
+                is_active=True,
+                added_by_user_id=added_by_user_id,
+                joined_at=current_time
+                # `created_at`, `updated_at` встановлюються автоматично
+            )
             self.db_session.add(membership_db)
 
-        try:
-            await self.commit()
-            await self.db_session.refresh(membership_db, attribute_names=['user', 'group', 'role'])
-        except IntegrityError as e:
-            await self.rollback()
-            logger.error(f"Integrity error adding user ID '{user_id}' to group ID '{group_id}': {e}", exc_info=True)
-            raise ValueError(f"Could not add user to group due to a data conflict: {e}")
+        if commit_session:
+            try:
+                await self.commit()
+                # Після коміту, оновлюємо об'єкт для завантаження зв'язків (якщо вони ще не завантажені)
+                await self.db_session.refresh(membership_db, attribute_names=['user', 'group', 'role'])
+            except IntegrityError as e:
+                await self.rollback()
+                logger.error(f"Помилка цілісності '{user_id}' до групи '{group_id}': {e}", exc_info=settings.DEBUG)
+                # i18n
+                raise ValueError(f"Не вдалося додати користувача до групи через конфлікт даних: {e}")
+        else: # Якщо коміт контролюється ззовні, просто робимо flush для отримання ID
+            await self.db_session.flush([membership_db])
+            # Завантаження зв'язків для відповіді, якщо потрібно (може бути небезпечно без коміту)
+            # Якщо потрібно повернути повний об'єкт, краще це робити після фінального коміту.
 
-        logger.info(f"User ID '{user_id}' successfully added/reactivated in group ID '{group_id}' with role '{role.name}'.")
-        # return GroupMembershipResponse.model_validate(membership_db) # Pydantic v2
-        return GroupMembershipResponse.from_orm(membership_db) # Pydantic v1
+        logger.info(f"Користувач ID '{user_id}' успішно доданий/реактивований в групі ID '{group_id}' з роллю '{role.name}'.")
+        # Якщо commit_session=False, зв'язки можуть бути не повністю завантажені для Pydantic валідації,
+        # тому, можливо, краще повертати ORM об'єкт або тільки ID, якщо немає коміту.
+        # Для простоти, припускаємо, що якщо commit_session=False, то об'єкт може бути неповним для відповіді.
+        # Однак, якщо flush виконано, ID будуть доступні.
+        # Для консистентної відповіді, коли commit_session=False, можливо, краще, щоб викликаючий код сам формував відповідь.
+        # Поки що, повертаємо те, що є.
+        if not commit_session: # Якщо не комітимо, то зв'язки можуть бути не завантажені
+             await self.db_session.refresh(membership_db, attribute_names=['user', 'group', 'role']) # Спробуємо оновити
+
+        return GroupMembershipResponse.model_validate(membership_db) # Pydantic v2
 
 
     async def remove_member_from_group(self, group_id: UUID, user_id: UUID, removed_by_user_id: Optional[UUID] = None) -> bool:
         """
-        Removes a user from a group by deactivating their membership.
-        Handles logic like "admin cannot leave if they are the only admin".
+        Видаляє користувача з групи шляхом деактивації його членства.
+        Обробляє логіку, наприклад, "адмін не може покинути групу, якщо він єдиний адмін".
 
-        Args:
-            group_id (UUID): The ID of the group.
-            user_id (UUID): The ID of the user to remove.
-            removed_by_user_id (Optional[UUID]): ID of user performing action.
-
-        Returns:
-            bool: True if removal was successful, False otherwise.
-
-        Raises:
-            ValueError: If the user is the last admin in the group.
+        :param group_id: ID групи.
+        :param user_id: ID користувача для видалення.
+        :param removed_by_user_id: ID користувача, що виконує дію.
+        :return: True, якщо видалення успішне, False - інакше.
+        :raises ValueError: Якщо користувач є останнім адміном у групі. # i18n
         """
-        logger.debug(f"Attempting to remove user ID '{user_id}' from group ID '{group_id}'.")
+        logger.debug(f"Спроба видалення користувача ID '{user_id}' з групи ID '{group_id}'.")
 
-        membership_stmt = select(GroupMembership).options(
-            selectinload(GroupMembership.role),
-        ).where(
-            GroupMembership.group_id == group_id,
-            GroupMembership.user_id == user_id,
-            GroupMembership.is_active == True
-        )
-        membership_db = (await self.db_session.execute(membership_stmt)).scalar_one_or_none()
+        membership_db = await self._get_membership_orm_with_relations(group_id, user_id)
 
-        if not membership_db:
-            logger.warning(f"Active membership for user ID '{user_id}' in group ID '{group_id}' not found. Cannot remove.")
+        if not membership_db or not membership_db.is_active:
+            logger.warning(f"Активне членство для користувача ID '{user_id}' в групі ID '{group_id}' не знайдено. Видалення неможливе.")
             return False
 
-        if membership_db.role.code == "ADMIN":
-            active_admins_stmt = select(func.count(GroupMembership.id)).select_from(GroupMembership).join(UserRole).where( # Import func from sqlalchemy
-                GroupMembership.group_id == group_id,
-                GroupMembership.is_active == True,
-                UserRole.code == "ADMIN",
-                GroupMembership.user_id != user_id
-            )
-            other_active_admins_count = (await self.db_session.execute(active_admins_stmt)).scalar_one()
+        # Перевірка, чи користувач є останнім адміном
+        if membership_db.role and membership_db.role.code == ADMIN_ROLE_CODE:
+            other_active_admins_count = (await self.db_session.execute(
+                select(func.count(GroupMembership.id)).join(UserRole).where(
+                    GroupMembership.group_id == group_id,
+                    GroupMembership.is_active == True,
+                    UserRole.code == ADMIN_ROLE_CODE,
+                    GroupMembership.user_id != user_id # Виключаємо поточного користувача
+                )
+            )).scalar_one()
+
             if other_active_admins_count == 0:
-                logger.warning(f"User ID '{user_id}' is the last admin in group ID '{group_id}'. Cannot remove.")
-                raise ValueError("Cannot remove the last admin from the group. Assign another admin first.")
+                msg = "Неможливо видалити останнього адміністратора з групи. Спочатку призначте іншого адміністратора." # i18n
+                logger.warning(f"Користувач ID '{user_id}' є останнім адміном в групі ID '{group_id}'. {msg}")
+                raise ValueError(msg)
 
         membership_db.is_active = False
-        if hasattr(membership_db, 'removed_at'):
-            membership_db.removed_at = datetime.now(timezone.utc)
-        if hasattr(membership_db, 'removed_by_user_id') and removed_by_user_id:
-            membership_db.removed_by_user_id = removed_by_user_id
+        membership_db.removed_at = datetime.now(timezone.utc)
+        membership_db.removed_by_user_id = removed_by_user_id
+        # `updated_at` оновлюється автоматично
 
         self.db_session.add(membership_db)
         await self.commit()
 
-        logger.info(f"User ID '{user_id}' successfully removed (deactivated) from group ID '{group_id}'.")
+        logger.info(f"Користувач ID '{user_id}' успішно видалений (деактивований) з групи ID '{group_id}'.")
         return True
 
     async def update_member_role(
-        self,
-        group_id: UUID,
-        user_id: UUID,
-        new_role_code: str,
-        updated_by_user_id: Optional[UUID] = None
-    ) -> Optional[GroupMembershipResponse]:
+        self, group_id: UUID, user_id: UUID, new_role_code: str,
+        updated_by_user_id: Optional[UUID] = None, commit_session: bool = True
+    ) -> GroupMembershipResponse:
         """
-        Updates a user's role within a group.
-        Handles logic if demoting the last admin.
+        Оновлює роль користувача в групі.
+        Обробляє логіку, якщо понижується останній адмін.
+
+        :param group_id: ID групи.
+        :param user_id: ID користувача.
+        :param new_role_code: Новий код ролі.
+        :param updated_by_user_id: ID користувача, що виконує оновлення.
+        :param commit_session: Якщо True, сесія буде закомічена.
+        :return: Pydantic схема оновленого GroupMembershipResponse.
+        :raises ValueError: Якщо членство або нова роль не знайдено, або якщо відбувається спроба понизити останнього адміна. # i18n
         """
-        logger.debug(f"Attempting to update role for user ID '{user_id}' in group ID '{group_id}' to role code '{new_role_code}'.")
+        logger.debug(f"Спроба оновлення ролі для користувача ID '{user_id}' в групі ID '{group_id}' на роль '{new_role_code}'.")
 
-        membership_stmt = select(GroupMembership).options(selectinload(GroupMembership.role)).where(
-            GroupMembership.group_id == group_id,
-            GroupMembership.user_id == user_id,
-            GroupMembership.is_active == True
-        )
-        membership_db = (await self.db_session.execute(membership_stmt)).scalar_one_or_none()
+        membership_db = await self._get_membership_orm_with_relations(group_id, user_id)
 
-        if not membership_db:
-            logger.warning(f"Active membership for user ID '{user_id}' in group ID '{group_id}' not found. Cannot update role.")
-            return None
+        if not membership_db or not membership_db.is_active:
+            # i18n
+            raise ValueError(f"Активне членство для користувача ID '{user_id}' в групі ID '{group_id}' не знайдено.")
 
-        new_role_stmt = select(UserRole).where(UserRole.code == new_role_code)
-        new_role_db = (await self.db_session.execute(new_role_stmt)).scalar_one_or_none()
+        new_role_db = (await self.db_session.execute(
+            select(UserRole).where(UserRole.code == new_role_code))
+        ).scalar_one_or_none()
         if not new_role_db:
-            raise ValueError(f"UserRole with code '{new_role_code}' not found.")
+            raise ValueError(f"Роль з кодом '{new_role_code}' не знайдено.") # i18n
 
         if membership_db.user_role_id == new_role_db.id:
-            logger.info(f"User ID '{user_id}' in group ID '{group_id}' already has role '{new_role_code}'. No update needed.")
-            # return GroupMembershipResponse.model_validate(membership_db) # Pydantic v2
-            return GroupMembershipResponse.from_orm(membership_db) # Pydantic v1
+            logger.info(f"Користувач ID '{user_id}' в групі ID '{group_id}' вже має роль '{new_role_code}'. Оновлення не потрібне.")
+            return GroupMembershipResponse.model_validate(membership_db) # Pydantic v2
 
-        if membership_db.role.code == "ADMIN" and new_role_db.code != "ADMIN":
-            from sqlalchemy import func # Local import for func
-            active_admins_stmt = select(func.count(GroupMembership.id)).select_from(GroupMembership).join(UserRole).where(
-                GroupMembership.group_id == group_id,
-                GroupMembership.is_active == True,
-                UserRole.code == "ADMIN",
-                GroupMembership.user_id != user_id
-            )
-            other_active_admins_count = (await self.db_session.execute(active_admins_stmt)).scalar_one()
+        # Перевірка, чи не понижується останній адмін
+        if membership_db.role and membership_db.role.code == ADMIN_ROLE_CODE and new_role_db.code != ADMIN_ROLE_CODE:
+            other_active_admins_count = (await self.db_session.execute(
+                select(func.count(GroupMembership.id)).join(UserRole).where(
+                    GroupMembership.group_id == group_id,
+                    GroupMembership.is_active == True,
+                    UserRole.code == ADMIN_ROLE_CODE,
+                    GroupMembership.user_id != user_id
+                )
+            )).scalar_one()
             if other_active_admins_count == 0:
-                logger.warning(f"User ID '{user_id}' is the last admin in group ID '{group_id}'. Cannot change role from ADMIN.")
-                raise ValueError("Cannot change the role of the last admin. Assign another admin first.")
+                msg = "Неможливо змінити роль останнього адміністратора. Спочатку призначте іншого адміністратора." # i18n
+                logger.warning(f"Користувач ID '{user_id}' є останнім адміном в групі ID '{group_id}'. {msg}")
+                raise ValueError(msg)
 
         membership_db.user_role_id = new_role_db.id
-        if hasattr(membership_db, 'updated_by_user_id') and updated_by_user_id:
-             membership_db.updated_by_user_id = updated_by_user_id
-        if hasattr(membership_db, 'role_updated_at'):
-            membership_db.role_updated_at = datetime.now(timezone.utc)
+        membership_db.updated_by_user_id = updated_by_user_id
+        # `updated_at` оновлюється автоматично. Можна додати `role_updated_at`, якщо таке поле є.
+        if hasattr(membership_db, 'role_updated_at'): # Припускаємо наявність такого поля для аудиту зміни ролі
+            setattr(membership_db, 'role_updated_at', datetime.now(timezone.utc))
 
         self.db_session.add(membership_db)
-        await self.commit()
-        await self.db_session.refresh(membership_db, attribute_names=['user', 'group', 'role'])
+        if commit_session:
+            await self.commit()
+            await self.db_session.refresh(membership_db, attribute_names=['user', 'group', 'role'])
+        else:
+            await self.db_session.flush([membership_db])
+            await self.db_session.refresh(membership_db, attribute_names=['user', 'group', 'role'])
 
-        logger.info(f"Role for user ID '{user_id}' in group ID '{group_id}' updated to '{new_role_db.name}'.")
-        # return GroupMembershipResponse.model_validate(membership_db) # Pydantic v2
-        return GroupMembershipResponse.from_orm(membership_db) # Pydantic v1
+
+        logger.info(f"Роль для користувача ID '{user_id}' в групі ID '{group_id}' оновлено на '{new_role_db.name}'.")
+        return GroupMembershipResponse.model_validate(membership_db) # Pydantic v2
 
     async def list_group_members(
-        self,
-        group_id: UUID,
-        skip: int = 0,
-        limit: int = 100,
-        is_active: Optional[bool] = True
-    ) -> List[GroupMemberResponse]:
-        logger.debug(f"Listing members for group ID: {group_id}, is_active: {is_active}, skip={skip}, limit={limit}")
+        self, group_id: UUID, skip: int = 0, limit: int = 100, is_active: Optional[bool] = True
+    ) -> List[GroupMemberResponse]: # Використовуємо GroupMemberResponse для потенційно розширеної інформації
+        """Перелічує членів групи."""
+        logger.debug(f"Перелік членів для групи ID: {group_id}, активні: {is_active}, пропустити={skip}, ліміт={limit}")
 
         stmt = select(GroupMembership).options(
-            selectinload(GroupMembership.user).options(
-                selectinload(User.user_type),
-            ),
+            selectinload(GroupMembership.user).options(selectinload(User.user_type), selectinload(User.avatar).options(selectinload(UserAvatar.file))), # Додаємо аватар
             selectinload(GroupMembership.role)
+            # selectinload(GroupMembership.group) # Група вже відома з group_id
         ).where(GroupMembership.group_id == group_id)
 
         if is_active is not None:
             stmt = stmt.where(GroupMembership.is_active == is_active)
 
-        stmt = stmt.join(User, GroupMembership.user_id == User.id).               order_by(User.username).               offset(skip).               limit(limit)
+        stmt = stmt.join(User, GroupMembership.user_id == User.id).order_by(User.username).offset(skip).limit(limit)
 
-        result = await self.db_session.execute(stmt)
-        memberships_db = result.scalars().unique().all()
+        memberships_db = (await self.db_session.execute(stmt)).scalars().unique().all()
 
-        # response_list = [GroupMemberResponse.model_validate(m) for m in memberships_db] # Pydantic v2
-        response_list = [GroupMemberResponse.from_orm(m) for m in memberships_db] # Pydantic v1
-        logger.info(f"Retrieved {len(response_list)} members for group ID '{group_id}'.")
+        response_list = [GroupMemberResponse.model_validate(m) for m in memberships_db] # Pydantic v2
+        logger.info(f"Отримано {len(response_list)} членів для групи ID '{group_id}'.")
         return response_list
 
     async def get_membership_details(self, group_id: UUID, user_id: UUID) -> Optional[GroupMembershipResponse]:
-        logger.debug(f"Getting membership details for user ID {user_id} in group ID {group_id}")
-        stmt = select(GroupMembership).options(
-            selectinload(GroupMembership.user).options(selectinload(User.user_type)), # Eager load user and its type
-            selectinload(GroupMembership.group).options(selectinload(Group.group_type)), # Eager load group and its type
-            selectinload(GroupMembership.role) # Eager load role
-        ).where(GroupMembership.group_id == group_id, GroupMembership.user_id == user_id)
+        """Отримує деталі членства для конкретного користувача в групі."""
+        logger.debug(f"Отримання деталей членства для користувача ID {user_id} в групі ID {group_id}")
 
-        membership_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
+        membership_db = await self._get_membership_orm_with_relations(group_id, user_id)
         if not membership_db:
-            logger.info(f"No membership found for user ID {user_id} in group ID {group_id}")
+            logger.info(f"Членство для користувача ID {user_id} в групі ID {group_id} не знайдено.")
             return None
 
-        # return GroupMembershipResponse.model_validate(membership_db) # Pydantic v2
-        return GroupMembershipResponse.from_orm(membership_db) # Pydantic v1
+        return GroupMembershipResponse.model_validate(membership_db) # Pydantic v2
 
-
-logger.info("GroupMembershipService class defined.")
+logger.debug(f"{GroupMembershipService.__name__} (сервіс членства в групах) успішно визначено.")

@@ -1,117 +1,100 @@
 # backend/app/src/schemas/dictionaries/user_roles.py
-
 """
-Pydantic schemas for UserRole dictionary entries.
+Pydantic схеми для довідника "Системні Ролі Користувачів".
+
+Цей модуль визначає схеми для представлення, створення та оновлення
+записів у довіднику системних ролей користувачів (наприклад, "superuser", "user").
 """
 
-import logging
-from typing import Optional, List, Any # For optional custom fields like 'permissions'
-from datetime import datetime, timezone # For example values in __main__ and BaseResponseSchema
+from typing import Optional  # Необхідно для опціональних полів в Update схемі
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-from pydantic import Field
+# Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    DictionaryBase,
-    # DictionaryCreate as BaseDictionaryCreate, # Not directly used if UserRoleCreate inherits UserRoleBase
-    # DictionaryUpdate as BaseDictionaryUpdate, # Not directly used if UserRoleUpdate inherits UserRoleBase
-    DictionaryResponse as BaseDictionaryResponse
+    BaseDictionarySchema,
+    DictionaryCreateSchema,
+    DictionaryUpdateSchema
 )
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
 
-# --- UserRole Schemas ---
+# from pydantic import Field # Може знадобитися, якщо додаватимуться специфічні поля з валідацією
 
-class UserRoleBase(DictionaryBase):
-    """Base schema for UserRole, inherits all fields from DictionaryBase."""
-    # Example of a custom field if UserRole model had 'permissions' as a JSON list:
-    # permissions: Optional[List[str]] = Field(None,
-    #                                          description="List of permission strings associated with this role.",
-    #                                          example=["users:read", "users:write", "tasks:assign"])
-    # is_system_role: Optional[bool] = Field(None,
-    #                                         description="True if this is a core system role and cannot be deleted by users.",
-    #                                         example=False)
+# Схема для представлення запису Системної Ролі Користувача (у відповідях API)
+class UserRoleSchema(BaseDictionarySchema):
+    """
+    Pydantic схема для представлення запису довідника "Системна Роль Користувача".
+    Успадковує всі поля від `BaseDictionarySchema`.
+    """
+    # Якщо для системних ролей потрібні специфічні додаткові поля у відповідях API,
+    # наприклад, перелік дозволів за замовчуванням для цієї ролі,
+    # їх можна визначити тут.
+    # default_permissions: Optional[List[str]] = Field(None, description="Список кодів дозволів за замовчуванням.")
+
+    # model_config успадковується з BaseDictionarySchema
     pass
 
-class UserRoleCreate(UserRoleBase):
+
+# Схема для створення нового запису Системної Ролі Користувача
+class UserRoleCreateSchema(DictionaryCreateSchema):
     """
-    Schema for creating a new UserRole.
-    Inherits fields from UserRoleBase. 'code' and 'name' are effectively required.
+    Pydantic схема для створення нового запису в довіднику "Системна Роль Користувача".
+    Успадковує всі поля від `DictionaryCreateSchema`.
     """
-    # If 'permissions' were in UserRoleBase and should be optional during creation:
-    # permissions: Optional[List[str]] = Field(None, example=["tasks:view"])
+    # Тут можна додати специфічні поля для створення UserRole, якщо вони є.
     pass
 
-class UserRoleUpdate(UserRoleBase):
-    """
-    Schema for updating an existing UserRole.
-    All fields from UserRoleBase are made optional here for partial updates.
-    """
-    code: Optional[str] = Field(None, min_length=1, max_length=100, description="Unique code or short identifier.")
-    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Human-readable name.")
-    description: Optional[str] = Field(None)
-    state: Optional[str] = Field(None, max_length=50)
-    is_default: Optional[bool] = Field(None)
-    display_order: Optional[int] = Field(None)
-    notes: Optional[str] = Field(None)
-    # If 'permissions' were in UserRoleBase and updatable:
-    # permissions: Optional[List[str]] = Field(None, example=["users:read_all"])
-    # is_system_role: Optional[bool] = Field(None)
 
-
-class UserRoleResponse(BaseDictionaryResponse):
+# Схема для оновлення існуючого запису Системної Ролі Користувача
+class UserRoleUpdateSchema(DictionaryUpdateSchema):
     """
-    Schema for representing a UserRole in API responses.
-    Inherits all fields from BaseDictionaryResponse.
-    Add any UserRole-specific response fields here if UserRoleBase had custom fields.
+    Pydantic схема для оновлення існуючого запису в довіднику "Системна Роль Користувача".
+    Успадковує всі поля від `DictionaryUpdateSchema`.
     """
-    # If 'permissions' were in UserRoleBase and should be in the response:
-    # permissions: Optional[List[str]] = Field(None, description="List of permission strings.", example=["users:read"])
-    # is_system_role: Optional[bool] = Field(None, description="Is this a core system role?")
+    # Тут можна додати специфічні поля для оновлення UserRole, якщо вони є.
     pass
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем UserRole.
+    logger.info("--- Pydantic Схеми для Довідника: UserRole ---")
 
-    logger.info("--- UserRole Schemas (Dictionary) --- Demonstration")
-
-    # UserRoleCreate Example
-    role_create_data = {
-        "code": "GROUP_ADMIN",
-        "name": "Group Administrator",
-        "description": "Manages a specific group and its members.",
+    logger.info("\nUserRoleSchema (приклад для відповіді API):")
+    user_role_data_from_db = {
+        "id": 1,
+        "name": "Супер Адміністратор",  # TODO i18n
+        "code": "SUPERUSER",
+        "description": "Роль з максимальними повноваженнями в системі.",  # TODO i18n
         "state": "active",
-        # "permissions": ["group:edit", "group:invite_member"],
-        # "isSystemRole": False
+        "created_at": "2023-02-01T10:00:00Z",
+        "updated_at": "2023-02-01T12:30:00Z",
     }
-    try:
-        role_create_schema = UserRoleCreate(**role_create_data)
-        logger.info(f"UserRoleCreate valid: {role_create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating UserRoleCreate: {e}")
+    # Для from_attributes=True, очікується datetime об'єкт
+    from datetime import datetime
 
-    # UserRoleUpdate Example
-    role_update_data = {"description": "Manages a specific group, its members, tasks, and rewards."}
-    role_update_schema = UserRoleUpdate(**role_update_data)
-    logger.info(f"UserRoleUpdate (partial): {role_update_schema.model_dump(exclude_unset=True, by_alias=True)}")
+    user_role_data_from_db['created_at'] = datetime.fromisoformat(
+        user_role_data_from_db['created_at'].replace('Z', '+00:00'))
+    user_role_data_from_db['updated_at'] = datetime.fromisoformat(
+        user_role_data_from_db['updated_at'].replace('Z', '+00:00'))
 
-    # UserRoleResponse Example
-    role_response_data = {
-        "id": 2,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "code": "MEMBER",
-        "name": "Member",
-        "description": "Regular member of a group.",
-        "state": "active",
-        "isDefault": True,
-        "displayOrder": 2,
-        # "permissions": ["tasks:view_own", "tasks:complete_own"],
-        # "isSystemRole": False
+    user_role_schema_instance = UserRoleSchema(**user_role_data_from_db)
+    logger.info(user_role_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nUserRoleCreateSchema (приклад для створення):")
+    create_data = {
+        "name": "Менеджер Контенту",  # TODO i18n
+        "code": "CONTENT_MANAGER",
+        "description": "Роль для управління контентом на сайті."  # TODO i18n
     }
-    try:
-        role_response_schema = UserRoleResponse(**role_response_data) # type: ignore[call-arg]
-        logger.info(f"UserRoleResponse: {role_response_schema.model_dump_json(by_alias=True, indent=2)}")
-    except Exception as e:
-        logger.error(f"Error creating UserRoleResponse: {e}")
+    create_schema_instance = UserRoleCreateSchema(**create_data)
+    logger.info(create_schema_instance.model_dump_json(indent=2))
+
+    logger.info("\nUserRoleUpdateSchema (приклад для оновлення):")
+    update_data = {
+        "description": "Оновлений опис для ролі Менеджера Контенту."  # TODO i18n
+    }
+    update_schema_instance = UserRoleUpdateSchema(**update_data)
+    logger.info(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")

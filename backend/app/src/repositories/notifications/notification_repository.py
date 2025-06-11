@@ -1,167 +1,149 @@
 # backend/app/src/repositories/notifications/notification_repository.py
-
 """
-Repository for Notification entities.
-Provides CRUD operations and specific methods for managing user notifications.
+Репозиторій для моделі "Сповіщення" (Notification).
+
+Цей модуль визначає клас `NotificationRepository`, який успадковує `BaseRepository`
+та надає специфічні методи для роботи зі сповіщеннями користувачів.
 """
 
-import logging
-from typing import Optional, List
+from typing import List, Optional, Tuple, Any
 from datetime import datetime, timezone
 
+from sqlalchemy import select, func, update as sqlalchemy_update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_, func # Added func for count
+# from sqlalchemy.orm import selectinload
 
-from backend.app.src.models.notifications.notification import Notification
-from backend.app.src.schemas.notifications.notification import NotificationCreateInternal, NotificationUpdate
+# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт моделі та схем
+from backend.app.src.models.notifications.notification import Notification
+from backend.app.src.schemas.notifications.notification import (
+    NotificationCreateSchema,
+    NotificationUpdateSchema  # Для позначки як прочитане
+)
 
-class NotificationRepository(BaseRepository[Notification, NotificationCreateInternal, NotificationUpdate]):
+
+# from backend.app.src.core.dicts import NotificationType as NotificationTypeEnum # Для фільтрації
+
+
+class NotificationRepository(BaseRepository[Notification, NotificationCreateSchema, NotificationUpdateSchema]):
     """
-    Repository for managing Notification records.
+    Репозиторій для управління сповіщеннями (`Notification`).
+
+    Успадковує базові CRUD-методи від `BaseRepository` та надає
+    методи для отримання сповіщень для користувача, позначки їх як прочитаних.
     """
 
-    def __init__(self):
-        super().__init__(Notification)
+    def __init__(self, db_session: AsyncSession):
+        """
+        Ініціалізує репозиторій для моделі `Notification`.
+
+        Args:
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
+        """
+        super().__init__(db_session=db_session, model=Notification)
 
     async def get_notifications_for_user(
-        self,
-        db: AsyncSession,
-        *,
-        user_id: int,
-        is_read: Optional[bool] = None,
-        include_expired: bool = False,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[Notification]:
+            self,
+            user_id: int,
+            *,
+            is_read: Optional[bool] = None,
+            notification_type: Optional[str] = None,  # Очікується значення з NotificationTypeEnum
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[Notification], int]:
         """
-        Retrieves notifications for a specific user, optionally filtered by read status and expiration.
+        Отримує список сповіщень для вказаного користувача з пагінацією та фільтрами.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            user_id: The ID of the user.
-            is_read: Optional. Filter by read status (True for read, False for unread).
-            include_expired: If False (default), only non-expired or notifications without an expiry are returned.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            user_id (int): ID користувача.
+            is_read (Optional[bool]): Фільтр за статусом прочитання.
+            notification_type (Optional[str]): Фільтр за типом сповіщення
+                                               (значення з `core.dicts.NotificationType`).
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            A list of Notification objects.
+            Tuple[List[Notification], int]: Кортеж зі списком сповіщень та їх загальною кількістю.
         """
-        conditions = [self.model.user_id == user_id] # type: ignore[attr-defined]
+        filters = [self.model.user_id == user_id]
         if is_read is not None:
-            conditions.append(self.model.is_read == is_read) # type: ignore[attr-defined]
+            filters.append(self.model.is_read == is_read)
+        if notification_type is not None:
+            # TODO: Переконатися, що notification_type передається як Enum.value або валідується
+            filters.append(self.model.notification_type == notification_type)
 
-        if not include_expired:
-            now = datetime.now(timezone.utc)
-            conditions.append(
-                (self.model.expires_at.is_(None)) | (self.model.expires_at > now) # type: ignore[attr-defined]
-            )
+        order_by = [self.model.created_at.desc()]  # Новіші сповіщення першими
 
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.created_at.desc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
+        # options = [selectinload(self.model.template)] # Приклад жадібного завантаження
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)  # , options=options)
+
+    async def mark_as_read(self, notification_id: int, user_id: int) -> Optional[Notification]:
+        """
+        Позначає конкретне сповіщення як прочитане для вказаного користувача.
+
+        Args:
+            notification_id (int): ID сповіщення, яке потрібно позначити як прочитане.
+            user_id (int): ID користувача, для якого позначається сповіщення (для перевірки прав).
+
+        Returns:
+            Optional[Notification]: Оновлений екземпляр сповіщення, якщо операція успішна
+                                    і сповіщення належало користувачеві та не було вже прочитане.
+                                    None, якщо сповіщення не знайдено, не належить користувачеві,
+                                    або вже було прочитане.
+        """
+        db_obj = await self.get(notification_id)
+
+        if db_obj and db_obj.user_id == user_id and not db_obj.is_read:
+            update_data = {
+                "is_read": True,
+                "read_at": datetime.now(timezone.utc)
+            }
+            # Використовуємо успадкований метод update, передаючи словник
+            return await super().update(db_obj=db_obj, obj_in=update_data)
+
+        # logger.warning(f"Сповіщення ID {notification_id} не знайдено для користувача ID {user_id} або вже прочитано.")
+        return None  # Або повернути db_obj, якщо він знайдений, але не оновлений
+
+    async def mark_all_as_read_for_user(self, user_id: int) -> int:
+        """
+        Позначає всі непрочитані сповіщення для вказаного користувача як прочитані.
+
+        Args:
+            user_id (int): ID користувача.
+
+        Returns:
+            int: Кількість сповіщень, позначених як прочитані.
+        """
+        stmt = (
+            sqlalchemy_update(self.model)
+            .where(self.model.user_id == user_id, self.model.is_read == False)
+            .values(is_read=True, read_at=datetime.now(timezone.utc))
+            # .execution_options(synchronize_session=False) # Може бути потрібно для деяких діалектів/ситуацій
         )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
+        result = await self.db_session.execute(stmt)
+        await self.db_session.commit()
+        # logger.info(f"{result.rowcount} сповіщень позначено як прочитані для користувача ID {user_id}.")
+        return result.rowcount
 
-    async def mark_as_read(self, db: AsyncSession, *, notification_id: int, read_at: Optional[datetime] = None) -> Optional[Notification]:
-        """
-        Marks a specific notification as read.
 
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            notification_id: The ID of the notification to mark as read.
-            read_at: Optional. Timestamp for when it was read. Defaults to now(UTC).
+if __name__ == "__main__":
+    # Демонстраційний блок для NotificationRepository.
+    logger.info("--- Репозиторій Сповіщень (NotificationRepository) ---")
 
-        Returns:
-            The updated Notification object if found and marked read, otherwise None.
-        """
-        db_obj = await self.get(db, id=notification_id)
-        if db_obj and not db_obj.is_read: # type: ignore[union-attr]
-            db_obj.is_read = True # type: ignore[union-attr]
-            db_obj.read_at = read_at if read_at else datetime.now(timezone.utc) # type: ignore[union-attr]
-            db.add(db_obj)
-            await db.commit()
-            await db.refresh(db_obj)
-            return db_obj
-        return db_obj
+    logger.info("Для тестування NotificationRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {Notification.__name__}.")
+    logger.info(f"  Очікує схему створення: {NotificationCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {NotificationUpdateSchema.__name__} (для is_read)")
 
-    async def mark_all_as_read_for_user(self, db: AsyncSession, *, user_id: int, read_at: Optional[datetime] = None) -> int:
-        """
-        Marks all unread notifications for a specific user as read.
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_notifications_for_user(user_id, is_read, notification_type, skip, limit)")
+    logger.info("  - mark_as_read(notification_id, user_id)")
+    logger.info("  - mark_all_as_read_for_user(user_id)")
 
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            user_id: The ID of the user whose notifications are to be marked as read.
-            read_at: Optional. Timestamp for when they were read. Defaults to now(UTC).
-
-        Returns:
-            The number of notifications successfully marked as read.
-        """
-        now = datetime.now(timezone.utc)
-        effective_read_at = read_at if read_at else now
-
-        statement = (
-            update(self.model)
-            .where(
-                self.model.user_id == user_id, # type: ignore[attr-defined]
-                self.model.is_read == False # type: ignore[attr-defined]
-            )
-            .values(is_read=True, read_at=effective_read_at, updated_at=now)
-            .execution_options(synchronize_session=False)
-        )
-        result = await db.execute(statement)
-        await db.commit()
-        return result.rowcount # type: ignore[no-any-return]
-
-    async def delete_expired_notifications(self, db: AsyncSession) -> int:
-        """
-        Deletes notifications that have passed their 'expires_at' timestamp.
-        This is a hard delete.
-
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-
-        Returns:
-            The number of expired notifications successfully deleted.
-        """
-        now = datetime.now(timezone.utc)
-        statement = delete(self.model).where(
-            self.model.expires_at.is_not(None), # type: ignore[attr-defined]
-            self.model.expires_at < now # type: ignore[attr-defined]
-        ).execution_options(synchronize_session=False)
-
-        result = await db.execute(statement)
-        await db.commit()
-        return result.rowcount # type: ignore[no-any-return]
-
-    async def count_unread_notifications_for_user(self, db: AsyncSession, *, user_id: int) -> int:
-        """
-        Counts unread, non-expired notifications for a user.
-
-        Args:
-            db: AsyncSession
-            user_id: int
-
-        Returns:
-            int: Count of unread notifications.
-        """
-        now = datetime.now(timezone.utc)
-        conditions = [
-            self.model.user_id == user_id, # type: ignore[attr-defined]
-            self.model.is_read == False, # type: ignore[attr-defined]
-            (self.model.expires_at.is_(None)) | (self.model.expires_at > now) # type: ignore[attr-defined]
-        ]
-
-        statement = select(func.count(self.model.id)).where(*conditions) # type: ignore[attr-defined]
-        result = await db.execute(statement)
-        count = result.scalar_one_or_none()
-        return count if count is not None else 0
-
-    # BaseRepository methods create, get, update, remove are inherited.
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("TODO: Переконатися, що `notification_type` у `get_notifications_for_user` коректно обробляється з Enum.")

@@ -1,146 +1,144 @@
 # backend/app/src/models/groups/invitation.py
-
 """
-SQLAlchemy model for Group Invitations.
+Модель SQLAlchemy для сутності "Запрошення до Групи" (GroupInvitation).
+
+Цей модуль визначає модель `GroupInvitation`, яка використовується для зберігання
+інформації про запрошення користувачів до груп, включаючи унікальний код запрошення,
+термін його дії, роль, що призначається, та статус запрошення.
 """
+from datetime import datetime, timezone, timedelta  # timedelta для прикладу в __main__
+from typing import TYPE_CHECKING, Optional
 
-import logging
-from typing import Optional, TYPE_CHECKING
-from datetime import datetime, timedelta, timezone # Added timezone
-from enum import Enum as PythonEnum # For InvitationStatusEnum definition
-
-from sqlalchemy import String, DateTime, ForeignKey, Enum as SQLAlchemyEnum, Integer # Added Integer for FKs
+from sqlalchemy import String, ForeignKey, func  # func для server_default в TimestampedMixin
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from sqlalchemy.sql import func # For server_default for created_at/updated_at in BaseModel
 
-from backend.app.src.models.base import BaseModel
-from backend.app.src.core.utils import generate_random_string # For generating invitation_code
+# Абсолютний імпорт базових класів та Enum
+from backend.app.src.models.base import Base
+from backend.app.src.models.mixins import TimestampedMixin
+from backend.app.src.core.dicts import GroupRole  # Для ролі за замовчуванням
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
-
-class InvitationStatusEnum(PythonEnum): # Changed to inherit from PythonEnum
-    """ Defines the possible statuses for a group invitation. """
-    PENDING = "pending"
-    ACCEPTED = "accepted"
-    DECLINED = "declined"
-    EXPIRED = "expired"
-    REVOKED = "revoked"
+# TODO: Визначити Enum InvitationStatus в core.dicts.py, наприклад:
+# class InvitationStatus(str, Enum):
+#     PENDING = "pending"  # Запрошення надіслано, очікує на відповідь
+#     ACCEPTED = "accepted" # Запрошення прийнято
+#     DECLINED = "declined" # Запрошення відхилено
+#     EXPIRED = "expired"  # Термін дії запрошення закінчився
+#     CANCELLED = "cancelled" # Запрошення скасовано відправником
+# Потім імпортувати: from backend.app.src.core.dicts import InvitationStatus
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
     from backend.app.src.models.groups.group import Group
 
-def default_invitation_code() -> str:
-    """Generates a default random string for invitation code."""
-    return generate_random_string(12) # 12-character random string
 
-def default_expires_at() -> datetime:
-    """Default expiration for an invitation (e.g., 7 days from now)."""
-    return datetime.now(timezone.utc) + timedelta(days=7)
-
-class GroupInvitation(BaseModel):
+class GroupInvitation(Base, TimestampedMixin):
     """
-    Represents an invitation sent to a user (or external email/phone)
-    to join a specific group.
+    Модель запрошення до групи.
 
-    Attributes:
-        group_id (int): Foreign key to the group the invitation is for.
-        invited_by_user_id (Optional[int]): Foreign key to the user who sent the invitation.
-                                          Null if system-generated or anonymous invite.
-        email_invited (Optional[str]): Email address of the invitee if not yet a system user.
-        phone_invited (Optional[str]): Phone number of the invitee if not yet a system user.
-        target_user_id (Optional[int]): FK to users.id if inviting an existing system user directly.
-        invitation_code (str): A unique code for this invitation (e.g., for link-based invites).
-        status (InvitationStatusEnum): Current status of the invitation.
-        expires_at (datetime): Timestamp when the invitation expires.
-        accepted_at (Optional[datetime]): Timestamp when the invitation was accepted.
-        # `id`, `created_at`, `updated_at` are inherited from BaseModel.
+    Зберігає деталі запрошень, надісланих користувачам для приєднання до групи.
+
+    Атрибути:
+        id (Mapped[int]): Унікальний ідентифікатор запрошення.
+        group_id (Mapped[int]): ID групи, до якої надсилається запрошення.
+        email (Mapped[Optional[str]]): Email адреса запрошеного користувача (якщо запрошення по email).
+        phone_number (Mapped[Optional[str]]): Номер телефону запрошеного (якщо запрошення по SMS).
+        invitation_code (Mapped[str]): Унікальний код запрошення.
+        role_to_assign (Mapped[str]): Роль, яка буде призначена користувачу при прийнятті запрошення.
+        expires_at (Mapped[datetime]): Дата та час закінчення терміну дії запрошення.
+        created_by_user_id (Mapped[Optional[int]]): ID користувача, який створив запрошення.
+        status (Mapped[str]): Поточний статус запрошення (наприклад, "pending", "accepted", "expired").
+
+        group (Mapped["Group"]): Зв'язок з моделлю `Group`.
+        created_by (Mapped[Optional["User"]]): Зв'язок з моделлю `User` (автор запрошення).
+        created_at, updated_at: Успадковано від `TimestampedMixin`.
     """
     __tablename__ = "group_invitations"
 
-    group_id: Mapped[int] = mapped_column(Integer, ForeignKey("groups.id"), nullable=False, index=True, comment="The group for which the invitation is made")
-    invited_by_user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, index=True, comment="The user who sent the invitation (if applicable)")
-
-    email_invited: Mapped[Optional[str]] = mapped_column(String(320), nullable=True, index=True, comment="Email of the person invited (if not yet a user or for direct email invite)")
-    phone_invited: Mapped[Optional[str]] = mapped_column(String(30), nullable=True, index=True, comment="Phone number of the person invited (if not yet a user)")
-    target_user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, index=True, comment="Direct invitation to an existing system user")
-
+    id: Mapped[int] = mapped_column(
+        primary_key=True, index=True, autoincrement=True, comment="Унікальний ідентифікатор запрошення"
+    )
+    group_id: Mapped[int] = mapped_column(
+        ForeignKey('groups.id', name='fk_group_invitation_group_id', ondelete="CASCADE"),
+        nullable=False,
+        comment="ID групи, до якої створено запрошення"
+    )
+    # Запрошення може бути на email АБО телефон, або просто кодом
+    email: Mapped[Optional[str]] = mapped_column(
+        String(255), nullable=True, index=True, comment="Email запрошеного користувача (якщо є)"
+    )
+    phone_number: Mapped[Optional[str]] = mapped_column(
+        String(30), nullable=True, index=True, comment="Номер телефону запрошеного (якщо є)"
+    )
     invitation_code: Mapped[str] = mapped_column(
-        String(100),
-        unique=True,
-        index=True,
-        nullable=False,
-        default=default_invitation_code,
-        comment="Unique code for this invitation (for link-based invites)"
+        String(50), unique=True, index=True, nullable=False, comment="Унікальний код запрошення"
     )
-
-    status: Mapped[InvitationStatusEnum] = mapped_column(
-        SQLAlchemyEnum(InvitationStatusEnum, name="invitationstatusenum", create_constraint=True, native_enum=False), # native_enum=False for string storage
-        nullable=False,
-        default=InvitationStatusEnum.PENDING,
-        index=True,
-        comment="Current status of the invitation (pending, accepted, expired, etc.)"
+    role_to_assign: Mapped[str] = mapped_column(
+        String(50), default=GroupRole.MEMBER.value, nullable=False, comment="Роль, що буде призначена при прийнятті"
     )
-
     expires_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True),
-        nullable=False,
-        default=default_expires_at,
-        comment="Timestamp when the invitation expires (UTC)"
+        nullable=False, comment="Час закінчення терміну дії запрошення"
     )
-    accepted_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, comment="Timestamp when the invitation was accepted (UTC)")
-    revoked_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, comment="Timestamp when the invitation was revoked (UTC)")
+    created_by_user_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey('users.id', name='fk_group_invitation_creator_id', ondelete="SET NULL"),
+        nullable=True,  # Може бути NULL, якщо запрошення системне або автор видалений
+        comment="ID користувача, який створив запрошення"
+    )
+    # TODO: Замінити String на Enum InvitationStatus, коли він буде визначений в core.dicts.py
+    # status: Mapped[InvitationStatus] = mapped_column(SQLEnum(InvitationStatus), default=InvitationStatus.PENDING, nullable=False)
+    status: Mapped[str] = mapped_column(
+        String(50), default="pending", nullable=False, index=True,
+        comment="Статус запрошення (pending, accepted, expired тощо)"
+    )
 
-    # --- Relationships ---
-    group: Mapped["Group"] = relationship(back_populates="invitations")
-    invited_by: Mapped[Optional["User"]] = relationship(foreign_keys=[invited_by_user_id]) # One-way, or define back_populates on User if needed
-    target_user: Mapped[Optional["User"]] = relationship(foreign_keys=[target_user_id]) # One-way, or define back_populates on User if needed
+    # --- Зв'язки (Relationships) ---
+    group: Mapped["Group"] = relationship(back_populates="invitations", lazy="selectin")
+    created_by: Mapped[Optional["User"]] = relationship(foreign_keys=[created_by_user_id],
+                                                        lazy="selectin")  # Немає back_populates, якщо User не має invitations_created
 
-    def __repr__(self) -> str:
-        id_val = getattr(self, 'id', 'N/A')
-        return f"<GroupInvitation(id={id_val}, group_id={self.group_id}, code='{self.invitation_code}', status='{self.status.value}')>"
+    # Поля для __repr__
+    _repr_fields = ["id", "group_id", "invitation_code", "status", "expires_at"]
+
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для моделі GroupInvitation.
+    logger.info("--- Модель Запрошення до Групи (GroupInvitation) ---")
+    logger.info(f"Назва таблиці: {GroupInvitation.__tablename__}")
 
-    logger.info("--- GroupInvitation Model --- Demonstration")
+    logger.info("\nОчікувані поля:")
+    expected_fields = [
+        'id', 'group_id', 'email', 'phone_number', 'invitation_code',
+        'role_to_assign', 'expires_at', 'created_by_user_id', 'status',
+        'created_at', 'updated_at'
+    ]
+    for field in expected_fields:
+        logger.info(f"  - {field}")
 
-    # Example GroupInvitation instance
-    invitation1 = GroupInvitation(
-        group_id=1, # Assuming group with id=1 exists
-        invited_by_user_id=1, # Assuming user with id=1 sent it
-        email_invited="new_user@example.com",
-        # invitation_code is auto-generated by default via default_invitation_code
-        # expires_at is auto-generated by default via default_expires_at
+    logger.info("\nОчікувані зв'язки (relationships):")
+    expected_relationships = ['group', 'created_by']
+    for rel in expected_relationships:
+        logger.info(f"  - {rel}")
+
+    # Приклад створення екземпляра (без взаємодії з БД)
+    example_invitation = GroupInvitation(
+        id=1,
+        group_id=202,
+        email="new.user@example.com",
+        invitation_code="UNIQUECODE123",
+        role_to_assign=GroupRole.MEMBER.value,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=7),
+        created_by_user_id=101,
+        status="pending"  # TODO: Замінити на InvitationStatus.PENDING.value
     )
-    invitation1.id = 1 # Simulate ORM-set ID
-    invitation1.created_at = datetime.now(timezone.utc)
-    invitation1.updated_at = datetime.now(timezone.utc)
+    # Імітуємо часові мітки
+    example_invitation.created_at = datetime.now(timezone.utc)
+    example_invitation.updated_at = datetime.now(timezone.utc)
 
-    logger.info(f"Example GroupInvitation 1: {invitation1!r}")
-    logger.info(f"  Group ID: {invitation1.group_id}")
-    logger.info(f"  Invited Email: {invitation1.email_invited}")
-    logger.info(f"  Code: {invitation1.invitation_code}") # Will be auto-generated
-    logger.info(f"  Status: {invitation1.status.value}")
-    logger.info(f"  Expires At: {invitation1.expires_at.isoformat() if invitation1.expires_at else 'N/A'}")
-    logger.info(f"  Created At: {invitation1.created_at.isoformat() if invitation1.created_at else 'N/A'}")
+    logger.info(f"\nПриклад екземпляра GroupInvitation (без сесії):\n  {example_invitation}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <GroupInvitation(id=1, group_id=202, invitation_code='UNIQUECODE123', status='pending', expires_at=...)>
 
-
-    invitation2_to_existing_user = GroupInvitation(
-        group_id=2,
-        invited_by_user_id=3,
-        target_user_id=5, # Inviting existing user with id=5
-        status=InvitationStatusEnum.ACCEPTED,
-        accepted_at=datetime.now(timezone.utc) - timedelta(hours=1)
-    )
-    invitation2_to_existing_user.id = 2
-    logger.info(f"Example GroupInvitation 2 (to existing user, accepted): {invitation2_to_existing_user!r}")
-    logger.info(f"  Target User ID: {invitation2_to_existing_user.target_user_id}")
-    logger.info(f"  Status: {invitation2_to_existing_user.status.value}")
-    logger.info(f"  Accepted At: {invitation2_to_existing_user.accepted_at.isoformat() if invitation2_to_existing_user.accepted_at else 'N/A'}")
-
-    # The following line would error if run directly without SQLAlchemy engine and metadata setup for all related tables.
-    # logger.info(f"GroupInvitation attributes (conceptual table columns): {[c.name for c in GroupInvitation.__table__.columns if not c.name.startswith('_')]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
+    logger.info("TODO: Не забудьте визначити Enum 'InvitationStatus' в core.dicts.py та оновити поле 'status'.")

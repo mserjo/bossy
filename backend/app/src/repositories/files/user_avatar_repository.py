@@ -1,154 +1,152 @@
 # backend/app/src/repositories/files/user_avatar_repository.py
-
 """
-Repository for UserAvatar entities.
-Manages the link between users and their avatar file records.
+Репозиторій для моделі "Аватар Користувача" (UserAvatar).
+
+Цей модуль визначає клас `UserAvatarRepository`, який успадковує `BaseRepository`
+та надає специфічні методи для роботи з аватарами користувачів,
+зокрема для встановлення активного аватара.
 """
 
-import logging
-from typing import Optional, List
+from typing import List, Optional, Tuple, Any
+from datetime import datetime, timezone
 
+from sqlalchemy import select, update as sqlalchemy_update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update, delete, and_
-from sqlalchemy.orm import selectinload
+# from sqlalchemy.orm import selectinload
 
-from backend.app.src.models.files.avatar import UserAvatar
-from backend.app.src.models.files.file import FileRecord
-from backend.app.src.schemas.files.avatar import UserAvatarCreate, UserAvatarUpdate
+# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+# Абсолютний імпорт моделі та схем
+from backend.app.src.models.files.avatar import UserAvatar
+from backend.app.src.schemas.files.avatar import UserAvatarCreateSchema, UserAvatarUpdateSchema  # UserAvatarUpdateSchema може бути простою
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-logger = logging.getLogger(__name__)
 
-class UserAvatarRepository(BaseRepository[UserAvatar, UserAvatarCreate, UserAvatarUpdate]):
+class UserAvatarRepository(BaseRepository[UserAvatar, UserAvatarCreateSchema, UserAvatarUpdateSchema]):
     """
-    Repository for managing UserAvatar records.
-    UserAvatar links a user to a FileRecord for their avatar.
-    The UserAvatar model uses user_id as its primary key.
+    Репозиторій для управління аватарами користувачів (`UserAvatar`).
+
+    Успадковує базові CRUD-методи від `BaseRepository` та надає
+    методи для отримання аватара користувача та встановлення активного аватара.
     """
 
-    def __init__(self):
-        super().__init__(UserAvatar)
-
-    async def get_by_user_id(self, db: AsyncSession, *, user_id: int) -> Optional[UserAvatar]:
+    def __init__(self, db_session: AsyncSession):
         """
-        Retrieves the UserAvatar record for a specific user using user_id as PK.
-        Eager loads the associated file_record.
+        Ініціалізує репозиторій для моделі `UserAvatar`.
+
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            user_id: The ID of the user whose avatar record is to be fetched.
-        Returns:
-            The UserAvatar object if found, otherwise None.
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        statement = (
-            select(self.model)
-            .where(self.model.user_id == user_id) # type: ignore[attr-defined]
-            .options(selectinload(self.model.file_record)) # type: ignore[attr-defined]
-        )
-        result = await db.execute(statement)
+        super().__init__(db_session=db_session, model=UserAvatar)
+
+    async def get_by_user_id(self, user_id: int) -> Optional[UserAvatar]:
+        """
+        Отримує запис UserAvatar для вказаного користувача.
+        Оскільки user_id є унікальним, повертає один запис або None.
+
+        Args:
+            user_id (int): ID користувача.
+
+        Returns:
+            Optional[UserAvatar]: Екземпляр моделі `UserAvatar`, якщо знайдено, інакше None.
+        """
+        stmt = select(self.model).where(self.model.user_id == user_id)
+        result = await self.db_session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_active_avatar_for_user(self, db: AsyncSession, *, user_id: int) -> Optional[UserAvatar]:
+    async def get_active_avatar_for_user(self, user_id: int) -> Optional[UserAvatar]:
         """
-        Retrieves the active UserAvatar record for a specific user.
-        Eager loads the associated file_record.
+        Отримує активний аватар для вказаного користувача.
+
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            user_id: The ID of the user.
+            user_id (int): ID користувача.
+
         Returns:
-            The active UserAvatar object if found, otherwise None.
+            Optional[UserAvatar]: Екземпляр моделі `UserAvatar`, що є активним, або None.
         """
-        statement = (
-            select(self.model)
-            .where(
-                self.model.user_id == user_id, # type: ignore[attr-defined]
-                self.model.is_active == True   # type: ignore[attr-defined]
-            )
-            .options(selectinload(self.model.file_record)) # type: ignore[attr-defined]
+        stmt = select(self.model).where(
+            self.model.user_id == user_id,
+            self.model.is_active == True
         )
-        result = await db.execute(statement)
+        # Додатково можна завантажити file_record: .options(selectinload(self.model.file_record))
+        result = await self.db_session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def set_active_avatar(
-        self, db: AsyncSession, *, user_id: int, file_record_id: int
-    ) -> UserAvatar:
+    async def set_active_avatar(self, user_id: int, file_record_id: int) -> UserAvatar:
         """
-        Sets or updates the avatar for a user. Deactivates other avatars for the user.
+        Встановлює новий активний аватар для користувача.
+        Якщо існує попередній активний аватар для цього користувача, він деактивується.
+        Якщо запис UserAvatar для цієї пари user_id/file_record_id вже існує,
+        він активується. В іншому випадку створюється новий запис.
+
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            user_id: The ID of the user.
-            file_record_id: The ID of the FileRecord to be used as the avatar.
+            user_id (int): ID користувача.
+            file_record_id (int): ID запису файлу (`FileRecord`), який стає новим аватаром.
+
         Returns:
-            The created or updated UserAvatar object.
+            UserAvatar: Актуальний (створений або оновлений) екземпляр `UserAvatar`.
         """
-        await self.deactivate_all_avatars_for_user(db, user_id=user_id)
+        # 1. Деактивувати всі поточні активні аватари для цього користувача
+        #    (хоча за логікою моделі з unique=True на user_id, такий має бути лише один)
+        update_stmt = (
+            sqlalchemy_update(self.model)
+            .where(self.model.user_id == user_id, self.model.is_active == True)
+            .values(is_active=False, updated_at=datetime.now(timezone.utc))  # Оновлюємо updated_at вручну
+            .execution_options(synchronize_session=False)
+        # Не синхронізувати сесію, щоб уникнути конфліктів перед комітом
+        )
+        await self.db_session.execute(update_stmt)
 
-        existing_avatar = await self.get_by_user_id(db, user_id=user_id)
+        # 2. Перевірити, чи існує запис UserAvatar для цієї пари user_id/file_record_id
+        existing_avatar_stmt = select(self.model).where(
+            self.model.user_id == user_id,
+            self.model.file_record_id == file_record_id
+        )
+        existing_avatar_result = await self.db_session.execute(existing_avatar_stmt)
+        db_obj = existing_avatar_result.scalar_one_or_none()
 
-        if existing_avatar:
-            existing_avatar.file_record_id = file_record_id # type: ignore[union-attr]
-            existing_avatar.is_active = True # type: ignore[union-attr]
-            db.add(existing_avatar)
-            await db.commit()
-            await db.refresh(existing_avatar)
-            return existing_avatar
+        if db_obj:
+            # Якщо запис існує, активуємо його та оновлюємо час
+            db_obj.is_active = True
+            # `updated_at` з TimestampedMixin має оновитися автоматично при коміті,
+            # але для явного контролю можна встановити тут, якщо onupdate не спрацює як очікувалось
+            # для `add` існуючого об'єкта. Краще покладатися на onupdate=func.now() в моделі.
+            # setattr(db_obj, "updated_at", datetime.now(timezone.utc)) # Для явного оновлення, якщо потрібно
+            self.db_session.add(db_obj)
         else:
-            # Ensure UserAvatarCreate schema aligns with these direct assignments or adjust.
-            # The model's __init__ will be used here.
-            new_avatar_data = {"user_id": user_id, "file_record_id": file_record_id, "is_active": True}
-            # obj_in = UserAvatarCreate(**new_avatar_data) # If using schema for validation first
-            # return await super().create(db, obj_in=obj_in) # This would use BaseModel's id, not user_id as PK for UserAvatar
-
-            # Direct model creation since UserAvatar PK is user_id
-            db_obj = self.model(**new_avatar_data) # type: ignore[call-arg]
-            db.add(db_obj)
-            await db.commit()
-            await db.refresh(db_obj)
-            return db_obj
-
-
-    async def deactivate_all_avatars_for_user(self, db: AsyncSession, *, user_id: int) -> int:
-        """
-        Marks all existing avatar records for a user as inactive.
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            user_id: The ID of the user.
-        Returns:
-            The number of avatar records updated.
-        """
-        statement = (
-            update(self.model)
-            .where(
-                self.model.user_id == user_id, # type: ignore[attr-defined]
-                self.model.is_active == True  # type: ignore[attr-defined]
+            # Якщо запис не існує, створюємо новий
+            # Схема UserAvatarCreateSchema очікує user_id, file_record_id, is_active
+            create_schema = UserAvatarCreateSchema(
+                user_id=user_id,
+                file_record_id=file_record_id,
+                is_active=True
             )
-            .values(is_active=False)
-            .execution_options(synchronize_session=False) # Recommended for bulk updates
-        )
-        result = await db.execute(statement)
-        await db.commit()
-        return result.rowcount # type: ignore[no-any-return]
+            # Використовуємо метод create з BaseRepository, який вже робить add, commit, refresh
+            # Однак, нам потрібен один commit в кінці, тому змінимо логіку.
+            db_obj = self.model(**create_schema.model_dump())
+            self.db_session.add(db_obj)
 
-    async def delete_avatar_for_user(self, db: AsyncSession, *, user_id: int) -> bool:
-        """
-        Deletes the UserAvatar record for a specific user (using user_id as PK).
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            user_id: The ID of the user whose avatar link should be deleted.
-        Returns:
-            True if an avatar was found and deleted, False otherwise.
-        """
-        # UserAvatar's PK is user_id. BaseRepository.remove() assumes PK is 'id'.
-        # So, we implement delete specifically for user_id.
-        obj = await self.get_by_user_id(db, user_id=user_id)
-        if obj:
-            await db.delete(obj)
-            await db.commit()
-            return True
-        return False
+        await self.db_session.commit()
+        await self.db_session.refresh(db_obj)
+        # logger.info(f"Встановлено активний аватар ID {file_record_id} для користувача ID {user_id}.")
+        return db_obj
 
-    # Note on super().create(): Since UserAvatar's PK is user_id, super().create()
-    # (which typically creates a new record with an auto-incrementing 'id')
-    # is not directly suitable if we want to enforce user_id as the PK without a separate 'id' column.
-    # The set_active_avatar method handles the upsert logic correctly for UserAvatar's structure.
-    # If UserAvatar was changed to have its own 'id' PK and user_id as a unique FK, then super().create()
-    # could be used more directly after ensuring uniqueness of user_id.
+
+if __name__ == "__main__":
+    # Демонстраційний блок для UserAvatarRepository.
+    logger.info("--- Репозиторій Аватарів Користувачів (UserAvatarRepository) ---")
+
+    logger.info("Для тестування UserAvatarRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {UserAvatar.__name__}.")
+    logger.info(f"  Очікує схему створення: {UserAvatarCreateSchema.__name__}")
+    logger.info(
+        f"  Очікує схему оновлення: {UserAvatarUpdateSchema.__name__} (може бути простою, оскільки оновлюється переважно is_active)")
+
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_user_id(user_id: int) -> Optional[UserAvatar]")
+    logger.info("  - get_active_avatar_for_user(user_id: int) -> Optional[UserAvatar]")
+    logger.info("  - set_active_avatar(user_id: int, file_record_id: int) -> UserAvatar")
+
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

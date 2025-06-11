@@ -22,11 +22,16 @@
 Після ініціалізації, екземпляр `settings` цього модуля містить усі
 доступні налаштування і може бути імпортований в інші частини програми.
 """
+# import os # Видалено, оскільки os не використовується безпосередньо; pathlib використовується для шляхів.
 from pathlib import Path
 from typing import List, Optional, Union, Any
 from pydantic import PostgresDsn, RedisDsn, field_validator, AnyHttpUrl, EmailStr, ValidationInfo
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from dotenv import load_dotenv
+from backend.app.src.config.logging import get_logger # Імпорт логера
+
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Визначення шляху до файлу .env
 # Спочатку шукаємо у backend/.env, потім у kudos/.env (корінь проекту)
@@ -221,15 +226,15 @@ settings.UPLOADED_FILES_DIR.mkdir(parents=True, exist_ok=True)
 
 
 if __name__ == "__main__":
-    print(f"Використовується .env файл: {dotenv_path if dotenv_path else 'Не знайдено'}")
+    logger.info(f"Використовується .env файл: {dotenv_path if dotenv_path else 'Не знайдено'}")
     if dotenv_path:
-        print(f"Чи існує .env файл: {dotenv_path.exists()}")
-    print("--- Завантажені налаштування програми ---")
+        logger.info(f"Чи існує .env файл: {dotenv_path.exists()}")
+    logger.info("--- Завантажені налаштування програми ---")
     # Виводимо значення, приховуючи чутливі дані
     for key, value in settings.model_dump().items():
         if "password" in key.lower() or "secret" in key.lower() or "key" in key.lower():
-            print(f"{key}: ******")
+            logger.info(f"{key}: ******")
         else:
-            print(f"{key}: {value}")
-    print(f"Повний шлях до директорії завантажених файлів: {settings.UPLOADED_FILES_DIR.resolve()}")
-    print(f"Повний шлях до директорії логів: {settings.LOG_DIR.resolve()}")
+            logger.info(f"{key}: {value}")
+    logger.info(f"Повний шлях до директорії завантажених файлів: {settings.UPLOADED_FILES_DIR.resolve()}")
+    logger.info(f"Повний шлях до директорії логів: {settings.LOG_DIR.resolve()}")

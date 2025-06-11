@@ -1,23 +1,49 @@
 # backend/app/src/repositories/dictionaries/task_type_repository.py
-
 """
-Repository for TaskType dictionary entries.
+Репозиторій для моделі "Тип Завдання" (TaskType).
+
+Цей модуль визначає клас `TaskTypeRepository`, який успадковує `BaseDictionaryRepository`
+та надає методи для роботи з довідником типів завдань.
 """
 
-import logging
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.src.models.dictionaries.task_types import TaskType
-from backend.app.src.schemas.dictionaries.task_types import TaskTypeCreate, TaskTypeUpdate
+# Абсолютний імпорт базового репозиторію для довідників
 from backend.app.src.repositories.dictionaries.base_dict_repository import BaseDictionaryRepository
 
-logger = logging.getLogger(__name__)
+# Абсолютний імпорт моделі та схем для Типів Завдань
+from backend.app.src.models.dictionaries.task_types import TaskType
+from backend.app.src.schemas.dictionaries.task_types import TaskTypeCreateSchema, TaskTypeUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-class TaskTypeRepository(BaseDictionaryRepository[TaskType, TaskTypeCreate, TaskTypeUpdate]):
-    """
-    Repository for managing TaskType dictionary records.
-    Inherits common dictionary operations from BaseDictionaryRepository.
-    """
-    def __init__(self):
-        super().__init__(TaskType)
 
-    # Add any TaskType-specific methods here if needed.
+class TaskTypeRepository(BaseDictionaryRepository[TaskType, TaskTypeCreateSchema, TaskTypeUpdateSchema]):
+    """
+    Репозиторій для управління записами довідника "Тип Завдання".
+
+    Успадковує всі базові методи CRUD та специфічні для довідників методи
+    від `BaseDictionaryRepository`.
+    """
+
+    def __init__(self, db_session: AsyncSession):
+        """
+        Ініціалізує репозиторій для моделі `TaskType`.
+
+        Args:
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
+        """
+        super().__init__(db_session=db_session, model=TaskType)
+
+    # Тут можна додати специфічні методи для TaskTypeRepository, якщо вони потрібні.
+
+
+if __name__ == "__main__":
+    # Демонстраційний блок для TaskTypeRepository.
+    logger.info("--- Репозиторій для Довідника Типів Завдань (TaskTypeRepository) ---")
+
+    logger.info("Для тестування TaskTypeRepository потрібна асинхронна сесія SQLAlchemy.")
+    logger.info(f"Він успадковує методи від BaseDictionaryRepository для моделі {TaskType.__name__}.")
+    logger.info(f"  Очікує схему створення: {TaskTypeCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {TaskTypeUpdateSchema.__name__}")

@@ -1,201 +1,126 @@
 # backend/app/src/repositories/groups/invitation_repository.py
-
 """
-Repository for GroupInvitation entities.
-Provides CRUD operations and specific methods for managing group invitations.
+Репозиторій для моделі "Запрошення до Групи" (GroupInvitation).
+
+Цей модуль визначає клас `GroupInvitationRepository`, який успадковує `BaseRepository`
+та надає специфічні методи для роботи із запрошеннями до груп.
 """
 
-import logging
-from typing import Optional, List
-from datetime import datetime, timezone # Added timezone
+from typing import List, Optional, Tuple, Any
 
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, update # Added update for potential status changes
+# from sqlalchemy.orm import selectinload # Для жадібного завантаження
 
-from backend.app.src.models.groups.invitation import GroupInvitation, InvitationStatusEnum
-from backend.app.src.schemas.groups.invitation import GroupInvitationCreate, GroupInvitationUpdate
+# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
+# Абсолютний імпорт моделі та схем
+from backend.app.src.models.groups.invitation import GroupInvitation
+from backend.app.src.schemas.groups.invitation import GroupInvitationCreateSchema, GroupInvitationUpdateSchema
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-logger = logging.getLogger(__name__)
 
-class GroupInvitationRepository(BaseRepository[GroupInvitation, GroupInvitationCreate, GroupInvitationUpdate]):
+class GroupInvitationRepository(
+    BaseRepository[GroupInvitation, GroupInvitationCreateSchema, GroupInvitationUpdateSchema]):
     """
-    Repository for managing GroupInvitation records.
+    Репозиторій для управління запрошеннями до груп (`GroupInvitation`).
+
+    Успадковує базові CRUD-методи від `BaseRepository` та надає
+    додаткові методи для отримання запрошень за кодом, ID групи,
+    або парою email-група.
     """
 
-    def __init__(self):
-        super().__init__(GroupInvitation)
-
-    async def get_by_invitation_code(self, db: AsyncSession, *, invitation_code: str) -> Optional[GroupInvitation]:
+    def __init__(self, db_session: AsyncSession):
         """
-        Retrieves a group invitation by its unique invitation code.
+        Ініціалізує репозиторій для моделі `GroupInvitation`.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            invitation_code: The unique code of the invitation.
+            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
+        """
+        super().__init__(db_session=db_session, model=GroupInvitation)
+
+    async def get_by_code(self, code: str) -> Optional[GroupInvitation]:
+        """
+        Отримує запис запрошення за його унікальним кодом.
+
+        Args:
+            code (str): Унікальний код запрошення.
 
         Returns:
-            The GroupInvitation object if found, otherwise None.
+            Optional[GroupInvitation]: Екземпляр моделі `GroupInvitation`, якщо знайдено, інакше None.
         """
-        statement = select(self.model).where(self.model.invitation_code == invitation_code) # type: ignore[attr-defined]
-        result = await db.execute(statement)
+        stmt = select(self.model).where(self.model.invitation_code == code)
+        result = await self.db_session.execute(stmt)
         return result.scalar_one_or_none()
 
-    async def get_all_for_group(
-        self,
-        db: AsyncSession,
-        *,
-        group_id: int,
-        status: Optional[InvitationStatusEnum] = None,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[GroupInvitation]:
+    async def get_by_group_id(self, group_id: int, skip: int = 0, limit: int = 100) -> Tuple[
+        List[GroupInvitation], int]:
         """
-        Retrieves all invitations for a specific group, optionally filtered by status.
+        Отримує список запрошень для вказаної групи з пагінацією.
 
         Args:
-            db: The SQLAlchemy asynchronous database session.
-            group_id: The ID of the group.
-            status: Optional. Filter by a specific invitation status.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
+            group_id (int): ID групи.
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
 
         Returns:
-            A list of GroupInvitation objects.
+            Tuple[List[GroupInvitation], int]: Кортеж зі списком запрошень та їх загальною кількістю.
         """
-        conditions = [self.model.group_id == group_id] # type: ignore[attr-defined]
-        if status:
-            conditions.append(self.model.status == status) # type: ignore[attr-defined]
+        filters = [self.model.group_id == group_id]
+        # Можна додати сортування, наприклад, за датою створення або терміном дії
+        order_by = [self.model.created_at.desc()]
+        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
 
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.created_at.desc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
+    async def get_by_email_and_group(self, email: str, group_id: int) -> Optional[GroupInvitation]:
+        """
+        Отримує активне запрошення для конкретного email в конкретній групі.
+        Може бути кілька запрошень на один email в різні групи, або навіть в одну, якщо старі не видалені/скасовані.
+        Цей метод може потребувати уточнення логіки (наприклад, повертати лише активне/непрострочене).
+
+        Args:
+            email (str): Електронна пошта запрошеного.
+            group_id (int): ID групи.
+
+        Returns:
+            Optional[GroupInvitation]: Екземпляр моделі `GroupInvitation`, якщо знайдено активне запрошення.
+        """
+        # TODO: Додати фільтр по статусу та expires_at для отримання лише дійсних запрошень.
+        # Наприклад:
+        # from backend.app.src.core.dicts import InvitationStatus # Потрібен Enum
+        # from datetime import datetime, timezone
+        # stmt = select(self.model).where(
+        #     self.model.email == email,
+        #     self.model.group_id == group_id,
+        #     self.model.status == InvitationStatus.PENDING.value, # Або відповідний рядок
+        #     self.model.expires_at > datetime.now(timezone.utc)
+        # )
+        stmt = select(self.model).where(
+            self.model.email == email,
+            self.model.group_id == group_id
         )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
+        result = await self.db_session.execute(stmt)
+        # Якщо може бути кілька, використовуйте .scalars().all() або .first()
+        return result.scalar_one_or_none()
 
-    async def get_all_for_email(
-        self,
-        db: AsyncSession,
-        *,
-        email: str,
-        group_id: Optional[int] = None, # Optionally filter by group as well
-        status: Optional[InvitationStatusEnum] = None,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[GroupInvitation]:
-        """
-        Retrieves all invitations sent to a specific email address,
-        optionally filtered by group and status.
+        # При створенні (успадкований метод create), GroupInvitationCreateSchema має містити group_id.
+    # created_by_user_id, invitation_code, expires_at, status - зазвичай встановлюються сервісом.
 
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            email: The email address to filter by.
-            group_id: Optional. Filter by a specific group ID.
-            status: Optional. Filter by a specific invitation status.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
 
-        Returns:
-            A list of GroupInvitation objects.
-        """
-        conditions = [self.model.email_invited == email] # type: ignore[attr-defined]
-        if group_id is not None:
-            conditions.append(self.model.group_id == group_id) # type: ignore[attr-defined]
-        if status:
-            conditions.append(self.model.status == status) # type: ignore[attr-defined]
+if __name__ == "__main__":
+    # Демонстраційний блок для GroupInvitationRepository.
+    logger.info("--- Репозиторій Запрошень до Груп (GroupInvitationRepository) ---")
 
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.created_at.desc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
+    logger.info("Для тестування GroupInvitationRepository потрібна асинхронна сесія SQLAlchemy та налаштована БД.")
+    logger.info(f"Він успадковує методи від BaseRepository для моделі {GroupInvitation.__name__}.")
+    logger.info(f"  Очікує схему створення: {GroupInvitationCreateSchema.__name__}")
+    logger.info(f"  Очікує схему оновлення: {GroupInvitationUpdateSchema.__name__}")
 
-    async def get_all_for_target_user(
-        self,
-        db: AsyncSession,
-        *,
-        user_id: int,
-        group_id: Optional[int] = None, # Optionally filter by group
-        status: Optional[InvitationStatusEnum] = None,
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[GroupInvitation]:
-        """
-        Retrieves all invitations sent directly to a specific target user ID,
-        optionally filtered by group and status.
+    logger.info("\nСпецифічні методи:")
+    logger.info("  - get_by_code(code: str)")
+    logger.info("  - get_by_group_id(group_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("  - get_by_email_and_group(email: str, group_id: int)")
 
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            user_id: The ID of the target user.
-            group_id: Optional. Filter by a specific group ID.
-            status: Optional. Filter by a specific invitation status.
-            skip: Number of records to skip.
-            limit: Maximum number of records to return.
-
-        Returns:
-            A list of GroupInvitation objects.
-        """
-        conditions = [self.model.target_user_id == user_id] # type: ignore[attr-defined]
-        if group_id is not None:
-            conditions.append(self.model.group_id == group_id) # type: ignore[attr-defined]
-        if status:
-            conditions.append(self.model.status == status) # type: ignore[attr-defined]
-
-        statement = (
-            select(self.model)
-            .where(*conditions)
-            .order_by(self.model.created_at.desc()) # type: ignore[attr-defined]
-            .offset(skip)
-            .limit(limit)
-        )
-        result = await db.execute(statement)
-        return list(result.scalars().all())
-
-    async def update_status(
-        self, db: AsyncSession, *, invitation_id: int, new_status: InvitationStatusEnum
-    ) -> Optional[GroupInvitation]:
-        """
-        Updates the status of a specific invitation.
-        Also updates `accepted_at` or `revoked_at` based on the new status.
-
-        Args:
-            db: The SQLAlchemy asynchronous database session.
-            invitation_id: The ID of the invitation to update.
-            new_status: The new status for the invitation.
-
-        Returns:
-            The updated GroupInvitation object if found, otherwise None.
-        """
-        db_obj = await self.get(db, id=invitation_id)
-        if db_obj:
-            if db_obj.status == new_status: # No change needed
-                return db_obj
-
-            db_obj.status = new_status
-            now = datetime.now(timezone.utc)
-            db_obj.updated_at = now # type: ignore[union-attr]
-
-            if new_status == InvitationStatusEnum.ACCEPTED:
-                db_obj.accepted_at = now # type: ignore[union-attr]
-            elif new_status == InvitationStatusEnum.REVOKED:
-                db_obj.revoked_at = now # type: ignore[union-attr]
-            # Add other status-specific logic if needed (e.g., clearing accepted_at if status changes from accepted)
-
-            db.add(db_obj)
-            await db.commit()
-            await db.refresh(db_obj)
-            return db_obj
-        return None
-
-    # The base `create` and `remove` (hard delete) methods from BaseRepository will be used.
-    # `create` uses GroupInvitationCreate schema.
-    # `update` (generic) uses GroupInvitationUpdate, but `update_status` is more specific.
-    # The model has default factories for `invitation_code` and `expires_at`.
+    logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+    logger.info("TODO: Метод get_by_email_and_group може потребувати доопрацювання для фільтрації за статусом/терміном дії.")

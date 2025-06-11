@@ -1,129 +1,132 @@
 # backend/app/src/schemas/tasks/review.py
-
 """
-Pydantic schemas for Task Reviews.
-"""
+Pydantic схеми для сутності "Відгук на Завдання" (TaskReview).
 
-import logging
+Цей модуль визначає схеми для:
+- Базового представлення відгуку на завдання (`TaskReviewBaseSchema`).
+- Створення нового відгуку (`TaskReviewCreateSchema`).
+- Оновлення існуючого відгуку (`TaskReviewUpdateSchema`).
+- Представлення даних про відгук у відповідях API (`TaskReviewSchema`).
+"""
+from datetime import datetime
 from typing import Optional
-from datetime import datetime, timezone, timedelta # For examples and BaseResponseSchema
 
-from pydantic import Field, conint
+from pydantic import Field
 
-from backend.app.src.schemas.base import BaseSchema, BaseResponseSchema
-
-# Configure logger for this module
-logger = logging.getLogger(__name__)
-
-# --- Locally defined Basic Info schemas for demonstration ---
-class UserBasicInfo(BaseSchema): # Inherit BaseSchema for consistent config (e.g. camelCase)
-    id: int = Field(..., example=105)
-    name: Optional[str] = Field(None, example="CriticalCarl")
-
-class TaskBasicInfo(BaseSchema): # Inherit BaseSchema
-    id: int = Field(..., example=1)
-    name: str = Field(..., example="Research Competitors")
-# --- End of local Basic Info schemas ---
+# Абсолютний імпорт базових схем та міксинів
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
-# --- TaskReview Schemas ---
-
-class TaskReviewBase(BaseSchema):
+class TaskReviewBaseSchema(BaseSchema):
     """
-    Base schema for task review data.
-    `task_id` and `user_id` (reviewer) are usually context-derived or path parameters.
+    Базова схема для полів відгуку на завдання.
+    `task_id` та `user_id` зазвичай визначаються з контексту.
     """
-    rating: Optional[conint(ge=1, le=5)] = Field(None, description="Numerical rating (e.g., 1 to 5 stars). Null if only comment provided.", example=5)
-    comment: Optional[str] = Field(None, description="Textual feedback or comment from the user.", example="Great task, very challenging!")
+    # task_id: int = Field(description="Ідентифікатор завдання, до якого залишено відгук.") # Зазвичай з URL
+    # user_id: int = Field(description="Ідентифікатор користувача, який залишив відгук.") # Зазвичай поточний користувач
 
-class TaskReviewCreate(TaskReviewBase):
+    rating: Optional[int] = Field(
+        None,
+        ge=1,
+        le=5,
+        description="Числовий рейтинг завдання (від 1 до 5, необов'язково)."
+    )
+    comment: Optional[str] = Field(
+        None,
+        description="Текстовий коментар до відгуку (необов'язково)."
+    )
+
+    # model_config успадковується з BaseSchema (from_attributes=True)
+
+
+class TaskReviewCreateSchema(TaskReviewBaseSchema):
     """
-    Schema for creating a new task review.
-    `task_id` from path, `user_id` from authenticated user.
-    At least one of rating or comment should typically be required by service layer.
+    Схема для створення нового відгуку на завдання.
+    `task_id` зазвичай з параметра шляху, `user_id` - поточний користувач.
     """
-    # Service layer should validate that at least rating or comment is provided.
-    # If strictness is desired at schema level, a model_validator could be added here.
-    # Example:
-    # @model_validator(mode='after')
-    # def check_rating_or_comment_exists(self) -> 'TaskReviewCreate':
-    #     if self.rating is None and self.comment is None:
-    #         raise ValueError("At least one of 'rating' or 'comment' must be provided.")
-    #     return self
+    # Успадковує rating та comment.
+    # Валідація, що хоча б одне з полів (rating або comment) має бути надане,
+    # може бути додана за допомогою model_validator.
     pass
 
-class TaskReviewUpdate(TaskReviewBase): # Inherits from TaskReviewBase, fields are already Optional
-    """
-    Schema for updating an existing task review.
-    All fields are optional for partial updates.
-    """
-    # rating and comment are already optional in TaskReviewBase for this purpose.
-    # If you want to make sure that at least one field is provided for update,
-    # a model_validator could be added here as well, checking if model_dump(exclude_unset=True) is empty.
-    pass
 
-class TaskReviewResponse(BaseResponseSchema):
+class TaskReviewUpdateSchema(
+    BaseSchema):  # Не успадковує TaskReviewBaseSchema, щоб уникнути успадкування полів, які не можна змінювати
     """
-    Schema for representing a task review in API responses.
-    Includes 'id' (of the review record), 'created_at', 'updated_at'.
-    `created_at` effectively serves as the review_date.
+    Схема для оновлення існуючого відгуку на завдання.
+    Дозволяє оновлювати рейтинг та/або коментар.
     """
-    task: TaskBasicInfo = Field(..., description="Basic information about the reviewed task.")
-    user: UserBasicInfo = Field(..., description="Basic information about the user who submitted the review.")
+    rating: Optional[int] = Field(
+        None,
+        ge=1,
+        le=5,
+        description="Новий числовий рейтинг завдання (від 1 до 5)."
+    )
+    comment: Optional[str] = Field(
+        None,
+        description="Новий текстовий коментар до відгуку."
+    )
+    # Валідація, що хоча б одне поле надано для оновлення,
+    # може бути додана за допомогою model_validator.
 
-    rating: Optional[int] = Field(None, description="Numerical rating given.") # conint is for validation, output can be int
-    comment: Optional[str] = Field(None, description="Textual comment provided.")
-    # review_date: datetime = Field(alias="createdAt", ...) # Alias if preferred, but createdAt is standard
+
+class TaskReviewSchema(TaskReviewBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+    """
+    Схема для представлення даних про відгук на завдання у відповідях API.
+    """
+    # id, created_at, updated_at успадковані.
+    # rating, comment успадковані.
+    # task_id та user_id потрібно додати явно, оскільки вони не в TaskReviewBaseSchema.
+    task_id: int = Field(description="Ідентифікатор завдання, до якого залишено відгук.")
+    user_id: int = Field(description="Ідентифікатор користувача, який залишив відгук.")
+
+    user: Optional[UserPublicProfileSchema] = Field(None,
+                                                    description="Публічний профіль користувача, який залишив відгук.")
+    # Можна додати поле `task: Optional[TaskBriefSchema] = None`, якщо потрібно.
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем відгуків на завдання.
+    logger.info("--- Pydantic Схеми для Відгуків на Завдання (TaskReview) ---")
 
-    logger.info("--- TaskReview Schemas --- Demonstration")
-
-    # TaskReviewCreate Example
-    # Assume task_id=1, user_id=1 (reviewer) from context
-    review_create_data = {
-        "rating": 4,
-        "comment": "Good task, but the instructions could be a bit clearer on step 3."
-    }
-    try:
-        create_schema = TaskReviewCreate(**review_create_data)
-        logger.info(f"TaskReviewCreate valid: {create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating TaskReviewCreate: {e}")
-
-    review_create_comment_only = {"comment": "Just a comment, no rating."}
-    try:
-        create_comment_schema = TaskReviewCreate(**review_create_comment_only)
-        logger.info(f"TaskReviewCreate (comment only) valid: {create_comment_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating TaskReviewCreate (comment only): {e}")
-
-    # TaskReviewUpdate Example
-    # Assume review_id from path
-    review_update_data = {"comment": "Updated comment: Actually, step 3 was fine after re-reading!"}
-    update_schema = TaskReviewUpdate(**review_update_data)
-    logger.info(f"TaskReviewUpdate (partial): {update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # TaskReviewResponse Example
-    task_info_data = {"id": 1, "name": "Research Competitors"}
-    reviewer_info_data = {"id": 105, "name": "CriticalCarl"}
-
-    response_data = {
-        "id": 707, # ID of the TaskReview record
-        "createdAt": (datetime.now(timezone.utc) - timedelta(days=1)).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "task": task_info_data,
-        "user": reviewer_info_data,
+    logger.info("\nTaskReviewCreateSchema (приклад для створення):")
+    create_review_data = {
         "rating": 5,
-        "comment": "This task provided excellent insights!"
+        "comment": "Дуже корисне завдання, дякую!"  # TODO i18n
     }
+    create_review_instance = TaskReviewCreateSchema(**create_review_data)
+    logger.info(create_review_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nTaskReviewUpdateSchema (приклад для оновлення):")
+    update_review_data = {
+        "comment": "Оновлений коментар: завдання було справді корисним для команди."  # TODO i18n
+    }
+    update_review_instance = TaskReviewUpdateSchema(**update_review_data)
+    logger.info(update_review_instance.model_dump_json(indent=2, exclude_none=True))
     try:
-        response_schema = TaskReviewResponse(**response_data) # type: ignore[call-arg]
-        logger.info(f"TaskReviewResponse: {response_schema.model_dump_json(by_alias=True, indent=2)}")
-        if response_schema.task and response_schema.user:
-            logger.info(f"  Task '{response_schema.task.name}' reviewed by '{response_schema.user.name}' with rating {response_schema.rating}")
+        TaskReviewUpdateSchema(rating=7)  # Невалідний рейтинг
     except Exception as e:
-        logger.error(f"Error creating TaskReviewResponse: {e}")
+        logger.info(f"Помилка валідації TaskReviewUpdateSchema (очікувано): {e}")
+
+    logger.info("\nTaskReviewSchema (приклад відповіді API):")
+    review_response_data = {
+        "id": 1,
+        "task_id": 10,
+        "user_id": 101,
+        "rating": 4,
+        "comment": "Гарне завдання, але можна було б чіткіше сформулювати умови.",  # TODO i18n
+        "created_at": datetime.now() - timedelta(days=1),
+        "updated_at": datetime.now(),
+        "user": {"id": 101, "name": "Рецензент Користувач"}  # TODO i18n
+    }
+    review_response_instance = TaskReviewSchema(**review_response_data)
+    logger.info(review_response_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних відгуків на завдання.")
+
+# Потрібно для timedelta в __main__
+from datetime import timedelta

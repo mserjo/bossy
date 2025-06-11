@@ -1,98 +1,105 @@
 # backend/app/src/models/auth/token.py
-
 """
-SQLAlchemy model for storing Refresh Tokens.
-Refresh tokens are typically long-lived tokens used to obtain new access tokens.
+Модель SQLAlchemy для сутності "Токен Оновлення" (RefreshToken).
+
+Цей модуль визначає модель `RefreshToken`, яка використовується для зберігання
+токенів оновлення JWT. Токени оновлення дозволяють користувачам отримувати
+нові токени доступу без повторного введення облікових даних.
 """
+from datetime import datetime
+from typing import TYPE_CHECKING, List  # List тут не потрібен, якщо немає зворотного зв'язку List
 
-import logging
-from typing import Optional, TYPE_CHECKING
-from datetime import datetime, timezone, timedelta # Added timezone, timedelta for __main__
-
-from sqlalchemy import String, DateTime, Boolean, ForeignKey, Integer # Added Integer for FK
+from sqlalchemy import String, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.src.models.base import BaseModel
-
-# Configure logger for this module
-logger = logging.getLogger(__name__)
+from backend.app.src.models.base import Base  # Успадковуємо від Base, а не BaseMainModel
+from backend.app.src.models.mixins import TimestampedMixin  # Додаємо часові мітки
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
-    from backend.app.src.models.auth.user import User
+    from backend.app.src.models.auth.user import User  # Для зв'язку user
 
-class RefreshToken(BaseModel):
+
+class RefreshToken(Base, TimestampedMixin):
     """
-    Represents a refresh token issued to a user.
-    Allows users to obtain new access tokens without re-authenticating.
-    It's crucial to manage these tokens securely.
+    Модель токена оновлення.
 
-    Attributes:
-        user_id (int): Foreign key to the user this token belongs to.
-        token_jti (str): The JWT ID (jti claim) of the refresh token, used for precise revocation.
-        expires_at (datetime): Timestamp when this refresh token expires (UTC).
-        is_revoked (bool): Whether this token has been revoked before its expiry.
-        ip_address (Optional[str]): IP address from which the token was issued/used.
-        user_agent (Optional[str]): User agent of the client that requested/used the token.
-        # `id`, `created_at`, `updated_at` are inherited from BaseModel.
+    Зберігає токени оновлення, пов'язані з користувачами, їх термін дії
+    та часові мітки створення/оновлення.
+
+    Атрибути:
+        id (Mapped[int]): Унікальний ідентифікатор запису токена.
+        token (Mapped[str]): Сам JWT токен оновлення (хешований або зашифрований у продакшені).
+                              Для простоти тут зберігається як є, але це НЕБЕЗПЕЧНО для реальних систем.
+                              TODO: Розглянути хешування або шифрування значення токена перед збереженням.
+        user_id (Mapped[int]): Зовнішній ключ до користувача, якому належить токен.
+        expires_at (Mapped[datetime]): Дата та час закінчення терміну дії токена.
+        user (Mapped["User"]): Зв'язок з моделлю User.
+        created_at, updated_at: Успадковано від `TimestampedMixin`.
     """
     __tablename__ = "refresh_tokens"
 
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True, comment="The user this token belongs to")
-    token_jti: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False, comment="JWT ID (jti claim) of the refresh token, for unique identification and revocation")
+    id: Mapped[int] = mapped_column(
+        primary_key=True, index=True, autoincrement=True, comment="Унікальний ідентифікатор токена оновлення"
+    )
+    # TODO: У продакшені значення `token` слід хешувати перед збереженням для безпеки.
+    #       Довжина 512 обрана з запасом для JWT. Якщо хешується, довжина може бути іншою (наприклад, 255 для SHA256 hex).
+    token: Mapped[str] = mapped_column(
+        String(512), unique=True, index=True, nullable=False,
+        comment="Значення токена оновлення (в реальності - його хеш)"
+    )
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey('users.id', name='fk_refresh_token_user_id', ondelete='CASCADE'),
+        nullable=False,
+        comment="ID користувача, якому належить токен"
+    )
+    expires_at: Mapped[datetime] = mapped_column(
+        nullable=False, comment="Час закінчення терміну дії токена"
+    )
 
-    expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, index=True, comment="Timestamp when this refresh token expires (UTC)")
-    is_revoked: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True, comment="True if this token has been revoked before its natural expiry")
+    # Зв'язок з користувачем
+    user: Mapped["User"] = relationship(back_populates="refresh_tokens", lazy="selectin")
 
-    ip_address: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, comment="IP address from which the token was issued/last used")
-    user_agent: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, comment="User agent of the client that requested/used the token")
+    # Поля для __repr__
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
+    _repr_fields = ["id", "user_id", "expires_at"]
 
-    # --- Relationship ---
-    user: Mapped["User"] = relationship(back_populates="refresh_tokens")
-
-    def __repr__(self) -> str:
-        id_val = getattr(self, 'id', 'N/A')
-        return f"<RefreshToken(id={id_val}, user_id={self.user_id}, jti='{self.token_jti[:10]}...', expires_at='{self.expires_at.isoformat() if self.expires_at else 'N/A'}', revoked={self.is_revoked})>"
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для моделі RefreshToken.
+    logger.info("--- Модель Токена Оновлення (RefreshToken) ---")
+    logger.info(f"Назва таблиці: {RefreshToken.__tablename__}")
 
-    logger.info("--- RefreshToken Model --- Demonstration")
+    logger.info("\nОчікувані поля:")
+    expected_fields = ['id', 'token', 'user_id', 'expires_at', 'created_at', 'updated_at']
+    for field in expected_fields:
+        logger.info(f"  - {field}")
 
-    # Assume User model is available for demonstration if this were run in context
-    # from backend.app.src.models.auth.user import User
-    # demo_user = User(id=1, email="test@example.com", name="Test User", hashed_password="xyz")
+    logger.info("\nОчікувані зв'язки (relationships):")
+    logger.info(f"  - user (до User)")
 
-    # Example RefreshToken instance
-    refresh_token_instance = RefreshToken(
-        user_id=1, # Assuming user with id=1 exists
-        token_jti="unique_jwt_identifier_for_token_revocation_12345",
+    # Приклад створення екземпляра (без взаємодії з БД)
+    from datetime import timedelta
+
+    # Потрібно імітувати User для зв'язку, якщо __repr__ його використовує,
+    # але наш __repr__ з Base використовує лише mapped_column поля.
+
+    example_token = RefreshToken(
+        id=1,
+        token="some_very_long_refresh_jwt_token_string_example_value",
+        user_id=101,
         expires_at=datetime.now(timezone.utc) + timedelta(days=7),
-        is_revoked=False,
-        ip_address="192.168.1.101",
-        user_agent="DemoClient/1.0"
     )
-    refresh_token_instance.id = 1 # Simulate ORM-set ID
-    refresh_token_instance.created_at = datetime.now(timezone.utc)
-    refresh_token_instance.updated_at = datetime.now(timezone.utc)
+    # Імітуємо часові мітки, які зазвичай встановлює БД або міксин
+    example_token.created_at = datetime.now(timezone.utc)
+    example_token.updated_at = datetime.now(timezone.utc)
 
-    logger.info(f"Example RefreshToken: {refresh_token_instance!r}")
-    logger.info(f"  User ID: {refresh_token_instance.user_id}")
-    logger.info(f"  JTI: {refresh_token_instance.token_jti}")
-    logger.info(f"  Expires At: {refresh_token_instance.expires_at.isoformat() if refresh_token_instance.expires_at else 'N/A'}")
-    logger.info(f"  Is Revoked: {refresh_token_instance.is_revoked}")
-    logger.info(f"  Created At: {refresh_token_instance.created_at.isoformat() if refresh_token_instance.created_at else 'N/A'}")
+    logger.info(f"\nПриклад екземпляра RefreshToken (без сесії):\n  {example_token}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <RefreshToken(id=1, user_id=101, expires_at=..., created_at=..., updated_at=...)>
+    # Поле 'token' не включено в _repr_fields за замовчуванням через його довжину та чутливість.
 
-
-    revoked_token_instance = RefreshToken(
-        user_id=2,
-        token_jti="another_jti_67890",
-        expires_at=datetime.now(timezone.utc) + timedelta(days=1),
-        is_revoked=True,
-    )
-    revoked_token_instance.id = 2
-    logger.info(f"Example Revoked RefreshToken: {revoked_token_instance!r}")
-
-    # The following line would error if run directly without SQLAlchemy engine and metadata setup for all related tables.
-    # logger.info(f"RefreshToken attributes (conceptual table columns): {[c.name for c in RefreshToken.__table__.columns if not c.name.startswith('_')]}")
-    logger.info("To see actual table columns, SQLAlchemy metadata needs to be initialized with an engine (e.g., Base.metadata.create_all(engine)).")
+    logger.info("\nВАЖЛИВО: У реальному застосунку поле 'token' повинно зберігатися хешованим!")
+    logger.info("Примітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

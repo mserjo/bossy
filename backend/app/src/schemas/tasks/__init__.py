@@ -1,24 +1,67 @@
 # backend/app/src/schemas/tasks/__init__.py
-
 """
-This package contains Pydantic schemas related to tasks, events, assignments,
-completions, and reviews.
+Pydantic схеми для сутностей, пов'язаних із "Завданнями".
+
+Цей пакет містить схеми Pydantic, що використовуються для валідації
+даних запитів та формування відповідей API, які стосуються завдань (або подій),
+їх призначень користувачам, записів про виконання та відгуків в програмі Kudos.
 """
 
-import logging
+# Схеми, пов'язані з Завданням (Task)
+from .task import (
+    TaskBaseSchema,
+    TaskCreateSchema,
+    TaskUpdateSchema,
+    TaskSchema,
+    TaskDetailSchema
+)
 
-logger = logging.getLogger(__name__)
-logger.debug("Task schemas package initialized.")
+# Схеми, пов'язані з Призначенням Завдання (TaskAssignment)
+from .assignment import (
+    TaskAssignmentBaseSchema,
+    TaskAssignmentCreateSchema,
+    TaskAssignmentUpdateSchema,
+    TaskAssignmentSchema
+)
 
-# Example of re-exporting for easier access:
-# from .task import TaskResponse, TaskCreate, TaskUpdate
-# from .event import EventResponse
-# from .assignment import TaskAssignmentResponse
-# from .completion import TaskCompletionResponse
-# from .review import TaskReviewResponse
+# Схеми, пов'язані з Виконанням Завдання (TaskCompletion)
+from .completion import (
+    TaskCompletionBaseSchema,
+    TaskCompletionCreateSchema,
+    TaskCompletionUpdateSchema,
+    TaskCompletionSchema
+)
 
-# __all__ = [
-#     "TaskResponse", "TaskCreate", "TaskUpdate",
-#     "EventResponse",
-#     # ... other task-related schemas
-# ]
+# Схеми, пов'язані з Відгуком на Завдання (TaskReview)
+from .review import (
+    TaskReviewBaseSchema,
+    TaskReviewCreateSchema,
+    TaskReviewUpdateSchema,
+    TaskReviewSchema
+)
+
+# Модуль event.py для схем був видалений, оскільки Event як сутність була об'єднана з Task.
+
+__all__ = [
+    # Task schemas
+    "TaskBaseSchema",
+    "TaskCreateSchema",
+    "TaskUpdateSchema",
+    "TaskSchema",
+    "TaskDetailSchema",
+    # TaskAssignment schemas
+    "TaskAssignmentBaseSchema",
+    "TaskAssignmentCreateSchema",
+    "TaskAssignmentUpdateSchema",
+    "TaskAssignmentSchema",
+    # TaskCompletion schemas
+    "TaskCompletionBaseSchema",
+    "TaskCompletionCreateSchema",
+    "TaskCompletionUpdateSchema",
+    "TaskCompletionSchema",
+    # TaskReview schemas
+    "TaskReviewBaseSchema",
+    "TaskReviewCreateSchema",
+    "TaskReviewUpdateSchema",
+    "TaskReviewSchema",
+]

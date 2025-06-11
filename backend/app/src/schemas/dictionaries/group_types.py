@@ -1,115 +1,94 @@
 # backend/app/src/schemas/dictionaries/group_types.py
-
 """
-Pydantic schemas for GroupType dictionary entries.
+Pydantic схеми для довідника "Типи Груп".
+
+Цей модуль визначає схеми для представлення, створення та оновлення
+записів у довіднику типів груп (наприклад, "Сім'я", "Відділ").
 """
 
-import logging
-from typing import Optional # For optional custom fields if any
-from datetime import datetime, timezone # For example values in __main__ and BaseResponseSchema
+from typing import Optional
+from backend.app.src.config.logging import get_logger  # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-from pydantic import Field
+# Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    DictionaryBase,
-    # DictionaryCreate as BaseDictionaryCreate, # Not directly used if GroupTypeCreate inherits GroupTypeBase
-    # DictionaryUpdate as BaseDictionaryUpdate, # Not directly used if GroupTypeUpdate inherits GroupTypeBase
-    DictionaryResponse as BaseDictionaryResponse
+    BaseDictionarySchema,
+    DictionaryCreateSchema,
+    DictionaryUpdateSchema
 )
 
-# Configure logger for this module
-logger = logging.getLogger(__name__)
 
-# --- GroupType Schemas ---
+# from pydantic import Field
 
-class GroupTypeBase(DictionaryBase):
-    """Base schema for GroupType, inherits all fields from DictionaryBase."""
-    # Example of custom fields if GroupType model had them:
-    # default_max_members: Optional[int] = Field(None,
-    #                                             description="Default maximum members for this group type.",
-    #                                             example=50)
-    # allows_subgroups: Optional[bool] = Field(None,
-    #                                         description="Whether groups of this type can have subgroups.",
-    #                                         example=False)
+# Схема для представлення запису Типу Групи (у відповідях API)
+class GroupTypeSchema(BaseDictionarySchema):
+    """
+    Pydantic схема для представлення запису довідника "Тип Групи".
+    Успадковує всі поля від `BaseDictionarySchema`.
+    """
+    # Специфічні поля для GroupTypeSchema, якщо є, додаються тут.
     pass
 
-class GroupTypeCreate(GroupTypeBase):
+
+# Схема для створення нового запису Типу Групи
+class GroupTypeCreateSchema(DictionaryCreateSchema):
     """
-    Schema for creating a new GroupType.
-    Inherits fields from GroupTypeBase. 'code' and 'name' are effectively required.
+    Pydantic схема для створення нового запису в довіднику "Тип Групи".
+    Успадковує всі поля від `DictionaryCreateSchema`.
     """
+    # Специфічні поля для створення GroupType, якщо є, додаються тут.
     pass
 
-class GroupTypeUpdate(GroupTypeBase):
-    """
-    Schema for updating an existing GroupType.
-    All fields from GroupTypeBase are made optional here for partial updates.
-    """
-    code: Optional[str] = Field(None, min_length=1, max_length=100, description="Unique code or short identifier.")
-    name: Optional[str] = Field(None, min_length=1, max_length=255, description="Human-readable name.")
-    description: Optional[str] = Field(None)
-    state: Optional[str] = Field(None, max_length=50)
-    is_default: Optional[bool] = Field(None)
-    display_order: Optional[int] = Field(None)
-    notes: Optional[str] = Field(None)
-    # If custom fields were in GroupTypeBase:
-    # default_max_members: Optional[int] = Field(None)
-    # allows_subgroups: Optional[bool] = Field(None)
 
-
-class GroupTypeResponse(BaseDictionaryResponse):
+# Схема для оновлення існуючого запису Типу Групи
+class GroupTypeUpdateSchema(DictionaryUpdateSchema):
     """
-    Schema for representing a GroupType in API responses.
-    Inherits all fields from BaseDictionaryResponse.
-    Add any GroupType-specific response fields here if GroupTypeBase had custom fields.
+    Pydantic схема для оновлення існуючого запису в довіднику "Тип Групи".
+    Успадковує всі поля від `DictionaryUpdateSchema`.
     """
-    # If custom fields were in GroupTypeBase and should be in response:
-    # default_max_members: Optional[int] = Field(None, description="Default maximum members.")
-    # allows_subgroups: Optional[bool] = Field(None, description="Can have subgroups?")
+    # Специфічні поля для оновлення GroupType, якщо є, додаються тут.
     pass
 
 
 if __name__ == "__main__":
-    if not logging.getLogger().hasHandlers():
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    # Демонстраційний блок для схем GroupType.
+    logger.info("--- Pydantic Схеми для Довідника: GroupType ---")
 
-    logger.info("--- GroupType Schemas (Dictionary) --- Demonstration")
-
-    # GroupTypeCreate Example
-    type_create_data = {
-        "code": "FAMILY_UNIT",
-        "name": "Family Unit",
-        "description": "A group type for families.",
-        "state": "active",
-        # "defaultMaxMembers": 10, # camelCase alias example if field existed
-        # "allowsSubgroups": False
-    }
-    try:
-        type_create_schema = GroupTypeCreate(**type_create_data)
-        logger.info(f"GroupTypeCreate valid: {type_create_schema.model_dump(by_alias=True)}")
-    except Exception as e:
-        logger.error(f"Error creating GroupTypeCreate: {e}")
-
-    # GroupTypeUpdate Example
-    type_update_data = {"description": "A group type specifically for close-knit family units."}
-    type_update_schema = GroupTypeUpdate(**type_update_data)
-    logger.info(f"GroupTypeUpdate (partial): {type_update_schema.model_dump(exclude_unset=True, by_alias=True)}")
-
-    # GroupTypeResponse Example
-    type_response_data = {
+    logger.info("\nGroupTypeSchema (приклад для відповіді API):")
+    group_type_data_from_db = {
         "id": 1,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-        "updatedAt": datetime.now(timezone.utc).isoformat(),
-        "code": "WORK_TEAM",
-        "name": "Work Team",
-        "description": "A group type for professional teams.",
+        "name": "Команда Розробки",  # TODO i18n
+        "code": "DEV_TEAM",
+        "description": "Тип групи для команд розробників програмного забезпечення.",  # TODO i18n
         "state": "active",
-        "isDefault": False,
-        "displayOrder": 3,
-        # "defaultMaxMembers": 25, # If field existed
-        # "allowsSubgroups": True
+        "created_at": "2023-04-01T10:00:00Z",
+        "updated_at": "2023-04-01T12:30:00Z",
     }
-    try:
-        type_response_schema = GroupTypeResponse(**type_response_data) # type: ignore[call-arg]
-        logger.info(f"GroupTypeResponse: {type_response_schema.model_dump_json(by_alias=True, indent=2)}")
-    except Exception as e:
-        logger.error(f"Error creating GroupTypeResponse: {e}")
+    from datetime import datetime  # Потрібно для конвертації рядків у datetime
+
+    group_type_data_from_db['created_at'] = datetime.fromisoformat(
+        group_type_data_from_db['created_at'].replace('Z', '+00:00'))
+    group_type_data_from_db['updated_at'] = datetime.fromisoformat(
+        group_type_data_from_db['updated_at'].replace('Z', '+00:00'))
+
+    group_type_schema_instance = GroupTypeSchema(**group_type_data_from_db)
+    logger.info(group_type_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nGroupTypeCreateSchema (приклад для створення):")
+    create_data = {
+        "name": "Сім'я",  # TODO i18n
+        "code": "FAMILY",
+        "description": "Група для членів сім'ї."  # TODO i18n
+    }
+    create_schema_instance = GroupTypeCreateSchema(**create_data)
+    logger.info(create_schema_instance.model_dump_json(indent=2))
+
+    logger.info("\nGroupTypeUpdateSchema (приклад для оновлення):")
+    update_data = {
+        "description": "Оновлений опис для типу групи Сім'я."  # TODO i18n
+    }
+    update_schema_instance = GroupTypeUpdateSchema(**update_data)
+    logger.info(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+
+    logger.info("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")

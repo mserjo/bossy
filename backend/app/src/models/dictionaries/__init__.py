@@ -1,4 +1,5 @@
 # backend/app/src/models/dictionaries/__init__.py
+# -*- coding: utf-8 -*-
 """
 Пакет моделей-довідників SQLAlchemy.
 
@@ -10,15 +11,15 @@
 наприклад, при визначенні зв'язків або при роботі з Alembic міграціями.
 """
 
-from .base_dict import BaseDictionaryModel
-from .statuses import Status
-from .user_roles import UserRole
-from .user_types import UserType
-from .group_types import GroupType
-from .task_types import TaskType
-from .bonus_types import BonusType
-from .calendars import CalendarProvider
-from .messengers import MessengerPlatform
+from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.models.dictionaries.statuses import Status
+from backend.app.src.models.dictionaries.user_roles import UserRole
+from backend.app.src.models.dictionaries.user_types import UserType
+from backend.app.src.models.dictionaries.group_types import GroupType
+from backend.app.src.models.dictionaries.task_types import TaskType
+from backend.app.src.models.dictionaries.bonus_types import BonusType
+from backend.app.src.models.dictionaries.calendars import CalendarProvider
+from backend.app.src.models.dictionaries.messengers import MessengerPlatform
 
 __all__ = [
     "BaseDictionaryModel",

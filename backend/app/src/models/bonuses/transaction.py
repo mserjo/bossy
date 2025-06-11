@@ -1,4 +1,5 @@
 # backend/app/src/models/bonuses/transaction.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для сутності "Транзакція по Рахунку" (AccountTransaction).
 

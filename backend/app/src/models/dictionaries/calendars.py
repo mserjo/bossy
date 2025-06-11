@@ -1,4 +1,5 @@
 # backend/app/src/models/dictionaries/calendars.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для довідника "Календарі" (постачальники календарів).
 

@@ -1,4 +1,5 @@
 # backend/app/src/models/groups/invitation.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для сутності "Запрошення до Групи" (GroupInvitation).
 

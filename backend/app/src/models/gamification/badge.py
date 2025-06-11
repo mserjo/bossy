@@ -1,4 +1,5 @@
 # backend/app/src/models/gamification/badge.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для сутності "Бейдж" (Badge) в системі гейміфікації.
 

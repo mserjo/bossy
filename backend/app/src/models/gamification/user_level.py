@@ -28,7 +28,7 @@ class UserLevel(Base, TimestampedMixin):
     """
     Модель Рівня Користувача.
 
-    Зберігає інформацію про те, якого рівня досяг користувач у конкретній групі
+    Зберігає інформацію про те, якого рівня досяг користувач, можливо, в конкретній групі,
     та коли це сталося. Поле `created_at` з `TimestampedMixin` використовується
     як дата та час досягнення рівня (`achieved_at`).
 
@@ -36,7 +36,7 @@ class UserLevel(Base, TimestampedMixin):
         id (Mapped[int]): Унікальний ідентифікатор запису про досягнення рівня.
         user_id (Mapped[int]): ID користувача, який досяг рівня.
         level_id (Mapped[int]): ID досягнутого рівня.
-        group_id (Mapped[int]): ID групи, в межах якої досягнуто рівень.
+        group_id (Mapped[Optional[int]]): ID групи, в межах якої досягнуто рівень (NULL для глобальних рівнів).
 
         user (Mapped["User"]): Зв'язок з моделлю `User`.
         level (Mapped["Level"]): Зв'язок з моделлю `Level`.
@@ -61,10 +61,10 @@ class UserLevel(Base, TimestampedMixin):
         nullable=False,
         comment="ID досягнутого рівня гейміфікації"
     )
-    group_id: Mapped[int] = mapped_column(
+    group_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey('groups.id', name='fk_user_level_group_id', ondelete="CASCADE"),
-        nullable=False,
-        comment="ID групи, в якій досягнуто рівень"
+        nullable=True, # Дозволяємо NULL для глобальних рівнів, не прив'язаних до групи
+        comment="ID групи, в якій досягнуто рівень (NULL для глобальних рівнів)"
     )
     # `created_at` з TimestampedMixin використовується як `achieved_at` (час досягнення)
 

@@ -1,4 +1,5 @@
 # backend/app/src/models/gamification/rating.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для сутності "Рейтинг Користувача в Групі" (UserGroupRating).
 

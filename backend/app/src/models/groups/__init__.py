@@ -1,4 +1,5 @@
 # backend/app/src/models/groups/__init__.py
+# -*- coding: utf-8 -*-
 """
 Пакет моделей SQLAlchemy для сутностей, пов'язаних з "Групами".
 
@@ -9,10 +10,10 @@
 Моделі експортуються для зручного доступу з інших частин програми.
 """
 
-from .group import Group
-from .membership import GroupMembership
-from .settings import GroupSetting
-from .invitation import GroupInvitation
+from backend.app.src.models.groups.group import Group
+from backend.app.src.models.groups.membership import GroupMembership
+from backend.app.src.models.groups.settings import GroupSetting
+from backend.app.src.models.groups.invitation import GroupInvitation
 
 __all__ = [
     "Group",

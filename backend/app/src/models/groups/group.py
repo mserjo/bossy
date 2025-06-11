@@ -1,4 +1,5 @@
 # backend/app/src/models/groups/group.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для сутності "Група".
 

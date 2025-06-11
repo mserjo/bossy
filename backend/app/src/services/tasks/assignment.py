@@ -1,85 +1,116 @@
 # backend/app/src/services/tasks/assignment.py
-import logging
+# import logging # Замінено на централізований логер
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload, joinedload, noload
 from sqlalchemy.exc import IntegrityError
 
-from app.src.services.base import BaseService
-from app.src.models.tasks.assignment import TaskAssignment # SQLAlchemy TaskAssignment model
-from app.src.models.tasks.task import Task # For task context
-from app.src.models.tasks.event import Event # For event context (if assignments can be to events too)
-from app.src.models.auth.user import User # For user context
+# Повні шляхи імпорту
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.tasks.assignment import TaskAssignment # Модель SQLAlchemy TaskAssignment
+from backend.app.src.models.tasks.task import Task # Для контексту завдання
+# from backend.app.src.models.tasks.event import Event # Для контексту події (якщо призначення можливі і для подій)
+from backend.app.src.models.auth.user import User # Для контексту користувача
+from backend.app.src.models.dictionaries.task_types import TaskType # Для завантаження типу завдання
+from backend.app.src.models.dictionaries.statuses import Status # Для завантаження статусу завдання
+from backend.app.src.models.groups.group import Group # Для завантаження групи завдання
 
-from app.src.schemas.tasks.assignment import ( # Pydantic Schemas
-    TaskAssignmentCreate, # Although not directly used as input to assign_task_to_user, good for consistency
-    # TaskAssignmentUpdate, # Assignments are often immutable; changes = new assignment or unassign/reassign
+
+from backend.app.src.schemas.tasks.assignment import ( # Схеми Pydantic
+    # TaskAssignmentCreate, # Не використовується прямо як тип параметра, але для узгодженості
+    # TaskAssignmentUpdate, # Призначення зазвичай незмінні; зміни = нове призначення або скасування/перепризначення
     TaskAssignmentResponse
 )
+from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import settings # Для доступу до конфігурацій (наприклад, DEBUG)
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
 
 class TaskAssignmentService(BaseService):
     """
-    Service for managing assignments of tasks (or events) to users.
-    Handles creating, retrieving, and removing assignments.
+    Сервіс для управління призначеннями завдань (або подій) користувачам.
+    Обробляє створення, отримання та видалення (деактивацію) призначень.
     """
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        logger.info("TaskAssignmentService initialized.")
+        logger.info("TaskAssignmentService ініціалізовано.")
+
+    async def _get_orm_assignment_with_relations(self, assignment_id: UUID) -> Optional[TaskAssignment]:
+        """Внутрішній метод для отримання ORM моделі TaskAssignment з усіма зв'язками."""
+        stmt = select(TaskAssignment).options(
+            selectinload(TaskAssignment.user).options(selectinload(User.user_type)),
+            selectinload(TaskAssignment.task).options(
+                selectinload(Task.task_type),
+                selectinload(Task.status),
+                selectinload(Task.group),
+                selectinload(Task.created_by_user).options(noload("*")) # Тільки ID, якщо не потрібен повний User
+            ),
+            selectinload(TaskAssignment.assigned_by).options(selectinload(User.user_type))
+        ).where(TaskAssignment.id == assignment_id)
+        return (await self.db_session.execute(stmt)).scalar_one_or_none()
+
 
     async def assign_task_to_user(
         self,
         task_id: UUID,
         user_id: UUID,
-        assigned_by_user_id: Optional[UUID] = None,
-        # Assuming TaskAssignment model has only task_id FK for simplicity now.
-        # If it can also link to events (e.g. event_id FK), item_type parameter would be needed.
+        assigned_by_user_id: Optional[UUID] = None
+        # TODO: Якщо сервіс має обробляти призначення і для Event, додати параметр item_type: str ('task'/'event')
+        #  та відповідно event_id: Optional[UUID]. Модель TaskAssignment також має це підтримувати.
     ) -> TaskAssignmentResponse:
         """
-        Assigns a task to a user.
-        Prevents duplicate active assignments. Reactivates inactive assignments.
-        """
-        logger.debug(f"Attempting to assign task ID '{task_id}' to user ID '{user_id}'.")
+        Призначає завдання користувачеві.
+        Запобігає дублюванню активних призначень. Реактивує неактивні призначення.
 
-        item_to_assign = await self.db_session.get(Task, task_id)
-        if not item_to_assign: raise ValueError(f"Task with ID '{task_id}' not found.")
+        :param task_id: ID завдання.
+        :param user_id: ID користувача, якому призначається завдання.
+        :param assigned_by_user_id: ID користувача, який виконав призначення (для аудиту).
+        :return: Pydantic схема TaskAssignmentResponse створеного або оновленого призначення.
+        :raises ValueError: Якщо завдання або користувача не знайдено, або виникає конфлікт даних. # i18n
+        """
+        logger.debug(f"Спроба призначення завдання ID '{task_id}' користувачу ID '{user_id}'.")
+
+        # Перевірка існування завдання та користувача
+        task = await self.db_session.get(Task, task_id)
+        if not task: raise ValueError(f"Завдання з ID '{task_id}' не знайдено.") # i18n
 
         user = await self.db_session.get(User, user_id)
-        if not user: raise ValueError(f"User with ID '{user_id}' not found.")
+        if not user: raise ValueError(f"Користувача з ID '{user_id}' не знайдено.") # i18n
 
+        # Пошук існуючого призначення (активного або неактивного)
         existing_assignment_stmt = select(TaskAssignment).where(
             TaskAssignment.task_id == task_id,
             TaskAssignment.user_id == user_id
-        ) # Fetch regardless of active status first
+        )
         assignment_db = (await self.db_session.execute(existing_assignment_stmt)).scalar_one_or_none()
 
-        if assignment_db:
+        current_time = datetime.now(timezone.utc)
+        if assignment_db: # Якщо запис призначення існує
             if assignment_db.is_active:
-                logger.warning(f"User ID '{user_id}' is already actively assigned to task ID '{task_id}'.")
-                # Return existing active assignment rather than raising error
-                await self.db_session.refresh(assignment_db, attribute_names=['user', 'task']) # Ensure fresh for response
-                return TaskAssignmentResponse.from_orm(assignment_db) # Pydantic v1
-                # For Pydantic v2: return TaskAssignmentResponse.model_validate(assignment_db)
-            else: # Is inactive, reactivate
-                logger.info(f"Reactivating existing assignment for user ID '{user_id}' to task ID '{task_id}'.")
+                logger.info(f"Користувач ID '{user_id}' вже активно призначений на завдання ID '{task_id}'. Повернення існуючого призначення.")
+                # Завантажуємо зв'язки для повної відповіді
+                full_assignment_db = await self._get_orm_assignment_with_relations(assignment_db.id)
+                return TaskAssignmentResponse.model_validate(full_assignment_db or assignment_db) # Pydantic v2
+            else: # Неактивне, реактивуємо
+                logger.info(f"Реактивація існуючого неактивного призначення для користувача ID '{user_id}' на завдання ID '{task_id}'.")
                 assignment_db.is_active = True
-                assignment_db.assigned_at = datetime.now(timezone.utc)
-                if hasattr(assignment_db, 'assigned_by_user_id') and assigned_by_user_id: # Check model attribute
+                assignment_db.assigned_at = current_time # Оновлюємо час "призначення" / реактивації
+                if hasattr(assignment_db, 'assigned_by_user_id'): # Перевірка наявності поля
                     assignment_db.assigned_by_user_id = assigned_by_user_id
-        else: # No existing assignment, create new
+                # `updated_at` оновлюється автоматично моделлю
+        else: # Немає існуючого призначення, створюємо нове
+            logger.info(f"Створення нового призначення завдання ID '{task_id}' користувачу ID '{user_id}'.")
             create_data = {
                 "task_id": task_id,
                 "user_id": user_id,
-                "is_active": True
+                "is_active": True,
+                "assigned_at": current_time
             }
-            if hasattr(TaskAssignment, 'assigned_by_user_id') and assigned_by_user_id:
+            if hasattr(TaskAssignment, 'assigned_by_user_id'):
                 create_data['assigned_by_user_id'] = assigned_by_user_id
 
             assignment_db = TaskAssignment(**create_data)
@@ -87,135 +118,125 @@ class TaskAssignmentService(BaseService):
 
         try:
             await self.commit()
-            await self.db_session.refresh(assignment_db, attribute_names=['user', 'task'])
-        except IntegrityError as e:
+            # Оновлюємо для завантаження всіх зв'язків для відповіді
+            refreshed_assignment = await self._get_orm_assignment_with_relations(assignment_db.id)
+            if not refreshed_assignment: # Малоймовірно
+                # i18n
+                raise RuntimeError("Критична помилка: не вдалося отримати запис призначення після збереження.")
+        except IntegrityError as e: # На випадок унікальних обмежень (task_id, user_id), якщо логіка вище дала збій
             await self.rollback()
-            logger.error(f"Integrity error assigning task ID '{task_id}' to user ID '{user_id}': {e}", exc_info=True)
-            # This might happen if a unique constraint on (task_id, user_id) exists and an inactive record was missed
-            # by initial checks (e.g. race condition, or if logic changes).
-            raise ValueError(f"Could not assign task due to a data conflict: {e}")
+            logger.error(f"Помилка цілісності '{task_id}' для '{user_id}': {e}", exc_info=global_settings.DEBUG)
+            # i18n
+            raise ValueError(f"Не вдалося призначити завдання через конфлікт даних: {e}")
 
-        logger.info(f"Successfully assigned task ID '{task_id}' to user ID '{user_id}'. Assignment ID: {assignment_db.id}")
-        # return TaskAssignmentResponse.model_validate(assignment_db) # Pydantic v2
-        return TaskAssignmentResponse.from_orm(assignment_db) # Pydantic v1
+        logger.info(f"Успішно призначено завдання ID '{task_id}' користувачу ID '{user_id}'. ID Призначення: {refreshed_assignment.id}")
+        return TaskAssignmentResponse.model_validate(refreshed_assignment) # Pydantic v2
 
     async def unassign_task_from_user(
-        self,
-        task_id: UUID,
-        user_id: UUID,
-        unassigned_by_user_id: Optional[UUID] = None # For audit
+        self, task_id: UUID, user_id: UUID, unassigned_by_user_id: Optional[UUID] = None
     ) -> bool:
         """
-        Unassigns a user from a task by deactivating the assignment.
-        """
-        logger.debug(f"Attempting to unassign user ID '{user_id}' from task ID '{task_id}'.")
+        Скасовує призначення завдання користувачеві (деактивує запис призначення).
 
-        assignment_stmt = select(TaskAssignment).where(
-            TaskAssignment.task_id == task_id,
-            TaskAssignment.user_id == user_id,
-            TaskAssignment.is_active == True
-        )
-        assignment_db = (await self.db_session.execute(assignment_stmt)).scalar_one_or_none()
+        :param task_id: ID завдання.
+        :param user_id: ID користувача.
+        :param unassigned_by_user_id: ID користувача, який виконав скасування (для аудиту).
+        :return: True, якщо скасування успішне, False - якщо активне призначення не знайдено.
+        """
+        logger.debug(f"Спроба скасування призначення завдання ID '{task_id}' для користувача ID '{user_id}'.")
+
+        assignment_db = (await self.db_session.execute(
+            select(TaskAssignment).where(
+                TaskAssignment.task_id == task_id,
+                TaskAssignment.user_id == user_id,
+                TaskAssignment.is_active == True # Шукаємо тільки активне призначення
+            )
+        )).scalar_one_or_none()
 
         if not assignment_db:
-            logger.warning(f"No active assignment found for user ID '{user_id}' on task ID '{task_id}'. Cannot unassign.")
+            logger.warning(f"Активне призначення для користувача ID '{user_id}' на завдання ID '{task_id}' не знайдено. Скасування неможливе.")
             return False
 
         assignment_db.is_active = False
-        if hasattr(assignment_db, 'unassigned_at'): # Check model attribute
-            assignment_db.unassigned_at = datetime.now(timezone.utc)
-        if hasattr(assignment_db, 'unassigned_by_user_id') and unassigned_by_user_id: # Check model attribute
-            assignment_db.unassigned_by_user_id = unassigned_by_user_id
+        # TODO: Перевірити, чи модель TaskAssignment має поля `unassigned_at`, `unassigned_by_user_id`
+        #  та встановити їх, якщо є. Поки що припускаємо, що `updated_at` оновлюється автоматично.
+        if hasattr(assignment_db, 'unassigned_at'):
+            setattr(assignment_db, 'unassigned_at', datetime.now(timezone.utc))
+        if hasattr(assignment_db, 'unassigned_by_user_id') and unassigned_by_user_id:
+            setattr(assignment_db, 'unassigned_by_user_id', unassigned_by_user_id)
 
         self.db_session.add(assignment_db)
         await self.commit()
 
-        logger.info(f"User ID '{user_id}' successfully unassigned (deactivated) from task ID '{task_id}'.")
+        logger.info(f"Користувача ID '{user_id}' успішно відкріплено (деактивовано) від завдання ID '{task_id}'.")
         return True
 
     async def list_assignments_for_task(
-        self,
-        task_id: UUID,
-        skip: int = 0,
-        limit: int = 100,
-        is_active: Optional[bool] = True
+        self, task_id: UUID, skip: int = 0, limit: int = 100, is_active: Optional[bool] = True
     ) -> List[TaskAssignmentResponse]:
-        logger.debug(f"Listing assignments for task ID '{task_id}', is_active: {is_active}, skip={skip}, limit={limit}")
+        """Перелічує призначення для конкретного завдання."""
+        logger.debug(f"Перелік призначень для завдання ID '{task_id}', активні: {is_active}, пропустити={skip}, ліміт={limit}")
 
         stmt = select(TaskAssignment).options(
             selectinload(TaskAssignment.user).options(selectinload(User.user_type)),
-            selectinload(TaskAssignment.task)
+            selectinload(TaskAssignment.task).options(noload("*")), # Завдання вже відоме (task_id)
+            selectinload(TaskAssignment.assigned_by).options(noload("*")) # Тільки ID, якщо не потрібен повний User
         ).where(TaskAssignment.task_id == task_id)
 
         if is_active is not None:
             stmt = stmt.where(TaskAssignment.is_active == is_active)
 
-        stmt = stmt.join(User, TaskAssignment.user_id == User.id).               order_by(User.username).               offset(skip).               limit(limit)
+        # Приєднуємо User для сортування за ім'ям користувача
+        stmt = stmt.join(User, TaskAssignment.user_id == User.id).order_by(User.username).offset(skip).limit(limit)
+        assignments_db = (await self.db_session.execute(stmt)).scalars().unique().all()
 
-        result = await self.db_session.execute(stmt)
-        assignments_db = result.scalars().unique().all()
-
-        # response_list = [TaskAssignmentResponse.model_validate(a) for a in assignments_db] # Pydantic v2
-        response_list = [TaskAssignmentResponse.from_orm(a) for a in assignments_db] # Pydantic v1
-        logger.info(f"Retrieved {len(response_list)} assignments for task ID '{task_id}'.")
+        response_list = [TaskAssignmentResponse.model_validate(a) for a in assignments_db] # Pydantic v2
+        logger.info(f"Отримано {len(response_list)} призначень для завдання ID '{task_id}'.")
         return response_list
 
     async def list_tasks_for_user(
-        self,
-        user_id: UUID,
-        skip: int = 0,
-        limit: int = 100,
+        self, user_id: UUID, skip: int = 0, limit: int = 100,
         is_active_assignment: Optional[bool] = True,
-    ) -> List[TaskAssignmentResponse]:
-        logger.debug(f"Listing tasks assigned to user ID: {user_id}, active_assignment: {is_active_assignment}, skip={skip}, limit={limit}")
+        # TODO: Додати фільтри за статусом завдання, типом завдання тощо, якщо потрібно
+    ) -> List[TaskAssignmentResponse]: # Повертає список призначень, що містять деталі завдання
+        """Перелічує завдання, призначені вказаному користувачеві."""
+        logger.debug(f"Перелік завдань, призначених користувачу ID: {user_id}, активне призначення: {is_active_assignment}, пропустити={skip}, ліміт={limit}")
 
         stmt = select(TaskAssignment).options(
-            selectinload(TaskAssignment.user).options(selectinload(User.user_type)), # Load user type for context
-            selectinload(TaskAssignment.task).options(
+            selectinload(TaskAssignment.user).options(noload("*")), # Користувач вже відомий (user_id)
+            selectinload(TaskAssignment.task).options( # Завантажуємо деталі завдання
                 selectinload(Task.task_type),
                 selectinload(Task.status),
-                selectinload(Task.group)
-            )
+                selectinload(Task.group).options(noload("*")), # Група завдання (тільки ID)
+                selectinload(Task.created_by_user).options(noload("*")) # Творець завдання (тільки ID)
+            ),
+            selectinload(TaskAssignment.assigned_by).options(noload("*"))
         ).where(TaskAssignment.user_id == user_id)
 
         if is_active_assignment is not None:
             stmt = stmt.where(TaskAssignment.is_active == is_active_assignment)
 
-        # Order by task's due_date or created_at. Need to join Task to access these.
-        # isouter=True in case an assignment somehow exists for a deleted task (though FKs should prevent)
-        stmt = stmt.join(Task, TaskAssignment.task_id == Task.id, isouter=True).order_by(
-            getattr(Task, 'due_date', Task.created_at).desc() if Task is not None else TaskAssignment.assigned_at.desc() # type: ignore
+        # Сортування за терміном виконання завдання (спочатку ті, що найближче), потім за датою створення завдання
+        # isouter=True не потрібен, якщо FK гарантує існування Task
+        stmt = stmt.join(Task, TaskAssignment.task_id == Task.id).order_by(
+            Task.due_date.asc().nulls_last(), Task.created_at.desc()
         ).offset(skip).limit(limit)
 
-        result = await self.db_session.execute(stmt)
-        assignments_db = result.scalars().unique().all()
+        assignments_db = (await self.db_session.execute(stmt)).scalars().unique().all()
 
-        # response_list = [TaskAssignmentResponse.model_validate(a) for a in assignments_db] # Pydantic v2
-        response_list = [TaskAssignmentResponse.from_orm(a) for a in assignments_db] # Pydantic v1
-        logger.info(f"Retrieved {len(response_list)} assigned items for user ID '{user_id}'.")
+        response_list = [TaskAssignmentResponse.model_validate(a) for a in assignments_db] # Pydantic v2
+        logger.info(f"Отримано {len(response_list)} призначених завдань для користувача ID '{user_id}'.")
         return response_list
 
     async def get_assignment_details(self, assignment_id: UUID) -> Optional[TaskAssignmentResponse]:
-        logger.debug(f"Getting assignment details for assignment ID {assignment_id}")
-        stmt = select(TaskAssignment).options(
-            selectinload(TaskAssignment.user).options(selectinload(User.user_type)),
-            selectinload(TaskAssignment.task).options(
-                selectinload(Task.task_type),
-                selectinload(Task.status),
-                selectinload(Task.group) # Added group for completeness
-            ),
-            selectinload(TaskAssignment.assigned_by).options(selectinload(User.user_type)) if hasattr(TaskAssignment, 'assigned_by') else None # Conditionally load if field exists
-        ).where(TaskAssignment.id == assignment_id)
+        """Отримує деталі конкретного призначення за його ID."""
+        logger.debug(f"Отримання деталей для призначення ID {assignment_id}")
 
-        # Filter out None options if any were conditionally added
-        stmt = stmt.options(*(opt for opt in stmt.get_options() if opt is not None))
-
-        assignment_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
+        assignment_db = await self._get_orm_assignment_with_relations(assignment_id)
         if not assignment_db:
-            logger.info(f"No assignment found for ID {assignment_id}")
+            logger.info(f"Призначення з ID {assignment_id} не знайдено.")
             return None
 
-        # return TaskAssignmentResponse.model_validate(assignment_db) # Pydantic v2
-        return TaskAssignmentResponse.from_orm(assignment_db) # Pydantic v1
+        return TaskAssignmentResponse.model_validate(assignment_db) # Pydantic v2
 
-logger.info("TaskAssignmentService class defined.")
+logger.debug(f"{TaskAssignmentService.__name__} (сервіс призначень завдань) успішно визначено.")

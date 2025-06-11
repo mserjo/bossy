@@ -1,305 +1,326 @@
 # backend/app/src/services/bonuses/reward.py
 import logging
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict # Any замінено на Dict для redeem_reward
 from uuid import UUID
-from decimal import Decimal # For points_cost
+from decimal import Decimal
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import or_ # For list_rewards query
+from sqlalchemy import or_, and_, func # Додано and_, func
 
-from app.src.services.base import BaseService
-from app.src.models.bonuses.reward import Reward # SQLAlchemy Reward model
-from app.src.models.bonuses.user_reward_redemption import UserRewardRedemption # Model for tracking redemptions
-from app.src.models.groups.group import Group # If rewards are group-specific
-from app.src.models.auth.user import User # For user redeeming, and created_by/updated_by
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.bonuses.reward import Reward # Модель SQLAlchemy Reward
+from backend.app.src.models.bonuses.user_reward_redemption import UserRewardRedemption # Модель для відстеження отримань
+from backend.app.src.models.groups.group import Group # Якщо винагороди специфічні для групи
+from backend.app.src.models.auth.user import User # Для користувача, що отримує, та created_by/updated_by
 
-from app.src.schemas.bonuses.reward import ( # Pydantic Schemas
+from backend.app.src.schemas.bonuses.reward import ( # Pydantic Схеми
     RewardCreate,
     RewardUpdate,
     RewardResponse,
-    RedeemRewardRequest # For user to request redemption
+    RedeemRewardRequest,
+    UserRewardRedemptionResponse # Додано для відповіді redeem_reward
 )
-# For deducting points and creating transactions
-# from app.src.services.bonuses.account import UserAccountService
-# from app.src.services.bonuses.transaction import AccountTransactionService
-# from app.src.schemas.bonuses.transaction import AccountTransactionCreate # For creating debit transaction
+from backend.app.src.schemas.bonuses.transaction import AccountTransactionCreate # Для створення транзакції списання
+from backend.app.src.services.bonuses.account import UserAccountService # Для роботи з рахунками
+# AccountTransactionService буде викликано через UserAccountService.adjust_account_balance
+from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import settings # Для доступу до конфігурацій
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# TODO: Перенести кастомні помилки до backend/app/src/core/exceptions.py
+class RewardUnavailableError(ValueError):
+    """Помилка, якщо винагорода недоступна (неактивна, немає в наявності тощо).""" # i18n
+    pass
+
+class Redemption 조건Error(ValueError): # RedemptionConditionError
+    """Помилка, якщо умови отримання винагороди не виконані (наприклад, ліміт на користувача).""" # i18n
+    pass
+
 
 class RewardService(BaseService):
     """
-    Service for managing rewards that users can redeem with their bonus points.
-    Handles CRUD for rewards and the redemption process.
+    Сервіс для управління винагородами, які користувачі можуть отримати за бонусні бали.
+    Обробляє CRUD для винагород та процес їх отримання.
     """
 
-    def __init__(self, db_session: AsyncSession): # Potentially pass UserAccountService, AccountTransactionService
+    def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        # self.account_service = UserAccountService(db_session) # Example for DI
-        # self.transaction_service = AccountTransactionService(db_session) # Example for DI
-        logger.info("RewardService initialized.")
+        self.account_service = UserAccountService(db_session) # Ініціалізація сервісу рахунків
+        logger.info("RewardService ініціалізовано.")
 
     async def get_reward_by_id(self, reward_id: UUID) -> Optional[RewardResponse]:
-        """Retrieves a reward by its ID, with related entities loaded."""
-        logger.debug(f"Attempting to retrieve reward by ID: {reward_id}")
+        """
+        Отримує винагороду за її ID, з завантаженими пов'язаними сутностями.
+
+        :param reward_id: ID винагороди.
+        :return: Pydantic схема RewardResponse або None, якщо не знайдено.
+        """
+        logger.debug(f"Спроба отримання винагороди за ID: {reward_id}")
 
         stmt = select(Reward).options(
-            selectinload(Reward.group) if hasattr(Reward, 'group') else None,
-            selectinload(Reward.created_by_user).options(selectinload(User.user_type)) if hasattr(Reward, 'created_by_user') else None,
-            selectinload(Reward.updated_by_user).options(selectinload(User.user_type)) if hasattr(Reward, 'updated_by_user') else None
+            selectinload(Reward.group),
+            selectinload(Reward.created_by_user).options(selectinload(User.user_type)),
+            selectinload(Reward.updated_by_user).options(selectinload(User.user_type))
         ).where(Reward.id == reward_id)
-        stmt = stmt.options(*(opt for opt in stmt.get_options() if opt is not None))
 
         reward_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
         if reward_db:
-            logger.info(f"Reward with ID '{reward_id}' found.")
-            # return RewardResponse.model_validate(reward_db) # Pydantic v2
-            return RewardResponse.from_orm(reward_db) # Pydantic v1
-        logger.info(f"Reward with ID '{reward_id}' not found.")
+            logger.info(f"Винагороду з ID '{reward_id}' знайдено.")
+            return RewardResponse.model_validate(reward_db) # Pydantic v2
+        logger.info(f"Винагороду з ID '{reward_id}' не знайдено.")
         return None
 
-    async def create_reward(self, reward_data: RewardCreate, creator_user_id: UUID) -> Optional[RewardResponse]: # Return Optional
-        logger.debug(f"Attempting to create new reward '{reward_data.name}' by user ID: {creator_user_id}")
+    async def create_reward(self, reward_data: RewardCreate, creator_user_id: UUID) -> RewardResponse:
+        """
+        Створює нову винагороду.
 
-        if reward_data.group_id:
-            if not await self.db_session.get(Group, reward_data.group_id):
-                raise ValueError(f"Group with ID '{reward_data.group_id}' not found.")
+        :param reward_data: Дані для створення винагороди (Pydantic схема).
+        :param creator_user_id: ID користувача, що створює винагороду.
+        :return: Pydantic схема створеної RewardResponse.
+        :raises ValueError: Якщо пов'язані сутності не знайдено або ім'я винагороди не унікальне. # i18n
+        """
+        logger.debug(f"Спроба створення нової винагороди '{reward_data.name}' користувачем ID: {creator_user_id}")
+
+        if reward_data.group_id and not await self.db_session.get(Group, reward_data.group_id):
+            raise ValueError(f"Групу з ID '{reward_data.group_id}' не знайдено.") # i18n
 
         stmt_name_check = select(Reward.id).where(Reward.name == reward_data.name)
+        scope_log_msg = "глобальній області" # i18n
         if reward_data.group_id:
             stmt_name_check = stmt_name_check.where(Reward.group_id == reward_data.group_id)
+            scope_log_msg = f"групі ID '{reward_data.group_id}'" # i18n
         else:
-            stmt_name_check = stmt_name_check.where(Reward.group_id.is_(None)) # type: ignore
+            stmt_name_check = stmt_name_check.where(Reward.group_id.is_(None))
 
         if (await self.db_session.execute(stmt_name_check)).scalar_one_or_none():
-            scope = f"group ID {reward_data.group_id}" if reward_data.group_id else "global scope"
-            raise ValueError(f"Reward with name '{reward_data.name}' already exists in {scope}.")
+            raise ValueError(f"Винагорода з ім'ям '{reward_data.name}' вже існує в {scope_log_msg}.") # i18n
 
-        reward_db_data = reward_data.dict()
-
-        create_final_data = reward_db_data.copy()
-        if hasattr(Reward, 'created_by_user_id'):
-            create_final_data['created_by_user_id'] = creator_user_id
-        if hasattr(Reward, 'updated_by_user_id'):
-            create_final_data['updated_by_user_id'] = creator_user_id
-
-
-        new_reward_db = Reward(**create_final_data)
+        new_reward_db = Reward(
+            **reward_data.model_dump(), # Pydantic v2
+            created_by_user_id=creator_user_id,
+            updated_by_user_id=creator_user_id
+            # created_at, updated_at - обробляються базовою моделлю або БД
+        )
 
         self.db_session.add(new_reward_db)
         try:
             await self.commit()
-            # Refresh to load relationships for the response
-            created_reward = await self.get_reward_by_id(new_reward_db.id)
-            if created_reward:
-                logger.info(f"Reward '{new_reward_db.name}' (ID: {new_reward_db.id}) created successfully.")
-                return created_reward
-            else: # Should not happen
-                logger.error(f"Failed to retrieve newly created reward ID {new_reward_db.id} after commit.")
-                return None
+            await self.db_session.refresh(new_reward_db, attribute_names=['group', 'created_by_user', 'updated_by_user'])
         except IntegrityError as e:
             await self.rollback()
-            logger.error(f"Integrity error creating reward '{reward_data.name}': {e}", exc_info=True)
-            raise ValueError(f"Could not create reward due to a data conflict: {e}")
+            logger.error(f"Помилка цілісності '{reward_data.name}': {e}", exc_info=settings.DEBUG)
+            raise ValueError(f"Не вдалося створити винагороду: конфлікт даних.") # i18n
         except Exception as e:
             await self.rollback()
-            logger.error(f"Unexpected error creating reward '{reward_data.name}': {e}", exc_info=True)
+            logger.error(f"Неочікувана помилка '{reward_data.name}': {e}", exc_info=settings.DEBUG)
             raise
 
+        logger.info(f"Винагорода '{new_reward_db.name}' (ID: {new_reward_db.id}) успішно створена.")
+        return RewardResponse.model_validate(new_reward_db)
 
     async def update_reward(
         self, reward_id: UUID, reward_update_data: RewardUpdate, current_user_id: UUID
     ) -> Optional[RewardResponse]:
-        logger.debug(f"Attempting to update reward ID: {reward_id} by user ID: {current_user_id}")
-
+        """Оновлює існуючу винагороду."""
+        logger.debug(f"Спроба оновлення винагороди ID: {reward_id} користувачем ID: {current_user_id}")
         reward_db = await self.db_session.get(Reward, reward_id)
         if not reward_db:
-            logger.warning(f"Reward ID '{reward_id}' not found for update.")
+            logger.warning(f"Винагорода ID '{reward_id}' не знайдена для оновлення.")
             return None
 
-        update_data = reward_update_data.dict(exclude_unset=True)
+        update_data = reward_update_data.model_dump(exclude_unset=True) # Pydantic v2
 
         if 'group_id' in update_data and reward_db.group_id != update_data['group_id']:
             if update_data['group_id'] and not await self.db_session.get(Group, update_data['group_id']):
-                raise ValueError(f"New Group ID '{update_data['group_id']}' not found.")
+                raise ValueError(f"Нова група ID '{update_data['group_id']}' не знайдена.") # i18n
 
         new_name = update_data.get('name', reward_db.name)
-        new_group_id = update_data.get('group_id', reward_db.group_id)
+        new_group_id = update_data['group_id'] if 'group_id' in update_data else reward_db.group_id
         if ('name' in update_data and new_name != reward_db.name) or \
            ('group_id' in update_data and new_group_id != reward_db.group_id):
             stmt_name_check = select(Reward.id).where(Reward.name == new_name, Reward.id != reward_id)
+            scope_log_msg = "глобальній області" # i18n
             if new_group_id is not None:
                 stmt_name_check = stmt_name_check.where(Reward.group_id == new_group_id)
+                scope_log_msg = f"групі ID '{new_group_id}'" # i18n
             else:
-                stmt_name_check = stmt_name_check.where(Reward.group_id.is_(None)) # type: ignore
+                stmt_name_check = stmt_name_check.where(Reward.group_id.is_(None))
             if (await self.db_session.execute(stmt_name_check)).scalar_one_or_none():
-                scope = f"group ID {new_group_id}" if new_group_id is not None else "global scope"
-                raise ValueError(f"Another reward with name '{new_name}' already exists in {scope}.")
+                raise ValueError(f"Інша винагорода '{new_name}' вже існує в {scope_log_msg}.") # i18n
 
         for field, value in update_data.items():
-            if hasattr(reward_db, field): setattr(reward_db, field, value)
+            setattr(reward_db, field, value)
 
-        if hasattr(reward_db, 'updated_by_user_id'):
-            reward_db.updated_by_user_id = current_user_id
-        if hasattr(reward_db, 'updated_at'):
-            reward_db.updated_at = datetime.now(timezone.utc)
+        reward_db.updated_by_user_id = current_user_id
+        reward_db.updated_at = datetime.now(timezone.utc)
 
         self.db_session.add(reward_db)
         try:
             await self.commit()
-            logger.info(f"Reward ID '{reward_id}' updated successfully.")
-            return await self.get_reward_by_id(reward_id)
+            await self.db_session.refresh(reward_db, attribute_names=['group', 'created_by_user', 'updated_by_user'])
+            logger.info(f"Винагорода ID '{reward_id}' успішно оновлена.")
+            return RewardResponse.model_validate(reward_db)
+        except IntegrityError as e:
+            await self.rollback()
+            logger.error(f"Помилка цілісності ID '{reward_id}': {e}", exc_info=settings.DEBUG)
+            raise ValueError(f"Не вдалося оновити винагороду: конфлікт даних.") # i18n
         except Exception as e:
             await self.rollback()
-            logger.error(f"Error updating reward ID '{reward_id}': {e}", exc_info=True)
+            logger.error(f"Помилка оновлення ID '{reward_id}': {e}", exc_info=settings.DEBUG)
             raise
 
-
     async def delete_reward(self, reward_id: UUID, current_user_id: UUID) -> bool:
-        logger.debug(f"Attempting to delete reward ID: {reward_id} by user: {current_user_id}")
+        """Видаляє винагороду."""
+        # TODO: Згідно `technical_task.txt`, чи є обмеження на видалення (напр., якщо є активні отримання)?
+        logger.debug(f"Спроба видалення винагороди ID: {reward_id} користувачем: {current_user_id}")
         reward_db = await self.db_session.get(Reward, reward_id)
         if not reward_db:
-            logger.warning(f"Reward ID '{reward_id}' not found for deletion.")
+            logger.warning(f"Винагорода ID '{reward_id}' не знайдена для видалення.")
             return False
 
         await self.db_session.delete(reward_db)
         await self.commit()
-        logger.info(f"Reward ID '{reward_id}' deleted by user {current_user_id}.")
+        logger.info(f"Винагорода ID '{reward_id}' видалена користувачем {current_user_id}.")
         return True
 
     async def list_rewards(
         self, group_id: Optional[UUID] = None, is_active: Optional[bool] = True,
         min_stock: Optional[int] = None, max_points_cost: Optional[Decimal] = None,
+        valid_on_date: Optional[datetime] = None,
         skip: int = 0, limit: int = 100,
-        include_global: bool = True # If group_id is provided, also include global rewards
+        include_global_if_group_given: bool = True
     ) -> List[RewardResponse]:
-        logger.debug(f"Listing rewards: group={group_id}, active={is_active}, stock>={min_stock}, cost<={max_points_cost}, global={include_global}")
+        """Перелічує винагороди з фільтрами та пагінацією."""
+        logger.debug(f"Перелік винагород: група={group_id}, активні={is_active}, запас>={min_stock}, ціна<={max_points_cost}, валідні_на={valid_on_date}, глобальні_для_групи={include_global_if_group_given}")
 
         stmt = select(Reward).options(
-            selectinload(Reward.group) if hasattr(Reward, 'group') else None,
-            selectinload(Reward.created_by_user).options(selectinload(User.user_type)) if hasattr(Reward, 'created_by_user') else None
+            selectinload(Reward.group),
+            selectinload(Reward.created_by_user).options(selectinload(User.user_type))
         )
-        stmt = stmt.options(*(opt for opt in stmt.get_options() if opt is not None))
-
         conditions = []
         if group_id is not None:
-            if include_global and hasattr(Reward, 'group_id'):
-                 conditions.append(or_(Reward.group_id == group_id, Reward.group_id.is_(None))) # type: ignore
+            if include_global_if_group_given:
+                conditions.append(or_(Reward.group_id == group_id, Reward.group_id.is_(None)))
             else:
-                 conditions.append(Reward.group_id == group_id)
-        # If group_id is None, and include_global is True (default or explicit), it lists all.
-        # If group_id is None, and include_global is False, it should list only global if that's the intent.
-        # This might need a more explicit filter e.g. list_type: "all", "global_only", "group_specific"
-        elif not include_global: # Only global if group_id is None and include_global is False
-            conditions.append(Reward.group_id.is_(None)) # type: ignore
+                conditions.append(Reward.group_id == group_id)
+        # Якщо group_id не вказано, за замовчуванням показує всі (і глобальні, і групові).
+        # Щоб показувати тільки глобальні, якщо group_id is None, потрібен окремий прапорець/логіка.
 
+        if is_active is not None: conditions.append(Reward.is_active == is_active)
+        if min_stock is not None: conditions.append(Reward.stock_available >= min_stock)
+        if max_points_cost is not None: conditions.append(Reward.points_cost <= max_points_cost)
+        if valid_on_date:
+            conditions.append(and_(
+                or_(Reward.valid_from.is_(None), Reward.valid_from <= valid_on_date),
+                or_(Reward.valid_until.is_(None), Reward.valid_until >= valid_on_date)
+            ))
 
-        if hasattr(Reward, 'is_active') and is_active is not None:
-            conditions.append(Reward.is_active == is_active) # type: ignore
-        if hasattr(Reward, 'stock_available') and min_stock is not None:
-            conditions.append(Reward.stock_available >= min_stock) # type: ignore
-        if hasattr(Reward, 'points_cost') and max_points_cost is not None:
-            conditions.append(Reward.points_cost <= max_points_cost) # type: ignore
+        if conditions: stmt = stmt.where(*conditions)
 
-        if conditions:
-            stmt = stmt.where(*conditions)
-
-        order_by_attr = getattr(Reward, 'points_cost', Reward.name)
-        stmt = stmt.order_by(order_by_attr).offset(skip).limit(limit) # type: ignore
+        # TODO: Згідно `technical_task.txt`, уточнити поля та напрямки сортування.
+        stmt = stmt.order_by(Reward.points_cost, Reward.name).offset(skip).limit(limit)
         rewards_db = (await self.db_session.execute(stmt)).scalars().unique().all()
-
-        # response_list = [RewardResponse.model_validate(r) for r in rewards_db] # Pydantic v2
-        response_list = [RewardResponse.from_orm(r) for r in rewards_db] # Pydantic v1
-        logger.info(f"Retrieved {len(response_list)} rewards.")
-        return response_list
+        return [RewardResponse.model_validate(r) for r in rewards_db]
 
     async def redeem_reward(
-        self,
-        user_id: UUID,
-        reward_id: UUID,
-        redeem_data: RedeemRewardRequest,
-        group_id_context: Optional[UUID] = None
-    ) -> Dict[str, Any]: # Placeholder for UserRewardRedemptionResponse
-        logger.info(f"User ID '{user_id}' attempting to redeem reward ID '{reward_id}'. Quantity: {redeem_data.quantity}")
+        self, user_id: UUID, reward_id: UUID, redeem_data: RedeemRewardRequest,
+        group_id_context: Optional[UUID] = None # Група, в контексті якої користувач намагається отримати винагороду
+    ) -> UserRewardRedemptionResponse:
+        """Обробляє запит користувача на отримання винагороди."""
+        logger.info(f"Користувач ID '{user_id}' намагається отримати винагороду ID '{reward_id}'. Кількість: {redeem_data.quantity}")
 
         reward_db = await self.db_session.get(Reward, reward_id)
-        if not reward_db or not getattr(reward_db, 'is_active', True):
-            raise ValueError("Reward not found or is not active.")
+        current_time = datetime.now(timezone.utc)
 
-        if hasattr(reward_db, 'group_id') and reward_db.group_id is not None and reward_db.group_id != group_id_context:
-             raise ValueError("This reward is not available in your current group context.")
+        # Перевірка доступності винагороди
+        if not reward_db: raise RewardUnavailableError("Винагороду не знайдено.") # i18n
+        if not reward_db.is_active: raise RewardUnavailableError("Винагорода неактивна.") # i18n
+        if reward_db.valid_from and reward_db.valid_from > current_time:
+            raise RewardUnavailableError(f"Винагорода буде доступна з {reward_db.valid_from.isoformat()}.") # i18n
+        if reward_db.valid_until and reward_db.valid_until < current_time:
+            raise RewardUnavailableError(f"Термін дії винагороди закінчився {reward_db.valid_until.isoformat()}.") # i18n
+
+        # Перевірка контексту групи
+        if reward_db.group_id is not None and reward_db.group_id != group_id_context:
+             raise RedemptionConditionError("Ця винагорода недоступна у вашому поточному контексті групи.") # i18n
+
+        # Визначення рахунку для списання: груповий (якщо винагорода групова) або глобальний
+        account_to_use_group_id = reward_db.group_id # Якщо винагорода групова, то і рахунок груповий
+        # Якщо винагорода глобальна (reward_db.group_id is None), то group_id_context не важливий для вибору рахунку,
+        # використовується глобальний рахунок користувача (де group_id is None).
+        # Однак, якщо group_id_context надано, він може бути використаний для інших цілей (наприклад, логування).
+        # Для вибору рахунку: якщо винагорода групова, використовуємо group_id винагороди.
+        # Якщо винагорода глобальна, використовуємо глобальний рахунок користувача (group_id=None).
+
+        user_account_orm = await self.account_service.get_or_create_user_account(user_id, group_id=account_to_use_group_id)
+
 
         quantity_to_redeem = redeem_data.quantity
-        if quantity_to_redeem <= 0: raise ValueError("Quantity to redeem must be positive.")
+        if quantity_to_redeem <= 0: raise ValueError("Кількість для отримання має бути позитивною.") # i18n
 
-        if hasattr(reward_db, 'stock_available') and reward_db.stock_available is not None:
-            if reward_db.stock_available < quantity_to_redeem:
-                raise ValueError(f"Not enough stock for reward '{reward_db.name}'. Available: {reward_db.stock_available}")
+        if reward_db.stock_available is not None and reward_db.stock_available < quantity_to_redeem:
+            raise RewardUnavailableError(f"Недостатньо запасів для '{reward_db.name}'. Доступно: {reward_db.stock_available}.") # i18n
+
+        if reward_db.max_per_user is not None:
+            stmt = select(func.sum(UserRewardRedemption.quantity)).where(
+                UserRewardRedemption.user_id == user_id,
+                UserRewardRedemption.reward_id == reward_id,
+                UserRewardRedemption.status == "COMPLETED" # Рахуємо тільки успішні
+            )
+            already_redeemed_count = (await self.db_session.execute(stmt)).scalar_one_or_none() or 0
+            if (already_redeemed_count + quantity_to_redeem) > reward_db.max_per_user:
+                raise RedemptionConditionError(f"Перевищено ліміт отримання на користувача ({reward_db.max_per_user}). Вже отримано: {already_redeemed_count}.") # i18n
 
         total_cost = Decimal(reward_db.points_cost) * quantity_to_redeem
-
-        from app.src.services.bonuses.account import UserAccountService
-        from app.src.services.bonuses.transaction import AccountTransactionService, AccountTransactionCreate
-
-        account_service = UserAccountService(self.db_session)
-        # Determine which account to use (user's global or group-specific account for this group_id_context)
-        user_account_response = await account_service.get_or_create_user_account(user_id, group_id=group_id_context)
-        if Decimal(user_account_response.balance) < total_cost:
-            raise ValueError(f"Insufficient points. Required: {total_cost}, Available: {user_account_response.balance}")
+        if Decimal(user_account_orm.balance) < total_cost: # Баланс з ORM моделі
+            raise self.account_service.InsufficientFundsError(current_balance=user_account_orm.balance) # Використовуємо кастомну помилку з account_service
 
         try:
-            transaction_service = AccountTransactionService(self.db_session)
-            transaction_create = AccountTransactionCreate(
-                user_account_id=user_account_response.id,
-                transaction_type="REWARD_REDEMPTION",
+            # Списання балів через adjust_account_balance, який створює транзакцію
+            _updated_account_resp, transaction_resp = await self.account_service.adjust_account_balance(
+                user_id=user_id,
+                group_id=account_to_use_group_id, # Рахунок, з якого списуємо
                 amount= -total_cost,
-                description=f"Redeemed {quantity_to_redeem}x '{reward_db.name}'",
-                related_entity_id=reward_id
-            )
-            _updated_account_resp, _transaction_resp = await transaction_service.create_transaction(
-                transaction_data=transaction_create,
-                commit_session=False
+                transaction_type="REWARD_REDEMPTION",
+                description=f"Отримано {quantity_to_redeem}x '{reward_db.name}'", # i18n
+                related_entity_id=reward_id,
+                commit_session=False # Важливо! Комміт буде в кінці redeem_reward
             )
 
-            if hasattr(reward_db, 'stock_available') and reward_db.stock_available is not None:
+            if reward_db.stock_available is not None:
                 reward_db.stock_available -= quantity_to_redeem
-                self.db_session.add(reward_db)
+            reward_db.updated_at = datetime.now(timezone.utc) # Оновлюємо час оновлення винагороди
+            self.db_session.add(reward_db)
 
             redemption_record = UserRewardRedemption(
                 user_id=user_id,
                 reward_id=reward_id,
-                user_account_id=user_account_response.id,
-                transaction_id=_transaction_resp.id,
+                user_account_id=user_account_orm.id, # ID рахунку з ORM моделі
+                transaction_id=transaction_resp.id, # ID транзакції з відповіді adjust_account_balance
                 quantity=quantity_to_redeem,
                 points_spent=total_cost,
-                status="COMPLETED",
+                status="COMPLETED", # Статус за замовчуванням, може бути іншим згідно ТЗ
+                redeemed_at=datetime.now(timezone.utc),
                 notes=redeem_data.notes
             )
             self.db_session.add(redemption_record)
 
-            await self.commit()
+            await self.commit() # Атомарний комміт всіх змін
 
             await self.db_session.refresh(redemption_record, attribute_names=['user', 'reward', 'account', 'transaction'])
-
-            logger.info(f"User ID '{user_id}' successfully redeemed {quantity_to_redeem} of reward ID '{reward_id}'.")
-
-            # from app.src.schemas.bonuses.reward import UserRewardRedemptionResponse # Placeholder
-            # return UserRewardRedemptionResponse.model_validate(redemption_record) # Pydantic v2
-            # return UserRewardRedemptionResponse.from_orm(redemption_record) # Pydantic v1
-            return {"redemption_id": redemption_record.id, "status": redemption_record.status, "points_spent": str(redemption_record.points_spent), "reward_name": reward_db.name}
-
-
-        except ValueError as ve:
+            logger.info(f"Користувач ID '{user_id}' успішно отримав {quantity_to_redeem} винагороди ID '{reward_id}'.")
+            return UserRewardRedemptionResponse.model_validate(redemption_record)
+        except Exception as e: # Широкий except для відкату транзакції
             await self.rollback()
-            logger.warning(f"Redemption failed for user ID '{user_id}', reward ID '{reward_id}': {ve}")
-            raise
-        except Exception as e:
-            await self.rollback()
-            logger.error(f"Unexpected error during reward redemption for user ID '{user_id}', reward ID '{reward_id}': {e}", exc_info=True)
+            logger.error(f"Неочікувана помилка '{user_id}', винагорода ID '{reward_id}': {e}", exc_info=settings.DEBUG)
+            # Перетворюємо на специфічну помилку або ре-рейзимо оригінальну, якщо вона вже підходяща
+            if not isinstance(e, (RewardUnavailableError, RedemptionConditionError, self.account_service.InsufficientFundsError, ValueError)):
+                raise RuntimeError(f"Внутрішня помилка сервера при отриманні винагороди.") # i18n
             raise
 
-logger.info("RewardService class defined.")
+
+logger.debug("RewardService клас визначено та завантажено.")

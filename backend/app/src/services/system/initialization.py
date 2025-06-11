@@ -1,84 +1,95 @@
 # backend/app/src/services/system/initialization.py
-import logging
-from typing import Dict, Any, List, Type # Added Type for model_cls
-from uuid import UUID
+# import logging # Замінено на централізований логер
+from typing import Dict, Any, List, Type
+from uuid import UUID # Не використовується прямо, але може бути в моделях
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.exc import IntegrityError # To catch potential duplicate key errors
+from sqlalchemy.exc import IntegrityError # Для обробки можливих помилок дублювання ключів
 
-from app.src.services.base import BaseService
-# Assuming models and schemas for various entities to be initialized:
-from app.src.models.auth.user import User
-from app.src.models.dictionaries.user_roles import UserRole
-from app.src.models.dictionaries.user_types import UserType
-from app.src.models.dictionaries.group_types import GroupType
-from app.src.models.dictionaries.task_types import TaskType
-from app.src.models.dictionaries.bonus_types import BonusType
-# from app.src.models.dictionaries.statuses import Status # If default statuses are needed
+# Повні шляхи імпорту
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.auth.user import User
+from backend.app.src.models.dictionaries.user_roles import UserRole
+from backend.app.src.models.dictionaries.user_types import UserType
+from backend.app.src.models.dictionaries.group_types import GroupType
+from backend.app.src.models.dictionaries.task_types import TaskType
+from backend.app.src.models.dictionaries.bonus_types import BonusType
+from backend.app.src.models.dictionaries.statuses import Status # Додано для ініціалізації статусів
 
-# For creating users, you might need password hashing utilities
-from app.src.core.security import get_password_hash # Assuming this utility exists
+from backend.app.src.core.security import get_password_hash # Для хешування паролів системних користувачів
+from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import settings # Для отримання паролів системних користувачів
 
-# Pydantic schemas might be used if data comes from a config file, but here we define it directly.
-# from app.src.schemas.auth.user import UserCreate # Example
-
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
-
-# --- Default Data Definitions ---
-# These could also be loaded from a configuration file (e.g., YAML, JSON)
+# --- Визначення даних за замовчуванням ---
+# Ці дані також можуть бути завантажені з конфігураційного файлу (наприклад, YAML, JSON)
 
 DEFAULT_USER_ROLES = [
-    {"name": "Superuser", "code": "SUPERUSER", "description": "Full system access."},
-    {"name": "Admin", "code": "ADMIN", "description": "Group administration access."},
-    {"name": "User", "code": "USER", "description": "Standard user access within a group."},
+    {"name": "Суперкористувач", "code": "SUPERUSER", "description": "Повний доступ до системи."}, # i18n
+    {"name": "Адміністратор", "code": "ADMIN", "description": "Доступ до адміністрування груп."}, # i18n
+    {"name": "Користувач", "code": "USER", "description": "Стандартний доступ користувача в межах групи."}, # i18n
+    {"name": "Гість", "code": "GUEST", "description": "Обмежений доступ для перегляду."}, # i18n
 ]
 
 DEFAULT_USER_TYPES = [
-    {"name": "Superuser", "code": "SUPERUSER_TYPE", "description": "System superuser."},
-    {"name": "Admin", "code": "ADMIN_TYPE", "description": "Group administrator."},
-    {"name": "User", "code": "USER_TYPE", "description": "Regular platform user."},
-    {"name": "Bot", "code": "BOT_TYPE", "description": "Automated system agent."},
+    {"name": "Суперкористувач Системи", "code": "SUPERUSER_TYPE", "description": "Системний суперкористувач."}, # i18n
+    {"name": "Адміністратор Платформи", "code": "ADMIN_TYPE", "description": "Адміністратор платформи/групи."}, # i18n
+    {"name": "Звичайний Користувач", "code": "USER_TYPE", "description": "Звичайний користувач платформи."}, # i18n
+    {"name": "Системний Бот", "code": "BOT_TYPE", "description": "Автоматизований системний агент."}, # i18n
 ]
 
 DEFAULT_GROUP_TYPES = [
-    {"name": "Family", "code": "FAMILY", "description": "For family groups."},
-    {"name": "Department", "code": "DEPARTMENT", "description": "For work departments or teams."},
-    {"name": "Organization", "code": "ORGANIZATION", "description": "For larger organizations."},
-    {"name": "Friends", "code": "FRIENDS", "description": "For groups of friends."},
-    {"name": "Project", "code": "PROJECT", "description": "For project-based groups."},
+    {"name": "Сім'я", "code": "FAMILY", "description": "Для сімейних груп."}, # i18n
+    {"name": "Відділ", "code": "DEPARTMENT", "description": "Для робочих відділів або команд."}, # i18n
+    {"name": "Організація", "code": "ORGANIZATION", "description": "Для великих організацій."}, # i18n
+    {"name": "Друзі", "code": "FRIENDS", "description": "Для груп друзів."}, # i18n
+    {"name": "Проект", "code": "PROJECT", "description": "Для проектних груп."}, # i18n
 ]
 
 DEFAULT_TASK_TYPES = [
-    {"name": "Regular Task", "code": "REGULAR", "description": "A standard task."},
-    {"name": "Complex Task", "code": "COMPLEX", "description": "A task that might involve multiple steps or higher effort."},
-    {"name": "Event", "code": "EVENT", "description": "A scheduled event or activity."},
-    {"name": "Chore", "code": "CHORE", "description": "A recurring or routine task, often household-related."},
-    {"name": "Reminder", "code": "REMINDER", "description": "A simple reminder item."},
-
+    {"name": "Звичайне Завдання", "code": "REGULAR", "description": "Стандартне завдання."}, # i18n
+    {"name": "Складне Завдання", "code": "COMPLEX", "description": "Завдання, що може вимагати кількох кроків або більших зусиль."}, # i18n
+    {"name": "Подія", "code": "EVENT", "description": "Запланована подія або активність."}, # i18n
+    {"name": "Доручення", "code": "CHORE", "description": "Повторюване або рутинне завдання, часто пов'язане з побутом."}, # i18n
+    {"name": "Нагадування", "code": "REMINDER", "description": "Простий пункт-нагадування."}, # i18n
 ]
 
 DEFAULT_BONUS_TYPES = [
-    {"name": "Standard Bonus", "code": "STANDARD_BONUS", "description": "A regular bonus point type."},
-    {"name": "Achievement Bonus", "code": "ACHIEVEMENT_BONUS", "description": "Bonus awarded for specific achievements."},
-    {"name": "Penalty", "code": "PENALTY_POINTS", "description": "Points deducted as a penalty."},
+    {"name": "Стандартний Бонус", "code": "STANDARD_BONUS", "description": "Звичайний тип бонусних балів."}, # i18n
+    {"name": "Бонус за Досягнення", "code": "ACHIEVEMENT_BONUS", "description": "Бонус, що надається за конкретні досягнення."}, # i18n
+    {"name": "Штрафні Бали", "code": "PENALTY_POINTS", "description": "Бали, що списуються як штраф.", "is_penalty": True}, # i18n
 ]
 
+DEFAULT_STATUSES = [
+    {"name": "Новий", "code": "NEW", "entity_type": "TASK", "description": "Завдання щойно створено."}, # i18n
+    {"name": "В роботі", "code": "IN_PROGRESS", "entity_type": "TASK", "description": "Завдання виконується."}, # i18n
+    {"name": "Завершено", "code": "COMPLETED", "entity_type": "TASK", "description": "Завдання успішно виконано."}, # i18n
+    {"name": "Ухвалено", "code": "APPROVED", "entity_type": "TASK_COMPLETION", "description": "Виконання завдання ухвалено."}, # i18n
+    {"name": "Відхилено", "code": "REJECTED", "entity_type": "TASK_COMPLETION", "description": "Виконання завдання відхилено."}, # i18n
+    {"name": "Активний", "code": "ACTIVE", "entity_type": "USER", "description": "Обліковий запис користувача активний."}, # i18n
+    {"name": "Неактивний", "code": "INACTIVE", "entity_type": "USER", "description": "Обліковий запис користувача неактивний."}, # i18n
+    {"name": "В очікуванні", "code": "PENDING", "entity_type": "INVITATION", "description": "Запрошення очікує на відповідь."}, # i18n
+    {"name": "Прийнято", "code": "ACCEPTED", "entity_type": "INVITATION", "description": "Запрошення прийнято."}, # i18n
+]
+
+# TODO: Паролі для системних користувачів повинні завантажуватися з конфігурації (settings.py або змінні середовища)
+#  і бути складними. Наголосити на необхідності їх зміни після першого запуску.
 DEFAULT_SYSTEM_USERS = [
     {
-        "username": "odin", "email": "odin@system.local", "password": "ChangeThisDefaultPasswordOdin!",
+        "username": "odin", "email": getattr(settings, "ODIN_USER_EMAIL", "odin@system.local"),
+        "password": getattr(settings, "ODIN_USER_PASSWORD", "ChangeThisOdin!"),
         "full_name": "Odin Superuser", "is_superuser": True, "is_active": True, "is_verified": True,
-        "user_type_code": "SUPERUSER_TYPE", "user_role_codes": ["SUPERUSER"] # Assign role by code
+        "user_type_code": "SUPERUSER_TYPE", "user_role_codes": ["SUPERUSER"]
     },
     {
-        "username": "shadow", "email": "shadow@system.local", "password": "ChangeThisDefaultPasswordShadow!",
-        "full_name": "Shadow System Bot", "is_superuser": False, "is_active": True, "is_verified": True, # Shadow may not be a superuser but a system bot
-        "user_type_code": "BOT_TYPE", "user_role_codes": ["ADMIN"] # Example: Shadow might have admin rights for automated tasks
+        "username": "shadow", "email": getattr(settings, "SHADOW_USER_EMAIL", "shadow@system.local"),
+        "password": getattr(settings, "SHADOW_USER_PASSWORD", "ChangeThisShadow!"),
+        "full_name": "Shadow System Bot", "is_superuser": False, "is_active": True, "is_verified": True,
+        "user_type_code": "BOT_TYPE", "user_role_codes": ["ADMIN"] # Бот може мати адмінські права для системних завдань
     },
-    # As per technical_task.txt, 'root' was also mentioned. Adding it.
     {
-        "username": "root", "email": "root@system.local", "password": "ChangeThisDefaultPasswordRoot!",
+        "username": "root", "email": getattr(settings, "ROOT_USER_EMAIL", "root@system.local"),
+        "password": getattr(settings, "ROOT_USER_PASSWORD", "ChangeThisRoot!"),
         "full_name": "Root Superuser", "is_superuser": True, "is_active": True, "is_verified": True,
         "user_type_code": "SUPERUSER_TYPE", "user_role_codes": ["SUPERUSER"]
     },
@@ -87,233 +98,199 @@ DEFAULT_SYSTEM_USERS = [
 
 class InitialDataService(BaseService):
     """
-    Service for initializing the system with default data.
-    This includes creating predefined dictionary items (roles, types) and system users.
+    Сервіс для ініціалізації системи даними за замовчуванням.
+    Включає створення попередньо визначених елементів довідників (ролі, типи) та системних користувачів.
+    Методи сервісу є ідемпотентними: вони не створюють дублікатів, якщо дані вже існують.
     """
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        logger.info("InitialDataService initialized.")
+        logger.info("InitialDataService ініціалізовано.")
 
     async def _initialize_dictionary(self, model_cls: Type[Any], defaults: List[Dict[str, Any]], code_field: str = "code") -> int:
         """
-        Generic helper to initialize a dictionary table.
-        Checks if items with default codes exist before creating.
+        Загальний допоміжний метод для ініціалізації таблиці-довідника.
+        Перевіряє, чи існують елементи з кодами за замовчуванням, перед створенням.
         """
-        count = 0
+        created_count = 0
         for item_data in defaults:
-            code = item_data.get(code_field)
-            if not code:
-                logger.warning(f"Skipping item in {model_cls.__name__} due to missing code: {item_data}")
+            code_value = item_data.get(code_field)
+            if not code_value:
+                logger.warning(f"Пропуск елемента в {model_cls.__name__} через відсутність значення для поля '{code_field}': {item_data}")
                 continue
 
-            # Check if item with this code already exists
-            stmt = select(model_cls).where(getattr(model_cls, code_field) == code)
-            result = await self.db_session.execute(stmt)
-            existing_item = result.scalar_one_or_none()
+            existing_item = (await self.db_session.execute(
+                select(model_cls.id).where(getattr(model_cls, code_field) == code_value) # type: ignore
+            )).scalar_one_or_none()
 
             if not existing_item:
                 try:
                     new_item = model_cls(**item_data)
                     self.db_session.add(new_item)
-                    await self.db_session.flush() # Flush to ensure it's in session for potential later reads within transaction
-                    logger.info(f"Created {model_cls.__name__} '{item_data.get('name', code)}' with code '{code}'.")
-                    count += 1
-                except IntegrityError: # Should be rare due to prior check, but good for safety
-                    await self.db_session.rollback() # Rollback the specific failed add
-                    logger.warning(f"IntegrityError while creating {model_cls.__name__} with code '{code}'. Item might have been created concurrently. Skipping.")
-                except Exception as e:
-                    await self.db_session.rollback()
-                    logger.error(f"Error creating {model_cls.__name__} '{item_data.get('name', code)}': {e}", exc_info=True)
+                    # Не робимо flush тут, щоб дозволити загальний rollback, якщо потрібно
+                    logger.info(f"Створено {model_cls.__name__} '{item_data.get('name', code_value)}' з кодом '{code_value}'.")
+                    created_count += 1
+                except Exception as e: # Широкий except для логування, але помилка буде піднята далі, якщо не IntegrityError
+                    # Якщо помилка IntegrityError, це може означати паралельне створення, що є прийнятним.
+                    # Інші помилки можуть бути більш критичними.
+                    if isinstance(e, IntegrityError):
+                         logger.warning(f"Помилка цілісності (можливо, паралельне створення) для {model_cls.__name__} з кодом '{code_value}'. Пропуск.")
+                         await self.db_session.rollback() # Відкат невдалого додавання
+                    else:
+                        logger.error(f"Помилка створення {model_cls.__name__} '{item_data.get('name', code_value)}': {e}", exc_info=True)
+                        raise # Перекидаємо помилку, щоб перервати загальну ініціалізацію, якщо це не IntegrityError
             else:
-                logger.info(f"{model_cls.__name__} with code '{code}' already exists. Skipping.")
-        return count
+                logger.info(f"{model_cls.__name__} з кодом '{code_value}' вже існує. Пропуск.")
+        return created_count
 
     async def initialize_user_roles(self) -> int:
-        """Initializes default user roles."""
-        logger.info("Initializing default user roles...")
-        created_count = await self._initialize_dictionary(UserRole, DEFAULT_USER_ROLES)
-        logger.info(f"Finished initializing user roles. Created {created_count} new roles.")
-        return created_count
+        """Ініціалізує ролі користувачів за замовчуванням."""
+        logger.info("Ініціалізація ролей користувачів за замовчуванням...")
+        count = await self._initialize_dictionary(UserRole, DEFAULT_USER_ROLES)
+        logger.info(f"Завершено ініціалізацію ролей користувачів. Створено {count} нових ролей.")
+        return count
 
     async def initialize_user_types(self) -> int:
-        """Initializes default user types."""
-        logger.info("Initializing default user types...")
-        created_count = await self._initialize_dictionary(UserType, DEFAULT_USER_TYPES)
-        logger.info(f"Finished initializing user types. Created {created_count} new types.")
-        return created_count
+        """Ініціалізує типи користувачів за замовчуванням."""
+        logger.info("Ініціалізація типів користувачів за замовчуванням...")
+        count = await self._initialize_dictionary(UserType, DEFAULT_USER_TYPES)
+        logger.info(f"Завершено ініціалізацію типів користувачів. Створено {count} нових типів.")
+        return count
 
     async def initialize_group_types(self) -> int:
-        """Initializes default group types."""
-        logger.info("Initializing default group types...")
-        created_count = await self._initialize_dictionary(GroupType, DEFAULT_GROUP_TYPES)
-        logger.info(f"Finished initializing group types. Created {created_count} new types.")
-        return created_count
+        """Ініціалізує типи груп за замовчуванням."""
+        logger.info("Ініціалізація типів груп за замовчуванням...")
+        count = await self._initialize_dictionary(GroupType, DEFAULT_GROUP_TYPES)
+        logger.info(f"Завершено ініціалізацію типів груп. Створено {count} нових типів.")
+        return count
 
     async def initialize_task_types(self) -> int:
-        """Initializes default task types."""
-        logger.info("Initializing default task types...")
-        created_count = await self._initialize_dictionary(TaskType, DEFAULT_TASK_TYPES)
-        logger.info(f"Finished initializing task types. Created {created_count} new types.")
-        return created_count
+        """Ініціалізує типи завдань за замовчуванням."""
+        logger.info("Ініціалізація типів завдань за замовчуванням...")
+        count = await self._initialize_dictionary(TaskType, DEFAULT_TASK_TYPES)
+        logger.info(f"Завершено ініціалізацію типів завдань. Створено {count} нових типів.")
+        return count
 
     async def initialize_bonus_types(self) -> int:
-        """Initializes default bonus types."""
-        logger.info("Initializing default bonus types...")
-        created_count = await self._initialize_dictionary(BonusType, DEFAULT_BONUS_TYPES)
-        logger.info(f"Finished initializing bonus types. Created {created_count} new types.")
-        return created_count
+        """Ініціалізує типи бонусів за замовчуванням."""
+        logger.info("Ініціалізація типів бонусів за замовчуванням...")
+        count = await self._initialize_dictionary(BonusType, DEFAULT_BONUS_TYPES)
+        logger.info(f"Завершено ініціалізацію типів бонусів. Створено {count} нових типів.")
+        return count
+
+    async def initialize_statuses(self) -> int:
+        """Ініціалізує статуси за замовчуванням."""
+        logger.info("Ініціалізація статусів за замовчуванням...")
+        count = await self._initialize_dictionary(Status, DEFAULT_STATUSES) # Використовуємо 'code' як унікальний ключ
+        logger.info(f"Завершено ініціалізацію статусів. Створено {count} нових статусів.")
+        return count
+
 
     async def initialize_system_users(self) -> int:
         """
-        Initializes default system users (odin, shadow, root).
-        Requires UserType and UserRole to be initialized first.
+        Ініціалізує системних користувачів за замовчуванням ('odin', 'shadow', 'root').
+        Вимагає попередньої ініціалізації UserType та UserRole.
         """
-        logger.info("Initializing default system users...")
+        logger.info("Ініціалізація системних користувачів за замовчуванням...")
         created_count = 0
         for user_data in DEFAULT_SYSTEM_USERS:
             username = user_data["username"]
             email = user_data["email"]
 
-            # Check if user already exists by username or email
-            stmt_username = select(User).where(User.username == username)
-            stmt_email = select(User).where(User.email == email)
+            user_exists = (await self.db_session.execute(
+                select(User.id).where(or_(User.username == username, User.email == email)) # type: ignore
+            )).scalar_one_or_none()
 
-            existing_by_username = (await self.db_session.execute(stmt_username)).scalar_one_or_none()
-            existing_by_email = (await self.db_session.execute(stmt_email)).scalar_one_or_none()
-
-            if existing_by_username:
-                logger.info(f"System user '{username}' already exists. Skipping.")
-                continue
-            if existing_by_email: # Should ideally not happen if username is also unique
-                logger.info(f"System user with email '{email}' (intended for '{username}') already exists. Skipping.")
+            if user_exists:
+                logger.info(f"Системний користувач '{username}' або користувач з email '{email}' вже існує. Пропуск.")
                 continue
 
             try:
-                # Fetch UserType by code
-                user_type_code = user_data["user_type_code"]
-                type_stmt = select(UserType).where(UserType.code == user_type_code)
-                user_type = (await self.db_session.execute(type_stmt)).scalar_one_or_none()
+                user_type = (await self.db_session.execute(
+                    select(UserType).where(UserType.code == user_data["user_type_code"]))
+                ).scalar_one_or_none()
                 if not user_type:
-                    logger.error(f"UserType with code '{user_type_code}' not found for system user '{username}'. Skipping.")
+                    logger.error(f"Тип користувача '{user_data['user_type_code']}' не знайдено для системного користувача '{username}'. Пропуск.")
                     continue
 
-                # Fetch UserRoles by codes
-                user_role_codes = user_data.get("user_role_codes", [])
-                roles_stmt = select(UserRole).where(UserRole.code.in_(user_role_codes))
-                user_roles_db = (await self.db_session.execute(roles_stmt)).scalars().all()
+                user_roles_db = (await self.db_session.execute(
+                    select(UserRole).where(UserRole.code.in_(user_data.get("user_role_codes", [])))) # type: ignore
+                ).scalars().all()
 
-                if len(user_roles_db) != len(user_role_codes):
+                if len(user_roles_db) != len(user_data.get("user_role_codes", [])):
                     found_codes = [r.code for r in user_roles_db]
-                    missing_codes = [code for code in user_role_codes if code not in found_codes]
-                    logger.warning(f"Not all roles found for system user '{username}'. Found: {found_codes}, Missing: {missing_codes}. User will be created with found roles.")
-                    # Decide if this is critical or if user can be created with available roles
-
-                hashed_password = get_password_hash(user_data["password"])
+                    missing_codes = [code for code in user_data.get("user_role_codes", []) if code not in found_codes]
+                    logger.warning(f"Не всі ролі знайдено для '{username}'. Знайдено: {found_codes}, Відсутні: {missing_codes}.")
 
                 new_user_db = User(
-                    username=username,
-                    email=email,
-                    hashed_password=hashed_password,
+                    username=username, email=email,
+                    hashed_password=get_password_hash(user_data["password"]),
                     full_name=user_data.get("full_name"),
                     is_active=user_data.get("is_active", True),
                     is_superuser=user_data.get("is_superuser", False),
-                    is_verified=user_data.get("is_verified", True), # System users are typically pre-verified
-                    user_type_id=user_type.id, # Link to UserType via ID
-                    # user_type = user_type # If relationship is set up to take the object
-                    roles=user_roles_db # Assign UserRole objects to the relationship
+                    is_verified=user_data.get("is_verified", True),
+                    user_type_id=user_type.id,
+                    roles=user_roles_db
                 )
                 self.db_session.add(new_user_db)
-                await self.db_session.flush() # Flush to get ID for logging if needed
-                logger.info(f"System user '{username}' created successfully with ID {new_user_db.id}.")
+                # Не робимо flush тут для загального rollback
+                logger.info(f"Системного користувача '{username}' підготовлено до створення.")
                 created_count += 1
-            except IntegrityError: # Should be rare due to prior checks
-                await self.db_session.rollback()
-                logger.warning(f"IntegrityError while creating system user '{username}'. User might have been created concurrently. Skipping.")
             except Exception as e:
-                await self.db_session.rollback()
-                logger.error(f"Error creating system user '{username}': {e}", exc_info=True)
+                logger.error(f"Помилка підготовки системного користувача '{username}': {e}", exc_info=True)
+                # Не перекидаємо помилку, щоб спробувати створити інших системних користувачів
 
-        logger.info(f"Finished initializing system users. Created {created_count} new users.")
+        logger.info(f"Завершено підготовку системних користувачів. Готово до створення: {created_count} нових користувачів.")
         return created_count
 
-    async def run_full_initialization(self, force_users: bool = False) -> Dict[str, int]:
-        """
-        Runs all initialization methods in the correct order.
-        Commits changes at the end of all successful initializations.
-        If any step fails critically, it should ideally roll back the entire transaction.
-        The BaseService commit/rollback are per-call, so a transaction block might be needed here.
-        For simplicity, each sub-initializer will attempt its own commit for now,
-        but a single transaction for all initializers is better.
-
-        Args:
-            force_users (bool): If true, attempts to create users even if other initializations are skipped.
-                                (Not fully implemented here, as user creation depends on roles/types).
-
-        Returns:
-            Dict[str, int]: A dictionary palavras_chave counts of created items per category.
-        """
-        logger.info("Starting full system data initialization...")
-        # This method should ideally be wrapped in a single transaction.
-        # However, BaseService.commit() is called by sub-methods.
-        # For true atomicity, remove commits from sub-methods and commit here once.
-        # Or, make sub-methods accept a 'commit_on_complete=False' flag.
-        # For now, we proceed with sub-methods committing after each category.
-
-        results = {}
-        try:
-            results["user_roles"] = await self.initialize_user_roles()
-            await self.commit() # Commit after user roles
-
-            results["user_types"] = await self.initialize_user_types()
-            await self.commit() # Commit after user types
-
-            results["group_types"] = await self.initialize_group_types()
-            await self.commit() # Commit after group types
-
-            results["task_types"] = await self.initialize_task_types()
-            await self.commit() # Commit after task types
-
-            results["bonus_types"] = await self.initialize_bonus_types()
-            await self.commit() # Commit after bonus types
-
-            # System users depend on roles and types being present
-            # Check if dependent roles/types exist or if force_users is True
-            essential_data_exists = await self._check_roles_types_exist()
-            if force_users or essential_data_exists:
-                 results["system_users"] = await self.initialize_system_users()
-                 await self.commit() # Commit after system users
-            else:
-                logger.warning("Skipping system user initialization as essential roles/types may not exist and force_users is False.")
-                results["system_users"] = 0
-
-            logger.info("Full system data initialization completed successfully.")
-
-        except Exception as e:
-            logger.error(f"Full system data initialization failed during one of the steps: {e}", exc_info=True)
-            await self.rollback() # Rollback any changes from the current transaction scope
-            # Re-raise or handle as per application's error policy
-            raise
-        return results
-
-    async def _check_roles_types_exist(self) -> bool:
-        """Helper to check if essential roles and types exist for user creation."""
-        # Check for a superuser role and type by code
-        su_role_stmt = select(UserRole).where(UserRole.code == "SUPERUSER")
-        su_type_stmt = select(UserType).where(UserType.code == "SUPERUSER_TYPE")
-        bot_type_stmt = select(UserType).where(UserType.code == "BOT_TYPE")
-        admin_role_stmt = select(UserRole).where(UserRole.code == "ADMIN")
+    async def _check_essential_data_exists(self) -> bool:
+        """Перевіряє наявність критично важливих ролей та типів для створення системних користувачів."""
+        # Перевірка наявності ролі SUPERUSER та типів SUPERUSER_TYPE, BOT_TYPE
+        su_role = (await self.db_session.execute(select(UserRole.id).where(UserRole.code == "SUPERUSER"))).scalar_one_or_none()
+        su_type = (await self.db_session.execute(select(UserType.id).where(UserType.code == "SUPERUSER_TYPE"))).scalar_one_or_none()
+        bot_type = (await self.db_session.execute(select(UserType.id).where(UserType.code == "BOT_TYPE"))).scalar_one_or_none()
+        admin_role = (await self.db_session.execute(select(UserRole.id).where(UserRole.code == "ADMIN"))).scalar_one_or_none()
 
 
-        su_role_exists = (await self.db_session.execute(su_role_stmt)).scalar_one_or_none() is not None
-        su_type_exists = (await self.db_session.execute(su_type_stmt)).scalar_one_or_none() is not None
-        bot_type_exists = (await self.db_session.execute(bot_type_stmt)).scalar_one_or_none() is not None
-        admin_role_exists = (await self.db_session.execute(admin_role_stmt)).scalar_one_or_none() is not None
-
-        if not all([su_role_exists, su_type_exists, bot_type_exists, admin_role_exists]):
-            logger.warning(f"Essential roles/types check: SuperUserRole: {su_role_exists}, SuperUserType: {su_type_exists}, BotUserType: {bot_type_exists}, AdminRole: {admin_role_exists}")
+        if not all([su_role, su_type, bot_type, admin_role]):
+            logger.warning(f"Перевірка критичних даних: Роль SUPERUSER: {'OK' if su_role else 'ВІДСУТНЯ'}, Тип SUPERUSER_TYPE: {'OK' if su_type else 'ВІДСУТНІЙ'}, Тип BOT_TYPE: {'OK' if bot_type else 'ВІДСУТНІЙ'}, Роль ADMIN: {'OK' if admin_role else 'ВІДСУТНЯ'}") # i18n
             return False
         return True
 
+    async def run_full_initialization(self) -> Dict[str, int]:
+        """
+        Виконує повну ініціалізацію всіх стандартних даних системи.
+        Зміни комітяться в кінці, якщо всі кроки успішні.
+        Якщо будь-який крок зазнає критичної невдачі (окрім IntegrityError при створенні словників),
+        відбувається відкат всієї транзакції.
+        """
+        logger.info("Запуск повної ініціалізації системних даних...")
+        results: Dict[str, int] = {}
 
-logger.info("InitialDataService class defined.")
+        try:
+            results["user_roles"] = await self.initialize_user_roles()
+            results["user_types"] = await self.initialize_user_types()
+            results["group_types"] = await self.initialize_group_types()
+            results["task_types"] = await self.initialize_task_types()
+            results["bonus_types"] = await self.initialize_bonus_types()
+            results["statuses"] = await self.initialize_statuses() # Додано ініціалізацію статусів
+
+            if not await self._check_essential_data_exists():
+                # i18n
+                logger.error("Критично важливі типи/ролі для створення системних користувачів відсутні після ініціалізації довідників. Ініціалізація користувачів скасована.")
+                # Можна кинути виняток, якщо це критично, або просто продовжити без створення користувачів
+                results["system_users"] = 0
+                # raise ValueError("Не вдалося створити основні ролі/типи, необхідні для системних користувачів.")
+            else:
+                results["system_users"] = await self.initialize_system_users()
+
+            await self.commit() # Єдиний коміт в кінці успішної підготовки всіх даних
+            logger.info("Повна ініціалізація системних даних успішно завершена та закомічена.")
+
+        except Exception as e:
+            logger.error(f"Повна ініціалізація системних даних не вдалася: {e}", exc_info=settings.DEBUG)
+            await self.rollback() # Відкат усіх змін, якщо будь-який крок спричинив непередбачену помилку
+            raise # Перекидаємо помилку далі
+        return results
+
+logger.debug(f"{InitialDataService.__name__} (сервіс початкової ініціалізації) успішно визначено.")

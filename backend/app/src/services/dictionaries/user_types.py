@@ -1,37 +1,54 @@
 # backend/app/src/services/dictionaries/user_types.py
-import logging
-# from typing import Optional # For potential custom methods
+# import logging # Замінено на централізований логер
+from typing import Optional # Потрібно для прикладу кастомного методу
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.future import select # For potential custom methods
+# from sqlalchemy.future import select # Для потенційних кастомних методів
 
-from app.src.services.dictionaries.base_dict import BaseDictionaryService
-from app.src.models.dictionaries.user_types import UserType # SQLAlchemy Model
-from app.src.schemas.dictionaries.user_types import ( # Pydantic Schemas
+# Повні шляхи імпорту
+from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
+from backend.app.src.models.dictionaries.user_types import UserType # Модель SQLAlchemy
+from backend.app.src.schemas.dictionaries.user_types import ( # Схеми Pydantic
     UserTypeCreate,
     UserTypeUpdate,
     UserTypeResponse,
 )
+from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import settings # Для доступу до налаштувань системи (наприклад, коду типу користувача за замовчуванням)
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
 
 class UserTypeService(BaseDictionaryService[UserType, UserTypeCreate, UserTypeUpdate, UserTypeResponse]):
     """
-    Service for managing UserType dictionary items.
-    Inherits generic CRUD operations from BaseDictionaryService.
+    Сервіс для управління елементами довідника "Типи Користувачів".
+    Типи користувачів визначають різні категорії користувачів у системі
+    (наприклад, 'СПІВРОБІТНИК', 'ПІДРЯДНИК', 'КЛІЄНТ', 'СИСТЕМНИЙ_АГЕНТ').
+    Успадковує загальні CRUD-операції від BaseDictionaryService.
     """
 
     def __init__(self, db_session: AsyncSession):
         """
-        Initializes the UserTypeService.
+        Ініціалізує сервіс UserTypeService.
 
-        Args:
-            db_session (AsyncSession): The SQLAlchemy asynchronous database session.
+        :param db_session: Асинхронна сесія бази даних SQLAlchemy.
         """
         super().__init__(db_session, model=UserType, response_schema=UserTypeResponse)
-        logger.info("UserTypeService initialized.")
+        logger.info(f"UserTypeService ініціалізовано для моделі: {self._model_name}")
 
-    # --- Custom methods for UserTypeService (if any) ---
-    # e.g.,  async def get_default_user_type() -> Optional[UserTypeResponse]: ...
+    # --- Кастомні методи для UserTypeService (якщо потрібні) ---
+    # Наприклад, отримання типу користувача за замовчуванням, визначеного в налаштуваннях системи.
+    #
+    # async def get_default_user_type(self) -> Optional[UserTypeResponse]:
+    #     """
+    #     Отримує тип користувача за замовчуванням, код якого вказано в системних налаштуваннях.
+    #     """
+    #     default_user_type_code = getattr(settings, 'DEFAULT_USER_TYPE_CODE', None)
+    #     if not default_user_type_code:
+    #         logger.warning("Код типу користувача за замовчуванням (DEFAULT_USER_TYPE_CODE) не визначено в налаштуваннях.")
+    #         return None
+    #
+    #     logger.debug(f"Спроба отримання типу користувача за замовчуванням з кодом: '{default_user_type_code}'.")
+    #     return await self.get_by_code(default_user_type_code)
+    #
+    # Примітка: Базовий сервіс вже надає get_by_code, тому цей метод є лише обгорткою
+    # для отримання коду з налаштувань.
 
-logger.info("UserTypeService class defined.")
+logger.debug(f"{UserTypeService.__name__} (сервіс типів користувачів) успішно визначено.")

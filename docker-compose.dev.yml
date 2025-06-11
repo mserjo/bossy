@@ -1,0 +1,51 @@
+# docker-compose.dev.yml
+# # Файл Docker Compose для середовища розробки.
+# # Розширює базовий docker-compose.yml та додає специфічні для розробки налаштування.
+
+version: '3.8'
+
+services:
+  backend:
+    # Розширює сервіс backend з docker-compose.yml
+    # Для розробки ми хочемо використовувати bind mount для миттєвого оновлення коду
+    volumes:
+      - ./backend:/app # Монтування коду backend в контейнер
+    # Dockerfile для розробки може бути іншим або використовувати іншу стадію,
+    # якщо у вас багатостадійний Dockerfile (наприклад, з dev-залежностями)
+    # build:
+    #   context: ./backend
+    #   dockerfile: Dockerfile # Або Dockerfile.dev, якщо є
+    #   target: development # Якщо є така стадія в Dockerfile
+    env_file:
+      - ./backend/.env # Завантаження змінних середовища для розробки
+    # Команда може бути переписана для запуску з live-reload,
+    # наприклад, uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    # command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    ports:
+      - "8000:8000" # Переконайтеся, що порт той самий або оновіть за потреби
+
+  # Сервіс db зазвичай успадковується з основного docker-compose.yml без змін для dev,
+  # але можна перевизначити, якщо потрібно (наприклад, інший порт).
+  # db:
+  #   ports:
+  #     - "5433:5432" # Приклад: інший порт для локальної розробки
+
+# Можна додати сервіси, специфічні для розробки, наприклад, Mailhog або Adminer
+#   mailhog:
+#     image: mailhog/mailhog
+#     container_name: project_mailhog
+#     ports:
+#       - "1025:1025" # SMTP порт
+#       - "8025:8025" # Веб-інтерфейс
+#     restart: unless-stopped
+
+#   adminer:
+#     image: adminer
+#     container_name: project_adminer
+#     ports:
+#       - "8080:8080"
+#     restart: unless-stopped
+#     depends_on:
+#       - db
+
+# Мережі та томи успадковуються з docker-compose.yml, якщо не перевизначені.

@@ -1,4 +1,5 @@
-# /backend/app/src/config/__init__.py
+# backend/app/src/config/__init__.py
+# -*- coding: utf-8 -*-
 """
 Пакет конфігурації для програми Kudos.
 
@@ -10,3 +11,9 @@
 - Підключення до Redis (`redis.py`)
 - Параметри безпеки та JWT (`security.py`)
 """
+
+# Можна додати імпорти для зручного доступу до основних конфігурацій, наприклад:
+# from .settings import settings
+# from .logging_config import LOGGING_CONFIG # Якщо LOGGING_CONFIG використовується для dictConfig
+
+# __all__ = ["settings", "LOGGING_CONFIG"] # Приклад

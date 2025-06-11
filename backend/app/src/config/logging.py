@@ -1,4 +1,5 @@
-# /backend/app/src/config/logging.py
+# backend/app/src/config/logging.py
+# -*- coding: utf-8 -*-
 """
 Конфігурація системи логування для FastAPI програми Kudos.
 

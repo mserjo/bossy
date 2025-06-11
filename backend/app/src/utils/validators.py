@@ -1,11 +1,13 @@
 # backend/app/src/utils/validators.py
-
+# -*- coding: utf-8 -*-
 """
-Custom data validation functions.
-These can be used in Pydantic models, service layers, or other parts of the application
-for validating specific data formats or rules.
-"""
+Модуль кастомних функцій валідації даних.
 
+Цей модуль надає функції для перевірки даних на відповідність певним критеріям
+або форматам. Ці валідатори можуть використовуватися в моделях Pydantic,
+сервісному шарі або інших частинах додатку, де потрібна специфічна
+перевірка даних перед їх обробкою або збереженням.
+"""
 import logging
 import re
 from typing import Optional # Added Optional for region type hint
@@ -15,120 +17,123 @@ logger = logging.getLogger(__name__)
 
 def is_strong_password(password: str, min_length: int = 8) -> bool:
     """
-    Checks if a password meets common strength criteria.
-    Criteria:
-        - Minimum length (default 8 characters).
-        - Contains at least one uppercase letter.
-        - Contains at least one lowercase letter.
-        - Contains at least one digit.
-        - Contains at least one special character (from a predefined set).
+    Перевіряє, чи відповідає пароль загальним критеріям надійності.
+    Критерії:
+        - Мінімальна довжина (за замовчуванням 8 символів).
+        - Містить принаймні одну велику літеру.
+        - Містить принаймні одну малу літеру.
+        - Містить принаймні одну цифру.
+        - Містить принаймні один спеціальний символ (із попередньо визначеного набору).
 
     Args:
-        password: The password string to validate.
-        min_length: The minimum required length for the password.
+        password: Рядок пароля для перевірки.
+        min_length: Мінімальна необхідна довжина пароля.
 
     Returns:
-        True if the password meets all criteria, False otherwise.
+        True, якщо пароль відповідає всім критеріям, False в іншому випадку.
     """
     if not password:
         return False
     if len(password) < min_length:
-        logger.debug(f"Password validation failed: Too short (length {len(password)}, required {min_length}).")
+        logger.debug(f"Перевірка пароля не вдалася: Занадто короткий (довжина {len(password)}, вимагається {min_length}).")
         return False
     if not re.search(r"[A-Z]", password):
-        logger.debug("Password validation failed: No uppercase letter.")
+        logger.debug("Перевірка пароля не вдалася: Немає великої літери.")
         return False
     if not re.search(r"[a-z]", password):
-        logger.debug("Password validation failed: No lowercase letter.")
+        logger.debug("Перевірка пароля не вдалася: Немає малої літери.")
         return False
     if not re.search(r"[0-9]", password):
-        logger.debug("Password validation failed: No digit.")
+        logger.debug("Перевірка пароля не вдалася: Немає цифри.")
         return False
-    if not re.search(r"[!@#$%^&*()_+=\-\[\]{};':"\|,.<>\/?~`]", password):
-        logger.debug("Password validation failed: No special character.")
+    if not re.search(r"[!@#$%^&*()_+=\-\[\]{};':\"\\|,.<>\/?~`]", password): # Екрановано зворотний слеш
+        logger.debug("Перевірка пароля не вдалася: Немає спеціального символу.")
         return False
 
-    logger.debug("Password validation successful: Meets all criteria.")
+    logger.debug("Перевірка пароля успішна: Відповідає всім критеріям.")
     return True
 
 def is_valid_phone_number(phone_number: str, region: Optional[str] = None) -> bool:
     """
-    Validates a phone number.
-    This is a basic placeholder implementation.
-    For robust validation, consider using a dedicated library like 'phonenumbers'.
+    Перевіряє номер телефону.
+    Це базова реалізація-заглушка.
+    Для надійної валідації розгляньте можливість використання спеціалізованої бібліотеки, наприклад 'phonenumbers'.
 
     Args:
-        phone_number: The phone number string to validate.
-        region: Optional. A region code (e.g., "US", "GB") for more specific validation if using a library.
-                Not used in this basic version.
+        phone_number: Рядок номера телефону для перевірки.
+        region: Необов'язково. Код регіону (наприклад, "UA", "GB") для більш конкретної валідації
+                при використанні бібліотеки. У цій базовій версії не використовується.
 
     Returns:
-        True if the phone number format seems valid, False otherwise.
+        True, якщо формат номера телефону виглядає дійсним, False в іншому випадку.
     """
     if not phone_number:
         return False
 
+    # Підрахунок лише цифр
     num_digits = sum(c.isdigit() for c in phone_number)
-    if not (7 <= num_digits <= 15):
-        logger.debug(f"Phone number validation failed: Contains {num_digits} digits, expected 7-15.")
+    if not (7 <= num_digits <= 15): # Дуже загальне правило, реальні номери можуть варіюватися
+        logger.debug(f"Перевірка номера телефону не вдалася: Містить {num_digits} цифр, очікується 7-15.")
         return False
 
+    # Дозволені символи: цифри, пробіли, дефіси, круглі дужки, плюс
     allowed_chars_pattern = re.compile(r"^[0-9\s\-\(\)\+]*$")
     if not allowed_chars_pattern.match(phone_number):
-        logger.debug(f"Phone number validation failed: Contains invalid characters.")
+        logger.debug("Перевірка номера телефону не вдалася: Містить недійсні символи.")
         return False
 
+    # Прості перевірки початку та кінця
     if not (phone_number.startswith('+') or phone_number[0].isdigit()):
-         logger.debug(f"Phone number validation failed: Does not start with '+' or digit.")
+         logger.debug("Перевірка номера телефону не вдалася: Не починається з '+' або цифри.")
          return False
-    if not phone_number[-1].isdigit():
-         logger.debug(f"Phone number validation failed: Does not end with a digit.")
+    if not phone_number[-1].isdigit(): # Має закінчуватися цифрою після видалення можливих пробілів або спецсимволів, але тут перевіряємо як є
+         logger.debug("Перевірка номера телефону не вдалася: Не закінчується цифрою.")
          return False
 
-    logger.debug(f"Phone number '{phone_number}' passed basic format validation.")
+    logger.debug(f"Номер телефону '{phone_number}' пройшов базову перевірку формату.")
     return True
 
 if __name__ == "__main__":
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    logger.info("--- Validation Utilities --- Demonstration")
+    logger.info("--- Демонстрація Утиліт Валідації ---")
 
-    logger.info("\n--- Password Strength Tests ---")
+    logger.info("\n--- Тести Надійності Пароля ---")
     passwords_to_test = {
-        "Short1!": False,
-        "nouppercase1!": False,
-        "NOLOWERCASE1!": False,
-        "NoDigit!Aa": False,
-        "NoSpecialChar1Aa": False,
-        "ValidPass123!": True,
-        "Another_Good-One_123": True,
-        "Weak": False
+        "Короткий1!": False,
+        "безвеликої1!": False,
+        "БЕЗМАЛОЇ1!": False,
+        "БезЦифри!Аа": False,
+        "БезСпецСимволу1Аа": False,
+        "ВаліднийПароль123!": True,
+        "Інший_Хороший-Пароль_123": True,
+        "Слабкий": False
     }
     for pw, expected in passwords_to_test.items():
         is_valid = is_strong_password(pw)
-        logger.info(f"Password '{pw}': Strong? {is_valid} (Expected: {expected})")
+        logger.info(f"Пароль '{pw}': Надійний? {is_valid} (Очікується: {expected})")
         assert is_valid == expected
 
-    logger.info("\n--- Phone Number Basic Validation Tests ---")
+    logger.info("\n--- Базові Тести Валідації Номера Телефону ---")
     phones_to_test = {
-        "+15551234567": True,
-        "555-123-4567": True,
-        "(555) 123 4567": True,
-        "1234567": True,
-        "12345": False,
-        "1234567890123456": False,
-        "123456789012345": True,
-        "555-123-ABCD": False,
-        "+1-555-123-4567 ext 9": False,
-        "invalid phone": False,
+        "+380501234567": True,
+        "050-123-45-67": True,
+        "(097) 123 4567": True,
+        "1234567": True,  # Мінімальна кількість цифр
+        "12345": False, # Занадто мало цифр
+        "1234567890123456": False, # Занадто багато цифр
+        "0441234567": True, # Київський міський
+        "050-123-АБВГ": False, # Недійсні символи
+        "+1-555-123-4567 ext 9": False, # Непідтримувані розширення в базовій версії
+        "невірний номер": False,
         "": False,
         "+": False,
         "123-": False
     }
     for phone, expected in phones_to_test.items():
         is_valid = is_valid_phone_number(phone)
-        logger.info(f"Phone '{phone}': Valid? {is_valid} (Expected: {expected})")
+        logger.info(f"Телефон '{phone}': Дійсний? {is_valid} (Очікується: {expected})")
         assert is_valid == expected
 
-    logger.info("Note: Phone number validation is very basic. Use a dedicated library for production.")
+    logger.info("Примітка: Перевірка номера телефону є дуже базовою. Використовуйте спеціалізовану бібліотеку для продуктивного середовища.")

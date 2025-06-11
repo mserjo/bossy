@@ -1,4 +1,5 @@
 # backend/app/src/models/auth/token.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для сутності "Токен Оновлення" (RefreshToken).
 

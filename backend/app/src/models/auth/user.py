@@ -1,4 +1,5 @@
 # backend/app/src/models/auth/user.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для сутності "Користувач".
 

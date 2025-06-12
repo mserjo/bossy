@@ -1,14 +1,23 @@
 # backend/app/src/services/cache/memory_service.py
-# import logging # Замінено на централізований логер
+"""
+Сервіс кешування в пам'яті.
+
+Конкретна реалізація `BaseCacheService`, що використовує словник Python
+для зберігання даних кешу в оперативній пам'яті. Підходить для розробки,
+тестування або невеликих однопроцесних застосунків.
+"""
 import time  # Для обробки терміну дії
-from typing import Optional, Any, Dict, Set, Union  # Union не використовується, можна прибрати
+from typing import Optional, Any, Dict, Set # Union видалено
 from datetime import datetime, timedelta, timezone  # Для точного терміну дії в логах
 
-from backend.app.src.services.cache.base_cache import BaseCacheService  # Повний шлях
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.services.cache.base_cache import BaseCacheService
+from backend.app.src.config import logger  # Використання спільного логера з конфігу
 
 
-# TODO: Розглянути використання asyncio.Lock для операцій читання-модифікації-запису для підвищення потокобезпечності,
+# TODO: [Concurrency] Розглянути використання asyncio.Lock для операцій читання-модифікації-запису
+#       для підвищення потокобезпечності, особливо якщо методи стануть більш складними
+#       та матимуть `await` у критичних секціях.
+#       Для простих операцій з dict GIL Python часто надає достатній захист.
 #  хоча для простих операцій з dict GIL Python часто надає достатній захист.
 
 # Внутрішній клас для зберігання записів кешу з інформацією про термін дії

@@ -1,34 +1,37 @@
 # backend/app/src/services/bonuses/transaction.py
-import logging
+"""
+Сервіс для управління транзакціями по бонусних рахунках.
+
+Відповідає за створення записів транзакцій, забезпечуючи атомарне
+та коректне оновлення балансів рахунків користувачів.
+"""
 from typing import List, Optional, Tuple
 from uuid import UUID
-from decimal import Decimal  # Для точних сум та балансів
+from decimal import Decimal
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+from sqlalchemy import select # Оновлено імпорт
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.bonuses.transaction import AccountTransaction  # Модель SQLAlchemy Transaction
-from backend.app.src.models.bonuses.account import UserAccount  # Для зв'язку транзакції та оновлення балансу
-from backend.app.src.models.auth.user import User  # Для контексту користувача в UserAccount
+from backend.app.src.models.bonuses.transaction import AccountTransaction
+from backend.app.src.models.bonuses.account import UserAccount
+from backend.app.src.models.auth.user import User
 # from backend.app.src.models.groups.group import Group # Не використовується прямо
 
-from backend.app.src.schemas.bonuses.transaction import (  # Pydantic Схеми
+from backend.app.src.schemas.bonuses.transaction import (
     AccountTransactionCreate,
     AccountTransactionResponse
 )
 from backend.app.src.schemas.bonuses.account import UserAccountResponse
-from backend.app.src.services.bonuses.account import UserAccountService, \
-    InsufficientFundsError  # Імпорт сервісу рахунків та його помилки
-
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings  # Для доступу до конфігурацій
+from backend.app.src.services.bonuses.account import UserAccountService, InsufficientFundsError
+from backend.app.src.config import logger  # Використання спільного логера з конфігу
+from backend.app.src.config import settings
 
 
-class AccountTransactionService(BaseService):
+class AccountTransactionService(BaseService): # type: ignore
     """
     Сервіс для управління транзакціями по бонусних рахунках.
     Відповідає за створення записів транзакцій та забезпечення атомарного

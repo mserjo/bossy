@@ -1,45 +1,47 @@
 # backend/app/src/services/bonuses/reward.py
-import logging
-from typing import List, Optional, Any, Dict  # Any замінено на Dict для redeem_reward
+"""
+Сервіс для управління винагородами в бонусній системі.
+
+Відповідає за створення, оновлення, видалення, отримання винагород
+та обробку процесу їх отримання користувачами за бонусні бали.
+"""
+from typing import List, Optional, Dict # Any, Tuple видалено
 from uuid import UUID
 from decimal import Decimal
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+from sqlalchemy import select, or_, and_, func # Оновлено імпорт select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import or_, and_, func  # Додано and_, func
 
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.bonuses.reward import Reward  # Модель SQLAlchemy Reward
-from backend.app.src.models.bonuses.user_reward_redemption import \
-    UserRewardRedemption  # Модель для відстеження отримань
-from backend.app.src.models.groups.group import Group  # Якщо винагороди специфічні для групи
-from backend.app.src.models.auth.user import User  # Для користувача, що отримує, та created_by/updated_by
+from backend.app.src.models.bonuses.reward import Reward
+from backend.app.src.models.bonuses.user_reward_redemption import UserRewardRedemption
+from backend.app.src.models.groups.group import Group
+from backend.app.src.models.auth.user import User
 
-from backend.app.src.schemas.bonuses.reward import (  # Pydantic Схеми
+from backend.app.src.schemas.bonuses.reward import (
     RewardCreate,
     RewardUpdate,
     RewardResponse,
     RedeemRewardRequest,
-    UserRewardRedemptionResponse  # Додано для відповіді redeem_reward
+    UserRewardRedemptionResponse
 )
-from backend.app.src.schemas.bonuses.transaction import AccountTransactionCreate  # Для створення транзакції списання
-from backend.app.src.services.bonuses.account import UserAccountService  # Для роботи з рахунками
-# AccountTransactionService буде викликано через UserAccountService.adjust_account_balance
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings  # Для доступу до конфігурацій
+# AccountTransactionCreate не використовується напряму цим сервісом
+from backend.app.src.services.bonuses.account import UserAccountService
+from backend.app.src.config import logger  # Використання спільного логера з конфігу
+from backend.app.src.config import settings
 
 
-# TODO: Перенести кастомні помилки до backend/app/src/core/exceptions.py
+# TODO: [Exceptions] Перенести кастомні помилки до backend/app/src/core/exceptions.py
 class RewardUnavailableError(ValueError):
-    """Помилка, якщо винагорода недоступна (неактивна, немає в наявності тощо)."""  # i18n
+    """Помилка, якщо винагорода недоступна (неактивна, немає в наявності тощо)."""
     pass
 
 
-class Redemption 조건Error(ValueError):  # RedemptionConditionError
-    """Помилка, якщо умови отримання винагороди не виконані (наприклад, ліміт на користувача)."""  # i18n
+class RedemptionConditionError(ValueError): # Назву виправлено
+    """Помилка, якщо умови отримання винагороди не виконані (наприклад, ліміт на користувача)."""
     pass
 
 

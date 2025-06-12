@@ -1,38 +1,24 @@
 # backend/app/src/services/groups/__init__.py
-import logging
+"""
+Ініціалізаційний файл для модуля сервісів, пов'язаних з групами.
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+Цей модуль реекспортує основні класи сервісів для управління групами,
+членством, налаштуваннями груп та запрошеннями.
+"""
 
-logger.info("Group services sub-package initialized.")
+from backend.app.src.config import logger
 
-# Import specific group service classes
-# These imports assume the service files (group.py, settings.py, etc.)
-# will be created in the same directory.
+# Явний імпорт сервісів для кращої читабельності та статичного аналізу
+from backend.app.src.services.groups.group import GroupService
+from backend.app.src.services.groups.settings import GroupSettingService # Уточнити назву класу, якщо потрібно
+from backend.app.src.services.groups.membership import GroupMembershipService
+from backend.app.src.services.groups.invitation import GroupInvitationService
 
-SERVICE_FILES = {
-    "GroupService": ".group",
-    "GroupSettingService": ".settings",
-    "GroupMembershipService": ".membership",
-    "GroupInvitationService": ".invitation",
-}
+__all__ = [
+    "GroupService",
+    "GroupSettingService",    # Уточнити фактичну назву класу у файлі settings.py
+    "GroupMembershipService",
+    "GroupInvitationService",
+]
 
-# Dynamically import services and add to __all__
-__all__ = []
-
-for service_name, module_name in SERVICE_FILES.items():
-    try:
-        # The `level=1` in __import__ signifies a relative import from the current package
-        module = __import__(module_name, globals(), locals(), [service_name], 1)
-        service_class = getattr(module, service_name)
-        globals()[service_name] = service_class # Make it available in the package namespace
-        __all__.append(service_name)
-        logger.info(f"Successfully imported {service_name} from {module_name}")
-    except (ImportError, AttributeError) as e:
-        logger.warning(f"{service_name} could not be imported from {module_name}: {e}. It might not be defined yet.")
-        globals()[service_name] = None # Define as None if import fails
-
-# Clean __all__ from None entries if any service failed to import
-__all__ = [name for name in __all__ if globals().get(name) is not None]
-
-logger.info(f"Group services sub-package exports: {__all__}")
+logger.info(f"Сервіси груп експортують: {__all__}")

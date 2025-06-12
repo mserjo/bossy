@@ -1,27 +1,33 @@
 # backend/app/src/services/bonuses/calculation.py
-import logging
-from typing import List, Optional, Dict, Any
+"""
+Сервіс для розрахунку бонусів.
+
+Відповідає за обчислення бонусних балів на основі визначених правил
+та контексту подій, таких як виконання завдань.
+"""
+from typing import List, Optional, Dict, Any, Tuple # Додано Tuple
 from uuid import UUID
 from decimal import Decimal
-from datetime import timedelta, datetime, timezone  # Додано datetime, timezone
+from datetime import timedelta, datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy import func
+from sqlalchemy import select, func # Оновлено імпорт select
 
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.bonuses.bonus import BonusRule  # Повний шлях не потрібен, бо це той самий рівень
+from backend.app.src.models.bonuses.bonus import BonusRule
 from backend.app.src.models.tasks.task import Task
 from backend.app.src.models.tasks.completion import TaskCompletion
 from backend.app.src.models.auth.user import User
 # from backend.app.src.models.groups.group import Group # Не використовується прямо
 
 from backend.app.src.schemas.bonuses.bonus_rule import BonusRuleResponse
-from backend.app.src.services.bonuses.bonus_rule import BonusRuleService  # Імпорт сервісу правил
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings  # Для доступу до конфігурацій
+from backend.app.src.services.bonuses.bonus_rule import BonusRuleService
+from backend.app.src.config import logger  # Використання спільного логера з конфігу
+from backend.app.src.config import settings
 
-# TODO: Винести COMPLETION_STATUS_APPROVED до спільного файлу констант/енумів, якщо він використовується в інших місцях.
+# TODO: [Constants/Enums] Винести COMPLETION_STATUS_APPROVED до спільного файлу констант або енумів,
+#       ймовірно в `backend.app.src.core.enums` або `backend.app.src.core.constants`,
+#       згідно з `technical_task.txt` / `structure-claude-v2.md`.
 COMPLETION_STATUS_APPROVED = "APPROVED"  # Статус для перевірки успішного виконання завдання
 
 

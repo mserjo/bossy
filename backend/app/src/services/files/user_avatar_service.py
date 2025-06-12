@@ -1,30 +1,31 @@
 # backend/app/src/services/files/user_avatar_service.py
-# import logging # Замінено на централізований логер
-from typing import List, Optional
+"""
+Сервіс для управління аватарами користувачів.
+
+Обробляє логіку зв'язування користувачів з файлами-аватарами,
+встановлення активного аватара та отримання інформації про аватари.
+"""
+from typing import List, Optional, Dict, Any # Tuple, Any видалено, Dict додано для update_values
 from uuid import UUID
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload  # , joinedload # joinedload не використовується
+from sqlalchemy import select # Оновлено імпорт
+from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 
-from backend.app.src.services.base import BaseService  # Повний шлях
-from backend.app.src.models.files.avatar import UserAvatar  # Модель SQLAlchemy UserAvatar
-from backend.app.src.models.files.file import FileRecord  # Для зв'язку з фактичним файлом
-from backend.app.src.models.auth.user import User  # Для контексту користувача
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.files.avatar import UserAvatar
+from backend.app.src.models.files.file import FileRecord
+from backend.app.src.models.auth.user import User
 
-from backend.app.src.schemas.files.avatar import (  # Схеми Pydantic
-    # UserAvatarCreate, # Не використовується прямо як тип параметра, але концептуально для file_id
-    # UserAvatarUpdate, # Не використовується прямо як тип параметра для зміни is_active
-    UserAvatarResponse
-)
-# from backend.app.src.schemas.files.file import FileRecordResponse # Для вкладених деталей файлу у відповіді (вже є в UserAvatarResponse)
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.schemas.files.avatar import UserAvatarResponse
+# UserAvatarCreate, UserAvatarUpdate не імпортуються, оскільки дані для них формуються в сервісі
+from backend.app.src.config import logger  # Використання спільного логера з конфігу
+from backend.app.src.config import settings
 
 
-class UserAvatarService(BaseService):
+class UserAvatarService(BaseService): # type: ignore
     """
     Сервіс для управління аватарами користувачів.
     Обробляє зв'язування користувачів з їхніми зображеннями-аватарами (FileRecords)
@@ -41,17 +42,22 @@ class UserAvatarService(BaseService):
             selectinload(UserAvatar.user).options(selectinload(User.user_type)),
             selectinload(UserAvatar.file).options(
                 selectinload(FileRecord.uploader_user).options(selectinload(User.user_type)),
-                selectinload(FileRecord.group)  # Якщо FileRecord має зв'язок з групою
+                selectinload(FileRecord.group)
             )
         ).where(UserAvatar.id == user_avatar_id)
-        return (await self.db_session.execute(stmt)).scalar_one_or_none()
+        try:
+            result = await self.db_session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(f"Помилка при отриманні UserAvatar link ID {user_avatar_id}: {e}", exc_info=settings.DEBUG)
+            return None
 
     async def set_user_avatar(
             self,
             user_id: UUID,
             file_id: UUID,
-            set_by_user_id: Optional[UUID] = None  # ID користувача, який виконує дію (для аудиту)
-    ) -> UserAvatarResponse:
+            set_by_user_id: Optional[UUID] = None
+    ) -> UserAvatarResponse: # type: ignore
         """
         Встановлює або змінює активний аватар для користувача.
         Деактивує попередні активні аватари.

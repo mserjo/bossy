@@ -1,39 +1,26 @@
 # backend/app/src/services/gamification/__init__.py
-import logging
+"""
+Ініціалізаційний файл для модуля сервісів, пов'язаних з гейміфікацією.
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+Цей модуль реекспортує основні класи сервісів для управління рівнями,
+досягненнями користувачів, бейджами та рейтингами.
+"""
 
-logger.info("Gamification services sub-package initialized.")
+from backend.app.src.config import logger
 
-# Import specific gamification-related service classes
-# These imports assume the service files (level.py, badge.py, etc.)
-# will be created in the same directory.
+# Явний імпорт сервісів для кращої читабельності та статичного аналізу
+from backend.app.src.services.gamification.level import LevelService
+from backend.app.src.services.gamification.user_level import UserLevelService
+from backend.app.src.services.gamification.badge import BadgeService
+from backend.app.src.services.gamification.achievement import UserAchievementService
+from backend.app.src.services.gamification.rating import RatingService # Відповідно до списку файлів завдання
 
-SERVICE_FILES = {
-    "LevelService": ".level",
-    "UserLevelService": ".user_level",
-    "BadgeService": ".badge",
-    "UserAchievementService": ".achievement",
-    "UserRatingService": ".rating",
-}
+__all__ = [
+    "LevelService",
+    "UserLevelService",
+    "BadgeService",
+    "UserAchievementService",
+    "RatingService", # Відповідно до списку файлів завдання
+]
 
-# Dynamically import services and add to __all__
-__all__ = []
-
-for service_name, module_name in SERVICE_FILES.items():
-    try:
-        # The `level=1` in __import__ signifies a relative import from the current package
-        module = __import__(module_name, globals(), locals(), [service_name], 1)
-        service_class = getattr(module, service_name)
-        globals()[service_name] = service_class # Make it available in the package namespace
-        __all__.append(service_name)
-        logger.info(f"Successfully imported {service_name} from {module_name}")
-    except (ImportError, AttributeError) as e:
-        logger.warning(f"{service_name} could not be imported from {module_name}: {e}. It might not be defined yet.")
-        globals()[service_name] = None # Define as None if import fails
-
-# Clean __all__ from None entries if any service failed to import
-__all__ = [name for name in __all__ if globals().get(name) is not None]
-
-logger.info(f"Gamification services sub-package exports: {__all__}")
+logger.info(f"Сервіси гейміфікації експортують: {__all__}")

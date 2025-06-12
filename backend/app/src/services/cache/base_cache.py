@@ -3,7 +3,7 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Any, Set # Додано Set для потенційних типів повернення (наприклад, smembers)
 
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import logger # Використання спільного логера з конфігу
 
 class BaseCacheService(ABC):
     """

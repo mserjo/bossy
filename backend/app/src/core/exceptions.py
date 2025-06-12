@@ -172,6 +172,16 @@ class InsufficientFundsError(ValueError):
         super().__init__(message)
 
 
+class RewardUnavailableError(ValueError):
+    """Помилка, що нагорода недоступна (наприклад, закінчилася кількість)."""
+    pass
+
+
+class RedemptionConditionError(ValueError):
+    """Помилка, що умови для отримання нагороди не виконані."""
+    pass
+
+
 # Закоментований приклад ServiceException. Наразі AppException достатньо гнучкий.
 # class ServiceException(AppException):
 #     """Базовий виняток для специфічних помилок сервісного шару, якщо буде потрібна така гранулярність."""
@@ -228,6 +238,8 @@ if __name__ == "__main__":
                           "Завантажений файл має непідтримуваний формат. Дозволені формати: JPG, PNG.")
     demonstrate_exception(InvalidTokenTypeError, "Надано невірний тип токена. Очікувався 'access_token'.")
     demonstrate_exception(InsufficientFundsError, "На рахунку недостатньо коштів для виконання операції.", current_balance=Decimal("10.50"))
+    demonstrate_exception(RewardUnavailableError, "Вибрана нагорода наразі недоступна.")
+    demonstrate_exception(RedemptionConditionError, "Умови для отримання цієї нагороди не виконані.")
 
     # Приклад імітації HTTP-відповіді на основі винятку
     logger.info("\n--- Імітація HTTP-Відповіді на Основі Винятку ---")

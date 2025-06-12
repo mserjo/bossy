@@ -291,6 +291,8 @@ class BonusRuleService(BaseService):
             stmt = stmt.where(*conditions)
 
         # TODO: Згідно technical_task.txt, уточнити поля для сортування.
+        # Можливі поля: name, amount, state, valid_from, valid_until, created_at.
+        # Потрібно реалізувати динамічне сортування аналогічно до UserService.list_users.
         stmt = stmt.order_by(BonusRule.group_id.nulls_first(), BonusRule.name).offset(skip).limit(limit)
 
         rules_db = (await self.db_session.execute(stmt)).scalars().unique().all()

@@ -6,7 +6,7 @@
 та перегляду бонусних рахунків, а також для запису транзакцій.
 """
 from typing import List, Optional, Tuple # Any видалено, Tuple використовується
-from uuid import UUID # Залишаємо для related_entity_id та інших потенційних UUID
+# UUID видалено, оскільки related_entity_id тепер int, і немає інших використань UUID
 from decimal import Decimal  # Для точних розрахунків балансу
 from datetime import datetime, timezone
 
@@ -174,7 +174,7 @@ class UserAccountService(BaseService):
             amount: Decimal,
             transaction_type: str,  # Наприклад, 'ENROLLMENT', 'MANUAL_ADJUSTMENT', 'REWARD_PAYOUT', 'WITHDRAWAL'
             description: Optional[str] = None,
-            related_entity_id: Optional[UUID] = None,  # ID пов'язаної сутності (наприклад, Reward.id) - залишаємо UUID
+            related_entity_id: Optional[int] = None,  # Змінено Optional[UUID] на Optional[int]
             group_id: Optional[int] = None,  # Змінено Optional[UUID] на Optional[int]
             commit_session: bool = True  # Чи потрібно комітити сесію в цьому методі
     ) -> Tuple[UserAccountResponse, AccountTransactionResponse]:
@@ -185,7 +185,7 @@ class UserAccountService(BaseService):
         :param amount: Сума для коригування (додатня для поповнення, від'ємна для списання).
         :param transaction_type: Тип транзакції.
         :param description: Опис транзакції.
-        :param related_entity_id: ID пов'язаної сутності (UUID).
+        :param related_entity_id: ID пов'язаної сутності (int).
         :param group_id: ID групи (int, None для глобального).
         :param commit_session: Якщо True, сесія буде закомічена.
         :return: Кортеж з оновленим UserAccountResponse та створеним AccountTransactionResponse.

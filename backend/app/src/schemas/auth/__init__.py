@@ -43,8 +43,7 @@ from backend.app.src.schemas.auth.login import (
 )
 
 # Схеми, пов'язані з сесіями користувачів
-# Припускаємо, що клас в session.py буде UserSessionSchema
-from backend.app.src.schemas.auth.session import UserSessionSchema
+from backend.app.src.schemas.auth.session import UserSessionResponse, UserSessionCreate
 
 # Визначаємо, які символи будуть експортовані при використанні `from backend.app.src.schemas.auth import *`.
 __all__ = [
@@ -64,7 +63,8 @@ __all__ = [
     "PasswordResetConfirmSchema",
     "TwoFactorAuthRequestSchema",
     # Session schemas
-    "UserSessionSchema",
+    "UserSessionResponse",
+    "UserSessionCreate",
 ]
 
 logger.debug("Ініціалізація пакету схем Pydantic `auth`...")

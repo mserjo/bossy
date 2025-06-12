@@ -24,15 +24,7 @@ from backend.app.src.schemas.auth.token import TokenResponse  # Pydantic схе�
 from backend.app.src.models.auth.token import RefreshToken  # Модель SQLAlchemy для refresh-токенів
 from backend.app.src.models.auth.user import User  # Модель SQLAlchemy для користувача
 from backend.app.src.config import logger  # Використання спільного логера з конфігу
-
-
-# from backend.app.src.core.exceptions import InvalidTokenTypeError # Має бути визначено в exceptions.py
-
-# Тимчасове визначення кастомної помилки.
-# TODO: [Exceptions] Перенести InvalidTokenTypeError до backend/app/src/core/exceptions.py
-class InvalidTokenTypeError(ValueError):
-    """Кастомна помилка для невірного типу токена."""
-    pass
+from backend.app.src.core.exceptions import InvalidTokenTypeError # Імпорт перенесеного винятку
 
 
 class TokenService(BaseService):

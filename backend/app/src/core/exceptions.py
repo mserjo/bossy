@@ -153,6 +153,18 @@ class FileProcessingException(AppException):
         super().__init__(message=message, status_code=status_code, detail=detail)
 
 
+class InvalidTokenTypeError(ValueError):
+    """Кастомна помилка для невірного типу токена."""
+    # Цей виняток успадковується від ValueError, оскільки він сигналізує про невідповідне значення
+    # для типу токена, що очікується. Можна також успадкувати від AuthenticationException,
+    # якщо це завжди пов'язано з помилкою автентифікації.
+    # Поки що залишимо ValueError, якщо він використовується для перевірки типів токенів
+    # в більш загальному контексті, не тільки автентифікації.
+    # Якщо він використовується виключно в TokenService для перевірки access/refresh,
+    # то краще було б AuthenticationException. Згідно завдання, це ValueError.
+    pass
+
+
 # Закоментований приклад ServiceException. Наразі AppException достатньо гнучкий.
 # class ServiceException(AppException):
 #     """Базовий виняток для специфічних помилок сервісного шару, якщо буде потрібна така гранулярність."""
@@ -207,6 +219,7 @@ if __name__ == "__main__":
     demonstrate_exception(RateLimitExceededException, "Ви перевищили ліміт запитів для цього ендпоінту.")
     demonstrate_exception(FileProcessingException,
                           "Завантажений файл має непідтримуваний формат. Дозволені формати: JPG, PNG.")
+    demonstrate_exception(InvalidTokenTypeError, "Надано невірний тип токена. Очікувався 'access_token'.")
 
     # Приклад імітації HTTP-відповіді на основі винятку
     logger.info("\n--- Імітація HTTP-Відповіді на Основі Винятку ---")

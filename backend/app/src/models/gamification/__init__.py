@@ -1,28 +1,42 @@
 # backend/app/src/models/gamification/__init__.py
 # -*- coding: utf-8 -*-
+"""Пакет моделей SQLAlchemy для сутностей, пов'язаних з гейміфікацією.
+
+Цей пакет містить моделі даних для представлення різноманітних елементів
+гейміфікації в системі, таких як:
+- Рівні користувачів (`LevelModel`).
+- Записи про досягнення користувачами певних рівнів (`UserLevelModel`).
+- Бейджі або досягнення, які користувачі можуть отримувати (`BadgeModel`).
+- Записи про отримання користувачами конкретних бейджів (`UserAchievementModel`).
+- Рейтинги користувачів у групах (`UserGroupRatingModel`).
+
+Моделі з цього пакету експортуються для використання в сервісному шарі,
+API ендпоінтах та інших частинах додатку, що реалізують логіку гейміфікації.
 """
-Пакет моделей SQLAlchemy для сутностей, пов'язаних з "Гейміфікацією".
 
-Цей пакет містить моделі для представлення елементів гейміфікації
-в програмі Kudos, таких як рівні, досягнення користувачів (бейджі),
-та рейтинги користувачів у групах.
+# Імпорт централізованого логера
+from backend.app.src.config import logger
 
-Моделі експортуються для зручного доступу з інших частин програми.
-"""
+# Імпорт моделей з відповідних файлів цього пакету, використовуючи нову конвенцію імен.
+# Припускаємо, що класи в файлах будуть перейменовані на *Model.
+from backend.app.src.models.gamification.level import LevelModel
+from backend.app.src.models.gamification.user_level import UserLevelModel
+from backend.app.src.models.gamification.badge import BadgeModel
+from backend.app.src.models.gamification.user_achievement import UserAchievementModel
+from backend.app.src.models.gamification.rating import UserGroupRatingModel
 
-from backend.app.src.models.gamification.level import Level
-from backend.app.src.models.gamification.user_level import UserLevel
-from backend.app.src.models.gamification.badge import Badge
-from backend.app.src.models.gamification.user_achievement import UserAchievement
-from backend.app.src.models.gamification.rating import UserGroupRating
-
+# Визначаємо, які символи будуть експортовані при використанні `from backend.app.src.models.gamification import *`.
 __all__ = [
-    "Level",
-    "UserLevel",
-    "Badge",
-    "UserAchievement",
-    "UserGroupRating",
+    "LevelModel",
+    "UserLevelModel",
+    "BadgeModel",
+    "UserAchievementModel",
+    "UserGroupRatingModel",
 ]
 
-# Майбутні моделі, пов'язані з гейміфікацією (наприклад, LeaderboardSnapshot),
-# також можуть бути додані сюди для експорту.
+logger.debug("Ініціалізація пакету моделей `gamification`...")
+
+# Коментар щодо можливого розширення:
+# В майбутньому сюди можуть бути додані інші моделі, пов'язані з гейміфікацією,
+# наприклад, для зберігання історії нарахування балів (PointLedgerModel),
+# або для знімків лідербордів (LeaderboardSnapshotModel).

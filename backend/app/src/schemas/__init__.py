@@ -1,58 +1,66 @@
 # backend/app/src/schemas/__init__.py
-"""
-Pydantic схеми для програми Kudos.
+# -*- coding: utf-8 -*-
+"""Pydantic схеми для додатку.
 
 Цей пакет є кореневим для всіх схем Pydantic, що використовуються в додатку.
-Він експортує основні базові схеми та підпакети, які містять схеми
-для конкретних предметних областей (модулів) програми.
+Він ре-експортує ключові базові схеми з модуля `base.py` та надає доступ
+до підпакетів, які містять схеми для конкретних предметних областей (модулів)
+програми.
 
-Структура схем зазвичай включає:
-- Базові схеми (`...BaseSchema`) для спільних полів.
-- Схеми для створення записів (`...CreateSchema`).
-- Схеми для оновлення записів (`...UpdateSchema`).
-- Схеми для представлення даних у відповідях API (`...Schema`).
-- Деталізовані схеми для відповідей API, що включають пов'язані об'єкти (`...DetailSchema`).
+Підпакети зазвичай містять:
+- Базові схеми для сутності (`EntityNameBaseSchema`).
+- Схеми для створення записів (`EntityNameCreateSchema`).
+- Схеми для оновлення записів (`EntityNameUpdateSchema`).
+- Схеми для представлення даних у відповідях API (`EntityNameResponseSchema`).
+- Деталізовані схеми для відповідей API, що включають пов'язані об'єкти (`EntityNameDetailResponseSchema`).
 
-Використання Pydantic забезпечує валідацію даних, серіалізацію та автоматичну
-генерацію документації OpenAPI для API.
+Використання Pydantic забезпечує валідацію даних на вході та виході API,
+серіалізацію даних, а також автоматичну генерацію документації OpenAPI.
 """
 
-# Експорт основних базових схем для прямого доступу
-from .base import (
+# Імпорт централізованого логера
+from backend.app.src.config import logger
+
+# Експорт основних базових схем для прямого доступу.
+# Назви відповідають тим, що будуть визначені в `base.py` згідно з завданням.
+from backend.app.src.schemas.base import (
     BaseSchema,
-    IDSchemaMixin,
-    TimestampedSchemaMixin,
-    SoftDeleteSchemaMixin,
-    BaseMainSchema,
     MsgResponse,
-    DataResponse,
-    PaginatedResponse,
-    T as GenericTypeVar  # Експорт TypeVar T, перейменованого для уникнення конфліктів
+    IDSchema,
+    TimestampSchema,
+    SoftDeleteSchema, # Додано, оскільки BaseMainResponseSchema його потребуватиме
+    BaseMainResponseSchema,
+    BaseMainCreateSchema,
+    BaseMainUpdateSchema,
+    PaginatedResponseSchema,
+    # GenericTypeVar # T буде визначено в PaginatedResponseSchema, немає потреби експортувати окремо
 )
 
-# Експорт підпакетів, що містять специфічні схеми
-from . import auth
-from . import bonuses
-from . import dictionaries
-from . import files
-from . import gamification
-from . import groups
-from . import notifications
-from . import system
-from . import tasks
+# Експорт підпакетів, що містять специфічні схеми для кожної предметної області.
+# Це дозволяє імпортувати схеми як `from backend.app.src.schemas.auth import UserCreateSchema`.
+from backend.app.src.schemas import auth
+from backend.app.src.schemas import bonuses
+from backend.app.src.schemas import dictionaries
+from backend.app.src.schemas import files
+from backend.app.src.schemas import gamification
+from backend.app.src.schemas import groups
+from backend.app.src.schemas import notifications
+from backend.app.src.schemas import system
+from backend.app.src.schemas import tasks
 
+# Визначаємо, які символи будуть експортовані при використанні `from backend.app.src.schemas import *`.
+# Включаємо базові схеми та підпакети.
 __all__ = [
-    # Базові схеми та міксини
+    # Базові схеми
     "BaseSchema",
-    "IDSchemaMixin",
-    "TimestampedSchemaMixin",
-    "SoftDeleteSchemaMixin",
-    "BaseMainSchema",
-    # Узагальнені відповіді
     "MsgResponse",
-    "DataResponse",
-    "PaginatedResponse",
-    "GenericTypeVar", # Раніше T
+    "IDSchema",
+    "TimestampSchema",
+    "SoftDeleteSchema",
+    "BaseMainResponseSchema",
+    "BaseMainCreateSchema",
+    "BaseMainUpdateSchema",
+    "PaginatedResponseSchema",
     # Підпакети зі схемами
     "auth",
     "bonuses",
@@ -64,3 +72,5 @@ __all__ = [
     "system",
     "tasks",
 ]
+
+logger.debug("Ініціалізація пакету схем Pydantic `schemas`...")

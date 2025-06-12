@@ -1,210 +1,192 @@
 # backend/app/src/models/base.py
 # -*- coding: utf-8 -*-
-"""
-Базові класи для моделей SQLAlchemy програми Kudos.
+# # Модуль базових класів для моделей SQLAlchemy програми Kudos (Virtus).
+# #
+# # Цей файл визначає:
+# # - `Base`: Декларативний базовий клас SQLAlchemy (`DeclarativeBase`), від якого
+# #   мають успадковуватися всі моделі даних програми. Метадані цього класу
+# #   використовуються Alembic для генерації міграцій.
+# # - `BaseModel`: Базовий клас для всіх моделей, що містить спільні поля,
+# #   такі як `id` (первинний ключ) та автоматично оновлювані часові мітки
+# #   `created_at` та `updated_at`.
+# # - `BaseMainModel`: Розширює `BaseModel`, додаючи типові поля для основних
+# #   сутностей, такі як `name`, `description`, `state`, `group_id` (опціонально),
+# #   `deleted_at` (для м'якого видалення) та `notes`.
+# #
+# # Використання цих базових класів забезпечує узгодженість структури моделей
+# # та зменшує дублювання коду.
 
-Цей модуль визначає:
-- `Base`: Декларативний базовий клас для всіх моделей SQLAlchemy, що дозволяє SQLAlchemy
-           автоматично відображати класи Python на таблиці бази даних.
-- `BaseMainModel`: Основний базовий клас для більшості моделей предметної області,
-                   який успадковує `Base` та включає набір стандартних полів
-                   через міксини (ID, часові мітки, м'яке видалення, назва, опис,
-                   стан, приналежність до групи, нотатки).
+from datetime import datetime, timezone
+from typing import Optional, Any # Any для типізації в __repr__, якщо буде додано
 
-Використання міксинів та спільного базового класу `BaseMainModel` сприяє
-узгодженості між моделями та зменшує дублювання коду.
-"""
-from datetime import datetime
-from typing import Optional, List, Any
+from sqlalchemy import func, ForeignKey # ForeignKey потрібен для BaseMainModel.group_id
+from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, declared_attr, relationship # relationship для прикладу в BaseMainModel
 
-from sqlalchemy import Text, func, ForeignKey
-from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column  # removed declared_attr as it's used in mixins
-from backend.app.src.config.logging import get_logger # Імпорт логера
-# Отримання логера для цього модуля
+# Імпорт логера (хоча в цьому файлі він використовується лише в __main__)
+from backend.app.src.config.logging import get_logger
+
+# TODO: Розглянути імпорт Enum типів з `core.dicts`, коли вони будуть використовуватися
+#       як типи для полів, наприклад, для `state` в `BaseMainModel`.
+# from backend.app.src.core.dicts import UserState, TaskStatus # Приклади Enum для поля 'state'
+
 logger = get_logger(__name__)
 
-# Імпорт міксинів з локального файлу mixins.py
-# Використовуємо абсолютний шлях для надійності
-from backend.app.src.models.mixins import (
-    TimestampedMixin,
-    SoftDeleteMixin,
-    NameDescriptionMixin,
-    StateMixin,
-    GroupAffiliationMixin,
-    NotesMixin
-)
-
-
+# --- Декларативний базовий клас SQLAlchemy ---
 class Base(DeclarativeBase):
     """
-    Декларативний базовий клас для всіх моделей SQLAlchemy.
-    Надає функціональність для визначення метаданих таблиць.
-    Також може містити спільну логіку для всіх моделей, наприклад, кастомний `__repr__`.
+    Декларативний базовий клас для всіх моделей SQLAlchemy в програмі.
+    Метадані (`metadata`) цього класу використовуються Alembic для автоматичної
+    генерації та управління міграціями схеми бази даних.
+
+    Можна також налаштувати `type_annotation_map` для кастомних типів даних,
+    якщо це потрібно для всього проекту. Наприклад:
+    ```python
+    # from sqlalchemy.dialects.postgresql import JSONB
+    # type_annotation_map = {
+    #     Dict[str, Any]: JSONB, # Усі поля типу Dict[str, Any] будуть мапитися на JSONB в PostgreSQL
+    # }
+    ```
     """
-
-    # Кастомний __repr__ для кращого налагодження
-    def __repr__(self) -> str:
-        """Генерує рядкове представлення екземпляра моделі для налагодження."""
-        # Збираємо поля з поточного класу та всіх батьківських міксинів/класів
-        repr_fields_collected = set()
-
-        # Додамо 'id', якщо він є у __mapper__.columns (тобто це реальна колонка)
-        # і не вказаний у _repr_fields (щоб уникнути дублювання, якщо міксин вже його додав)
-        # або якщо _repr_fields взагалі не визначено на класі.
-        # Це також гарантує, що 'id' буде першим, якщо він є.
-        if hasattr(self, 'id') and 'id' in self.__mapper__.columns:
-            is_id_in_custom_repr_fields = False
-            for base_cls_for_check in self.__class__.__mro__:
-                if 'id' in getattr(base_cls_for_check, '_repr_fields', []):
-                    is_id_in_custom_repr_fields = True
-                    break
-            if not is_id_in_custom_repr_fields:
-                repr_fields_collected.add('id')
-
-        for base_cls in self.__class__.__mro__:
-            # Шукаємо атрибут _repr_fields у класі та його предках
-            # Це дозволяє міксинам визначати, які з їхніх полів включати в repr
-            for field_name in getattr(base_cls, '_repr_fields', []):
-                # Перевіряємо, чи це поле є реальною колонкою SQLAlchemy, а не, наприклад, relationship
-                if field_name in self.__mapper__.columns:
-                    repr_fields_collected.add(field_name)
-
-        field_values_str = []
-        # Сортуємо для узгодженого порядку, 'id' завжди перший, якщо він був зібраний
-        sorted_fields = []
-        if 'id' in repr_fields_collected:
-            sorted_fields.append('id')
-            repr_fields_collected.remove('id')  # Видаляємо, щоб не дублювати при сортуванні решти
-
-        sorted_fields.extend(sorted(list(repr_fields_collected)))
-
-        for field_name in sorted_fields:
-            # hasattr перевіряє, чи існує атрибут на екземплярі (може бути ще не завантажений з БД)
-            if hasattr(self, field_name):
-                field_values_str.append(f"{field_name}={getattr(self, field_name)!r}")
-            else:  # Якщо атрибута немає, але він є в repr_fields (наприклад, deferred)
-                field_values_str.append(f"{field_name}=<не завантажено>")
-
-        return f"<{self.__class__.__name__}({', '.join(field_values_str)})>"
+    pass
 
 
-class BaseMainModel(
-    Base,
-    TimestampedMixin,
-    SoftDeleteMixin,
-    NameDescriptionMixin,
-    StateMixin,
-    GroupAffiliationMixin,
-    NotesMixin
-):
+# --- Базовий клас для моделей з ID та часовими мітками ---
+class BaseModel(Base):
     """
-    Основний базовий клас для моделей предметної області.
+    Абстрактний базовий клас для моделей даних, що містить спільні поля:
+    `id` (первинний ключ), `created_at` (час створення) та `updated_at` (час останнього оновлення).
 
-    Успадковує від `Base` та включає набір стандартних полів і функціональностей
-    через міксини:
-    - `id`: Унікальний ідентифікатор (первинний ключ).
-    - `TimestampedMixin`: Поля `created_at` та `updated_at`.
-    - `SoftDeleteMixin`: Поле `deleted_at` для м'якого видалення.
-    - `NameDescriptionMixin`: Поля `name` та `description`.
-    - `StateMixin`: Поле `state` для відстеження стану сутності.
-    - `GroupAffiliationMixin`: Поле `group_id` для зв'язку з групою.
-    - `NotesMixin`: Поле `notes` для додаткових нотаток.
-
-    Моделі, що представляють основні сутності програми (наприклад, Користувачі,
-    Групи, Завдання), повинні успадковувати цей клас.
+    Атрибут `__abstract__ = True` вказує SQLAlchemy, що цей клас
+    не повинен створювати власну таблицю в базі даних, а слугує лише
+    шаблоном (міксином) для успадкування іншими моделями.
     """
-    __abstract__ = True  # Вказує SQLAlchemy, що це не таблиця, а базовий клас для інших таблиць.
+    __abstract__ = True # Означає, що для цього класу не буде створено окрему таблицю в БД.
 
-    # Первинний ключ, спільний для всіх основних моделей.
-    # UUID може бути альтернативою, якщо потрібні глобально унікальні ID без залежності від БД.
-    # Наразі використовується автоінкрементний Integer.
     id: Mapped[int] = mapped_column(
-        primary_key=True,
-        index=True,
-        autoincrement=True,
-        comment="Унікальний ідентифікатор запису"
+        primary_key=True,      # Первинний ключ таблиці.
+        index=True,            # Створює індекс для цього поля для швидшого пошуку.
+        autoincrement=True,    # Автоматично збільшує значення ID для нових записів (типово для PostgreSQL).
+        comment="Унікальний ідентифікатор запису (первинний ключ)" # Коментар для схеми БД.
     )
-    # Поле 'id' автоматично додається до __repr__ через логіку в Base.__repr__
+    created_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc), # Значення за замовчуванням на рівні Python (використовує lambda для динамічного значення).
+        server_default=func.now(), # SQL функція (`NOW()` або аналог) для значення за замовчуванням на рівні БД.
+                                   # Це гарантує, що час буде встановлено БД, навіть якщо Python не передасть значення.
+        comment="Час створення запису (в UTC)"
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        default=lambda: datetime.now(timezone.utc), # Початкове значення при створенні.
+        onupdate=lambda: datetime.now(timezone.utc), # Оновлюється автоматично на рівні Python при зміні запису.
+        server_default=func.now(), # Початкове значення на рівні БД.
+        server_onupdate=func.now(), # Автоматичне оновлення на рівні БД при зміні запису (якщо підтримується СУБД, наприклад, через тригери).
+        comment="Час останнього оновлення запису (в UTC)"
+    )
+
+    # Можна додати типовий __repr__ для зручності відладки, якщо потрібно.
+    # def __repr__(self) -> str:
+    #     """Повертає рядкове представлення об'єкта моделі."""
+    #     return f"<{self.__class__.__name__}(id={self.id})>"
 
 
-# Для демонстрації, якщо цей файл запускається окремо
+# --- Розширений базовий клас для основних сутностей ---
+class BaseMainModel(BaseModel):
+    """
+    Розширений базовий клас для основних сутностей програми, що успадковує від `BaseModel`.
+    Додає поля, які часто зустрічаються в основних моделях, такі як:
+    `name` (назва), `description` (опис), `state` (стан/статус),
+    `group_id` (опціональний зовнішній ключ до групи),
+    `deleted_at` (для реалізації м'якого видалення) та `notes` (додаткові примітки).
+
+    Як і `BaseModel`, цей клас є абстрактним (`__abstract__ = True`).
+    """
+    __abstract__ = True
+
+    name: Mapped[str] = mapped_column(
+        index=True, # Часто використовується для пошуку, тому індексуємо.
+        comment="Назва сутності (наприклад, ім'я користувача, назва групи, завдання). Має бути унікальною в межах певного контексту."
+    )
+    description: Mapped[Optional[str]] = mapped_column(
+        nullable=True, # Опис може бути відсутнім.
+        comment="Детальний опис сутності, якщо потрібно."
+    )
+
+    # Поле 'state' може використовувати рядок або спеціальний тип Enum з `core.dicts`.
+    # Наприклад, для завдань це може бути `TaskStatus`, для користувачів - `UserState`.
+    # Поки що використовуємо рядок, з можливістю доопрацювання з конкретним Enum у похідних моделях.
+    # Приклад з Enum:
+    # state: Mapped[Optional[TaskStatus]] = mapped_column(default=TaskStatus.OPEN, index=True)
+    state: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        index=True,
+        comment="Поточний стан або статус сутності (наприклад, 'active', 'pending', 'completed')."
+    )
+
+    # `group_id` - опціональний зовнішній ключ до таблиці груп (якщо сутність може належати до групи).
+    # TODO: (ВАЖЛИВО) Розкоментувати та налаштувати ForeignKey, коли модель `Group` буде визначена
+    #       в `backend.app.src.models.groups.group.py` (або аналогічному файлі).
+    #       Переконайтеся, що назва таблиці ('groups.id') та схема (якщо є) є правильними.
+    # group_id: Mapped[Optional[int]] = mapped_column(
+    #     ForeignKey("groups.id", name="fk_base_main_model_group_id", ondelete="SET NULL"), # Приклад: SET NULL при видаленні групи
+    #     nullable=True,
+    #     index=True,
+    #     comment="Ідентифікатор групи, до якої належить ця сутність (якщо застосовно)."
+    # )
+
+    # Поле для реалізації механізму "м'якого видалення" (soft delete).
+    # Якщо `deleted_at` встановлено, запис вважається видаленим, але залишається в БД.
+    deleted_at: Mapped[Optional[datetime]] = mapped_column(
+        nullable=True, # NULL означає, що запис не видалено.
+        index=True,    # Індексуємо для ефективного фільтрування активних записів.
+        comment="Час м'якого видалення запису (в UTC). Якщо NULL, запис вважається активним."
+    )
+
+    notes: Mapped[Optional[str]] = mapped_column(
+        nullable=True,
+        comment="Додаткові службові примітки або коментарі щодо запису."
+    )
+
+    # Приклад визначення зв'язку (relationship) для group_id.
+    # Це дозволить легко доступатися до об'єкта групи з екземпляра цієї моделі.
+    # Потрібно буде імпортувати модель Group та налаштувати `back_populates` в моделі Group.
+    # @declared_attr
+    # def group(cls) -> Mapped[Optional["Group"]]: # Використовуємо рядок "Group" для уникнення циклічних імпортів
+    #     # Перевіряємо, чи клас має атрибут group_id, перш ніж створювати зв'язок.
+    #     # Це робить зв'язок умовним, що може бути корисним, якщо не всі нащадки BaseMainModel мають group_id.
+    #     if hasattr(cls, "group_id"):
+    #         # from backend.app.src.models.groups.group import Group # Імпорт тут, всередині методу
+    #         return relationship("Group", foreign_keys=[cls.group_id]) # back_populates="items_or_similar_name_in_group_model"
+    #     return None # Якщо group_id немає, то і зв'язку немає.
+
+
+# Блок для демонстрації структури класів при прямому запуску файлу.
 if __name__ == "__main__":
-    logger.info("--- Базові класи моделей SQLAlchemy ---")
-    logger.info(f"Клас Base: {Base}")
-    logger.info(f"Клас BaseMainModel: {BaseMainModel}")
+    logger.info("Модуль базових моделей SQLAlchemy (`models.base.py`).")
+    logger.info(f"Декларативна база SQLAlchemy, що використовується Alembic та моделями: {Base}")
+    logger.info(f"Базовий клас моделей (ID, часові мітки): {BaseModel}")
+    logger.info(f"Розширений базовий клас моделей (назва, опис, стан тощо): {BaseMainModel}")
 
+    # Демонстрація атрибутів (не екземплярів, а структури класу)
+    # Більш надійний спосіб інтроспекції - через __mapper__ або inspect(), але це вимагає,
+    # щоб моделі були повністю ініціалізовані SQLAlchemy, що може не бути так при простому імпорті.
+    # Тому тут простий dir() для базової демонстрації.
 
-    # Створення прикладу моделі, що успадковує BaseMainModel, для демонстрації
-    # Це лише для тестування структури; реальні моделі будуть в інших файлах.
-    # Для реального тестування потрібна engine та сесія.
+    base_model_defined_attrs = {
+        attr for attr in dir(BaseModel)
+        if not attr.startswith('_') and attr not in dir(Base) # Атрибути BaseModel, не успадковані від Base
+    }
+    # Атрибути, які Base успадковує від object, але які не є "магічними" і можуть бути цікаві
+    # base_attrs_from_object = {attr for attr in dir(Base) if not attr.startswith('_') and attr in dir(object)}
 
-    class ExampleEntity(BaseMainModel):
-        __tablename__ = "example_entities"
-        # Додаткові специфічні поля для ExampleEntity
-        extra_data: Mapped[Optional[str]]
-
-        # Додаємо 'extra_data' до списку полів для __repr__ цього конкретного класу
-        _repr_fields = ["extra_data"]  # Це поле буде додано до тих, що збираються з міксинів
-
-
-    logger.info(f"\nСтворено демонстраційну модель ExampleEntity, що успадковує BaseMainModel.")
-    logger.info(f"Очікувані атрибути в ExampleEntity (включаючи успадковані):")
-    # Приблизний список атрибутів, які мають бути в ExampleEntity
-    # Реальний introspection краще робити через SQLAlchemy Inspector після створення таблиць.
-    expected_attrs = ['id', 'created_at', 'updated_at', 'deleted_at', 'name',
-                      'description', 'state', 'group_id', 'notes', 'extra_data']
-    logger.info(f"  Очікувані атрибути: {', '.join(expected_attrs)}")
-
-    logger.info("\nДемонстрація __repr__:")
-    # Створюємо фіктивний екземпляр. Для реального __repr__ з усіма полями,
-    # особливо тими, що з @declared_attr, потрібна ініціалізація через SQLAlchemy.
-    # Ця демонстрація буде обмеженою без реальної сесії.
-
-    # Імітуємо, як SQLAlchemy міг би створити екземпляр (дуже спрощено)
-    # У реальному випадку __mapper__ та інші атрибути SQLAlchemy будуть заповнені.
-    # Для цілей __repr__ тут, ми можемо створити простий об'єкт з потрібними полями.
-
-    # Створимо фіктивний mapper для демонстрації __repr__
-    mock_mapper_columns = {
-        'id': None, 'created_at': None, 'updated_at': None, 'deleted_at': None,
-        'name': None, 'description': None, 'state': None, 'group_id': None,
-        'notes': None, 'extra_data': None
+    base_main_model_defined_attrs = {
+        attr for attr in dir(BaseMainModel)
+        if not attr.startswith('_') and attr not in dir(BaseModel) # Атрибути BaseMainModel, не успадковані від BaseModel
     }
 
-    # Динамічно створюємо клас для тесту, щоб не конфліктувати з ExampleEntity вище,
-    # якщо __name__ == "__main__" запускається кілька разів або в іншому контексті.
-    TestReprEntity = type(
-        "TestReprEntity",
-        (BaseMainModel,),
-        {
-            "__tablename__": "test_repr_entities",  # Потрібно для @declared_attr в міксинах
-            "extra_data": mapped_column(Text, nullable=True),  # Приклад поля
-            "_repr_fields": ["extra_data"],  # Додаємо специфічне поле до repr
-            # Імітація __mapper__ для __repr__
-            "__mapper__": type('Mapper', (), {'columns': mock_mapper_columns})()
-        }
-    )
+    logger.info(f"\nАтрибути, визначені в BaseModel (окрім успадкованих від Base): {sorted(list(base_model_defined_attrs))}")
+    logger.info(f"Атрибути, додані в BaseMainModel (окрім успадкованих від BaseModel): {sorted(list(base_main_model_defined_attrs))}")
 
-    # Важливо: _repr_fields з міксинів повинні бути доступні класу TestReprEntity.
-    # Наша реалізація __repr__ в Base збирає їх через MRO.
-
-    test_instance = TestReprEntity()
-    test_instance.id = 1
-    test_instance.name = "Тестовий Запис"
-    test_instance.state = "активний"
-    test_instance.created_at = datetime(2023, 1, 1, 10, 0, 0)
-    test_instance.extra_data = "Це додаткові дані"
-    # updated_at, deleted_at, description, group_id, notes - залишаться None або значеннями за замовчуванням
-
-    logger.info(f"  Екземпляр TestReprEntity: {test_instance}")
-    # Очікуваний вивід буде приблизно:
-    # <TestReprEntity(id=1, name='Тестовий Запис', state='активний', created_at=datetime.datetime(2023, 1, 1, 10, 0), extra_data='Це додаткові дані')>
-    # (порядок може трохи відрізнятися через сортування set, крім id)
-
-    test_instance_minimal = TestReprEntity()
-    test_instance_minimal.id = 2
-    test_instance_minimal.name = "Мінімальний"
-    logger.info(f"  Екземпляр TestReprEntity (мінімальний): {test_instance_minimal}")
-
-    logger.info("\nПримітка: Повноцінне тестування SQLAlchemy моделей та їх __repr__")
-    logger.info("зазвичай включає створення тестової бази даних та взаємодію з сесіями.")
+    logger.info("\nДля використання цих базових класів, конкретні моделі даних (наприклад, User, Task) "
+                "повинні успадковувати їх.")
+    logger.info("Важливо: `Base.metadata` буде використовуватися Alembic для генерації міграцій схеми бази даних.")
+    logger.info("Переконайтеся, що всі моделі, які мають відображатися в БД, імпортовані до того, "
+                "як Alembic використовує `Base.metadata` (зазвичай це обробляється в `models/__init__.py` та `alembic/env.py`).")

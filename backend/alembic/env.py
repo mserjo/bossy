@@ -37,10 +37,9 @@ if BACKEND_DIR not in sys.path:
 
 
 # --- Імпорт метаданих моделей та налаштувань БД ---
-# Імпортуємо Base з конфігурації бази даних SQLAlchemy вашого проекту.
-# Base.metadata є об'єктом MetaData, який Alembic використовує для автогенерації.
-# TODO: Перевірити та узгодити шлях імпорту Base, якщо він відрізняється.
-from backend.app.src.models.base_model import Base  # Припускаємо, що Base (декларативна база) визначено тут
+# Імпортуємо централізований декларативний базовий клас `Base` з `models.base`.
+# `Base.metadata` є об'єктом `MetaData`, який Alembic використовує для автогенерації міграцій.
+from backend.app.src.models.base import Base  # Імпорт централізованого Base
 
 # Імпортуємо ВСІ моделі SQLAlchemy вашого додатку.
 # Це необхідно для того, щоб Alembic "бачив" їх і міг порівнювати

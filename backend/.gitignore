@@ -1,1 +1,59 @@
+# backend/.gitignore
+# Цей файл використовується для ігнорування файлів системою контролю версій Git.
+# Він містить список файлів та директорій, які не повинні бути відстежені.
 
+# Файли Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Директорії віртуального середовища
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# Файли IDE
+.idea/
+.vscode/
+*.sublime-project
+*.sublime-workspace
+
+# Файли операційної системи
+.DS_Store
+Thumbs.db
+
+# Файли конфігурації середовища
+.env
+.env.*
+!/.env.example
+
+# Файли журналів та баз даних
+*.log
+*.sql
+*.sqlite3
+local_database.db
+
+# Файли збірки та дистрибуції
+build/
+dist/
+*.egg-info/
+*.egg
+
+# Файли тестів
+.pytest_cache/
+.coverage
+htmlcov/
+nosetests.xml
+coverage.xml
+*.cover
+
+# Файли Jupyter Notebook
+.ipynb_checkpoints
+
+# Файли тимчасових файлів
+*.tmp
+*.swp
+*~

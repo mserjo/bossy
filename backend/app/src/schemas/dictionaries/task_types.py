@@ -1,94 +1,94 @@
 # backend/app/src/schemas/dictionaries/task_types.py
-"""
-Pydantic схеми для довідника "Типи Завдань".
+# -*- coding: utf-8 -*-
+"""Pydantic схеми для довідника "Типи Завдань".
 
-Цей модуль визначає схеми для представлення, створення та оновлення
-записів у довіднику типів завдань (наприклад, "Звичайне завдання", "Подія").
+Цей модуль визначає схеми Pydantic для валідації даних під час створення,
+оновлення та представлення записів у довіднику типів завдань
+(наприклад, "Звичайне завдання", "Складне завдання", "Подія", "Штраф").
+Ці типи використовуються для класифікації завдань та подій в системі.
 """
 
 from typing import Optional
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
-logger = get_logger(__name__)
+from datetime import datetime, timezone # timezone для прикладу в __main__
+import uuid # Для прикладу в __main__
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    BaseDictionarySchema,
     DictionaryCreateSchema,
+    DictionaryResponseSchema,
     DictionaryUpdateSchema
 )
+# Імпорт централізованого логера
+from backend.app.src.config import logger
+
+# from pydantic import Field # Розкоментувати, якщо будуть специфічні поля з Field атрибутами
 
 
-# from pydantic import Field
+class TaskTypeResponseSchema(DictionaryResponseSchema):
+    """Pydantic схема для представлення запису довідника "Тип Завдання" у відповідях API.
 
-# Схема для представлення запису Типу Завдання (у відповідях API)
-class TaskTypeSchema(BaseDictionarySchema):
+    Успадковує всі поля від `DictionaryResponseSchema`.
+    Якщо для типів завдань потрібні специфічні додаткові поля у відповідях API,
+    їх можна визначити тут.
     """
-    Pydantic схема для представлення запису довідника "Тип Завдання".
-    Успадковує всі поля від `BaseDictionarySchema`.
-    """
-    # Специфічні поля для TaskTypeSchema, якщо є, додаються тут.
+    # Наприклад:
+    # default_priority: Optional[int] = Field(None, description="Пріоритет за замовчуванням для цього типу завдання.")
     pass
 
 
-# Схема для створення нового запису Типу Завдання
 class TaskTypeCreateSchema(DictionaryCreateSchema):
-    """
-    Pydantic схема для створення нового запису в довіднику "Тип Завдання".
+    """Pydantic схема для створення нового запису в довіднику "Тип Завдання".
+
     Успадковує всі поля від `DictionaryCreateSchema`.
     """
-    # Специфічні поля для створення TaskType, якщо є, додаються тут.
+    # Тут можна додати специфічні поля для створення TaskTypeModel, якщо вони є.
     pass
 
 
-# Схема для оновлення існуючого запису Типу Завдання
 class TaskTypeUpdateSchema(DictionaryUpdateSchema):
+    """Pydantic схема для оновлення існуючого запису в довіднику "Тип Завдання".
+
+    Успадковує всі поля від `DictionaryUpdateSchema` (всі поля опціональні).
     """
-    Pydantic схема для оновлення існуючого запису в довіднику "Тип Завдання".
-    Успадковує всі поля від `DictionaryUpdateSchema`.
-    """
-    # Специфічні поля для оновлення TaskType, якщо є, додаються тут.
+    # Тут можна додати специфічні поля для оновлення TaskTypeModel, якщо вони є.
     pass
 
 
 if __name__ == "__main__":
-    # Демонстраційний блок для схем TaskType.
-    logger.info("--- Pydantic Схеми для Довідника: TaskType ---")
+    # Демонстраційний блок для схем TaskTypeModel.
+    logger.info("--- Pydantic Схеми для Довідника: TaskTypeModel ---")
 
-    logger.info("\nTaskTypeSchema (приклад для відповіді API):")
+    logger.info("\nTaskTypeResponseSchema (приклад для відповіді API):")
     task_type_data_from_db = {
-        "id": 1,
-        "name": "Термінове Завдання",  # TODO i18n
+        "id": uuid.uuid4(),
+        "name": "Термінове Завдання",  # TODO i18n: "Термінове Завдання"
         "code": "URGENT_TASK",
         "description": "Тип для завдань з високим пріоритетом.",  # TODO i18n
-        "state": "active",
-        "created_at": "2023-05-01T10:00:00Z",
-        "updated_at": "2023-05-01T12:30:00Z",
+        "icon": "fas fa-exclamation-triangle",
+        "color": "#FF0000",
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+        "is_deleted": False
     }
-    from datetime import datetime  # Потрібно для конвертації рядків у datetime
 
-    task_type_data_from_db['created_at'] = datetime.fromisoformat(
-        task_type_data_from_db['created_at'].replace('Z', '+00:00'))
-    task_type_data_from_db['updated_at'] = datetime.fromisoformat(
-        task_type_data_from_db['updated_at'].replace('Z', '+00:00'))
-
-    task_type_schema_instance = TaskTypeSchema(**task_type_data_from_db)
-    logger.info(task_type_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    task_type_response_instance = TaskTypeResponseSchema(**task_type_data_from_db)
+    logger.info(task_type_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nTaskTypeCreateSchema (приклад для створення):")
     create_data = {
-        "name": "Подія",  # TODO i18n
+        "name": "Подія",  # TODO i18n: "Подія"
         "code": "EVENT",
-        "description": "Тип для відстеження подій."  # TODO i18n
+        "description": "Тип для відстеження подій, а не завдань з конкретним результатом."  # TODO i18n
     }
     create_schema_instance = TaskTypeCreateSchema(**create_data)
     logger.info(create_schema_instance.model_dump_json(indent=2))
 
     logger.info("\nTaskTypeUpdateSchema (приклад для оновлення):")
     update_data = {
-        "description": "Оновлений опис для типу Подія."  # TODO i18n
+        "description": "Оновлений опис для типу 'Подія'."  # TODO i18n
     }
     update_schema_instance = TaskTypeUpdateSchema(**update_data)
     logger.info(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")
+    logger.info("Вони успадковують поля та конфігурацію від базових схем довідників.")

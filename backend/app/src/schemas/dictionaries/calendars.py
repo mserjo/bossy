@@ -1,98 +1,124 @@
 # backend/app/src/schemas/dictionaries/calendars.py
-"""
-Pydantic схеми для довідника "Постачальники Календарів".
+# -*- coding: utf-8 -*-
+"""Pydantic схеми для довідника "Провайдери Календарів".
 
-Цей модуль визначає схеми для представлення, створення та оновлення
-записів у довіднику постачальників календарів (наприклад, Google Calendar, Outlook Calendar).
+Цей модуль визначає схеми Pydantic для валідації даних під час створення,
+оновлення та представлення записів у довіднику провайдерів календарів
+(наприклад, Google Calendar, Outlook Calendar, Apple iCloud Calendar).
+Довідник зберігає інформацію про назву провайдера, його код, опис,
+а також специфічні налаштування для інтеграції.
 """
 
-from typing import Optional
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
-logger = get_logger(__name__)
+from typing import Optional, Dict, Any
+from datetime import datetime, timezone # timezone для прикладу в __main__
+import uuid # Для прикладу в __main__
+from pydantic import Field
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    BaseDictionarySchema,
     DictionaryCreateSchema,
+    DictionaryResponseSchema,
     DictionaryUpdateSchema
 )
+# Імпорт централізованого логера
+from backend.app.src.config import logger
 
 
-# from pydantic import Field
+class CalendarProviderResponseSchema(DictionaryResponseSchema):
+    """Pydantic схема для представлення запису довідника "Провайдер Календаря" у відповідях API.
 
-# Схема для представлення запису Постачальника Календаря (у відповідях API)
-class CalendarProviderSchema(BaseDictionarySchema):
+    Успадковує всі поля від `DictionaryResponseSchema`.
+    Додає специфічні поля для провайдерів календарів.
     """
-    Pydantic схема для представлення запису довідника "Постачальник Календаря".
-    Успадковує всі поля від `BaseDictionarySchema`.
-    """
-    # Специфічні поля для CalendarProviderSchema, якщо є, додаються тут.
-    # Наприклад:
-    # api_integration_url: Optional[AnyHttpUrl] = Field(None, description="URL для інтеграції з API календаря.")
-    pass
+    is_active: bool = Field(..., description="Статус активності провайдера.")
+    credentials_schema: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="JSON схема необхідних credential для цього провайдера (наприклад, для OAuth)."
+    )
+    sync_frequency_minutes: Optional[int] = Field(
+        default=None,
+        description="Рекомендована частота синхронізації в хвилинах."
+    )
+    # model_config успадковується
 
 
-# Схема для створення нового запису Постачальника Календаря
 class CalendarProviderCreateSchema(DictionaryCreateSchema):
+    """Pydantic схема для створення нового запису в довіднику "Провайдер Календаря".
+
+    Успадковує поля від `DictionaryCreateSchema` (name, code, description, icon, color).
+    Додає специфічні поля для провайдерів календарів.
     """
-    Pydantic схема для створення нового запису в довіднику "Постачальник Календаря".
-    Успадковує всі поля від `DictionaryCreateSchema`.
-    """
-    # Специфічні поля для створення CalendarProvider, якщо є, додаються тут.
-    pass
+    is_active: bool = Field(default=True, description="Статус активності провайдера (за замовчуванням True).")
+    credentials_schema: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="JSON схема необхідних credential для налаштування інтеграції."
+    )
+    sync_frequency_minutes: Optional[int] = Field(
+        default=None,
+        ge=1, # Мінімальна частота - 1 хвилина, якщо вказано
+        description="Рекомендована частота синхронізації в хвилинах (наприклад, 60 для щогодинної)."
+    )
 
 
-# Схема для оновлення існуючого запису Постачальника Календаря
 class CalendarProviderUpdateSchema(DictionaryUpdateSchema):
+    """Pydantic схема для оновлення існуючого запису в довіднику "Провайдер Календаря".
+
+    Успадковує поля від `DictionaryUpdateSchema` (всі поля з `DictionaryBaseSchema` опціональні).
+    Додає опціональні версії специфічних полів для провайдерів календарів.
     """
-    Pydantic схема для оновлення існуючого запису в довіднику "Постачальник Календаря".
-    Успадковує всі поля від `DictionaryUpdateSchema`.
-    """
-    # Специфічні поля для оновлення CalendarProvider, якщо є, додаються тут.
-    pass
+    is_active: Optional[bool] = Field(default=None, description="Новий статус активності провайдера.")
+    credentials_schema: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Оновлена JSON схема credential."
+    )
+    sync_frequency_minutes: Optional[int] = Field(
+        default=None,
+        ge=1, # Мінімальна частота - 1 хвилина, якщо вказано
+        description="Оновлена рекомендована частота синхронізації в хвилинах."
+    )
 
 
 if __name__ == "__main__":
-    # Демонстраційний блок для схем CalendarProvider.
-    logger.info("--- Pydantic Схеми для Довідника: CalendarProvider ---")
+    # Демонстраційний блок для схем CalendarProviderModel.
+    logger.info("--- Pydantic Схеми для Довідника: CalendarProviderModel ---")
 
-    logger.info("\nCalendarProviderSchema (приклад для відповіді API):")
-    calendar_provider_data_from_db = {
-        "id": 1,
-        "name": "Google Calendar",  # TODO i18n
+    logger.info("\nCalendarProviderResponseSchema (приклад для відповіді API):")
+    cp_response_data = {
+        "id": uuid.uuid4(),
+        "name": "Google Calendar",  # TODO i18n: "Google Calendar"
         "code": "GOOGLE_CALENDAR",
         "description": "Інтеграція з сервісом Google Calendar.",  # TODO i18n
-        "state": "active",
-        "created_at": "2023-07-01T10:00:00Z",
-        "updated_at": "2023-07-01T12:30:00Z",
+        "icon": "fab fa-google",
+        "color": "#4285F4",
+        "is_active": True,
+        "credentials_schema": {"type": "oauth2", "scopes": ["calendar.readonly"]},
+        "sync_frequency_minutes": 60,
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+        "is_deleted": False
     }
-    from datetime import datetime  # Потрібно для конвертації рядків у datetime
-
-    # from pydantic import AnyHttpUrl # Для прикладу з api_integration_url
-    calendar_provider_data_from_db['created_at'] = datetime.fromisoformat(
-        calendar_provider_data_from_db['created_at'].replace('Z', '+00:00'))
-    calendar_provider_data_from_db['updated_at'] = datetime.fromisoformat(
-        calendar_provider_data_from_db['updated_at'].replace('Z', '+00:00'))
-
-    calendar_provider_schema_instance = CalendarProviderSchema(**calendar_provider_data_from_db)
-    logger.info(calendar_provider_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    cp_response_instance = CalendarProviderResponseSchema(**cp_response_data)
+    logger.info(cp_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nCalendarProviderCreateSchema (приклад для створення):")
-    create_data = {
-        "name": "Outlook Calendar",  # TODO i18n
+    cp_create_data = {
+        "name": "Outlook Calendar",  # TODO i18n: "Outlook Calendar"
         "code": "OUTLOOK_CALENDAR",
-        "description": "Інтеграція з сервісом Outlook Calendar."  # TODO i18n
+        "description": "Інтеграція з сервісом Outlook Calendar.",  # TODO i18n
+        "is_active": True,
+        "sync_frequency_minutes": 120
     }
-    create_schema_instance = CalendarProviderCreateSchema(**create_data)
-    logger.info(create_schema_instance.model_dump_json(indent=2))
+    cp_create_instance = CalendarProviderCreateSchema(**cp_create_data)
+    logger.info(cp_create_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nCalendarProviderUpdateSchema (приклад для оновлення):")
-    update_data = {
+    cp_update_data = {
         "description": "Оновлений опис для інтеграції з Outlook Calendar.",  # TODO i18n
-        "state": "beta"  # TODO i18n
+        "is_active": False,
+        "sync_frequency_minutes": 30
     }
-    update_schema_instance = CalendarProviderUpdateSchema(**update_data)
-    logger.info(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    cp_update_instance = CalendarProviderUpdateSchema(**cp_update_data)
+    logger.info(cp_update_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")
+    logger.info("Вони успадковують поля та конфігурацію від базових схем довідників та додають специфічні поля.")

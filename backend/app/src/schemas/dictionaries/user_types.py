@@ -1,83 +1,84 @@
 # backend/app/src/schemas/dictionaries/user_types.py
-"""
-Pydantic схеми для довідника "Типи Користувачів".
+# -*- coding: utf-8 -*-
+"""Pydantic схеми для довідника "Типи користувачів".
 
-Цей модуль визначає схеми для представлення, створення та оновлення
-записів у довіднику типів користувачів (наприклад, "REGULAR_USER", "BOT_USER").
+Цей модуль визначає схеми Pydantic для валідації даних під час створення,
+оновлення та представлення записів у довіднику типів користувачів
+(наприклад, "REGULAR_USER", "ADMIN_USER", "BOT_USER"). Ці типи можуть
+використовуватися для класифікації користувачів та надання їм різних
+базових наборів можливостей або обмежень на рівні системи.
 """
 
 from typing import Optional
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
-logger = get_logger(__name__)
+from datetime import datetime, timezone # timezone для прикладу в __main__
+import uuid # Для прикладу в __main__
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    BaseDictionarySchema,
     DictionaryCreateSchema,
+    DictionaryResponseSchema,
     DictionaryUpdateSchema
 )
+# Імпорт централізованого логера
+from backend.app.src.config import logger
+
+# from pydantic import Field # Розкоментувати, якщо будуть специфічні поля з Field атрибутами
 
 
-# from pydantic import Field
+class UserTypeResponseSchema(DictionaryResponseSchema):
+    """Pydantic схема для представлення запису довідника "Тип Користувача" у відповідях API.
 
-# Схема для представлення запису Типу Користувача (у відповідях API)
-class UserTypeSchema(BaseDictionarySchema):
+    Успадковує всі поля від `DictionaryResponseSchema`.
+    Якщо для типів користувачів потрібні специфічні додаткові поля у відповідях API,
+    їх можна визначити тут.
     """
-    Pydantic схема для представлення запису довідника "Тип Користувача".
-    Успадковує всі поля від `BaseDictionarySchema`.
-    """
-    # Специфічні поля для UserTypeSchema, якщо є, додаються тут.
+    # Наприклад:
+    # default_permissions_level: Optional[int] = Field(None, description="Рівень дозволів за замовчуванням для цього типу.")
     pass
 
 
-# Схема для створення нового запису Типу Користувача
 class UserTypeCreateSchema(DictionaryCreateSchema):
-    """
-    Pydantic схема для створення нового запису в довіднику "Тип Користувача".
+    """Pydantic схема для створення нового запису в довіднику "Тип Користувача".
+
     Успадковує всі поля від `DictionaryCreateSchema`.
     """
-    # Специфічні поля для створення UserType, якщо є, додаються тут.
+    # Тут можна додати специфічні поля для створення UserTypeModel, якщо вони є,
+    # або перевизначити поля з DictionaryCreateSchema для зміни обмежень/значень за замовчуванням.
     pass
 
 
-# Схема для оновлення існуючого запису Типу Користувача
 class UserTypeUpdateSchema(DictionaryUpdateSchema):
+    """Pydantic схема для оновлення існуючого запису в довіднику "Тип Користувача".
+
+    Успадковує всі поля від `DictionaryUpdateSchema` (всі поля опціональні).
     """
-    Pydantic схема для оновлення існуючого запису в довіднику "Тип Користувача".
-    Успадковує всі поля від `DictionaryUpdateSchema`.
-    """
-    # Специфічні поля для оновлення UserType, якщо є, додаються тут.
+    # Тут можна додати специфічні поля для оновлення UserTypeModel, якщо вони є.
     pass
 
 
 if __name__ == "__main__":
-    # Демонстраційний блок для схем UserType.
-    logger.info("--- Pydantic Схеми для Довідника: UserType ---")
+    # Демонстраційний блок для схем UserTypeModel.
+    logger.info("--- Pydantic Схеми для Довідника: UserTypeModel ---")
 
-    logger.info("\nUserTypeSchema (приклад для відповіді API):")
+    logger.info("\nUserTypeResponseSchema (приклад для відповіді API):")
     user_type_data_from_db = {
-        "id": 1,
-        "name": "Зареєстрований Користувач",  # TODO i18n
+        "id": uuid.uuid4(),
+        "name": "Зареєстрований Користувач",  # TODO i18n: "Зареєстрований Користувач"
         "code": "REGULAR_USER",
         "description": "Стандартний тип для користувачів, що пройшли реєстрацію.",  # TODO i18n
-        "state": "active",
-        "created_at": "2023-03-01T10:00:00Z",
-        "updated_at": "2023-03-01T12:30:00Z",
+        "icon": "fas fa-user",
+        "color": "#3498db",
+        "created_at": datetime.now(timezone.utc),
+        "updated_at": datetime.now(timezone.utc),
+        "is_deleted": False
     }
-    from datetime import datetime  # Потрібно для конвертації рядків у datetime
 
-    user_type_data_from_db['created_at'] = datetime.fromisoformat(
-        user_type_data_from_db['created_at'].replace('Z', '+00:00'))
-    user_type_data_from_db['updated_at'] = datetime.fromisoformat(
-        user_type_data_from_db['updated_at'].replace('Z', '+00:00'))
-
-    user_type_schema_instance = UserTypeSchema(**user_type_data_from_db)
-    logger.info(user_type_schema_instance.model_dump_json(indent=2, exclude_none=True))
+    user_type_response_instance = UserTypeResponseSchema(**user_type_data_from_db)
+    logger.info(user_type_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nUserTypeCreateSchema (приклад для створення):")
     create_data = {
-        "name": "Системний Бот",  # TODO i18n
+        "name": "Системний Бот",  # TODO i18n: "Системний Бот"
         "code": "BOT_USER",
         "description": "Тип для автоматизованих системних облікових записів."  # TODO i18n
     }
@@ -92,3 +93,4 @@ if __name__ == "__main__":
     logger.info(update_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nПримітка: Ці схеми використовуються для валідації даних на рівні API та для серіалізації.")
+    logger.info("Вони успадковують поля та конфігурацію від базових схем довідників.")

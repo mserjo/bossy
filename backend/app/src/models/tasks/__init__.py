@@ -1,30 +1,42 @@
 # backend/app/src/models/tasks/__init__.py
+# -*- coding: utf-8 -*-
+"""Пакет моделей SQLAlchemy для сутностей, пов'язаних із завданнями та подіями.
+
+Цей пакет містить моделі даних для представлення:
+- Завдань (`TaskModel`).
+- Подій (`EventModel`), які можуть розглядатися як специфічний тип завдань або окрема сутність.
+- Призначень завдань користувачам (`TaskAssignmentModel`).
+- Записів про виконання завдань (`TaskCompletionModel`).
+- Відгуків або рецензій на виконання завдань (`TaskReviewModel`).
+
+Моделі з цього пакету експортуються для використання в сервісному шарі,
+API ендпоінтах та інших частинах додатку, що реалізують логіку управління
+завданнями та подіями.
 """
-Пакет моделей SQLAlchemy для сутностей, пов'язаних із "Завданнями".
 
-Цей пакет містить моделі для представлення завдань (або подій),
-призначень завдань користувачам, записів про виконання завдань
-та відгуків на завдання в програмі Kudos.
+# Імпорт централізованого логера
+from backend.app.src.config import logger
 
-Моделі експортуються для зручного доступу з інших частин програми.
-"""
+# Імпорт моделей з відповідних файлів цього пакету, використовуючи нову конвенцію імен.
+# Припускаємо, що класи в файлах будуть перейменовані на *Model.
+from backend.app.src.models.tasks.task import TaskModel
+from backend.app.src.models.tasks.event import EventModel
+from backend.app.src.models.tasks.assignment import TaskAssignmentModel
+from backend.app.src.models.tasks.completion import TaskCompletionModel
+from backend.app.src.models.tasks.review import TaskReviewModel
 
-from .task import Task
-from .assignment import TaskAssignment
-from .completion import TaskCompletion
-from .review import TaskReview
-# Модель Event була інтегрована в модель Task.
-# Якщо в майбутньому Event знову стане окремою сутністю з власною таблицею,
-# її потрібно буде імпортувати та експортувати тут.
-# from .event import Event # Наразі закоментовано
-
+# Визначаємо, які символи будуть експортовані при використанні `from backend.app.src.models.tasks import *`.
 __all__ = [
-    "Task",
-    "TaskAssignment",
-    "TaskCompletion",
-    "TaskReview",
-    # "Event", # Наразі закоментовано
+    "TaskModel",
+    "EventModel",
+    "TaskAssignmentModel",
+    "TaskCompletionModel",
+    "TaskReviewModel",
 ]
 
-# Майбутні моделі, пов'язані із завданнями (наприклад, TaskDependency, TaskTag),
-# також можуть бути додані сюди для експорту.
+logger.debug("Ініціалізація пакету моделей `tasks`...")
+
+# Коментар щодо можливого розширення:
+# В майбутньому сюди можуть бути додані інші моделі, пов'язані із завданнями,
+# наприклад, для залежностей між завданнями (TaskDependencyModel)
+# або для тегування завдань (TaskTagModel).

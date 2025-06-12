@@ -1,26 +1,39 @@
 # backend/app/src/core/__init__.py
 # -*- coding: utf-8 -*-
-"""
-Пакет ядра (core) програми Kudos.
+"""Пакет ядра (core) додатку.
 
 Цей пакет об'єднує основні компоненти, які є фундаментом для
-бізнес-логіки та функціональності програми. Сюди входять:
-- Базові класи та структури (`base.py`)
-- Глобальні константи (`constants.py`)
-- Загальні залежності FastAPI (`dependencies.py`)
-- Системні переліки (Enums) (`dicts.py`)
-- Кастомні винятки (`exceptions.py`)
-- Система дозволів (`permissions.py`)
-- Допоміжні утиліти (`utils.py`)
-- Функції-валідатори (`validators.py`)
+бізнес-логіки та функціональності програми. Сюди можуть входити:
+- Базові класи, моделі або схеми, що використовуються в усьому проекті (`base.py`).
+- Глобальні константи та переліки (`constants.py`, `dicts.py`).
+- Загальні залежності (dependencies) для FastAPI, що використовуються в обробниках запитів (`dependencies.py`).
+- Кастомні класи винятків (exceptions), специфічні для домену програми (`exceptions.py`).
+- Логіка системи дозволів (permissions) та авторизації (`permissions.py`).
+- Інші допоміжні утиліти або валідатори, що мають широке застосування в ядрі системи (`utils.py`, `validators.py`).
+
+Файл `__init__.py` може використовуватися для ре-експорту ключових компонентів
+з модулів цього пакету, щоб спростити їх імпорт в інших частинах додатку.
+Наприклад: `from backend.app.src.core import SomeCoreException`.
 """
 
-# Приклад ре-експорту для зручності (розкоментуйте та адаптуйте за потреби):
-# from .exceptions import ItemNotFoundError, PermissionDeniedError
-# from .constants import MAX_ITEMS_PER_PAGE
+from backend.app.src.config import logger
 
+# Приклади ре-експорту (розкоментуйте та адаптуйте за потреби):
+# from backend.app.src.core.exceptions import ItemNotFoundError, PermissionDeniedError
+# from backend.app.src.core.constants import MAX_ITEMS_PER_PAGE, DEFAULT_LANGUAGE
+# from backend.app.src.core.dependencies import get_current_active_user
+
+# Список символів, які будуть експортовані при `from backend.app.src.core import *`.
+# Рекомендується використовувати явні імпорти, але `__all__` визначає поведінку "зірочкового" імпорту.
 # __all__ = [
-# "ItemNotFoundError",
-# "PermissionDeniedError",
-# "MAX_ITEMS_PER_PAGE",
+#     # Exceptions
+#     "ItemNotFoundError",
+#     "PermissionDeniedError",
+#     # Constants
+#     "MAX_ITEMS_PER_PAGE",
+#     "DEFAULT_LANGUAGE",
+#     # Dependencies
+#     "get_current_active_user",
 # ]
+
+logger.debug("Пакет ядра `core` ініціалізовано.")

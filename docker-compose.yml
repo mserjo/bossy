@@ -1,6 +1,12 @@
 # docker-compose.yml
-# # Базовий файл Docker Compose для запуску проекту.
-# # Визначає основні сервіси, їх конфігурацію та зв'язки.
+# # Цей файл Docker Compose визначає та налаштовує основні сервіси,
+# # необхідні для запуску додатку в контейнеризованому середовищі.
+# # Він описує, як контейнери будуть збиратися, які порти використовувати,
+# # як вони будуть взаємодіяти між собою та як керувати даними.
+# #
+# # Цей файл є базовим і може розширюватися або перевизначатися
+# # файлами `docker-compose.dev.yml` (для розробки) та
+# # `docker-compose.prod.yml` (для продуктивного середовища).
 
 version: '3.8' # Використання однієї з останніх версій Docker Compose
 
@@ -15,12 +21,12 @@ services:
       - ./backend/.env # Шлях до файлу з конфігурацією БД
     ports:
       - "5432:5432" # Прокидання порту для локального доступу (за потреби)
-    environment:
+    environment: # Змінні середовища для конфігурації PostgreSQL
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
     restart: unless-stopped # Політика перезапуску
-    healthcheck:
+    healthcheck: # Перевірка стану працездатності сервісу
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
       interval: 10s
       timeout: 5s
@@ -31,7 +37,7 @@ services:
     build:
       context: ./backend # Шлях до Dockerfile та коду backend
       dockerfile: Dockerfile
-    container_name: project_backend
+    container_name: project_backend # Чітке ім'я контейнера для backend
     # env_file визначатиметься в docker-compose.dev.yml або docker-compose.prod.yml
     # для уникнення дублювання та для специфічних налаштувань середовища.
     # Однак, якщо є загальні змінні, їх можна додати тут:
@@ -42,7 +48,7 @@ services:
     depends_on:
       db: # Залежність від сервісу бази даних
         condition: service_healthy # Чекати, доки БД буде готова
-    restart: unless-stopped
+    restart: unless-stopped # Політика перезапуску
     # volumes: # Розкоментуйте для розробки, щоб зміни коду відображались миттєво
     #   - ./backend:/app
 
@@ -52,4 +58,4 @@ volumes:
 # --- Мережа (за потреби, якщо потрібна кастомна) ---
 # networks:
 #   app_network:
-#     driver: bridge
+#     driver: bridge # Тип драйвера мережі (за замовчуванням bridge)

@@ -11,12 +11,12 @@ from backend.app.src.config import logger
 # Явний імпорт сервісів для кращої читабельності та статичного аналізу
 from backend.app.src.services.cache.base_cache import BaseCacheService
 from backend.app.src.services.cache.redis_service import RedisCacheService
-from backend.app.src.services.cache.memory_service import InMemoryCacheService # Або MemoryCacheService, уточнити назву класу
+from backend.app.src.services.cache.memory_service import InMemoryCacheService
 
 __all__ = [
     "BaseCacheService",
     "RedisCacheService",
-    "InMemoryCacheService", # Переконайтеся, що ця назва класу є правильною у файлі memory_service.py
+    "InMemoryCacheService",
 ]
 
 logger.info(f"Сервіси кешування експортують: {__all__}")

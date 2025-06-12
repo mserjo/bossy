@@ -188,20 +188,28 @@ class InMemoryCacheService(BaseCacheService):
         logger.debug(f"Кеш DECREMENT: ключ='{key}', сума={amount}. Нове значення: {new_value}")
         return new_value
 
-    async def set_add(self, key: str, *values: Any) -> int:
-        """Додає елементи до множини."""
+    async def set_add(self, key: str, *values: Any, expire_seconds: Optional[int] = None) -> int:
+        """
+        Додає один або більше елементів до множини, що зберігається за ключем.
+        Оновлює TTL множини, якщо надано `expire_seconds`.
+
+        :param key: Ключ множини.
+        :param values: Значення для додавання до множини.
+        :param expire_seconds: Опціональний час життя в секундах для множини.
+        :return: Кількість елементів, що були фактично додані до множини.
+        """
         entry = self._cache.get(key)
         current_set: Set[Any] = set()
-        expire_at: Optional[float] = None
+        existing_expire_at: Optional[float] = None
 
         if entry and not entry.is_expired():
             if isinstance(entry.value, set):
                 current_set = entry.value
-                expire_at = entry.expire_at  # Зберігаємо термін дії існуючої множини
+                existing_expire_at = entry.expire_at  # Зберігаємо поточний TTL
             else:
                 logger.warning(
                     f"Кеш SADD: ключ '{key}' існує, але не є множиною (тип: {type(entry.value)}). Буде перезаписано новою множиною.")
-                # expire_at залишається None, щоб встановити новий термін дії, якщо він переданий в set()
+                # existing_expire_at залишається None, новий TTL буде встановлено нижче
 
         added_count = 0
         for v_item in values:
@@ -209,15 +217,38 @@ class InMemoryCacheService(BaseCacheService):
                 current_set.add(v_item)
                 added_count += 1
 
-        # Оновлюємо кеш, тільки якщо щось було додано або запис був новий/прострочений/неправильного типу
-        if added_count > 0 or not entry or (entry and (entry.is_expired() or not isinstance(entry.value, set))):
-            # Якщо expire_at тут None, то set_add не підтримує встановлення TTL для нової множини.
-            # Це можна змінити, передаючи expire_seconds в set_add.
-            # Поки що, якщо множина нова, вона буде безстроковою, або успадкує TTL, якщо це перезапис.
-            # Для послідовності, якщо expire_at не встановлено (нова множина), вона буде безстроковою.
-            self._cache[key] = _CacheEntry(current_set, expire_at)
+        new_expire_at = existing_expire_at # За замовчуванням зберігаємо старий TTL (або None, якщо його не було)
+
+        if expire_seconds is not None:
+            if expire_seconds <= 0:
+                logger.debug(f"Кеш SADD: ключ='{key}' з непозитивним expire_seconds ({expire_seconds}). Видалення ключа.")
+                # Якщо елементи були формально додані до current_set, але ключ видаляється, added_count відображає це.
+                # Якщо ключ не існував, added_count може бути > 0, але нічого не збережеться.
+                if key in self._cache: # Видаляємо тільки якщо ключ справді існував
+                    await self.delete(key)
+                return added_count
+            new_expire_at = time.monotonic() + expire_seconds
+        elif not entry or entry.is_expired() or not isinstance(entry.value, set):
+            # Якщо це новий запис (або перезапис неправильного типу/простроченого) і expire_seconds не надано,
+            # то new_expire_at залишиться None (безстроковий кеш).
+            pass
+
+        # Оновлюємо кеш, якщо:
+        # 1. Були фактично додані нові елементи.
+        # 2. Або запис був новий (not entry).
+        # 3. Або існуючий запис був прострочений або мав неправильний тип.
+        # 4. Або TTL був змінений (new_expire_at відрізняється від existing_expire_at, навіть якщо added_count = 0).
+        ttl_changed = (expire_seconds is not None and new_expire_at != existing_expire_at)
+
+        if added_count > 0 or not entry or (entry and (entry.is_expired() or not isinstance(entry.value, set))) or ttl_changed :
+            self._cache[key] = _CacheEntry(current_set, new_expire_at)
+            log_action = "оновлено/створено" if added_count > 0 or ttl_changed else "перезаписано (тип/прострочення)"
+        else:
+            log_action = "не змінено (елементи вже існували, TTL не вказано)"
+
         logger.debug(
-            f"Кеш SADD: ключ='{key}', {added_count} нових значень додано. Поточний розмір: {len(current_set)}.")
+            f"Кеш SADD: ключ='{key}', {added_count} нових значень додано. Множину {log_action}. "
+            f"Поточний розмір: {len(current_set)}. TTL (монотонний): {new_expire_at}")
         return added_count
 
     async def set_get_all(self, key: str) -> Set[Any]:

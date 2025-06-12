@@ -1,3 +1,6 @@
 # backend/alembic/versions/__init__.py
-# This file makes the 'versions' directory a Python package.
-# Alembic migration script files will be stored here.
+# -*- coding: utf-8 -*-
+# # Ініціалізаційний файл для пакету `versions` всередині `alembic`.
+# # Цей файл робить директорію `versions` пакетом Python.
+# # В цій директорії Alembic зберігає згенеровані скрипти міграцій (версії схеми бази даних).
+# # Кожен файл у цій директорії представляє окрему міграцію.

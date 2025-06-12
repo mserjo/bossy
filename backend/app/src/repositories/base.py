@@ -1,459 +1,374 @@
+# -*- coding: utf-8 -*-
 # backend/app/src/repositories/base.py
 """
-Базовий репозиторій для CRUD операцій з моделями SQLAlchemy.
+Базовий репозиторій (`BaseRepository`).
 
-Цей модуль визначає узагальнений клас `BaseRepository`, який надає
-стандартні методи для створення, читання, оновлення та видалення (CRUD)
-записів у базі даних за допомогою SQLAlchemy. Він призначений для успадкування
-конкретними репозиторіями, що працюють зі специфічними моделями.
+Цей модуль визначає узагальнений (Generic) клас `BaseRepository`, який надає
+стандартний набір CRUD (Create, Read, Update, Delete) операцій та деякі
+додаткові методи для взаємодії з базою даних через SQLAlchemy.
+Він призначений для успадкування конкретними репозиторіями, які працюють
+з певними моделями даних.
+
+Клас параметризований трьома типами:
+- `ModelType`: Тип моделі SQLAlchemy (успадкований від `SQLAlchemyBaseModel`).
+- `CreateSchemaType`: Тип схеми Pydantic для створення записів (успадкований від `PydanticBaseModel`).
+- `UpdateSchemaType`: Тип схеми Pydantic для оновлення записів (успадкований від `PydanticBaseModel`).
+
+Основні методи:
+- `get`: Отримання одного запису за ідентифікатором.
+- `get_multi`: Отримання списку записів з можливістю фільтрації, сортування та пагінації.
+- `create`: Створення нового запису.
+- `update`: Оновлення існуючого запису.
+- `remove`: Видалення запису (жорстке видалення).
+- `count`: Підрахунок кількості записів з можливістю фільтрації.
+
+Використовує асинхронні операції SQLAlchemy 2.0 та централізований логер.
 """
 
-from typing import List, Optional, Type, Any, Tuple, Dict, Union, Generic
-from datetime import datetime  # Потрібно для soft_delete, якщо встановлювати datetime.now(timezone.utc)
+from typing import Type, TypeVar, Generic, Optional, List, Any, Dict
+from uuid import UUID # Хоча UUID не використовується прямо тут, він може бути ID
 
-from sqlalchemy import select, func, update as sqlalchemy_update, delete as sqlalchemy_delete, Column
+from pydantic import BaseModel as PydanticBaseModel
+from sqlalchemy import select, update as sqlalchemy_update, delete as sqlalchemy_delete, func, asc, desc
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm.decl_api import DeclarativeMeta  # Для перевірки типу моделі або атрибутів
-from pydantic import BaseModel  # Для перевірки типу схеми в update
+# Для TypeVar bound, ми посилаємося на метаклас, який мають усі моделі SQLAlchemy
+from sqlalchemy.orm import DeclarativeMeta as SQLAlchemyModelDeclarativeMeta
 
-# Абсолютний імпорт TypeVars з core.base
-from backend.app.src.core.base import ModelType, CreateSchemaType, UpdateSchemaType
-from backend.app.src.config.logging import get_logger # Імпорт логера
-# Отримання логера для цього модуля
-logger = get_logger(__name__)
+from backend.app.src.config import logger
 
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
+# Визначення узагальнених типів для моделей та схем
+# ModelType прив'язаний до метакласу SQLAlchemy моделей. Це означає, що ModelType
+# буде типом класу моделі (наприклад, User), а не екземпляром моделі.
+ModelType = TypeVar("ModelType", bound=SQLAlchemyModelDeclarativeMeta)
+CreateSchemaType = TypeVar("CreateSchemaType", bound=PydanticBaseModel)
+UpdateSchemaType = TypeVar("UpdateSchemaType", bound=PydanticBaseModel)
 
-# logger = get_logger(__name__)
 
 class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     """
-    Узагальнений базовий клас репозиторію для CRUD операцій.
-
-    Параметризується типами моделі SQLAlchemy (`ModelType`), схеми створення (`CreateSchemaType`)
-    та схеми оновлення (`UpdateSchemaType`).
-
-    Атрибути:
-        model (Type[ModelType]): Клас моделі SQLAlchemy, з якою працює репозиторій.
-        db_session (AsyncSession): Асинхронна сесія SQLAlchemy для взаємодії з БД.
+    Узагальнений базовий репозиторій для CRUD операцій.
     """
 
-    def __init__(self, db_session: AsyncSession, model: Type[ModelType]):
+    def __init__(self, model: Type[ModelType]):
         """
-        Ініціалізує репозиторій з сесією БД та моделлю.
+        Ініціалізація репозиторію.
 
-        Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
-            model (Type[ModelType]): Клас моделі SQLAlchemy.
+        :param model: Клас моделі SQLAlchemy, з якою працюватиме репозиторій.
+                      `Type[ModelType]` означає, що `model` є самим класом, а не екземпляром.
         """
-        self.db_session = db_session
-        self.model = model
+        self.model: Type[ModelType] = model
+        logger.debug(f"Репозиторій для моделі '{self.model.__name__}' ініціалізовано.")
 
-    async def create(self, obj_in: CreateSchemaType) -> ModelType:
+    async def get(self, session: AsyncSession, id: Any) -> Optional[ModelType]:
         """
-        Створює новий запис у базі даних.
+        Отримує один запис за його ідентифікатором.
 
-        Args:
-            obj_in (CreateSchemaType): Pydantic схема з даними для створення.
-
-        Returns:
-            ModelType: Створений екземпляр моделі SQLAlchemy.
+        :param session: Асинхронна сесія SQLAlchemy.
+        :param id: Ідентифікатор запису (може бути UUID, int тощо).
+        :return: Об'єкт моделі або None, якщо запис не знайдено.
         """
-        # Створюємо екземпляр моделі з даних схеми
-        # Pydantic v2 model_dump() повертає dict
-        db_obj = self.model(**obj_in.model_dump())
-        self.db_session.add(db_obj)
-        await self.db_session.commit()
-        await self.db_session.refresh(db_obj)
-        # logger.info(f"Створено запис: {db_obj}")
-        return db_obj
+        logger.debug(f"Отримання запису типу '{self.model.__name__}' за ID: {id}")
+        # Оскільки self.model - це клас, доступ до атрибутів (наприклад, self.model.id) є коректним.
+        stmt = select(self.model).where(self.model.id == id)
+        try:
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none() # Повертає екземпляр ModelType або None
+        except Exception as e:
+            logger.error(f"Помилка при отриманні запису '{self.model.__name__}' за ID {id}: {e}", exc_info=True)
+            # Розглянути можливість підняття специфічного виключення або повернення None
+            # залежно від стратегії обробки помилок. Наразі повертаємо None.
+            return None
 
-    async def get(self, record_id: Any) -> Optional[ModelType]:
-        """
-        Отримує один запис за його первинним ключем (зазвичай 'id').
-
-        Args:
-            record_id (Any): Значення первинного ключа для пошуку.
-
-        Returns:
-            Optional[ModelType]: Екземпляр моделі, якщо знайдено, інакше None.
-        """
-        # Припускаємо, що первинний ключ називається 'id'
-        stmt = select(self.model).where(self.model.id == record_id)
-        result = await self.db_session.execute(stmt)
-        return result.scalar_one_or_none()
 
     async def get_multi(
-            self,
-            *,
-            skip: int = 0,
-            limit: int = 100,
-            filters: Optional[List[Any]] = None,  # Список фільтрів SQLAlchemy (наприклад, [User.is_active == True])
-            order_by: Optional[List[Any]] = None  # Список полів для сортування (наприклад, [User.email.asc()])
-    ) -> Tuple[List[ModelType], int]:
+        self,
+        session: AsyncSession,
+        *,
+        skip: int = 0,
+        limit: int = 100,
+        filters: Optional[Dict[str, Any]] = None,
+        sort_by: Optional[str] = None,
+        sort_order: str = "asc"
+    ) -> List[ModelType]: # Повертає список екземплярів ModelType
         """
-        Отримує список записів з пагінацією, фільтрацією та сортуванням.
+        Отримує список записів з можливістю фільтрації, сортування та пагінації.
 
-        Args:
-            skip (int): Кількість записів, яку потрібно пропустити (для пагінації).
-            limit (int): Максимальна кількість записів для повернення.
-            filters (Optional[List[Any]]): Список виразів фільтрації SQLAlchemy.
-            order_by (Optional[List[Any]]): Список виразів сортування SQLAlchemy.
-
-        Returns:
-            Tuple[List[ModelType], int]: Кортеж зі списком знайдених записів та їх загальною кількістю (до пагінації).
+        :param session: Асинхронна сесія SQLAlchemy.
+        :param skip: Кількість записів, які потрібно пропустити (для пагінації).
+        :param limit: Максимальна кількість записів для повернення (для пагінації).
+        :param filters: Словник фільтрів, де ключ - назва поля, значення - значення для фільтрації.
+                        Підтримуються оператори '__gt', '__lt', '__gte', '__lte', '__ne', '__in', '__like'.
+        :param sort_by: Поле, за яким потрібно сортувати.
+        :param sort_order: Напрямок сортування ("asc" або "desc").
+        :return: Список об'єктів моделі.
         """
-        count_stmt = select(func.count()).select_from(self.model)
+        logger.debug(
+            f"Отримання списку записів типу '{self.model.__name__}' з параметрами: "
+            f"skip={skip}, limit={limit}, filters={filters}, sort_by={sort_by}, sort_order={sort_order}"
+        )
         stmt = select(self.model)
 
-        if filters is not None and len(filters) > 0:
-            stmt = stmt.where(*filters)
-            count_stmt = count_stmt.where(*filters)
+        if filters:
+            for field, value in filters.items():
+                # Поле може містити оператор, наприклад, "age__gt"
+                field_name = field.split("__")[0]
+                column = getattr(self.model, field_name, None)
+                if column:
+                    if "__gt" in field:
+                        stmt = stmt.where(column > value)
+                    elif "__lt" in field:
+                        stmt = stmt.where(column < value)
+                    elif "__gte" in field:
+                        stmt = stmt.where(column >= value)
+                    elif "__lte" in field:
+                        stmt = stmt.where(column <= value)
+                    elif "__ne" in field:
+                        stmt = stmt.where(column != value)
+                    elif "__in" in field: # value має бути списком або кортежем
+                        stmt = stmt.where(column.in_(value))
+                    elif "__like" in field: # value має бути рядком
+                        stmt = stmt.where(column.ilike(f"%{value}%")) # ilike для нечутливого до регістру пошуку
+                    else: # Точне співпадіння
+                        stmt = stmt.where(column == value)
+                else:
+                    logger.warning(f"Поле '{field_name}' для фільтрації не знайдено в моделі '{self.model.__name__}'.")
 
-        total = (await self.db_session.execute(count_stmt)).scalar_one()
 
-        if order_by is not None and len(order_by) > 0:
-            stmt = stmt.order_by(*order_by)
+        if sort_by:
+            column_to_sort = getattr(self.model, sort_by, None)
+            if column_to_sort:
+                if sort_order.lower() == "desc":
+                    stmt = stmt.order_by(desc(column_to_sort))
+                else:
+                    stmt = stmt.order_by(asc(column_to_sort))
+            else:
+                logger.warning(f"Поле '{sort_by}' для сортування не знайдено в моделі '{self.model.__name__}'.")
 
         stmt = stmt.offset(skip).limit(limit)
 
-        items_result = await self.db_session.execute(stmt)
-        items = list(items_result.scalars().all())  # Перетворюємо результат на список
+        try:
+            result = await session.execute(stmt)
+            return list(result.scalars().all())
+        except Exception as e:
+            logger.error(f"Помилка при отриманні списку записів '{self.model.__name__}': {e}", exc_info=True)
+            return []
 
-        return items, total
+    async def create(self, session: AsyncSession, *, obj_in: CreateSchemaType) -> ModelType: # Повертає екземпляр ModelType
+        """
+        Створює новий запис у базі даних.
+
+        :param session: Асинхронна сесія SQLAlchemy.
+        :param obj_in: Об'єкт схеми Pydantic з даними для створення.
+        :return: Створений об'єкт моделі.
+        """
+        logger.debug(f"Створення нового запису типу '{self.model.__name__}' з даними: {obj_in}")
+        # `self.model` - це клас моделі, `**obj_in.model_dump()` розпаковує дані зі схеми
+        # для конструктора моделі. Це створює екземпляр ModelType.
+        db_obj = self.model(**obj_in.model_dump())
+
+        try:
+            # Використовуємо `begin_nested` якщо транзакція вже активна (наприклад, з сервісного рівня),
+            # інакше починаємо нову транзакцію.
+            async with session.begin_nested() if session.in_transaction() else session.begin():
+                session.add(db_obj)
+                # flush потрібен, щоб отримати ID (якщо він генерується базою даних, наприклад, SERIAL)
+                # або для перевірки обмежень (constraints) до фактичного commit.
+                await session.flush()
+                # refresh оновлює `db_obj` даними з бази даних (наприклад, default значеннями, тригерами).
+                await session.refresh(db_obj)
+            # `commit` відбувається автоматично при виході з блоку `async with`, якщо не було помилок.
+            # `rollback` відбувається автоматично, якщо всередині блоку виникло виключення.
+            logger.info(f"Запис типу '{self.model.__name__}' з ID {getattr(db_obj, 'id', 'N/A')} успішно створено.")
+            return db_obj
+        except Exception as e:
+            logger.error(f"Помилка при створенні запису '{self.model.__name__}': {e}", exc_info=True)
+            # TODO: Підняти специфічне виключення програми (наприклад, DatabaseCreateError)
+            raise
 
     async def update(
-            self,
-            *,
-            db_obj: ModelType,  # Екземпляр моделі SQLAlchemy для оновлення
-            obj_in: Union[UpdateSchemaType, Dict[str, Any]]  # Дані для оновлення (схема Pydantic або dict)
-    ) -> ModelType:
+        self,
+        session: AsyncSession,
+        *,
+        db_obj: ModelType, # `db_obj` є екземпляром ModelType
+        obj_in: UpdateSchemaType | Dict[str, Any]
+    ) -> ModelType: # Повертає екземпляр ModelType
         """
         Оновлює існуючий запис у базі даних.
 
-        Args:
-            db_obj (ModelType): Екземпляр моделі SQLAlchemy, який потрібно оновити.
-            obj_in (Union[UpdateSchemaType, Dict[str, Any]]): Pydantic схема або словник
-                                                              з даними для оновлення.
-
-        Returns:
-            ModelType: Оновлений екземпляр моделі SQLAlchemy.
+        :param session: Асинхронна сесія SQLAlchemy.
+        :param db_obj: Об'єкт моделі (екземпляр), який потрібно оновити.
+        :param obj_in: Об'єкт схеми Pydantic або словник з даними для оновлення.
+                       Використовується `exclude_unset=True` для Pydantic схем,
+                       щоб оновлювати тільки передані поля.
+        :return: Оновлений об'єкт моделі.
         """
-        if isinstance(obj_in, dict):
-            update_data = obj_in
-        else:  # Pydantic модель
-            update_data = obj_in.model_dump(exclude_unset=True)  # exclude_unset=True для часткових оновлень (PATCH)
+        logger.debug(f"Оновлення запису типу '{self.model.__name__}' з ID {getattr(db_obj, 'id', 'N/A')}")
+        if isinstance(obj_in, PydanticBaseModel):
+            # `exclude_unset=True` важливо, щоб не перезаписувати поля значеннями None,
+            # якщо вони не були явно передані в схемі оновлення.
+            update_data = obj_in.model_dump(exclude_unset=True)
+        else:
+            update_data = obj_in # Якщо це словник, використовуємо його як є.
 
         for field, value in update_data.items():
-            if hasattr(db_obj, field):  # Перевіряємо, чи існує такий атрибут у моделі
+            if hasattr(db_obj, field):
                 setattr(db_obj, field, value)
-            # else:
-            # logger.warning(f"Спроба оновити неіснуюче поле '{field}' для моделі {self.model.__name__}")
+            else:
+                logger.warning(
+                    f"Спроба оновити неіснуюче поле '{field}' для моделі '{self.model.__name__}'."
+                )
 
-        self.db_session.add(db_obj)
-        await self.db_session.commit()
-        await self.db_session.refresh(db_obj)
-        # logger.info(f"Оновлено запис: {db_obj}")
-        return db_obj
+        try:
+            async with session.begin_nested() if session.in_transaction() else session.begin():
+                session.add(db_obj) # Додає об'єкт до сесії, якщо він ще не там, або відмічає його як "dirty"
+                await session.flush()
+                await session.refresh(db_obj)
+            logger.info(f"Запис типу '{self.model.__name__}' з ID {getattr(db_obj, 'id', 'N/A')} успішно оновлено.")
+            return db_obj
+        except Exception as e:
+            logger.error(
+                f"Помилка при оновленні запису '{self.model.__name__}' з ID {getattr(db_obj, 'id', 'N/A')}: {e}",
+                exc_info=True
+            )
+            # TODO: Підняти специфічне виключення програми (наприклад, DatabaseUpdateError)
+            raise
 
-    async def delete(self, record_id: Any) -> Optional[ModelType]:
+    async def remove(self, session: AsyncSession, *, id: Any) -> Optional[ModelType]: # Повертає екземпляр ModelType або None
         """
-        Видаляє запис із бази даних за його первинним ключем.
-        Це "жорстке" видалення.
+        Видаляє запис із бази даних (жорстке видалення).
 
-        Args:
-            record_id (Any): Значення первинного ключа запису для видалення.
-
-        Returns:
-            Optional[ModelType]: Видалений екземпляр моделі, або None, якщо запис не знайдено.
+        :param session: Асинхронна сесія SQLAlchemy.
+        :param id: Ідентифікатор запису, який потрібно видалити.
+        :return: Видалений об'єкт моделі або None, якщо запис не знайдено.
         """
-        db_obj = await self.get(record_id)
-        if db_obj is None:
-            # logger.warning(f"Спроба видалити неіснуючий запис ID {record_id} з {self.model.__name__}")
-            return None
+        logger.debug(f"Видалення запису типу '{self.model.__name__}' за ID: {id}")
+        # TODO: Розглянути можливість перевірки наявності `is_deleted` атрибуту
+        #       і виконання м'якого видалення, якщо це передбачено моделлю.
+        #       Для цього може знадобитися передавати `db_obj` замість `id` або мати окремий метод.
 
-        await self.db_session.delete(db_obj)
-        await self.db_session.commit()
-        # logger.info(f"Видалено запис: {db_obj}")
-        return db_obj
+        try:
+            async with session.begin_nested() if session.in_transaction() else session.begin():
+                # Спочатку отримуємо об'єкт, щоб повернути його після видалення (якщо потрібно)
+                # і щоб переконатися, що він існує.
+                # `self.get` використовує ту саму сесію, але не починає нову транзакцію, якщо вже є.
+                obj_to_delete = await self.get(session, id)
+                if obj_to_delete:
+                    await session.delete(obj_to_delete)
+                    # `flush` тут не обов'язковий, оскільки `commit` (через with-блок) все зробить.
+                    # await session.flush()
+                    logger.info(f"Запис типу '{self.model.__name__}' з ID {id} успішно видалено (жорстке видалення).")
+                    return obj_to_delete
+                else:
+                    logger.warning(f"Запис типу '{self.model.__name__}' з ID {id} не знайдено для видалення.")
+                    return None
+        except Exception as e:
+            logger.error(f"Помилка при видаленні запису '{self.model.__name__}' з ID {id}: {e}", exc_info=True)
+            # TODO: Підняти специфічне виключення програми (наприклад, DatabaseDeleteError)
+            raise
 
-    async def soft_delete(self, db_obj: ModelType) -> Optional[ModelType]:
-        """
-        Виконує "м'яке" видалення запису, встановлюючи поле `deleted_at`.
-        Потребує наявності поля `deleted_at` у моделі (зазвичай через `SoftDeleteMixin`).
 
-        Args:
-            db_obj (ModelType): Екземпляр моделі SQLAlchemy для м'якого видалення.
-
-        Returns:
-            Optional[ModelType]: Екземпляр моделі з встановленим `deleted_at`, або None, якщо операція неможлива.
-
-        Raises:
-            NotImplementedError: Якщо модель не підтримує м'яке видалення (немає поля `deleted_at`).
-        """
-        if not hasattr(db_obj, "deleted_at"):
-            # logger.error(f"Модель {self.model.__name__} не підтримує м'яке видалення (відсутнє поле 'deleted_at').")
-            raise NotImplementedError(f"Модель {self.model.__name__} не підтримує м'яке видалення.")
-
-        # Встановлюємо поточний час UTC для deleted_at
-        # Використання func.now() тут може бути проблематичним, оскільки це серверне значення БД,
-        # а ми хочемо оновити поле Python об'єкта перед комітом.
-        # Краще використовувати datetime.now(timezone.utc)
-        from datetime import timezone  # Локальний імпорт, щоб уникнути циклічності, якщо utils імпортує щось звідси
-        setattr(db_obj, "deleted_at", datetime.now(timezone.utc))
-
-        self.db_session.add(db_obj)
-        await self.db_session.commit()
-        await self.db_session.refresh(db_obj)
-        # logger.info(f"М'яко видалено запис: {db_obj}")
-        return db_obj
-
-    async def count(self, filters: Optional[List[Any]] = None) -> int:
+    async def count(
+        self,
+        session: AsyncSession,
+        *,
+        filters: Optional[Dict[str, Any]] = None
+    ) -> int:
         """
         Підраховує кількість записів, що відповідають заданим фільтрам.
 
-        Args:
-            filters (Optional[List[Any]]): Список виразів фільтрації SQLAlchemy.
-
-        Returns:
-            int: Загальна кількість знайдених записів.
+        :param session: Асинхронна сесія SQLAlchemy.
+        :param filters: Словник фільтрів (аналогічно до get_multi).
+        :return: Кількість записів.
         """
-        stmt = select(func.count(self.model.id if hasattr(self.model, 'id') else '*')).select_from(
-            self.model)  # Рахуємо по id, якщо є
-        if filters is not None and len(filters) > 0:
-            stmt = stmt.where(*filters)
+        logger.debug(f"Підрахунок записів типу '{self.model.__name__}' з фільтрами: {filters}")
+        # Використовуємо `func.count(self.model.id)` для підрахунку за первинним ключем,
+        # що зазвичай є ефективним.
+        stmt = select(func.count(self.model.id)).select_from(self.model)
 
-        total = (await self.db_session.execute(stmt)).scalar_one()
-        return total
+        if filters: # Логіка фільтрації аналогічна до get_multi
+            for field, value in filters.items():
+                field_name = field.split("__")[0]
+                column = getattr(self.model, field_name, None)
+                if column:
+                    if "__gt" in field:
+                        stmt = stmt.where(column > value)
+                    elif "__lt" in field:
+                        stmt = stmt.where(column < value)
+                    elif "__gte" in field:
+                        stmt = stmt.where(column >= value)
+                    elif "__lte" in field:
+                        stmt = stmt.where(column <= value)
+                    elif "__ne" in field:
+                        stmt = stmt.where(column != value)
+                    elif "__in" in field:
+                        stmt = stmt.where(column.in_(value))
+                    elif "__like" in field:
+                        stmt = stmt.where(column.ilike(f"%{value}%"))
+                    else:
+                        stmt = stmt.where(column == value)
+                else:
+                    logger.warning(f"Поле '{field_name}' для фільтрації (count) не знайдено в моделі '{self.model.__name__}'.")
+        try:
+            result = await session.execute(stmt)
+            count_value = result.scalar_one() # `scalar_one` очікує один рядок, одне значення.
+            logger.debug(f"Загальна кількість записів типу '{self.model.__name__}': {count_value}")
+            return count_value
+        except Exception as e:
+            logger.error(f"Помилка при підрахунку записів '{self.model.__name__}': {e}", exc_info=True)
+            # TODO: Повернути 0 чи підняти виключення? Наразі 0 для уникнення падіння.
+            return 0
 
+    # --- TODOs та Замітки для подальшого покращення ---
 
-# Блок для демонстрації та базового тестування (потребує значних макетів)
-if __name__ == "__main__":
-    # Цей блок потребує значної кількості макетів для SQLAlchemy AsyncSession, моделей та схем,
-    # тому повноцінне тестування тут складне. Краще тестувати через інтеграційні тести.
-    # Нижче наведено дуже спрощену концептуальну демонстрацію.
+    # TODO: [Error Handling] Замість загального `except Exception`, ловити більш специфічні помилки
+    #       SQLAlchemy (наприклад, `IntegrityError` від `sqlalchemy.exc`) та відповідно реагувати
+    #       або піднімати кастомні виключення програми (наприклад, `DuplicateEntryError`, `DataTooLongError`).
 
-    logger.info("--- Демонстрація Базового Репозиторію (BaseRepository) ---")
+    # TODO: [Filtering] Розширити можливості фільтрації:
+    #       - Підтримка OR умов (наприклад, через спеціальний синтаксис у `filters` або окремий параметр).
+    #       - Фільтрація за полями пов'язаних моделей (потребуватиме `join` або `selectinload` і потім фільтрацію в Python,
+    #         або більш складні конструкції `where` з `Relationship.Comparator.any()` або `has()`).
+    #         Приклад: `filters={"user__name__like": "John"}`.
 
+    # TODO: [Sorting] Дозволити сортування за кількома полями.
+    #       Наприклад, `sort_by: Optional[Union[str, List[Tuple[str, str]]]]`,
+    #       де `List[Tuple[str, str]]` містить пари (назва_поля, напрямок_сортування).
 
-    # 1. Визначення фіктивних моделей та схем для тестування
-    class MockSQLAlchemyModel(DeclarativeMeta):  # Не зовсім коректно, але для імітації
-        __tablename__ = "mock_items"
-        id: Mapped[int] = mapped_column(primary_key=True)
-        name: Mapped[str]
-        value: Mapped[Optional[int]]
+    # TODO: [Soft Delete] Реалізувати або інтегрувати механізм м'якого видалення.
+    #       Якщо модель має атрибути типу `is_deleted` та `deleted_at`, метод `remove`
+    #       міг би автоматично виконувати м'яке видалення. Або додати окремий метод `soft_remove`.
+    #       Можливо, додати параметр `hard_delete: bool = False` до методу `remove`.
 
-        # Імітація колонок для __repr__ та update
-        __table__ = type('Table', (), {
-            'columns': [Column('id', Integer, primary_key=True), Column('name', String), Column('value', Integer)]})()
+    # TODO: [Bulk Operations] Розглянути додавання методів для пакетного створення (`bulk_create`),
+    #       оновлення (`bulk_update`), та видалення (`bulk_delete`), якщо це часто потрібно.
+    #       Це може бути значно ефективніше для великої кількості записів.
+    #       Наприклад: `async def bulk_create(self, session: AsyncSession, *, objs_in: List[CreateSchemaType]) -> List[ModelType]: ...`
 
-        def __init__(self, **kwargs):  # Простий init для приймання kwargs
-            for k, v in kwargs.items():
-                setattr(self, k, v)
+    # TODO: [Type Hinting for ModelType] Поточне `ModelType = TypeVar("ModelType", bound=SQLAlchemyModelDeclarativeMeta)`
+    #       є коректним для передачі *класу* моделі. Екземпляри моделі будуть типу `ModelType`.
+    #       Переконатися, що це узгоджується зі статичним аналізатором (mypy).
+    #       `SQLAlchemyModelDeclarativeMeta` - це метаклас `declarative_base()`.
+    #       Альтернативою для SQLAlchemy 2.0+ могло б бути використання `TypeVar("ModelType", bound=DeclarativeBase)`
+    #       якщо всі моделі успадковуються від спільного `DeclarativeBase`.
+    #       Або `TypeVar("ModelType", bound=Any)` якщо не вдається знайти спільний базовий тип,
+    #       але це менш безпечно з точки зору типів. Поточний варіант є прийнятним.
 
-        def __repr__(self):
-            return f"<MockSQLAlchemyModel(id={self.id}, name='{self.name}', value={self.value})>"
+    # TODO: [Pydantic V1/V2] Код використовує `model_dump()` та `model_dump(exclude_unset=True)`,
+    #       що є синтаксисом Pydantic V2. Якщо проект може використовувати Pydantic V1,
+    #       потрібна буде сумісність (наприклад, через `obj_in.dict()`).
 
+    # TODO: [Specific Getters] Можливо, додати типові специфічні гетери, якщо вони часто потрібні,
+    #       наприклад, `get_by_field(session: AsyncSession, field_name: str, field_value: Any) -> Optional[ModelType]: ...`
+    #       або `get_all_by_ids(session: AsyncSession, ids: List[Any]) -> List[ModelType]: ...`.
 
-    class MockCreateSchema(BaseModel):
-        name: str
-        value: Optional[int] = None
+    # TODO: [Exists Check] Додати простий метод `exists(session: AsyncSession, id: Any) -> bool:`
+    #       який був би оптимізований для перевірки існування (не витягуючи весь об'єкт).
+    #       `select(self.model.id).where(self.model.id == id)` і перевірка `scalar_one_or_none() is not None`.
 
+    # TODO: [Logging Context] Для кращого відстеження, можна додати більше контексту до логів,
+    #       наприклад, ім'я користувача або ID запиту, якщо вони доступні.
+    #       Це зазвичай робиться через middleware та передачу контексту.
 
-    class MockUpdateSchema(BaseModel):
-        name: Optional[str] = None
-        value: Optional[int] = None
+pass # Кінець класу BaseRepository
 
-
-    # 2. Макет AsyncSession (дуже спрощений)
-    class MockAsyncSession:
-        def __init__(self):
-            self._store: Dict[int, MockSQLAlchemyModel] = {}
-            self._next_id = 1
-            self.flushed_objects = []  # Для імітації add/delete/commit
-
-        async def add(self, obj):
-            # logger.debug(f"MockSession: Додавання об'єкта {obj}")
-            if not hasattr(obj, 'id') or obj.id is None:  # Імітація автоінкремента
-                obj.id = self._next_id
-                self._next_id += 1
-            self._store[obj.id] = obj
-            self.flushed_objects.append(obj)
-
-        async def commit(self):
-            # logger.debug(f"MockSession: Коміт {len(self.flushed_objects)} об'єктів.")
-            # Тут можна було б імітувати реальний запис, але для refresh достатньо очистити список
-            self.flushed_objects = []
-            pass
-
-        async def refresh(self, obj):
-            # logger.debug(f"MockSession: Оновлення об'єкта {obj}")
-            # В реальності це завантажує стан з БД. Тут просто передаємо далі.
-            pass
-
-        async def delete(self, obj):
-            # logger.debug(f"MockSession: Видалення об'єкта {obj}")
-            if obj.id in self._store:
-                del self._store[obj.id]
-            self.flushed_objects.append(obj)  # Для імітації, хоча об'єкт вже видалено
-
-        async def execute(self, stmt):
-            # Дуже спрощена імітація execute для get, get_multi, count
-            # logger.debug(f"MockSession: Виконання запиту {stmt}")
-            # Це потребує парсингу stmt, що виходить за рамки простого макета.
-            # Для get:
-            if hasattr(stmt, 'whereclause') and stmt.whereclause is not None:
-                # Імітуємо пошук по id для get
-                # Це дуже грубе припущення про структуру stmt.whereclause
-                # У реальному тесті використовуйте тестову БД або більш складний макет SQLAlchemy.
-                try:
-                    # Приклад для stmt = select(self.model).where(self.model.id == record_id)
-                    # whereclause.right.value буде record_id
-                    target_id = stmt.whereclause.right.value
-                    found_obj = self._store.get(target_id)
-
-                    class MockScalarResult:
-                        def __init__(self, value): self._value = value
-
-                        def scalar_one_or_none(self): return self._value
-
-                        def scalar_one(self): return self._value if self._value is not None else (_ for _ in ()).throw(
-                            Exception("No row was found for one()"))  # Імітація помилки
-
-                        def scalars(self): return self  # Для .scalars().all()
-
-                        def all(self): return [self._value] if self._value else []
-
-                    return MockScalarResult(found_obj)
-                except Exception:  # Якщо структура stmt інша
-                    pass
-
-            # Для get_multi (items) та count
-            # Повернемо всі об'єкти для get_multi, якщо немає фільтрів
-            # або порожній список / 0 для count, якщоstmt не для get(id)
-
-            # Імітація для select(func.count())
-            if any(isinstance(col, func.count) for col in stmt.selected_columns):
-                class MockScalarCountResult:
-                    def __init__(self, count_val): self._count_val = count_val
-
-                    def scalar_one(self): return self._count_val
-
-                return MockScalarCountResult(len(self._store))
-
-            # Імітація для select(model)
-            class MockScalarAllResult:
-                def __init__(self, items_list): self._items_list = items_list
-
-                def scalars(self): return self  # Для .scalars().all()
-
-                def all(self): return self._items_list
-
-            # Дуже спрощено, без фільтрів та сортування
-            return MockScalarAllResult(list(self._store.values()))
-
-
-    async def run_repository_demo():
-        logger.info("\n--- Демонстрація роботи BaseRepository з Макетами ---")
-        mock_session = MockAsyncSession()
-        repo = BaseRepository[MockSQLAlchemyModel, MockCreateSchema, MockUpdateSchema](
-            db_session=mock_session, model=MockSQLAlchemyModel
-        )
-
-        # 1. Створення
-        logger.info("1. Тест створення:")
-        create_schema = MockCreateSchema(name="Тестовий Запис 1", value=100)
-        created_obj = await repo.create(create_schema)
-        logger.info(f"  Створено: {created_obj}")
-        assert created_obj.id == 1
-        assert created_obj.name == "Тестовий Запис 1"
-
-        create_schema_2 = MockCreateSchema(name="Тестовий Запис 2", value=200)
-        created_obj_2 = await repo.create(create_schema_2)
-        logger.info(f"  Створено: {created_obj_2}")
-        assert created_obj_2.id == 2
-
-        # 2. Отримання одного запису
-        logger.info("\n2. Тест отримання одного запису:")
-        retrieved_obj = await repo.get(1)
-        logger.info(f"  Отримано (ID 1): {retrieved_obj}")
-        assert retrieved_obj is not None
-        assert retrieved_obj.id == 1
-        assert retrieved_obj.name == "Тестовий Запис 1"
-
-        retrieved_obj_none = await repo.get(99)  # Неіснуючий ID
-        logger.info(f"  Отримано (ID 99): {retrieved_obj_none}")
-        assert retrieved_obj_none is None
-
-        # 3. Отримання кількох записів (спрощено, без фільтрів/сортування в макеті)
-        logger.info("\n3. Тест отримання кількох записів (спрощено):")
-        items, total = await repo.get_multi(limit=10)
-        logger.info(f"  Отримано {len(items)} з {total} записів.")
-        assert total == 2
-        assert len(items) == 2
-
-        # 4. Оновлення
-        logger.info("\n4. Тест оновлення:")
-        update_schema = MockUpdateSchema(name="Оновлений Запис 1", value=150)
-        if retrieved_obj:
-            updated_obj = await repo.update(db_obj=retrieved_obj, obj_in=update_schema)
-            logger.info(f"  Оновлено: {updated_obj}")
-            assert updated_obj.name == "Оновлений Запис 1"
-            assert updated_obj.value == 150
-
-        # 5. Підрахунок
-        logger.info("\n5. Тест підрахунку:")
-        count = await repo.count()
-        logger.info(f"  Загальна кількість записів: {count}")
-        assert count == 2  # Залишилося 2 записи
-
-        # 6. "М'яке" видалення (якщо модель підтримує)
-        logger.info("\n6. Тест м'якого видалення:")
-        # Наша MockSQLAlchemyModel не має поля deleted_at, тому очікуємо помилку
-        if created_obj_2:
-            try:
-                await repo.soft_delete(db_obj=created_obj_2)
-            except NotImplementedError as e:
-                logger.info(f"  Очікувана помилка для soft_delete: {e}")
-            except Exception as e:
-                logger.error(f"  Неочікувана помилка для soft_delete: {e}")
-
-        # Додамо поле deleted_at до MockSQLAlchemyModel для тесту
-        setattr(MockSQLAlchemyModel, 'deleted_at', None)  # Імітація поля
-        # Імітуємо, що колонка існує в __mapper__ для __repr__ (якщо __repr__ це перевіряє)
-        MockSQLAlchemyModel.__table__.columns.append(Column('deleted_at', type_=datetime, nullable=True))
-
-        if created_obj_2:
-            # Потрібно оновити екземпляр, щоб він мав атрибут (або перезавантажити з "БД")
-            created_obj_2.deleted_at = None
-            soft_deleted_obj = await repo.soft_delete(db_obj=created_obj_2)
-            logger.info(f"  М'яко видалено: {soft_deleted_obj}")
-            assert soft_deleted_obj.deleted_at is not None
-            # Перевірка, що запис все ще в "БД" (для макета)
-            assert created_obj_2.id in mock_session._store
-
-            # 7. "Жорстке" видалення
-        logger.info("\n7. Тест жорсткого видалення:")
-        deleted_obj = await repo.delete(1)
-        logger.info(f"  Видалено (ID 1): {deleted_obj}")
-        assert deleted_obj is not None
-        assert deleted_obj.id == 1
-        assert 1 not in mock_session._store  # Перевірка, що запис видалено з макету сховища
-
-        retrieved_after_delete = await repo.get(1)
-        logger.info(f"  Спроба отримати видалений (ID 1): {retrieved_after_delete}")
-        assert retrieved_after_delete is None
-
-        count_after_delete = await repo.count()
-        logger.info(f"  Загальна кількість записів після видалення: {count_after_delete}")
-        assert count_after_delete == 1  # Один м'яко видалений, один жорстко
-
-
-    import asyncio
-
-    # Для запуску демонстрації потрібен event loop.
-    # У реальному застосунку FastAPI це обробляє.
-    # logger = get_logger(__name__) # Переміщено наверх для використання в run_repository_demo
-    # asyncio.run(run_repository_demo())
-    logger.info("\nЗапуск демонстрації BaseRepository закоментовано через складність повного макетування SQLAlchemy.")
-    logger.info("Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
+# Кінець файлу backend/app/src/repositories/base.py

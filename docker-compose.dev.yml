@@ -1,51 +1,82 @@
 # docker-compose.dev.yml
-# # Файл Docker Compose для середовища розробки.
-# # Розширює базовий docker-compose.yml та додає специфічні для розробки налаштування.
+# Цей файл Docker Compose призначений для середовища розробки.
+# Він розширює базовий файл `docker-compose.yml` та додає або змінює
+# налаштування, специфічні для комфортної розробки, такі як монтування коду
+# для "гарячого перезавантаження" та використання змінних середовища для розробки.
 
-version: '3.8'
+version: '3.8' # Повинна співпадати з версією в docker-compose.yml
 
 services:
   backend:
-    # Розширює сервіс backend з docker-compose.yml
-    # Для розробки ми хочемо використовувати bind mount для миттєвого оновлення коду
+    # Розширює та частково перевизначає сервіс `backend` з `docker-compose.yml`.
+    # Для середовища розробки ми монтуємо локальний код в контейнер,
+    # щоб зміни миттєво відображалися без необхідності перебудови образу.
     volumes:
-      - ./backend:/app # Монтування коду backend в контейнер
-    # Dockerfile для розробки може бути іншим або використовувати іншу стадію,
-    # якщо у вас багатостадійний Dockerfile (наприклад, з dev-залежностями)
+      - ./backend:/app # Монтування директорії ./backend (де лежить код FastAPI) до /app в контейнері
+
+    # Dockerfile для розробки може бути тим самим, що й для продакшену,
+    # або можна використовувати багатостадійний Dockerfile і вказати `target: development`,
+    # якщо є окрема стадія для розробки з додатковими інструментами.
     # build:
     #   context: ./backend
-    #   dockerfile: Dockerfile # Або Dockerfile.dev, якщо є
-    #   target: development # Якщо є така стадія в Dockerfile
-    env_file:
-      - ./backend/.env # Завантаження змінних середовища для розробки
-    # Команда може бути переписана для запуску з live-reload,
-    # наприклад, uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    # command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
-    ports:
-      - "8000:8000" # Переконайтеся, що порт той самий або оновіть за потреби
+    #   dockerfile: Dockerfile # Або Dockerfile.dev, якщо такий існує
+    #   target: development # Назва стадії для розробки у Dockerfile (якщо є)
 
-  # Сервіс db зазвичай успадковується з основного docker-compose.yml без змін для dev,
-  # але можна перевизначити, якщо потрібно (наприклад, інший порт).
+    # Завантаження змінних середовища. Файл .env повинен містити
+    # конфігурації для розробки, наприклад, DEBUG=True.
+    env_file:
+      - ./backend/.env # Використовуємо той самий .env, що й для базової конфігурації,
+                       # але очікуємо, що він налаштований для розробки (наприклад, DEBUG=True).
+                       # Альтернативно, можна використовувати ./backend/.env.dev
+
+    # Команда для запуску uvicorn сервера з автоматичним перезавантаженням при зміні коду.
+    # Це стандартна практика для розробки FastAPI додатків.
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+    # Порти успадковуються з docker-compose.yml, але їх можна перевизначити тут, якщо потрібно.
+    # ports:
+    #   - "8000:8000"
+
+    # Залежності (depends_on) також успадковуються.
+
+  # Сервіс `db` (база даних) зазвичай успадковується з `docker-compose.yml` без змін.
+  # Якщо для розробки потрібні специфічні налаштування БД (наприклад, інший порт або том),
+  # їх можна перевизначити тут.
   # db:
   #   ports:
-  #     - "5433:5432" # Приклад: інший порт для локальної розробки
+  #     - "5433:5432" # Приклад: мапимо порт БД на 5433 на хості для уникнення конфліктів
+  #   volumes:
+  #     - postgres_data_dev_volume:/var/lib/postgresql/data/ # Окремий том для даних розробки
 
-# Можна додати сервіси, специфічні для розробки, наприклад, Mailhog або Adminer
+# --- Додаткові сервіси для розробки (опціонально) ---
+# Можна додати сервіси, які корисні під час розробки, наприклад:
+# - MailHog для тестування відправки email.
+# - Adminer або pgAdmin для управління базою даних через веб-інтерфейс.
+
 #   mailhog:
-#     image: mailhog/mailhog
-#     container_name: project_mailhog
+#     image: mailhog/mailhog:latest
+#     container_name: app_mailhog_dev
 #     ports:
-#       - "1025:1025" # SMTP порт
-#       - "8025:8025" # Веб-інтерфейс
+#       - "1025:1025" # SMTP порт (для перехоплення листів)
+#       - "8025:8025" # Веб-інтерфейс MailHog
 #     restart: unless-stopped
 
-#   adminer:
-#     image: adminer
-#     container_name: project_adminer
+#   pgadmin: # Або Adminer
+#     image: dpage/pgadmin4:latest
+#     container_name: app_pgadmin_dev
+#     environment:
+#       PGADMIN_DEFAULT_EMAIL: "admin@example.com"
+#       PGADMIN_DEFAULT_PASSWORD: "admin"
 #     ports:
-#       - "8080:8080"
-#     restart: unless-stopped
+#       - "5050:80" # Веб-інтерфейс pgAdmin
 #     depends_on:
 #       - db
+#     restart: unless-stopped
+#     volumes:
+#       - pgadmin_data_dev_volume:/var/lib/pgadmin
 
-# Мережі та томи успадковуються з docker-compose.yml, якщо не перевизначені.
+# Томи та мережі, визначені в `docker-compose.yml`, успадковуються,
+# якщо їх не перевизначити тут. Можна також визначити нові, специфічні для розробки.
+# volumes:
+#   postgres_data_dev_volume:
+#   pgadmin_data_dev_volume:

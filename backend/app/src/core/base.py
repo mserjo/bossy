@@ -1,53 +1,79 @@
 # backend/app/src/core/base.py
 # -*- coding: utf-8 -*-
-"""
-Базові елементи ядра програми Kudos.
+"""Базові типи для ядра додатку.
 
-Цей модуль визначає загальні типи (TypeVars), які використовуються для побудови
-узагальнених базових класів для сервісів, репозиторіїв та інших компонентів,
-що працюють з моделями даних Pydantic.
+Цей модуль визначає загальні змінні типи (`TypeVar`), які призначені
+для використання при побудові узагальнених (Generic) базових класів.
+Ці типи допомагають забезпечити строгу типізацію для сервісів,
+репозиторіїв та інших компонентів, що оперують моделями даних
+SQLAlchemy (представленими через схеми Pydantic) та схемами Pydantic
+для створення та оновлення даних.
 
 Визначені TypeVars:
-- `ModelType`: Представляє тип моделі SQLAlchemy, що відображається Pydantic моделлю (зазвичай для відповіді).
-- `CreateSchemaType`: Представляє тип Pydantic схеми, що використовується для створення нових записів.
-- `UpdateSchemaType`: Представляє тип Pydantic схеми, що використовується для оновлення існуючих записів.
+- `ModelType`: Представляє тип схеми Pydantic, що використовується для
+               відображення даних моделі SQLAlchemy (зазвичай для відповіді API).
+- `CreateSchemaType`: Представляє тип схеми Pydantic, що використовується
+                      для створення нових екземплярів моделі в базі даних.
+- `UpdateSchemaType`: Представляє тип схеми Pydantic, що використовується
+                      для оновлення існуючих екземплярів моделі в базі даних.
 
-Ці типи дозволяють створювати гнучкі та типізовані базові класи, зменшуючи дублювання коду
-та покращуючи підтримку кодової бази.
+Використання цих `TypeVar` дозволяє створювати гнучкі та типізовані
+інтерфейси для базових класів, що зменшує дублювання коду, покращує
+читабельність та підтримку кодової бази завдяки статичній перевірці типів.
 """
 
 from typing import TypeVar
+
 from pydantic import BaseModel
 
-# Загальні TypeVariable (змінні типи) для моделей Pydantic.
-# Вони призначені для використання в узагальнених (Generic) базових класах,
-# таких як базові сервіси або репозиторії, для забезпечення типізації
-# моделей SQLAlchemy (які представлені Pydantic моделями для API) та схем Pydantic.
-
-# ModelType: Очікується, що це буде Pydantic модель, яка представляє дані з бази даних (наприклад, User).
-# Часто використовується як тип повернення для операцій читання.
+# ModelType: Очікується, що це буде схема Pydantic, яка відображає модель SQLAlchemy.
+# Наприклад, якщо є модель SQLAlchemy `User`, то `ModelType` може бути `UserSchema` (Pydantic модель).
+# Цей тип часто використовується як тип повернення для операцій читання даних.
 ModelType = TypeVar("ModelType", bound=BaseModel)
 
-# CreateSchemaType: Очікується, що це буде Pydantic схема, яка використовується для створення
-# нового екземпляра моделі (наприклад, UserCreate).
+# CreateSchemaType: Очікується, що це буде схема Pydantic, призначена для валідації даних
+# при створенні нового об'єкта в базі даних (наприклад, `UserCreateSchema`).
 CreateSchemaType = TypeVar("CreateSchemaType", bound=BaseModel)
 
-# UpdateSchemaType: Очікується, що це буде Pydantic схема, яка використовується для оновлення
-# існуючого екземпляра моделі (наприклад, UserUpdate).
+# UpdateSchemaType: Очікується, що це буде схема Pydantic, призначена для валідації даних
+# при оновленні існуючого об'єкта в базі даних (наприклад, `UserUpdateSchema`).
+# Зазвичай містить опціональні поля.
 UpdateSchemaType = TypeVar("UpdateSchemaType", bound=BaseModel)
 
-# Раніше тут були класи BaseCoreComponent та ObjectConfigurator.
-# BaseCoreComponent був видалений через надмірну загальність та відсутність конкретної користі
-# для базових класів сервісів/репозиторіїв, які краще розміщувати у відповідних пакетах.
-# ObjectConfigurator був видалений, оскільки Pydantic моделі мають власні потужні механізми
-# для ініціалізації та оновлення з диктів (`model_validate`, `model_construct`, `model_copy(update=...)`).
+# Коментар щодо попереднього вмісту файлу (якщо актуально для історії змін):
+# Раніше цей файл міг містити базові класи, такі як `BaseCoreComponent` або `ObjectConfigurator`.
+# Однак, вони були видалені або перенесені для спрощення структури ядра, оскільки:
+# - `BaseCoreComponent` міг бути надто абстрактним і не надавати значної конкретної користі,
+#   а специфічна логіка краще реалізується у відповідних базових класах сервісів/репозиторіїв.
+# - `ObjectConfigurator` (якщо такий був) міг дублювати функціональність Pydantic,
+#   який вже надає потужні механізми для ініціалізації, валідації та оновлення моделей
+#   з словників (наприклад, `model_validate()`, `model_construct()`, `model_copy(update=...)`).
 
-# Приклад використання цих TypeVars можна знайти в базових класах для CRUD операцій,
-# наприклад, у `backend/app/src/repositories/base.py` або `backend/app/src/services/base.py` (якщо такі будуть створені).
+# Приклад використання цих TypeVars можна знайти в реалізації узагальнених
+# базових класів для CRUD операцій, наприклад, у файлах типу
+# `backend/app/src/repositories/base_repository.py` або
+# `backend/app/src/services/base_service.py` (якщо такі класи будуть створені).
+#
+# Наприклад, базовий сервіс міг би виглядати так:
+#
+# from typing import Generic, Optional, Any
+# from sqlalchemy.ext.asyncio import AsyncSession
+#
 # class BaseService(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
-#     async def get(self, db: AsyncSession, id: Any) -> Optional[ModelType]:
-#         ...
+#     # ... реалізація методів ...
+#     async def get(self, db: AsyncSession, item_id: Any) -> Optional[ModelType]:
+#         # логіка отримання об'єкта
+#         pass
+#
 #     async def create(self, db: AsyncSession, *, obj_in: CreateSchemaType) -> ModelType:
-#         ...
-#     async def update(self, db: AsyncSession, *, db_obj: ModelType, obj_in: UpdateSchemaType) -> ModelType:
-#         ...
+#         # логіка створення об'єкта
+#         pass
+#
+#     async def update(
+#         self, db: AsyncSession, *, db_obj: ModelType, obj_in: UpdateSchemaType
+#     ) -> ModelType:
+#         # логіка оновлення об'єкта
+#         pass
+#
+# Цей модуль не містить активного коду, що виконується, а лише визначення типів.
+# Тому логування тут не потрібне.

@@ -1,43 +1,52 @@
 # backend/app/src/schemas/bonuses/__init__.py
-"""
-Pydantic схеми для сутностей, пов'язаних з "Бонусами".
+# -*- coding: utf-8 -*-
+"""Pydantic схеми для сутностей, пов'язаних з бонусною системою.
 
 Цей пакет містить схеми Pydantic, що використовуються для валідації
-даних запитів та формування відповідей API, які стосуються правил нарахування бонусів,
-рахунків користувачів, транзакцій по цих рахунках та нагород в програмі Kudos.
+даних запитів та формування відповідей API, які стосуються:
+- Правил нарахування бонусів (`BonusRule...Schema` з `bonus_rule.py`).
+- Бонусних рахунків користувачів (`UserAccount...Schema` з `account.py`).
+- Транзакцій по бонусних рахунках (`AccountTransaction...Schema` з `transaction.py`).
+- Нагород, які можна придбати за бонуси (`Reward...Schema` з `reward.py`).
+
+Моделі з цього пакету експортуються для використання в сервісному шарі та API.
 """
 
+# Імпорт централізованого логера
+from backend.app.src.config import logger
+
 # Схеми, пов'язані з Правилами Нарахування Бонусів
-from .bonus_rule import (
+from backend.app.src.schemas.bonuses.bonus_rule import (
     BonusRuleBaseSchema,
     BonusRuleCreateSchema,
     BonusRuleUpdateSchema,
-    BonusRuleSchema
+    BonusRuleResponseSchema  # Оновлено ім'я
 )
 
 # Схеми, пов'язані з Рахунками Користувачів
-from .account import (
+from backend.app.src.schemas.bonuses.account import (
     UserAccountBaseSchema,
     UserAccountCreateSchema,
     UserAccountUpdateSchema,
-    UserAccountSchema,
-    UserAccountTransactionHistorySchema
+    UserAccountResponseSchema,  # Оновлено ім'я
+    UserAccountTransactionHistorySchema # Допоміжна схема, залишаємо як є
 )
 
 # Схеми, пов'язані з Транзакціями по Рахунках
-from .transaction import (
+from backend.app.src.schemas.bonuses.transaction import (
     AccountTransactionBaseSchema,
     AccountTransactionCreateSchema,
-    AccountTransactionSchema
+    # AccountTransactionUpdateSchema, # Зазвичай транзакції не оновлюються
+    AccountTransactionResponseSchema  # Оновлено ім'я
 )
 
 # Схеми, пов'язані з Нагородами
-from .reward import (
+from backend.app.src.schemas.bonuses.reward import (
     RewardBaseSchema,
     RewardCreateSchema,
     RewardUpdateSchema,
-    RewardSchema,
-    RedeemRewardRequestSchema
+    RewardResponseSchema,  # Оновлено ім'я
+    RedeemRewardRequestSchema # Допоміжна схема, залишаємо як є
 )
 
 
@@ -46,21 +55,24 @@ __all__ = [
     "BonusRuleBaseSchema",
     "BonusRuleCreateSchema",
     "BonusRuleUpdateSchema",
-    "BonusRuleSchema",
+    "BonusRuleResponseSchema",
     # UserAccount schemas
     "UserAccountBaseSchema",
     "UserAccountCreateSchema",
     "UserAccountUpdateSchema",
-    "UserAccountSchema",
+    "UserAccountResponseSchema",
     "UserAccountTransactionHistorySchema",
     # AccountTransaction schemas
     "AccountTransactionBaseSchema",
     "AccountTransactionCreateSchema",
-    "AccountTransactionSchema",
+    # "AccountTransactionUpdateSchema",
+    "AccountTransactionResponseSchema",
     # Reward schemas
     "RewardBaseSchema",
     "RewardCreateSchema",
     "RewardUpdateSchema",
-    "RewardSchema",
+    "RewardResponseSchema",
     "RedeemRewardRequestSchema",
 ]
+
+logger.debug("Ініціалізація пакету схем Pydantic `bonuses`...")

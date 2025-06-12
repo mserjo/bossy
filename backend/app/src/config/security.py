@@ -1,257 +1,282 @@
 # backend/app/src/config/security.py
 # -*- coding: utf-8 -*-
-"""
-Модуль конфігурацій та утиліт безпеки для FastAPI програми Kudos.
+"""Модуль конфігурацій та утиліт безпеки для додатку.
 
 Цей модуль відповідає за:
 - Створення та декодування JWT (JSON Web Tokens) для автентифікації та авторизації.
-  Включає токени доступу (access tokens) та токени оновлення (refresh tokens).
-- Додавання стандартних клеймів до JWT, таких як `exp` (час закінчення), `iss` (видавець),
-  `aud` (аудиторія) та кастомний клейм `type` (тип токена: access/refresh).
-- Обробку помилок, пов'язаних з JWT, та їх логування.
+  Включає функції для генерації токенів доступу (access tokens) та токенів
+  оновлення (refresh tokens).
+- Додавання стандартних "клеймів" (claims) до JWT, таких як `exp` (час закінчення),
+  `iat` (час видачі), `iss` (видавець), `aud` (аудиторія) та кастомний
+  клейм `type` (тип токена: "access" або "refresh").
+- Обробку помилок, пов'язаних з JWT (наприклад, прострочений токен, недійсна
+  аудиторія/видавець, помилка підпису), та їх логування.
 
-Налаштування, такі як секретний ключ JWT, алгоритм, час життя токенів, видавець та аудиторія,
-беруться з `settings.py`. Утиліти для хешування паролів знаходяться в `backend.app.src.utils.hash`.
+Налаштування, такі як секретний ключ JWT, алгоритм шифрування, час життя токенів,
+ідентифікатори видавця та аудиторії, беруться з об'єкта `settings`
+(з `backend.app.src.config.settings`).
+
+Утиліти для хешування паролів винесені до окремого модуля `backend.app.src.utils.hash`.
 """
+import logging # Для локального використання в __main__
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Any
-# `jose.exceptions` імпортується для типізації конкретних помилок JWT
-from jose import jwt, JWTError, exceptions as jose_exceptions
-# from passlib.context import CryptContext # Видалено, оскільки хешування паролів перенесено
+from typing import Any, Dict, Optional
 
-# Абсолютний імпорт налаштувань та логера
-from backend.app.src.config.settings import settings
-from backend.app.src.config.logging import get_logger
+# `jose.exceptions` імпортується для типізації та обробки конкретних помилок JWT
+from jose import JWTError, jwt
+from jose import exceptions as jose_exceptions
 
-# Отримання логера для цього модуля
-logger = get_logger(__name__)
+# Абсолютний імпорт налаштувань та централізованого логера
+from backend.app.src.config import logger, settings
 
-# --- Налаштування хешування паролів перенесено до backend.app.src.utils.hash ---
 
 # --- Утиліти для роботи з JWT (JSON Web Token) ---
 
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """
-    Створює новий JWT токен доступу.
-
-    Токен містить надані дані, час закінчення терміну дії, тип токена ("access"),
-    видавця (`iss`) та аудиторію (`aud`), взяті з налаштувань.
+def create_jwt_token(
+    data: Dict[str, Any],
+    token_type: str,
+    expires_delta: timedelta,
+    secret_key: str,
+    algorithm: str,
+    issuer: Optional[str] = None,
+    audience: Optional[str] = None,
+) -> str:
+    """Створює JWT токен (загальна функція).
 
     Args:
-        data (dict): Дані для кодування в токен (наприклад, ідентифікатор користувача `sub`).
-        expires_delta (Optional[timedelta]): Тривалість життя токена.
-                                             Якщо не надано, використовується значення
-                                             `ACCESS_TOKEN_EXPIRE_MINUTES` з налаштувань.
+        data: Дані для кодування в токен (наприклад, ідентифікатор користувача `sub`).
+        token_type: Тип токена (наприклад, "access", "refresh", "email_verification").
+        expires_delta: Тривалість життя токена.
+        secret_key: Секретний ключ для підпису токена.
+        algorithm: Алгоритм підпису токена.
+        issuer: Опціональний видавець токена (claim "iss").
+        audience: Опціональна аудиторія токена (claim "aud").
 
     Returns:
-        str: Закодований JWT токен доступу у вигляді рядка.
+        Закодований JWT токен у вигляді рядка.
     """
     to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    issued_at = datetime.now(timezone.utc)
+    expire = issued_at + expires_delta
 
     to_encode.update({
+        "iat": issued_at,
         "exp": expire,
-        "type": "access", # Тип токена
-        "iss": settings.JWT_ISSUER, # Видавець токена
-        "aud": settings.JWT_AUDIENCE, # Аудиторія токена
+        "type": token_type,
     })
-    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
+    if issuer:
+        to_encode["iss"] = issuer
+    if audience:
+        to_encode["aud"] = audience
+
+    encoded_jwt = jwt.encode(claims=to_encode, key=secret_key, algorithm=algorithm)
+    logger.debug("Створено JWT токен типу '%s', термін дії до: %s", token_type, expire.isoformat())
     return encoded_jwt
 
-def create_refresh_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
-    """
-    Створює новий JWT токен оновлення.
 
-    Токен містить надані дані, час закінчення терміну дії, тип токена ("refresh"),
-    видавця (`iss`) та аудиторію (`aud`), взяті з налаштувань.
+def create_access_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+    """Створює новий JWT токен доступу.
 
-    Args:
-        data (dict): Дані для кодування в токен (наприклад, ідентифікатор користувача `sub`).
-        expires_delta (Optional[timedelta]): Тривалість життя токена.
-                                             Якщо не надано, використовується значення
-                                             `REFRESH_TOKEN_EXPIRE_DAYS` з налаштувань.
-
-    Returns:
-        str: Закодований JWT токен оновлення у вигляді рядка.
-    """
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.now(timezone.utc) + expires_delta
-    else:
-        expire = datetime.now(timezone.utc) + timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
-
-    to_encode.update({
-        "exp": expire,
-        "type": "refresh", # Тип токена
-        "iss": settings.JWT_ISSUER, # Видавець токена
-        "aud": settings.JWT_AUDIENCE, # Аудиторія токена
-    })
-    encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.JWT_ALGORITHM)
-    return encoded_jwt
-
-def decode_token(token: str) -> Optional[dict[str, Any]]:
-    """
-    Декодує JWT токен, перевіряє його валідність (включаючи термін дії, видавця та аудиторію)
-    та повертає його корисне навантаження (payload).
+    Токен містить надані дані, стандартні клейми (iat, exp, type, iss, aud)
+    та використовує налаштування з `settings` для секретного ключа, алгоритму,
+    часу життя, видавця та аудиторії.
 
     Args:
-        token (str): JWT токен для декодування.
+        data: Дані для кодування в токен (наприклад, `{"sub": "user_id"}`).
+        expires_delta: Опціональна тривалість життя токена. Якщо не надано,
+                       використовується `settings.ACCESS_TOKEN_EXPIRE_MINUTES`.
 
     Returns:
-        Optional[dict[str, Any]]: Словник з корисним навантаженням токена, якщо він дійсний
-                                  та відповідає всім критеріям перевірки.
-                                  Повертає `None` у разі будь-якої помилки декодування або валідації.
+        Закодований JWT токен доступу у вигляді рядка.
     """
+    if expires_delta is None:
+        expires_delta = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+
+    return create_jwt_token(
+        data=data,
+        token_type="access",
+        expires_delta=expires_delta,
+        secret_key=settings.JWT_SECRET_KEY,
+        algorithm=settings.JWT_ALGORITHM,
+        issuer=settings.JWT_ISSUER,
+        audience=settings.JWT_AUDIENCE,
+    )
+
+
+def create_refresh_token(data: Dict[str, Any], expires_delta: Optional[timedelta] = None) -> str:
+    """Створює новий JWT токен оновлення.
+
+    Токен містить надані дані, стандартні клейми (iat, exp, type, iss, aud)
+    та використовує налаштування з `settings` для секретного ключа, алгоритму,
+    часу життя, видавця та аудиторії.
+
+    Args:
+        data: Дані для кодування в токен (наприклад, `{"sub": "user_id"}`).
+        expires_delta: Опціональна тривалість життя токена. Якщо не надано,
+                       використовується `settings.REFRESH_TOKEN_EXPIRE_DAYS`.
+
+    Returns:
+        Закодований JWT токен оновлення у вигляді рядка.
+    """
+    if expires_delta is None:
+        expires_delta = timedelta(days=settings.REFRESH_TOKEN_EXPIRE_DAYS)
+
+    return create_jwt_token(
+        data=data,
+        token_type="refresh",
+        expires_delta=expires_delta,
+        secret_key=settings.JWT_SECRET_KEY, # Можна використовувати інший ключ для refresh токенів
+        algorithm=settings.JWT_ALGORITHM,
+        issuer=settings.JWT_ISSUER,
+        audience=settings.JWT_AUDIENCE, # Можна використовувати іншу аудиторію
+    )
+
+
+def decode_token(token: str) -> Optional[Dict[str, Any]]:
+    """Декодує JWT токен та перевіряє його валідність.
+
+    Перевіряється підпис, термін дії, видавець (`issuer`) та аудиторія (`audience`)
+    на основі значень, вказаних у `settings`.
+
+    Args:
+        token: JWT токен для декодування у вигляді рядка.
+
+    Returns:
+        Словник з корисним навантаженням (payload) токена, якщо він дійсний
+        та відповідає всім критеріям перевірки.
+        Повертає `None` у разі будь-якої помилки декодування або валідації
+        (наприклад, прострочений токен, невірний підпис, невідповідність видавця/аудиторії).
+    """
+    if not token:
+        logger.warning("Спроба декодувати порожній токен.")
+        return None
     try:
         payload = jwt.decode(
-            token,
-            settings.JWT_SECRET_KEY,
+            token=token,
+            key=settings.JWT_SECRET_KEY,
             algorithms=[settings.JWT_ALGORITHM],
-            audience=settings.JWT_AUDIENCE, # Перевірка аудиторії
-            issuer=settings.JWT_ISSUER      # Перевірка видавця
+            audience=settings.JWT_AUDIENCE, # Перевірка очікуваної аудиторії
+            issuer=settings.JWT_ISSUER      # Перевірка очікуваного видавця
         )
+        # Додаткова перевірка типу токена, якщо потрібно розрізняти їх після декодування
+        # token_type = payload.get("type")
+        # if token_type not in ["access", "refresh", ...]: # Додайте очікувані типи
+        #     logger.warning("Невідомий або непідтримуваний тип токена: '%s'", token_type)
+        #     return None
+        logger.debug("JWT токен успішно декодовано та валідовано.")
         return payload
     except jose_exceptions.ExpiredSignatureError:
         logger.warning("Помилка декодування JWT: термін дії токена закінчився.")
         return None
     except jose_exceptions.InvalidAudienceError:
-        logger.warning("Помилка декодування JWT: недійсна аудиторія (aud).")
+        logger.warning("Помилка декодування JWT: недійсна аудиторія (aud) токена.")
         return None
     except jose_exceptions.InvalidIssuerError:
-        logger.warning("Помилка декодування JWT: недійсний видавець (iss).")
+        logger.warning("Помилка декодування JWT: недійсний видавець (iss) токена.")
         return None
     except jose_exceptions.InvalidAlgorithmError as e:
-        logger.error(f"Помилка декодування JWT: недійсний алгоритм. Очікувався {settings.JWT_ALGORITHM}, отримано інший. Деталі: {e}", exc_info=True)
+        logger.error(
+            "Помилка декодування JWT: недійсний алгоритм. Очікувався '%s', але токен використовує інший. Деталі: %s",
+            settings.JWT_ALGORITHM, e, exc_info=True
+        )
         return None
-    except JWTError as e: # Загальна помилка JWT (недійсний підпис, неправильний формат тощо)
-        logger.warning(f"Загальна помилка декодування JWT: {e}", exc_info=True)
+    except JWTError as e:  # Загальна помилка JWT (наприклад, недійсний підпис, неправильний формат)
+        logger.warning("Загальна помилка декодування JWT: %s", e, exc_info=True)
         return None
-    except Exception as e: # Інші непередбачені помилки
-        logger.error(f"Неочікувана помилка при декодуванні JWT: {e}", exc_info=True)
+    except Exception as e: # pylint: disable=broad-except # Інші непередбачені помилки
+        logger.error("Неочікувана помилка (%s) при декодуванні JWT: %s", type(e).__name__, e, exc_info=True)
         return None
 
 
-# Приклад можливих додаткових функцій безпеки (не частина поточного завдання):
-# def check_permissions(user_role: str, required_role: str) -> bool:
-# """Перевіряє, чи має користувач необхідну роль."""
-#     # Логіка перевірки ролей...
-# return user_role == required_role
-
-
-# Блок для демонстрації або тестування функціональності цього модуля
 if __name__ == "__main__":
-    # Для перегляду логів помилок з verify_password та decode_token,
-    # потрібно налаштувати логування, якщо воно ще не налаштоване.
-    # Зазвичай це робиться в main.py або при старті програми.
-    # Тут ми можемо спробувати налаштувати його для тестування:
-    try:
-        from backend.app.src.config.logging import setup_logging
-        setup_logging() # Застосувати конфігурацію логування
-        logger.info("Логування налаштовано для тестування security.py.")
-    except ImportError:
-        # Якщо setup_logging не доступний, використовуємо базове налаштування
-        import logging as base_logging
-        base_logging.basicConfig(level=base_logging.INFO)
-        logger.warning("Не вдалося імпортувати setup_logging. Використовується базова конфігурація логування для тестів security.py.")
+    # Логер вже налаштований через імпорт `from backend.app.src.config import logger`
+    # та виклик setup_logging() в __init__.py пакета config.
+    main_logger = logging.getLogger(__name__) # Використовуємо окремий логер для __main__
 
-    # --- Тестування хешування паролів (перенесено до utils/hash.py) ---
-    # logger.info("--- Тестування хешування паролів ---")
-    # raw_password = "s3cureP@sswOrd!"
-    # hashed = get_password_hash(raw_password) # Ця функція видалена звідси
-    # logger.info(f"Сирий пароль: {raw_password}")
-    # logger.info(f"Хешований пароль: {hashed}")
-    # logger.info(f"Перевірка (правильно): {verify_password(raw_password, hashed)}") # Ця функція видалена звідси
-    # logger.info(f"Перевірка (неправильно): {verify_password('wrongpassword', hashed)}") # Ця функція видалена звідси
-
-    # --- Тестування створення та декодування JWT ---
-    logger.info("--- Тестування створення та декодування JWT ---")
-    user_data_payload = {"sub": "testuser@example.com", "user_id": 123, "role": "user"}
+    main_logger.info("--- Тестування створення та декодування JWT ---")
+    user_data_payload: Dict[str, Any] = {"sub": "testuser@example.com", "user_id": 123, "role": "user"}
 
     # Токен доступу
     access_token = create_access_token(user_data_payload)
-    logger.info(f"Згенерований токен доступу: {access_token}")
+    main_logger.info("Згенерований токен доступу: %s", access_token)
     decoded_access_payload = decode_token(access_token)
     if decoded_access_payload:
-        logger.info(f"Декодоване корисне навантаження токена доступу: {decoded_access_payload}")
+        main_logger.info("Декодоване корисне навантаження токена доступу: %s", decoded_access_payload)
         exp_timestamp = decoded_access_payload.get('exp')
         if exp_timestamp:
-            logger.info(f"Токен доступу закінчується (UTC): {datetime.fromtimestamp(exp_timestamp, timezone.utc)}")
+            main_logger.info("Токен доступу закінчується (UTC): %s", datetime.fromtimestamp(exp_timestamp, timezone.utc))
+        assert decoded_access_payload.get("sub") == user_data_payload["sub"]
+        assert decoded_access_payload.get("type") == "access"
+        assert decoded_access_payload.get("iss") == settings.JWT_ISSUER
+        assert decoded_access_payload.get("aud") == settings.JWT_AUDIENCE
     else:
-        logger.warning("Не вдалося декодувати токен доступу (або він недійсний/прострочений).")
+        main_logger.warning("Не вдалося декодувати токен доступу (або він недійсний/прострочений).")
 
     # Токен оновлення
     refresh_token = create_refresh_token(user_data_payload)
-    logger.info(f"\nЗгенерований токен оновлення: {refresh_token}")
+    main_logger.info("\nЗгенерований токен оновлення: %s", refresh_token)
     decoded_refresh_payload = decode_token(refresh_token)
     if decoded_refresh_payload:
-        logger.info(f"Декодоване корисне навантаження токена оновлення: {decoded_refresh_payload}")
+        main_logger.info("Декодоване корисне навантаження токена оновлення: %s", decoded_refresh_payload)
         exp_timestamp = decoded_refresh_payload.get('exp')
         if exp_timestamp:
-            logger.info(f"Токен оновлення закінчується (UTC): {datetime.fromtimestamp(exp_timestamp, timezone.utc)}")
+            main_logger.info("Токен оновлення закінчується (UTC): %s", datetime.fromtimestamp(exp_timestamp, timezone.utc))
+        assert decoded_refresh_payload.get("type") == "refresh"
     else:
-        logger.warning("Не вдалося декодувати токен оновлення (або він недійсний/прострочений).")
+        main_logger.warning("Не вдалося декодувати токен оновлення (або він недійсний/прострочений).")
 
     # Тестування простроченого токена
-    logger.info("\n--- Тестування простроченого токена ---")
-    expired_access_token = create_access_token(user_data_payload, expires_delta=timedelta(seconds=-3600)) # Прострочений на 1 годину
-    logger.info(f"Згенерований прострочений токен доступу: {expired_access_token}")
+    main_logger.info("\n--- Тестування простроченого токена ---")
+    expired_access_token = create_access_token(user_data_payload, expires_delta=timedelta(seconds=-3600))
+    main_logger.info("Згенерований прострочений токен доступу: %s", expired_access_token)
     decoded_expired_payload = decode_token(expired_access_token)
     if decoded_expired_payload:
-        logger.error(f"ПОМИЛКА ТЕСТУ: Декодовано прострочений токен: {decoded_expired_payload}")
+        main_logger.error("ПОМИЛКА ТЕСТУ: Декодовано прострочений токен: %s", decoded_expired_payload)
+        assert False, "Прострочений токен не повинен декодуватися."
     else:
-        logger.info("КОРЕКТНО: Не вдалося декодувати прострочений токен доступу.")
+        main_logger.info("КОРЕКТНО: Не вдалося декодувати прострочений токен доступу.")
 
     # Тестування недійсного токена (неправильний підпис)
-    logger.info("\n--- Тестування недійсного токена (неправильний підпис) ---")
-    invalid_signature_token = access_token[:-5] + "XXXXX" # Змінити частину підпису
-    logger.info(f"Недійсний токен (змінений підпис): {invalid_signature_token}")
+    main_logger.info("\n--- Тестування недійсного токена (неправильний підпис) ---")
+    invalid_signature_token = access_token[:-5] + "XXXXX" # Змінюємо частину підпису
+    main_logger.info("Недійсний токен (змінений підпис): %s", invalid_signature_token)
     decoded_invalid_payload = decode_token(invalid_signature_token)
     if decoded_invalid_payload:
-        logger.error(f"ПОМИЛКА ТЕСТУ: Декодовано токен з недійсним підписом: {decoded_invalid_payload}")
+        main_logger.error("ПОМИЛКА ТЕСТУ: Декодовано токен з недійсним підписом: %s", decoded_invalid_payload)
+        assert False, "Токен з недійсним підписом не повинен декодуватися."
     else:
-        logger.info("КОРЕКТНО: Не вдалося декодувати токен з недійсним підписом.")
+        main_logger.info("КОРЕКТНО: Не вдалося декодувати токен з недійсним підписом.")
 
     # Тестування токена з неправильним видавцем (issuer)
-    logger.info("\n--- Тестування токена з неправильним видавцем ---")
+    main_logger.info("\n--- Тестування токена з неправильним видавцем ---")
     original_issuer = settings.JWT_ISSUER
-    settings.JWT_ISSUER = "some.other.issuer.com" # Тимчасово змінюємо для тесту
-    token_with_wrong_issuer_payload = user_data_payload.copy()
-    token_with_wrong_issuer_payload["iss"] = original_issuer # Створюємо токен зі старим (правильним) видавцем
-    token_with_wrong_issuer = jwt.encode(
-        token_with_wrong_issuer_payload,
-        settings.JWT_SECRET_KEY,
-        algorithm=settings.JWT_ALGORITHM
-    )
-    # А тепер намагаємось декодувати, очікуючи settings.JWT_ISSUER = "some.other.issuer.com"
-    decoded_wrong_issuer = decode_token(token_with_wrong_issuer)
+    # Створюємо токен з правильним видавцем
+    temp_payload_issuer = {"sub": "test_user_issuer", "type": "access", "iss": original_issuer, "aud": settings.JWT_AUDIENCE}
+    token_correct_issuer = jwt.encode(temp_payload_issuer, settings.JWT_SECRET_KEY, settings.JWT_ALGORITHM)
+    # Тепер намагаємося декодувати його, очікуючи іншого видавця
+    settings.JWT_ISSUER = "some.other.issuer.com" # Тимчасово змінюємо очікуваного видавця
+    decoded_wrong_issuer = decode_token(token_correct_issuer)
     if decoded_wrong_issuer:
-        logger.error(f"ПОМИЛКА ТЕСТУ: Декодовано токен з неправильним видавцем: {decoded_wrong_issuer}")
+        main_logger.error("ПОМИЛКА ТЕСТУ: Декодовано токен, хоча видавець мав бути неправильним: %s", decoded_wrong_issuer)
+        assert False, "Токен з неправильним видавцем не повинен декодуватися."
     else:
-        logger.info("КОРЕКТНО: Не вдалося декодувати токен з неправильним видавцем.")
+        main_logger.info("КОРЕКТНО: Не вдалося декодувати токен через невідповідність видавця.")
     settings.JWT_ISSUER = original_issuer # Повертаємо оригінальне значення
 
     # Тестування токена з неправильною аудиторією (audience)
-    logger.info("\n--- Тестування токена з неправильною аудиторією ---")
+    main_logger.info("\n--- Тестування токена з неправильною аудиторією ---")
     original_audience = settings.JWT_AUDIENCE
-    settings.JWT_AUDIENCE = "some.other.audience.com" # Тимчасово змінюємо для тесту
-    token_with_wrong_audience_payload = user_data_payload.copy()
-    token_with_wrong_audience_payload["aud"] = original_audience # Створюємо токен зі старою (правильною) аудиторією
-    # Додамо також правильного видавця, щоб ізолювати тест аудиторії
-    token_with_wrong_audience_payload["iss"] = settings.JWT_ISSUER
-    token_with_wrong_audience = jwt.encode(
-        token_with_wrong_audience_payload,
-        settings.JWT_SECRET_KEY,
-        algorithm=settings.JWT_ALGORITHM
-    )
-    # А тепер намагаємось декодувати, очікуючи settings.JWT_AUDIENCE = "some.other.audience.com"
-    decoded_wrong_audience = decode_token(token_with_wrong_audience)
+    # Створюємо токен з правильною аудиторією
+    temp_payload_audience = {"sub": "test_user_audience", "type": "access", "iss": settings.JWT_ISSUER, "aud": original_audience}
+    token_correct_audience = jwt.encode(temp_payload_audience, settings.JWT_SECRET_KEY, settings.JWT_ALGORITHM)
+    # Тепер намагаємося декодувати його, очікуючи іншу аудиторію
+    settings.JWT_AUDIENCE = "some.other.audience.com" # Тимчасово змінюємо очікувану аудиторію
+    decoded_wrong_audience = decode_token(token_correct_audience)
     if decoded_wrong_audience:
-        logger.error(f"ПОМИЛКА ТЕСТУ: Декодовано токен з неправильною аудиторією: {decoded_wrong_audience}")
+        main_logger.error("ПОМИЛКА ТЕСТУ: Декодовано токен, хоча аудиторія мала бути неправильною: %s", decoded_wrong_audience)
+        assert False, "Токен з неправильною аудиторією не повинен декодуватися."
     else:
-        logger.info("КОРЕКТНО: Не вдалося декодувати токен з неправильною аудиторією.")
+        main_logger.info("КОРЕКТНО: Не вдалося декодувати токен через невідповідність аудиторії.")
     settings.JWT_AUDIENCE = original_audience # Повертаємо оригінальне значення
 
-    logger.info("\nТестування функцій безпеки завершено.")
+    main_logger.info("\nТестування функцій безпеки завершено.")

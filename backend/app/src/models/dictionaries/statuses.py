@@ -1,4 +1,5 @@
 # backend/app/src/models/dictionaries/statuses.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для довідника "Статуси".
 

@@ -1,4 +1,5 @@
 # backend/app/src/models/gamification/level.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для сутності "Рівень" (Level) в системі гейміфікації.
 

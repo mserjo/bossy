@@ -1,4 +1,5 @@
-# /backend/app/src/config/database.py
+# backend/app/src/config/database.py
+# -*- coding: utf-8 -*-
 """
 Налаштування підключення до бази даних для FastAPI програми Kudos.
 

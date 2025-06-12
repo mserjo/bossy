@@ -1,4 +1,5 @@
 # backend/app/src/models/auth/__init__.py
+# -*- coding: utf-8 -*-
 """
 Пакет моделей SQLAlchemy для автентифікації та авторизації.
 
@@ -9,11 +10,11 @@
 наприклад, при визначенні залежностей FastAPI, у сервісах або репозиторіях.
 """
 
-from .user import User
-from .token import RefreshToken
-from .session import Session
+from backend.app.src.models.auth.user import User
+from backend.app.src.models.auth.token import RefreshToken
+from backend.app.src.models.auth.session import Session
 # UserAvatar буде імпортовано, коли файл files/avatar.py буде створено/рефакторено.
-# from ..files.avatar import UserAvatar # Розкоментувати після створення UserAvatar
+# from backend.app.src.models.files.avatar import UserAvatar # Розкоментувати після створення UserAvatar
 
 __all__ = [
     "User",

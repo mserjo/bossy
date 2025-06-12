@@ -1,4 +1,5 @@
 # backend/app/src/models/base.py
+# -*- coding: utf-8 -*-
 """
 Базові класи для моделей SQLAlchemy програми Kudos.
 

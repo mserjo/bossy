@@ -1,4 +1,5 @@
 # backend/app/src/models/bonuses/account.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для сутності "Рахунок Користувача" (UserAccount).
 

@@ -1,4 +1,5 @@
 # backend/app/src/models/gamification/user_achievement.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для сутності "Досягнення Користувача" (UserAchievement).
 

@@ -1,4 +1,5 @@
 # backend/app/src/models/dictionaries/user_roles.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для довідника "Ролі користувачів".
 

@@ -1,4 +1,5 @@
-# /backend/app/src/core/__init__.py
+# backend/app/src/core/__init__.py
+# -*- coding: utf-8 -*-
 """
 Пакет ядра (core) програми Kudos.
 
@@ -13,3 +14,13 @@
 - Допоміжні утиліти (`utils.py`)
 - Функції-валідатори (`validators.py`)
 """
+
+# Приклад ре-експорту для зручності (розкоментуйте та адаптуйте за потреби):
+# from .exceptions import ItemNotFoundError, PermissionDeniedError
+# from .constants import MAX_ITEMS_PER_PAGE
+
+# __all__ = [
+# "ItemNotFoundError",
+# "PermissionDeniedError",
+# "MAX_ITEMS_PER_PAGE",
+# ]

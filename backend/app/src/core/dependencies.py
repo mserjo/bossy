@@ -1,4 +1,5 @@
 # backend/app/src/core/dependencies.py
+# -*- coding: utf-8 -*-
 """
 Загальні залежності для FastAPI програми Kudos.
 

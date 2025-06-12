@@ -1,4 +1,5 @@
 # backend/app/src/models/groups/membership.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для сутності "Членство в Групі" (GroupMembership).
 
@@ -57,6 +58,7 @@ class GroupMembership(Base, TimestampedMixin):
     )
 
     # Роль користувача в групі
+    # TODO: Розглянути використання SQLEnum(GroupRole) для поля 'role' для кращої цілісності на рівні БД.
     role: Mapped[str] = mapped_column(
         String(50),  # Довжина відповідає можливим значенням з GroupRole
         nullable=False,

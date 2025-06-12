@@ -1,4 +1,5 @@
 # backend/app/src/core/constants.py
+# -*- coding: utf-8 -*-
 """
 Глобальні константи для програми Kudos.
 

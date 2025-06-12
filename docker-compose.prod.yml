@@ -1,0 +1,51 @@
+# docker-compose.prod.yml
+# # Файл Docker Compose для продуктивного середовища.
+# # Розширює базовий docker-compose.yml та додає/перевизначає налаштування для продуктиву.
+
+version: '3.8'
+
+services:
+  backend:
+    # Розширює сервіс backend з docker-compose.yml
+    # Для продуктиву код має бути вбудований в образ, тому volumes для коду не використовуються.
+    # build: # Можна перевизначити, якщо для продуктиву використовується інша стадія Dockerfile
+    #   context: ./backend
+    #   dockerfile: Dockerfile
+    #   target: production # Якщо є така стадія в Dockerfile
+    env_file:
+      - ./backend/.env.prod # Використання окремого файлу .env.prod для продуктивних налаштувань
+                           # АБО змінні середовища надаються інфраструктурою розгортання.
+                           # Якщо .env.prod не використовується, закоментуйте або видаліть цю строку.
+    restart: always # Політика перезапуску для продуктивного середовища
+    # ports: # Порти можуть бути перевизначені або оброблені через reverse proxy (наприклад, Nginx)
+    #   - "80:8000" # Приклад: мапінг на стандартний HTTP порт
+    # command: gunicorn -k uvicorn.workers.UvicornWorker app.main:app --bind 0.0.0.0:8000 -w 4 # Приклад команди для запуску з Gunicorn
+
+  db:
+    # Сервіс db зазвичай успадковується з основного docker-compose.yml.
+    # Переконайтеся, що змінні POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB
+    # встановлені надійно для продуктивного середовища (через .env.prod або змінні середовища).
+    env_file:
+      - ./backend/.env.prod # Переконайтеся, що цей файл містить продуктивні дані для БД
+    restart: always
+    # У продуктивному середовищі порт бази даних зазвичай не прокидається назовні,
+    # доступ до неї відбувається через внутрішню мережу Docker.
+    # ports:
+    #  - "5432:5432" # Видаліть або закоментуйте, якщо не потрібен зовнішній доступ
+
+# Томи та мережі успадковуються з docker-compose.yml.
+# Для продуктиву можуть бути додані сервіси для моніторингу, логування тощо.
+
+# Приклад додавання Nginx reverse proxy (опціонально)
+# nginx:
+#   image: nginx:stable-alpine
+#   container_name: project_nginx
+#   ports:
+#     - "80:80"    # HTTP
+#     - "443:443"  # HTTPS (якщо налаштовано SSL)
+#   volumes:
+#     - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro # Конфігурація Nginx
+#     # - ./nginx/certs:/etc/nginx/certs:ro        # SSL сертифікати (якщо є)
+#   depends_on:
+#     - backend
+#   restart: always

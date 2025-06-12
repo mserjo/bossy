@@ -13,8 +13,8 @@
 import re
 from typing import Any, Optional, List
 # TODO: Додати 'phonenumbers' до файлу requirements.txt або pyproject.toml
-# import phonenumbers # Розкоментуйте, коли бібліотека буде додана до залежностей
-# from phonenumbers import phonenumberutil # Розкоментуйте для використання винятків phonenumbers
+import phonenumbers # Розкоментуйте, коли бібліотека буде додана до залежностей
+from phonenumbers import phonenumberutil # Розкоментуйте для використання винятків phonenumbers
 
 # Абсолютні імпорти з проекту
 from backend.app.src.core.exceptions import ValidationException
@@ -230,10 +230,10 @@ def validate_phone_number(phone_number: str, default_region: Optional[str] = "UA
             )
 
         formatted_number = phonenumbers.format_number(parsed_number, phonenumbers.PhoneNumberFormat.E164)
-        # logger.info(f"Номер телефону '{phone_number}' (регіон: {default_region}) успішно валідовано та відформатовано як {formatted_number}.")
+        logger.info(f"Номер телефону '{phone_number}' (регіон: {default_region}) успішно валідовано та відформатовано як {formatted_number}.")
         return formatted_number
     except ImportError:
-        # logger.error("Бібліотека 'phonenumbers' не встановлена. Валідація номера телефону неможлива.")
+        logger.error("Бібліотека 'phonenumbers' не встановлена. Валідація номера телефону неможлива.")
         # У продакшені це має бути критичною помилкою конфігурації.
         # Для розробки можна повернути оригінальне значення або викликати помилку.
         # Наразі, щоб не блокувати розробку без залежності, повернемо помилку валідації
@@ -245,7 +245,7 @@ def validate_phone_number(phone_number: str, default_region: Optional[str] = "UA
                      "type": "value_error.phone_number.config_error"}]  # TODO i18n: Translatable msg
         )
     except phonenumberutil.NumberParseException as e:
-        # logger.warning(f"Помилка парсингу номера телефону '{phone_number}': {e}")
+        logger.warning(f"Помилка парсингу номера телефону '{phone_number}': {e}")
         # TODO i18n: Translatable messages in error_type_map
         error_type_map = {
             phonenumberutil.NumberParseException.INVALID_COUNTRY_CODE: "Недійсний код країни.",

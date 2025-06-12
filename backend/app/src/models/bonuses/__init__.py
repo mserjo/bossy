@@ -1,4 +1,5 @@
 # backend/app/src/models/bonuses/__init__.py
+# -*- coding: utf-8 -*-
 """
 Пакет моделей SQLAlchemy для сутностей, пов'язаних з "Бонусами".
 
@@ -9,10 +10,10 @@
 Моделі експортуються для зручного доступу з інших частин програми.
 """
 
-from .bonus_rule import BonusRule
-from .account import UserAccount
-from .transaction import AccountTransaction
-from .reward import Reward
+from backend.app.src.models.bonuses.bonus_rule import BonusRule
+from backend.app.src.models.bonuses.account import UserAccount
+from backend.app.src.models.bonuses.transaction import AccountTransaction
+from backend.app.src.models.bonuses.reward import Reward
 
 __all__ = [
     "BonusRule",

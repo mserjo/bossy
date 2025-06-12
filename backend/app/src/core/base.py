@@ -1,4 +1,5 @@
 # backend/app/src/core/base.py
+# -*- coding: utf-8 -*-
 """
 Базові елементи ядра програми Kudos.
 

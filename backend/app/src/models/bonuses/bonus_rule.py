@@ -1,4 +1,5 @@
 # backend/app/src/models/bonuses/bonus_rule.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для сутності "Правило Нарахування Бонусів" (BonusRule).
 

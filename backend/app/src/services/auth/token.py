@@ -6,7 +6,7 @@
 записами refresh-токенів у базі даних, включаючи їх відкликання.
 """
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any, List, Type # Type не використовується явно, але може бути корисним
+from typing import Optional, Dict, Any, List # Type видалено
 from uuid import UUID, uuid4
 
 from jose import JWTError, jwt  # python-jose для обробки JWT
@@ -78,7 +78,7 @@ class TokenService(BaseService):
 
     async def create_refresh_token(
             self,
-            user_id: UUID,
+            user_id: int, # Змінено UUID на int
             expires_delta: Optional[timedelta] = None,
             device_info: Optional[str] = None,
             ip_address: Optional[str] = None  # Додано згідно technical_task.txt
@@ -86,7 +86,7 @@ class TokenService(BaseService):
         """
         Генерує новий refresh-токен та зберігає його запис у базі даних.
 
-        :param user_id: ID користувача.
+        :param user_id: ID користувача (int).
         :param expires_delta: Час життя refresh-токена.
         :param device_info: Інформація про пристрій.
         :param ip_address: IP-адреса, з якої видано токен.
@@ -199,10 +199,10 @@ class TokenService(BaseService):
             f"Refresh-токен JTI '{refresh_token_jti_str}' успішно оброблено для користувача ID '{token_db.user_id}'. Токен було відкликано.")
         return token_db.user
 
-    async def revoke_refresh_token(self, refresh_token_jti_str: str, user_id: Optional[UUID] = None) -> bool:
+    async def revoke_refresh_token(self, refresh_token_jti_str: str, user_id: Optional[int] = None) -> bool: # user_id змінено на Optional[int]
         """Відкликає конкретний refresh-токен."""
         logger.debug(
-            f"Спроба відкликання refresh-токена JTI: {refresh_token_jti_str} для користувача: {user_id if user_id else 'будь-який'}")
+            f"Спроба відкликання refresh-токена JTI: {refresh_token_jti_str} для користувача ID: {user_id if user_id else 'будь-який'}")
         try:
             jti_uuid = UUID(refresh_token_jti_str)
         except ValueError:
@@ -232,7 +232,7 @@ class TokenService(BaseService):
             f"Refresh-токен JTI '{refresh_token_jti_str}' успішно відкликано для користувача ID '{token_db.user_id}'.")
         return True
 
-    async def revoke_all_refresh_tokens_for_user(self, user_id: UUID, exclude_jti: Optional[UUID] = None) -> int:
+    async def revoke_all_refresh_tokens_for_user(self, user_id: int, exclude_jti: Optional[UUID] = None) -> int: # user_id змінено на int
         """Відкликає всі активні refresh-токени для даного користувача."""
         logger.info(
             f"Спроба відкликання всіх refresh-токенів для користувача ID: {user_id}, виключаючи JTI: {exclude_jti}")

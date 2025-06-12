@@ -5,7 +5,7 @@
 Надає функціонал для створення, отримання, валідації та інвалідації
 користувацьких сесій, а також для очищення прострочених сесій.
 """
-from typing import List, Optional, Type # Type не використовується безпосередньо, але може бути корисним
+from typing import List, Optional # Type видалено
 from uuid import UUID, uuid4
 from datetime import datetime, timedelta, timezone
 
@@ -42,7 +42,7 @@ class UserSessionService(BaseService):
 
     async def create_session(
             self,
-            user_id: UUID,
+            user_id: int, # Змінено UUID на int
             user_agent: Optional[str] = None,
             ip_address: Optional[str] = None,
             duration_days: Optional[int] = None
@@ -50,7 +50,7 @@ class UserSessionService(BaseService):
         """
         Створює нову сесію користувача та зберігає її в базі даних.
 
-        :param user_id: ID користувача, для якого створюється сесія.
+        :param user_id: ID користувача (int), для якого створюється сесія.
         :param user_agent: Рядок User-Agent клієнта.
         :param ip_address: IP-адреса клієнта.
         :param duration_days: Тривалість сесії в днях. Якщо None, використовується DEFAULT_SESSION_DURATION_DAYS.
@@ -122,16 +122,16 @@ class UserSessionService(BaseService):
             f"Токен сесії (UUID) '{session_token}' валідовано для користувача ID '{session_db.user_id}'. Поле 'last_active_at' оновлено.")
         return UserSessionResponse.model_validate(session_db)
 
-    async def invalidate_session(self, session_token: UUID, user_id: Optional[UUID] = None) -> bool:
+    async def invalidate_session(self, session_token: UUID, user_id: Optional[int] = None) -> bool: # user_id змінено на Optional[int]
         """
         Інвалідує/видаляє конкретну сесію користувача за її токеном.
         Якщо надано user_id, переконується, що сесія належить цьому користувачеві.
 
         :param session_token: Токен сесії (UUID) для інвалідації.
-        :param user_id: Якщо надано, перевірити, чи сесія належить цьому користувачеві.
+        :param user_id: ID користувача (int), якщо надано, перевірити, чи сесія належить цьому користувачеві.
         :return: True, якщо сесію знайдено та інвалідовано, інакше False.
         """
-        logger.debug(f"Спроба інвалідації токена сесії (UUID): {session_token} для користувача: {user_id or 'будь-який'}")
+        logger.debug(f"Спроба інвалідації токена сесії (UUID): {session_token} для користувача ID: {user_id or 'будь-який'}")
 
         stmt = select(UserSession).where(UserSession.session_token == str(session_token)) # Порівняння з рядком
         if user_id:
@@ -150,12 +150,12 @@ class UserSessionService(BaseService):
             f"Токен сесії (UUID) '{session_token}' для користувача ID '{session_db.user_id}' успішно інвалідовано (видалено).")
         return True
 
-    async def list_user_sessions(self, user_id: UUID, skip: int = 0, limit: int = 100) -> List[UserSessionResponse]:
+    async def list_user_sessions(self, user_id: int, skip: int = 0, limit: int = 100) -> List[UserSessionResponse]: # user_id змінено на int
         """
         Перелічує всі активні (не прострочені) сесії для даного користувача.
         Сортування за `last_active_at` у спадаючому порядку.
 
-        :param user_id: ID користувача.
+        :param user_id: ID користувача (int).
         :param skip: Кількість сесій для пропуску (пагінація).
         :param limit: Максимальна кількість сесій для повернення.
         :return: Список об'єктів UserSessionResponse (Pydantic схеми) активних сесій.
@@ -175,12 +175,12 @@ class UserSessionService(BaseService):
         logger.info(f"Отримано {len(response_list)} активних сесій (UserSessionResponse) для користувача ID '{user_id}'.")
         return response_list
 
-    async def invalidate_all_user_sessions(self, user_id: UUID, exclude_session_token: Optional[UUID] = None) -> int:
+    async def invalidate_all_user_sessions(self, user_id: int, exclude_session_token: Optional[UUID] = None) -> int: # user_id змінено на int
         """
         Інвалідує/видаляє всі сесії для даного користувача, опціонально виключаючи один токен сесії.
         Корисно для функції "вийти з усіх інших пристроїв".
 
-        :param user_id: ID користувача, чиї сесії потрібно інвалідувати.
+        :param user_id: ID користувача (int), чиї сесії потрібно інвалідувати.
         :param exclude_session_token: Токен сесії (UUID), який потрібно залишити активним.
         :return: Кількість інвалідованих сесій.
         """

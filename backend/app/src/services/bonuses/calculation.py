@@ -6,7 +6,7 @@
 та контексту подій, таких як виконання завдань.
 """
 from typing import List, Optional, Dict, Any, Tuple # Додано Tuple
-from uuid import UUID
+# UUID видалено, оскільки ID правила тепер int, і немає інших використань UUID
 from decimal import Decimal
 from datetime import timedelta, datetime, timezone
 
@@ -23,12 +23,13 @@ from backend.app.src.models.auth.user import User
 from backend.app.src.schemas.bonuses.bonus_rule import BonusRuleResponse
 from backend.app.src.services.bonuses.bonus_rule import BonusRuleService
 from backend.app.src.config import logger  # Використання спільного логера з конфігу
-from backend.app.src.config import settings
+# settings видалено, оскільки не використовується
+from backend.app.src.core.constants import TASK_COMPLETION_STATUS_APPROVED # Імпорт константи
 
-# TODO: [Constants/Enums] Винести COMPLETION_STATUS_APPROVED до спільного файлу констант або енумів,
+# TODO: [Constants/Enums] Константа COMPLETION_STATUS_APPROVED винесена до core.constants.
 #       ймовірно в `backend.app.src.core.enums` або `backend.app.src.core.constants`,
 #       згідно з `technical_task.txt` / `structure-claude-v2.md`.
-COMPLETION_STATUS_APPROVED = "APPROVED"  # Статус для перевірки успішного виконання завдання
+# COMPLETION_STATUS_APPROVED = "APPROVED"  # Видалено локальне визначення
 
 
 class BonusCalculationService(BaseService):
@@ -48,7 +49,7 @@ class BonusCalculationService(BaseService):
             task: Task,
             user: User,
             task_completion: TaskCompletion
-    ) -> Tuple[Optional[Decimal], Optional[UUID]]:  # Повертає суму бонусу та ID застосованого правила
+    ) -> Tuple[Optional[Decimal], Optional[int]]:  # ID правила тепер int
         """
         Розраховує бонус за виконання завдання.
 
@@ -67,9 +68,9 @@ class BonusCalculationService(BaseService):
         """
         logger.info(f"Розрахунок бонусу за виконання завдання ID '{task.id}' користувачем ID '{user.id}'.")
 
-        if task_completion.status != COMPLETION_STATUS_APPROVED:
+        if task_completion.status != TASK_COMPLETION_STATUS_APPROVED: # Використання імпортованої константи
             logger.info(
-                f"Завдання ID '{task.id}' не має статусу '{COMPLETION_STATUS_APPROVED}'. Бонус не нараховується.")
+                f"Завдання ID '{task.id}' не має статусу '{TASK_COMPLETION_STATUS_APPROVED}'. Бонус не нараховується.") # Використання імпортованої константи
             return None, None
 
         if not task.group_id:
@@ -93,10 +94,9 @@ class BonusCalculationService(BaseService):
         candidate_rules: List[BonusRuleResponse] = []
         for rule_schema in applicable_rules_schemas:
             logger.debug(
-                f"Оцінка правила ID '{rule_schema.id}' (Ім'я: '{rule_schema.name}', Бали: {rule_schema.points_amount})")
-            if rule_schema.points_amount is None or rule_schema.points_amount == Decimal(
-                    "0"):  # Правила без балів або з нульовими балами не розглядаються
-                logger.debug(f"Правило ID '{rule_schema.id}' пропущено: немає балів або бали нульові.")
+                f"Оцінка правила ID '{rule_schema.id}' (Ім'я: '{rule_schema.name}', Бали: {rule_schema.amount})") # points_amount -> amount
+            if rule_schema.amount == Decimal("0"):  # points_amount -> amount, is None видалено
+                logger.debug(f"Правило ID '{rule_schema.id}' пропущено: бали нульові.")
                 continue
 
             if await self._check_rule_conditions(rule_schema, task, user, task_completion):
@@ -108,13 +108,13 @@ class BonusCalculationService(BaseService):
             logger.info(f"Жодне правило не пройшло перевірку умов для завдання ID '{task.id}'.")
             return None, None
 
-        # Сортування кандидатів: 1. points_amount (desc), 2. created_at (desc)
+        # Сортування кандидатів: 1. amount (desc), 2. created_at (desc)
         # Специфічність вже врахована порядком з get_applicable_bonus_rules.
         # Якщо два правила з однаковою специфічністю і балами, беремо новіше.
-        candidate_rules.sort(key=lambda r: (r.points_amount, r.created_at), reverse=True)
+        candidate_rules.sort(key=lambda r: (r.amount, r.created_at), reverse=True) # points_amount -> amount
 
         best_rule = candidate_rules[0]
-        final_bonus_amount = Decimal(str(best_rule.points_amount))
+        final_bonus_amount = Decimal(str(best_rule.amount)) # points_amount -> amount
 
         logger.info(f"Застосовано правило '{best_rule.name}' (ID: {best_rule.id}): {final_bonus_amount} балів.")
         return final_bonus_amount, best_rule.id
@@ -138,7 +138,7 @@ class BonusCalculationService(BaseService):
         logger.debug(f"Перевірка умов для правила '{rule.name}' (ID: {rule.id}), тип умови: {rule.condition_type}")
 
         # Базова перевірка: завдання має бути ухвалене
-        if task_completion.status != COMPLETION_STATUS_APPROVED:
+        if task_completion.status != TASK_COMPLETION_STATUS_APPROVED: # Використання імпортованої константи
             return False  # Умова не виконана, якщо завдання не ухвалене
 
         condition_type = rule.condition_type
@@ -172,7 +172,7 @@ class BonusCalculationService(BaseService):
         elif condition_type == "USER_FIRST_TASK_COMPLETION":
             stmt = select(func.count(TaskCompletion.id)).where(
                 TaskCompletion.user_id == user.id,
-                TaskCompletion.status == COMPLETION_STATUS_APPROVED,
+                TaskCompletion.status == TASK_COMPLETION_STATUS_APPROVED, # Використання імпортованої константи
                 TaskCompletion.id != task_completion.id  # Не рахувати поточне виконання
             )
             prior_completions_count = (await self.db_session.execute(stmt)).scalar_one()
@@ -187,7 +187,7 @@ class BonusCalculationService(BaseService):
             stmt = select(func.count(TaskCompletion.id)).where(
                 TaskCompletion.user_id == user.id,
                 TaskCompletion.task_id == task.id,
-                TaskCompletion.status == COMPLETION_STATUS_APPROVED,
+                TaskCompletion.status == TASK_COMPLETION_STATUS_APPROVED, # Використання імпортованої константи
                 TaskCompletion.id != task_completion.id  # Не рахувати поточне виконання
             )
             prior_specific_completions_count = (await self.db_session.execute(stmt)).scalar_one()

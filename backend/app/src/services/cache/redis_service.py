@@ -7,7 +7,7 @@
 Включає логіку серіалізації/десеріалізації даних.
 """
 import json  # Для серіалізації/десеріалізації складних типів даних
-from typing import Optional, Any, Set, List
+from typing import Optional, Any, Set # List видалено
 from decimal import Decimal  # Для обробки типу Decimal
 
 import redis.asyncio as aioredis  # Використання асинхронних можливостей redis-py
@@ -17,11 +17,11 @@ from backend.app.src.config.redis import get_redis_pool  # Функція для
 from backend.app.src.config import logger  # Використання спільного логера з конфігу
 
 
-# from backend.app.src.config import settings # Якщо потрібні специфічні налаштування Redis напряму
-
-# TODO: [Serialization] Розглянути використання більш надійної бібліотеки для серіалізації/десеріалізації,
-#  особливо якщо кешуються складні вкладені об'єкти або моделі Pydantic.
-#  Наприклад, msgpack або pickle (з обережністю щодо безпеки pickle).
+# TODO: [Serialization] Розглянути використання більш надійної бібліотеки або підходів для серіалізації/десеріалізації.
+#  Поточна реалізація json.dumps/loads може не коректно обробляти всі типи (наприклад, datetime без кастомного енкодера).
+#  Для Pydantic моделей краще використовувати model_dump_json() / model_validate_json(), але це потребує інформації про тип при десеріалізації.
+#  Можливі альтернативи: msgpack. Уникати pickle через проблеми з безпекою, якщо дані кешу не є повністю довіреними.
+#  Також варто додати обробку datetime об'єктів у _serialize_value та _deserialize_value.
 
 # Допоміжні функції для серіалізації/десеріалізації значень
 def _serialize_value(value: Any) -> str:
@@ -291,14 +291,34 @@ class RedisCacheService(BaseCacheService):
             logger.error(f"Кеш DECREMENT (Redis) помилка для ключа '{key}': {e}", exc_info=True)
             return None
 
-    async def set_add(self, key: str, *values: Any) -> int:
-        """Додає елементи до множини в Redis."""
-        if not values: return 0
+    async def set_add(self, key: str, *values: Any, expire_seconds: Optional[int] = None) -> int:
+        """
+        Додає елементи до множини в Redis.
+        Опціонально встановлює або оновлює TTL для ключа.
+
+        :param key: Ключ множини.
+        :param values: Значення для додавання.
+        :param expire_seconds: Час життя в секундах. Якщо <= 0, ключ буде видалено.
+        :return: Кількість фактично доданих нових елементів.
+        """
+        if not values: return 0 # Нічого не додавати, якщо значення не надані
         try:
             client = await self._get_client()
+
+            if expire_seconds is not None and expire_seconds <= 0:
+                logger.debug(f"Кеш SADD (Redis): ключ='{key}' з непозитивним expire_seconds ({expire_seconds}). Видалення ключа.")
+                await client.delete(key)
+                return 0 # Елементи не були ефективно додані на тривалий термін
+
             serialized_values = [_serialize_value(v) for v in values]
             num_added = await client.sadd(key, *serialized_values)
-            logger.debug(f"Кеш SADD (Redis): ключ='{key}', додано {num_added} з {len(values)} наданих значень.")
+
+            if expire_seconds is not None: # Тут expire_seconds > 0
+                await client.expire(key, expire_seconds)
+                logger.debug(f"Кеш SADD (Redis): ключ='{key}', додано {num_added} з {len(values)} наданих значень. Встановлено TTL: {expire_seconds}s.")
+            else:
+                logger.debug(f"Кеш SADD (Redis): ключ='{key}', додано {num_added} з {len(values)} наданих значень. TTL не змінено/встановлено.")
+
             return num_added
         except ConnectionError:
             logger.error(f"Кеш SADD (Redis): помилка з'єднання для ключа '{key}'.")

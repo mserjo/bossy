@@ -10,15 +10,15 @@ from backend.app.src.config import logger
 
 # Явний імпорт сервісів для кращої читабельності та статичного аналізу
 from backend.app.src.services.bonuses.bonus_rule import BonusRuleService
-from backend.app.src.services.bonuses.account import UserAccountService # Або UserBonusAccountService, уточнити назву класу
-from backend.app.src.services.bonuses.transaction import AccountTransactionService # Або BonusTransactionService, уточнити
+from backend.app.src.services.bonuses.account import UserAccountService
+from backend.app.src.services.bonuses.transaction import AccountTransactionService
 from backend.app.src.services.bonuses.reward import RewardService
 from backend.app.src.services.bonuses.calculation import BonusCalculationService
 
 __all__ = [
     "BonusRuleService",
-    "UserAccountService",       # Уточнити фактичну назву класу у файлі account.py
-    "AccountTransactionService",# Уточнити фактичну назву класу у файлі transaction.py
+    "UserAccountService",
+    "AccountTransactionService",
     "RewardService",
     "BonusCalculationService",
 ]

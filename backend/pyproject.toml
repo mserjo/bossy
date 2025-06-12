@@ -1,43 +1,54 @@
 # backend/pyproject.toml
-# # Файл конфігурації для інструментів збірки та якості коду Python.
-# # Використовується такими інструментами, як Black, isort, Ruff, MyPy та іншими.
+# # Цей файл є стандартним конфігураційним файлом для проектів Python (PEP 518).
+# # Він використовується для налаштування інструментів збірки, управління залежностями
+# # (хоча в цьому проекті залежності керуються через `requirements.txt`),
+# # а також для конфігурації інструментів якості коду, таких як форматувальники
+# # (Black), сортувальники імпортів (isort), лінтери (Ruff) та статичні
+# # аналізатори типів (MyPy).
 
 # --- Загальна інформація про проект (PEP 621) ---
-# Хоча ми використовуємо requirements.txt, можна додати базову метаінформацію.
-# Це може бути корисно для майбутнього переходу на Poetry або PDM.
+# Хоча ми використовуємо requirements.txt для управління залежностями,
+# тут можна визначити базову метаінформацію про проект згідно PEP 621.
+# Це може бути корисним для майбутнього переходу на інструменти типу Poetry або PDM,
+# або для публікації пакету (якщо це бібліотека).
 # [project]
-# name = "my_project_backend"
-# version = "0.1.0"
-# description = "Бекенд для мого проекту"
+# name = "kudos_virtus_backend" # Назва проекту (може бути змінена)
+# version = "0.1.0" # Початкова версія проекту
+# description = "Бекенд для Kudos/Virtus" # Короткий опис проекту
 # authors = [
-#   { name = "Your Name", email = "you@example.com" },
+#   { name = "Your Name / Company Name", email = "contact@example.com" }, # Вкажіть авторів
 # ]
-# readme = "README.md" # Якщо є README в папці backend/
-# requires-python = ">=3.10"
-# license = { text = "MIT" } # Або інша ліцензія
-# classifiers = [
+# readme = "README.md" # Файл README (якщо він існує в директорії backend/)
+# requires-python = ">=3.13" # Мінімальна необхідна версія Python
+# license = { text = "MIT" } # Або інша ліцензія, наприклад, "Proprietary" для комерційних проектів
+# classifiers = [ # Класифікатори PyPI
 #     "Programming Language :: Python :: 3",
-#     "License :: OSI Approved :: MIT License",
+#     "Programming Language :: Python :: 3.13",
+#     "License :: OSI Approved :: MIT License", # Змініть відповідно до вашої ліцензії
 #     "Operating System :: OS Independent",
 #     "Framework :: FastAPI",
+#     "Topic :: Software Development :: Libraries :: Application Frameworks",
 # ]
 # dependencies = [
 #   # Сюди можна було б перенести залежності з requirements.txt,
-#   # але поки що вони залишаються в requirements.txt для простоти.
+#   # але в даному проекті вони залишаються в `requirements.txt` для спрощення
+#   # та сумісності з деякими інструментами розгортання.
 # ]
 
-# [project.urls]
-# "Homepage" = "https://example.com"
-# "Bug Tracker" = "https://github.com/user/repo/issues"
+# [project.urls] # Додаткові посилання, пов'язані з проектом
+# "Homepage" = "https://example.com/kudos-virtus" # Головна сторінка проекту
+# "Documentation" = "https://docs.example.com/kudos-virtus" # Документація
+# "Repository" = "https://github.com/your-repo/kudos-virtus" # Репозиторій проекту
+# "Bug Tracker" = "https://github.com/your-repo/kudos-virtus/issues" # Трекер помилок
 
 
 # --- Конфігурація Black (форматувальник коду) ---
 [tool.black]
-line-length = 88                           # Довжина рядка (стандарт для Black)
-target-version = ['py311']                 # Версія Python для сумісності
-# include = '\.pyi?$'                      # Шаблон файлів для форматування (за замовчуванням)
-# exclude = '''                             # Шаблон файлів/директорій для виключення
-# /(
+line-length = 88                           # Максимальна довжина рядка (стандарт для Black)
+target-version = ['py313']                 # Цільова версія Python для забезпечення сумісності форматування
+# include = '\.pyi?$'                      # Шаблон файлів для форматування (за замовчуванням .py та .pyi)
+# exclude = '''                             # Шаблон файлів/директорій для виключення з форматування
+# /(                                       # (стандартний список виключень Black)
 #     \.eggs
 #   | \.git
 #   | \.hg
@@ -48,108 +59,125 @@ target-version = ['py311']                 # Версія Python для сумі
 #   | buck-out
 #   | build
 #   | dist
+#   | venv
 # )/
 # '''
 
 # --- Конфігурація isort (сортувальник імпортів) ---
+# Ruff може виконувати сортування імпортів, тому окрема конфігурація isort
+# може бути непотрібною, якщо ви використовуєте Ruff для цього (`I` в `select` Ruff).
+# Якщо ж isort використовується окремо або для специфічних налаштувань:
 [tool.isort]
-profile = "black"                          # Сумісність з Black
-line_length = 88                           # Довжина рядка
-multi_line_output = 3                      # Стиль багаторядкових імпортів (Vertical Hanging Indent)
+profile = "black"                          # Профіль сумісності з Black
+line_length = 88                           # Максимальна довжина рядка
+multi_line_output = 3                      # Стиль багаторядкових імпортів: 3 = Vertical Hanging Indent
 include_trailing_comma = true              # Додавати кому в кінці багаторядкових імпортів
-force_grid_wrap = 0                        # Не розбивати імпорти на сітку
-use_parentheses = true                     # Використовувати дужки для багаторядкових імпортів
-ensure_newline_before_comments = true      # Порожній рядок перед коментарями на рівні імпортів
-# known_first_party = ["my_app_module"]    # Ваші модулі першої сторони
+force_grid_wrap = 0                        # Не розбивати короткі імпорти на сітку
+use_parentheses = true                     # Використовувати дужки для багаторядкових імпортів (замість `\`)
+ensure_newline_before_comments = true      # Забезпечити порожній рядок перед коментарями на рівні імпортів
+# known_first_party = ["app"]              # Ваші модулі першої сторони (допомагає isort правильно їх групувати)
+                                           # Якщо використовується Ruff для isort, це налаштовується в [tool.ruff.isort]
 # known_third_party = ["fastapi", "sqlalchemy"] # Приклади сторонніх бібліотек (часто автовизначення працює добре)
-# sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"] # Порядок секцій
+# sections = ["FUTURE", "STDLIB", "THIRDPARTY", "FIRSTPARTY", "LOCALFOLDER"] # Бажаний порядок секцій імпортів
 
-# --- Конфігурація Ruff (лінтер) ---
+# --- Конфігурація Ruff (лінтер та форматувальник) ---
 [tool.ruff]
-line-length = 88                           # Довжина рядка
-target-version = "py311"                   # Цільова версія Python
+line-length = 88                           # Максимальна довжина рядка (для сумісності з Black)
+target-version = "py313"                   # Цільова версія Python для правил лінтера
 
-# Список правил, які потрібно увімкнути. 'ALL' - не рекомендується для початку.
-# E, F - стандартні помилки Pyflakes та синтаксичні помилки.
+# Список правил, які потрібно увімкнути.
+# E, F - стандартні помилки Pyflakes та синтаксичні помилки Pycodestyle.
 # W - попередження Pycodestyle.
 # I - для isort (якщо Ruff використовується для сортування імпортів).
-# আরও багато інших категорій доступні.
+# ANN - для flake8-annotations (перевірка анотацій типів).
+# Дивіться документацію Ruff для повного списку доступних правил.
 select = [
-    "E",  # Pycodestyle errors
-    "F",  # Pyflakes
-    "W",  # Pycodestyle warnings
-    "I",  # isort (Ruff може замінити isort)
-    "N",  # pep8-naming
-    "UP", # pyupgrade
-    "ANN",# flake8-annotations (ANN001, ANN101, ANN201...)
-    "BLE",# flake8-blind-except
-    "B",  # flake8-bugbear
-    "A",  # flake8-builtins
-    "C4", # flake8-comprehensions
-    "ISC",# flake8-implicit-str-concat
-    "T20",# flake8-print (T201 - print, T203 - pprint)
-    "SIM",# flake8-simplify
-    "PTH",# flake8-use-pathlib
-    "ERA",# eradicate (закоментований код)
-    "RUF",# Ruff-specific rules
+    "E",  # Pycodestyle (Error)
+    "F",  # Pyflakes (Error)
+    "W",  # Pycodestyle (Warning)
+    "I",  # isort (сортування імпортів)
+    "N",  # pep8-naming (конвенції іменування)
+    "UP", # pyupgrade (модернізація синтаксису Python)
+    "ANN",# flake8-annotations (анотації типів: ANN001, ANN101, ANN201 тощо)
+    "BLE",# flake8-blind-except (використання "голих" except)
+    "B",  # flake8-bugbear (потенційні помилки та проблеми дизайну)
+    "A",  # flake8-builtins (неправильне використання вбудованих імен)
+    "C4", # flake8-comprehensions (непотрібні list/dict/set comprehensions)
+    "ISC",# flake8-implicit-str-concat (неявна конкатенація рядків)
+    "T20",# flake8-print (наявність print/pprint викликів: T201 - print, T203 - pprint)
+    "SIM",# flake8-simplify (спрощення коду)
+    "PTH",# flake8-use-pathlib (використання pathlib замість os.path)
+    "ERA",# eradicate (пошук закоментованого коду)
+    "RUF",# Ruff-specific rules (специфічні правила Ruff)
 ]
 
 # Правила, які потрібно ігнорувати.
-# Наприклад, ANN101 - відсутність типізації для self в методах.
-# ignore = ["ANN101", "ANN102", "ANN204", "ANN401"]
+# Наприклад, ANN101 - відсутність типізації для `self` в методах (часто ігнорується).
+# ignore = ["ANN101", "ANN102", "ANN204", "ANN401"] # Приклади правил для ігнорування
 ignore = ["E501"] # Ігнорувати помилку довжини рядка (E501), оскільки Black цим займається.
 
-# Директорії, які потрібно виключити з аналізу.
+# Директорії та файли, які потрібно виключити з аналізу Ruff.
 exclude = [
     ".bzr",
     ".direnv",
     ".eggs",
     ".git",
     ".hg",
-    ".mypy_cache",
+    ".mypy_cache", # Кеш MyPy
     ".nox",
     ".pants.d",
-    ".ruff_cache",
+    ".ruff_cache", # Кеш Ruff
     ".svn",
     ".tox",
-    ".venv",
+    ".venv", # Віртуальні середовища
     "__pypackages__",
     "_build",
     "buck-out",
     "build",
     "dist",
-    "node_modules",
-    "venv",
-    "*/alembic/versions/*.py", # Зазвичай генерується автоматично
+    "node_modules", # Залежності Node.js
+    "venv", # Стандартна назва для віртуальних середовищ
+    "*/alembic/versions/*.py", # Автоматично згенеровані файли міграцій Alembic
 ]
 
-# [tool.ruff.isort] # Налаштування isort всередині Ruff, якщо Ruff використовується для сортування
-# known-first-party = ["app"] # Вкажіть тут кореневий пакет вашого додатку
+[tool.ruff.isort]
+# Налаштування сортування імпортів для Ruff (якщо Ruff використовується замість окремого isort)
+# Вказує, що 'app' є пакетом першої сторони (first-party).
+# Це допомагає Ruff правильно групувати імпорти. 'app' - це корінь вашого додатку в `backend/`.
+known-first-party = ["app"]
+# force-single-line = true # Опціонально: примусово робити всі імпорти в один рядок, якщо це бажаний стиль.
 
-# [tool.ruff.flake8-annotations]
-# ignore-fully-untyped = true # Не вимагати типізацію для функцій без жодної анотації
+# [tool.ruff.flake8-annotations] # Специфічні налаштування для правил анотацій типів
+# ignore-fully-untyped = true # Не вимагати типізацію для функцій, які не мають жодної анотації (для поступового введення типізації)
+# allow-star-arg-any = true # Дозволити використання Any для *args, **kwargs
 
 # --- Конфігурація MyPy (статичний аналізатор типів) ---
-# [tool.mypy]
-# python_version = "3.11"
-# warn_return_any = true                     # Попереджати про повернення Any
-# warn_unused_configs = true                 # Попереджати про невикористану конфігурацію
-# ignore_missing_imports = true              # Ігнорувати відсутні імпорти для сторонніх бібліотек без стабів
-#                                            # (краще створювати/використовувати стаби або --install-types)
-# # disallow_untyped_defs = true             # Забороняти функції без анотацій типів (суворий режим)
-# # disallow_any_unimported = true           # Забороняти використання Any з неімпортованих модулів
-# # no_implicit_optional = true              # Не дозволяти неявні Optional (None)
-# # check_untyped_defs = true                # Перевіряти тіла функцій без анотацій (може бути повільно)
+[tool.mypy]
+# Конфігурація MyPy - статичного аналізатора типів
+python_version = "3.13"        # Версія Python, яку використовує проект
+ignore_missing_imports = true  # Ігнорувати відсутні імпорти для бібліотек без стабів (особливо сторонніх)
+                               # Для кращої перевірки рекомендується встановлювати стаби або використовувати `--install-types`.
+warn_return_any = true         # Попереджати, якщо функція неявно повертає тип `Any`
+warn_unused_configs = true     # Попереджати про невикористані секції конфігурації MyPy
 
-# # Шляхи для MyPy (зазвичай MyPy сам знаходить файли)
-# # files = ["app", "tests"]
+# Більш суворі налаштування (закоментовані для початку, можна увімкнути поступово для покращення якості коду):
+# disallow_untyped_defs = true     # Забороняти визначення функцій та методів без анотацій типів
+# disallow_incomplete_defs = true  # Забороняти функції з неповними анотаціями типів (деякі аргументи або повернене значення не типізовані)
+# no_implicit_optional = true      # Вимагати явного `Optional[X]` або `Union[X, None]` замість неявного `None` для аргументів з значенням за замовчуванням `None`
+# check_untyped_defs = true        # Перевіряти тіла функцій без анотацій типів (може значно уповільнити аналіз)
 
-# # Виключення файлів/директорій
-# # exclude = ["alembic/versions/.*\.py"]
+# Шляхи пошуку коду (MyPy зазвичай знаходить їх автоматично в поточному каталозі, але можна вказати явно)
+# files = ["app/src", "app/main.py", "app/tests"] # Приклад: вказує MyPy аналізувати ці шляхи
 
-# [[tool.mypy.overrides]]
-# module = [
-#     "*.migrations.*", # Приклад для міграцій Django/Alembic
-#     "alembic.versions.*"
-# ]
-# ignore_errors = true # Ігнорувати помилки для певних модулів (наприклад, генерОВАНИХ)
+# Виключення файлів або директорій з аналізу MyPy
+# Використовуйте регулярні вирази, що відповідають шляхам відносно кореня проекту MyPy (де запущено MyPy).
+exclude = [
+    "alembic/versions/.*\\.py$", # Регулярний вираз для виключення всіх файлів версій Alembic
+    "app/tests/fixtures/.*\\.py$", # Приклад: виключити фікстури, якщо вони не типізуються або генерують помилки
+]
+
+# Специфічні налаштування для окремих модулів або файлів
+[[tool.mypy.overrides]]
+# Ігнорувати помилки типізації для автоматично згенерованих файлів міграцій Alembic
+module = "alembic.versions.*" # Застосувати до всіх модулів, що відповідають шаблону
+ignore_errors = true          # Ігнорувати всі помилки MyPy для цих модулів

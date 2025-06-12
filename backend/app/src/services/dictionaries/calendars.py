@@ -1,20 +1,22 @@
 # backend/app/src/services/dictionaries/calendars.py
 # import logging # Замінено на централізований логер
-# from typing import Optional # Для потенційних кастомних методів
+# from typing import Optional # Видалено
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.future import select # Для потенційних кастомних методів
+# from sqlalchemy.future import select # Видалено
 
 # Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.dictionaries.calendars import CalendarProvider # Модель SQLAlchemy
+from backend.app.src.repositories.dictionaries.calendar_provider_repository import CalendarProviderRepository # Імпорт репозиторію
+from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.calendars import ( # Схеми Pydantic
     CalendarProviderCreate,
     CalendarProviderUpdate,
     CalendarProviderResponse,
 )
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import logger # Стандартизований імпорт логера
 
-class CalendarProviderService(BaseDictionaryService[CalendarProvider, CalendarProviderCreate, CalendarProviderUpdate, CalendarProviderResponse]):
+class CalendarProviderService(BaseDictionaryService[CalendarProvider, CalendarProviderRepository, CalendarProviderCreate, CalendarProviderUpdate, CalendarProviderResponse]): # Додано CalendarProviderRepository до Generic
     """
     Сервіс для управління елементами довідника "Постачальники Календарів".
     Ці елементи представляють різні платформи календарів, з якими система може інтегруватися
@@ -24,13 +26,21 @@ class CalendarProviderService(BaseDictionaryService[CalendarProvider, CalendarPr
     з цим постачальником на рівні системи.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService):
         """
         Ініціалізує сервіс CalendarProviderService.
 
         :param db_session: Асинхронна сесія бази даних SQLAlchemy.
+        :param cache_service: Екземпляр сервісу кешування.
         """
-        super().__init__(db_session, model=CalendarProvider, response_schema=CalendarProviderResponse)
+        calendar_provider_repo = CalendarProviderRepository(model=CalendarProvider)
+        super().__init__(
+            db_session,
+            repository=calendar_provider_repo,
+            cache_service=cache_service,
+            response_schema=CalendarProviderResponse
+        )
+        # _model_name ініціалізується в BaseDictionaryService з repository.model.__name__
         logger.info(f"CalendarProviderService ініціалізовано для моделі: {self._model_name}")
 
     # --- Кастомні методи для CalendarProviderService (якщо потрібні) ---

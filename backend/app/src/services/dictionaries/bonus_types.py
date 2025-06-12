@@ -2,19 +2,21 @@
 # import logging # Замінено на централізований логер
 # from typing import List # Для потенційних кастомних методів (наразі не використовуються)
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.future import select # Для потенційних кастомних методів
+# from sqlalchemy.future import select # Видалено
 
 # Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.dictionaries.bonus_types import BonusType # Модель SQLAlchemy
+from backend.app.src.repositories.dictionaries.bonus_type_repository import BonusTypeRepository # Імпорт репозиторію
+from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.bonus_types import ( # Схеми Pydantic
     BonusTypeCreate,
     BonusTypeUpdate,
     BonusTypeResponse,
 )
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import logger # Стандартизований імпорт логера
 
-class BonusTypeService(BaseDictionaryService[BonusType, BonusTypeCreate, BonusTypeUpdate, BonusTypeResponse]):
+class BonusTypeService(BaseDictionaryService[BonusType, BonusTypeRepository, BonusTypeCreate, BonusTypeUpdate, BonusTypeResponse]): # Додано BonusTypeRepository до Generic
     """
     Сервіс для управління елементами довідника "Типи Бонусів".
     Успадковує загальні CRUD-операції від BaseDictionaryService.
@@ -23,13 +25,21 @@ class BonusTypeService(BaseDictionaryService[BonusType, BonusTypeCreate, BonusTy
     Кожен тип може мати позначку `is_penalty`, яка вказує, чи є цей тип штрафом.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService):
         """
         Ініціалізує сервіс BonusTypeService.
 
         :param db_session: Асинхронна сесія бази даних SQLAlchemy.
+        :param cache_service: Екземпляр сервісу кешування.
         """
-        super().__init__(db_session, model=BonusType, response_schema=BonusTypeResponse)
+        bonus_type_repo = BonusTypeRepository(model=BonusType)
+        super().__init__(
+            db_session,
+            repository=bonus_type_repo,
+            cache_service=cache_service,
+            response_schema=BonusTypeResponse
+        )
+        # _model_name ініціалізується в BaseDictionaryService з repository.model.__name__
         logger.info(f"BonusTypeService ініціалізовано для моделі: {self._model_name}")
 
     # --- Кастомні методи для BonusTypeService (якщо потрібні) ---

@@ -6,8 +6,7 @@
 кешування для оптимізації доступу до часто запитуваних даних.
 """
 from typing import TypeVar, Generic, List, Optional, Type, Any, Dict
-from uuid import UUID
-from datetime import datetime, timezone # Додано timezone
+from datetime import datetime # timezone видалено
 import json # Для серіалізації в кеш
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -62,7 +61,7 @@ class BaseDictionaryService(
     def _generate_cache_key(self, identifier: Any) -> str:
         return f"{self._cache_prefix}{identifier}"
 
-    async def get_by_id(self, item_id: UUID) -> Optional[SchemaResponseType]:
+    async def get_by_id(self, item_id: int) -> Optional[SchemaResponseType]: # item_id змінено на int
         cache_key = self._generate_cache_key(f"id:{item_id}")
         cached_item_str = await self.cache_service.get(cache_key)
 
@@ -202,7 +201,7 @@ class BaseDictionaryService(
             logger.error(f"Неочікувана помилка при створенні {self._model_name}: {e}", exc_info=settings.DEBUG)
             raise
 
-    async def update(self, item_id: UUID, data: SchemaUpdateType, **kwargs: Any) -> Optional[SchemaResponseType]:
+    async def update(self, item_id: int, data: SchemaUpdateType, **kwargs: Any) -> Optional[SchemaResponseType]: # item_id змінено на int
         logger.debug(f"Спроба оновлення {self._model_name} з ID: {item_id}, дані: {data}, додатково: {kwargs}")
 
         # Отримуємо об'єкт з БД через репозиторій
@@ -249,7 +248,7 @@ class BaseDictionaryService(
             logger.error(f"Неочікувана помилка при оновленні {self._model_name} ID '{item_id}': {e}", exc_info=settings.DEBUG)
             raise
 
-    async def delete(self, item_id: UUID) -> bool:
+    async def delete(self, item_id: int) -> bool: # item_id змінено на int
         logger.debug(f"Спроба видалення {self._model_name} з ID: {item_id}")
 
         # Потрібно отримати об'єкт, щоб знати його 'code' для інвалідації кешу, якщо він є

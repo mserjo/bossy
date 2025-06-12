@@ -13,17 +13,18 @@ import time
 from typing import Callable, Awaitable
 
 from fastapi import Request, Response, HTTPException, status
-from starlette.types import ASGIApp # Для типізації app при реєстрації middleware
+from starlette.types import ASGIApp  # Для типізації app при реєстрації middleware
 
 # Повні шляхи імпорту
-from backend.app.src.config.logging import logger # Централізований логер
-from backend.app.src.config import settings # Для доступу до налаштувань, наприклад, DEBUG або VALID_API_KEYS
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до налаштувань, наприклад, DEBUG або VALID_API_KEYS
+
 
 # --- Middleware для додавання часу обробки запиту ---
 
 async def add_process_time_header_middleware(
-    request: Request,
-    call_next: Callable[[Request], Awaitable[Response]]
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
     """
     Простий middleware для вимірювання часу обробки запиту та додавання
@@ -36,14 +37,14 @@ async def add_process_time_header_middleware(
     start_time = time.perf_counter()
 
     try:
-        response: Response = await call_next(request) # Передача запиту наступному обробнику
+        response: Response = await call_next(request)  # Передача запиту наступному обробнику
     except Exception as e:
         # Важливо обробляти винятки, щоб middleware не "зламав" відповідь про помилку
         process_time_on_error = time.perf_counter() - start_time
         logger.error(
             f"Помилка під час обробки запиту {request.method} {request.url.path} "
             f"(час до помилки: {process_time_on_error:.4f} сек): {e}",
-            exc_info=True # Додаємо traceback для діагностики
+            exc_info=True  # Додаємо traceback для діагностики
         )
         # Перепрокидаємо виняток, щоб FastAPI міг його обробити стандартним чином
         # (наприклад, через зареєстровані обробники винятків)
@@ -62,6 +63,7 @@ async def add_process_time_header_middleware(
     )
 
     return response
+
 
 # --- Заглушка для API Key Middleware ---
 # Цей middleware міг би використовуватися для захисту певних ендпоінтів,

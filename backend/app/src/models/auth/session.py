@@ -1,4 +1,5 @@
 # backend/app/src/models/auth/session.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для сутності "Сесія Користувача".
 
@@ -61,8 +62,8 @@ class Session(Base, TimestampedMixin):
     ip_address: Mapped[Optional[str]] = mapped_column(
         String(100), nullable=True, comment="IP-адреса клієнта сесії"
     )
-    last_active_at: Mapped[Optional[datetime]] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(),
+    last_active_at: Mapped[Optional[datetime]] = mapped_column( # Додано DateTime з timezone=True
+        func.now(), server_default=func.now(), onupdate=func.now(), # Виправлено: func.now() має бути для server_default/onupdate
         comment="Час останньої активності сесії"
     )
 

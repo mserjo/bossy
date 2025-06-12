@@ -9,18 +9,19 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
-from backend.app.src.services.base import BaseService # Повний шлях
-from backend.app.src.models.gamification.achievement import UserAchievement # Модель SQLAlchemy UserAchievement
-from backend.app.src.models.gamification.badge import Badge # Для контексту Badge
-from backend.app.src.models.auth.user import User # Для контексту User
-from backend.app.src.models.groups.group import Group # Якщо досягнення контекстно-залежні від групи
+from backend.app.src.services.base import BaseService  # Повний шлях
+from backend.app.src.models.gamification.achievement import UserAchievement  # Модель SQLAlchemy UserAchievement
+from backend.app.src.models.gamification.badge import Badge  # Для контексту Badge
+from backend.app.src.models.auth.user import User  # Для контексту User
+from backend.app.src.models.groups.group import Group  # Якщо досягнення контекстно-залежні від групи
 
-from backend.app.src.schemas.gamification.achievement import ( # Схеми Pydantic
-    UserAchievementCreate, # Схема для нагородження досягненням
+from backend.app.src.schemas.gamification.achievement import (  # Схеми Pydantic
+    UserAchievementCreate,  # Схема для нагородження досягненням
     UserAchievementResponse
 )
-from backend.app.src.config.logging import logger # Централізований логер
-from backend.app.src.config import settings # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+
 
 class UserAchievementService(BaseService):
     """
@@ -38,19 +39,18 @@ class UserAchievementService(BaseService):
         """Внутрішній метод для отримання ORM моделі UserAchievement з усіма зв'язками."""
         stmt = select(UserAchievement).options(
             selectinload(UserAchievement.user).options(selectinload(User.user_type)),
-            selectinload(UserAchievement.badge), # Завантажуємо повний об'єкт Badge
-            selectinload(UserAchievement.group), # Завантажуємо повний об'єкт Group, якщо є
-            selectinload(UserAchievement.awarded_by).options(selectinload(User.user_type)) # Ким видано
+            selectinload(UserAchievement.badge),  # Завантажуємо повний об'єкт Badge
+            selectinload(UserAchievement.group),  # Завантажуємо повний об'єкт Group, якщо є
+            selectinload(UserAchievement.awarded_by).options(selectinload(User.user_type))  # Ким видано
         ).where(UserAchievement.id == achievement_id)
         return (await self.db_session.execute(stmt)).scalar_one_or_none()
 
-
     async def award_achievement_to_user(
-        self,
-        user_id: UUID,
-        badge_id: UUID,
-        achievement_data: UserAchievementCreate, # Містить context_details, group_id
-        awarded_by_user_id: Optional[UUID] = None # Хто видає (наприклад, адмін або система)
+            self,
+            user_id: UUID,
+            badge_id: UUID,
+            achievement_data: UserAchievementCreate,  # Містить context_details, group_id
+            awarded_by_user_id: Optional[UUID] = None  # Хто видає (наприклад, адмін або система)
     ) -> UserAchievementResponse:
         """
         Нагороджує користувача досягненням (бейджем).
@@ -91,13 +91,14 @@ class UserAchievementService(BaseService):
                 UserAchievement.user_id == user_id,
                 UserAchievement.badge_id == badge_id
             )
-            if achievement_data.group_id: # Якщо досягнення в контексті групи
-                existing_achievement_stmt = existing_achievement_stmt.where(UserAchievement.group_id == achievement_data.group_id)
-            else: # Якщо досягнення глобальне
+            if achievement_data.group_id:  # Якщо досягнення в контексті групи
+                existing_achievement_stmt = existing_achievement_stmt.where(
+                    UserAchievement.group_id == achievement_data.group_id)
+            else:  # Якщо досягнення глобальне
                 existing_achievement_stmt = existing_achievement_stmt.where(UserAchievement.group_id.is_(None))
 
             if (await self.db_session.execute(existing_achievement_stmt)).scalar_one_or_none():
-                msg = f"Бейдж '{badge.name}' (ID: {badge_id}) вже було надано цьому користувачеві в даному контексті і він не є повторюваним." # i18n
+                msg = f"Бейдж '{badge.name}' (ID: {badge_id}) вже було надано цьому користувачеві в даному контексті і він не є повторюваним."  # i18n
                 logger.warning(msg)
                 raise ValueError(msg)
 
@@ -106,7 +107,7 @@ class UserAchievementService(BaseService):
         new_achievement_db = UserAchievement(
             user_id=user_id,
             badge_id=badge_id,
-            group_id=achievement_data.group_id, # Може бути None
+            group_id=achievement_data.group_id,  # Може бути None
             context_details=achievement_data.context_details,
             awarded_by_user_id=awarded_by_user_id
             # `created_at` та `updated_at` (якщо є в моделі) встановлюються автоматично
@@ -117,8 +118,9 @@ class UserAchievementService(BaseService):
             await self.commit()
             # Отримуємо повний об'єкт для відповіді
             refreshed_achievement = await self._get_orm_user_achievement_by_id(new_achievement_db.id)
-            if not refreshed_achievement: # Малоймовірно
-                logger.critical(f"Не вдалося отримати щойно створене досягнення ID {new_achievement_db.id} після коміту.")
+            if not refreshed_achievement:  # Малоймовірно
+                logger.critical(
+                    f"Не вдалося отримати щойно створене досягнення ID {new_achievement_db.id} після коміту.")
                 # i18n
                 raise RuntimeError("Критична помилка: не вдалося отримати запис досягнення після збереження.")
         except IntegrityError as e:
@@ -127,8 +129,9 @@ class UserAchievementService(BaseService):
             # i18n
             raise ValueError(f"Не вдалося нагородити досягненням через конфлікт даних: {e}")
 
-        logger.info(f"Досягнення (Бейдж ID: '{badge_id}') успішно надано користувачу ID '{user_id}'. ID Запису: {refreshed_achievement.id}")
-        return UserAchievementResponse.model_validate(refreshed_achievement) # Pydantic v2
+        logger.info(
+            f"Досягнення (Бейдж ID: '{badge_id}') успішно надано користувачу ID '{user_id}'. ID Запису: {refreshed_achievement.id}")
+        return UserAchievementResponse.model_validate(refreshed_achievement)  # Pydantic v2
 
     async def get_user_achievement_by_id(self, achievement_id: UUID) -> Optional[UserAchievementResponse]:
         """Отримує конкретний запис про нагородження досягненням за його ID."""
@@ -137,18 +140,18 @@ class UserAchievementService(BaseService):
         achievement_db = await self._get_orm_user_achievement_by_id(achievement_id)
         if achievement_db:
             logger.info(f"Запис досягнення з ID '{achievement_id}' знайдено.")
-            return UserAchievementResponse.model_validate(achievement_db) # Pydantic v2
+            return UserAchievementResponse.model_validate(achievement_db)  # Pydantic v2
 
         logger.info(f"Запис досягнення з ID '{achievement_id}' не знайдено.")
         return None
 
     async def list_achievements_for_user(
-        self,
-        user_id: UUID,
-        group_id: Optional[UUID] = None, # Фільтр за ID групи
-        filter_global_only: bool = False, # Якщо True і group_id не вказано, показує тільки глобальні
-        skip: int = 0,
-        limit: int = 100
+            self,
+            user_id: UUID,
+            group_id: Optional[UUID] = None,  # Фільтр за ID групи
+            filter_global_only: bool = False,  # Якщо True і group_id не вказано, показує тільки глобальні
+            skip: int = 0,
+            limit: int = 100
     ) -> List[UserAchievementResponse]:
         """
         Перелічує досягнення для вказаного користувача.
@@ -161,7 +164,8 @@ class UserAchievementService(BaseService):
         logger.debug(f"Перелік досягнень для {log_ctx}, пропустити={skip}, ліміт={limit}")
 
         stmt = select(UserAchievement).options(
-            selectinload(UserAchievement.user).options(noload("*")), # Уникаємо завантаження всього користувача, тільки ID
+            selectinload(UserAchievement.user).options(noload("*")),
+            # Уникаємо завантаження всього користувача, тільки ID
             selectinload(UserAchievement.badge),
             selectinload(UserAchievement.group),
             selectinload(UserAchievement.awarded_by).options(noload("*"))
@@ -169,25 +173,25 @@ class UserAchievementService(BaseService):
 
         if group_id is not None:
             stmt = stmt.where(UserAchievement.group_id == group_id)
-        elif filter_global_only: # group_id не вказано, але потрібні тільки глобальні
+        elif filter_global_only:  # group_id не вказано, але потрібні тільки глобальні
             stmt = stmt.where(UserAchievement.group_id.is_(None))
         # Якщо group_id is None і filter_global_only is False, показує всі досягнення користувача (і глобальні, і групові).
 
         stmt = stmt.order_by(UserAchievement.achieved_at.desc()).offset(skip).limit(limit)
         achievements_db = (await self.db_session.execute(stmt)).scalars().unique().all()
 
-        response_list = [UserAchievementResponse.model_validate(ach) for ach in achievements_db] # Pydantic v2
+        response_list = [UserAchievementResponse.model_validate(ach) for ach in achievements_db]  # Pydantic v2
         logger.info(f"Отримано {len(response_list)} досягнень для {log_ctx}.")
         return response_list
 
     async def list_users_for_badge(
-        self,
-        badge_id: UUID,
-        group_id: Optional[UUID] = None, # Фільтр за ID групи
-        filter_global_only: bool = False, # Якщо True і group_id не вказано, показує тільки глобальні
-        skip: int = 0,
-        limit: int = 100
-    ) -> List[UserAchievementResponse]: # Повертає список UserAchievement, звідки можна отримати користувачів
+            self,
+            badge_id: UUID,
+            group_id: Optional[UUID] = None,  # Фільтр за ID групи
+            filter_global_only: bool = False,  # Якщо True і group_id не вказано, показує тільки глобальні
+            skip: int = 0,
+            limit: int = 100
+    ) -> List[UserAchievementResponse]:  # Повертає список UserAchievement, звідки можна отримати користувачів
         """
         Перелічує користувачів (через їхні записи UserAchievement), які отримали вказаний бейдж.
         Може фільтрувати за групою або показувати тільки глобальні нагородження цим бейджем.
@@ -199,8 +203,9 @@ class UserAchievementService(BaseService):
         logger.debug(f"Перелік користувачів, що здобули {log_ctx}, пропустити={skip}, ліміт={limit}")
 
         stmt = select(UserAchievement).options(
-            selectinload(UserAchievement.user).options(selectinload(User.user_type)), # Завантажуємо користувача для відповіді
-            selectinload(UserAchievement.badge), # Можна noload("*"), якщо сам бейдж не потрібен у відповіді
+            selectinload(UserAchievement.user).options(selectinload(User.user_type)),
+            # Завантажуємо користувача для відповіді
+            selectinload(UserAchievement.badge),  # Можна noload("*"), якщо сам бейдж не потрібен у відповіді
             selectinload(UserAchievement.group),
             selectinload(UserAchievement.awarded_by).options(noload("*"))
         ).where(UserAchievement.badge_id == badge_id)
@@ -214,11 +219,12 @@ class UserAchievementService(BaseService):
         stmt = stmt.order_by(UserAchievement.achieved_at.desc()).offset(skip).limit(limit)
         achievements_db = (await self.db_session.execute(stmt)).scalars().unique().all()
 
-        response_list = [UserAchievementResponse.model_validate(ach) for ach in achievements_db] # Pydantic v2
+        response_list = [UserAchievementResponse.model_validate(ach) for ach in achievements_db]  # Pydantic v2
         logger.info(f"Отримано {len(response_list)} записів нагороджень для {log_ctx}.")
         return response_list
 
     # TODO: Розглянути метод для відкликання досягнення (revoke_achievement), якщо це передбачено бізнес-логікою.
     # Це може включати видалення запису UserAchievement або позначення його як неактивного/відкликаного.
+
 
 logger.debug(f"{UserAchievementService.__name__} (сервіс досягнень користувачів) успішно визначено.")

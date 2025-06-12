@@ -1,4 +1,5 @@
 # backend/app/src/models/files/__init__.py
+# -*- coding: utf-8 -*-
 """
 Пакет моделей SQLAlchemy для сутностей, пов'язаних з "Файлами".
 
@@ -9,8 +10,8 @@
 Моделі експортуються для зручного доступу з інших частин програми.
 """
 
-from .file import FileRecord
-from .avatar import UserAvatar
+from backend.app.src.models.files.file import FileRecord
+from backend.app.src.models.files.avatar import UserAvatar
 # В майбутньому тут можуть бути інші моделі, пов'язані з файлами,
 # наприклад, GroupIconRecord, RewardIconRecord, якщо вони матимуть
 # власні таблиці та логіку, відмінну від загального FileRecord.

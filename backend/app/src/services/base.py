@@ -1,22 +1,23 @@
 # backend/app/src/services/base.py
 # import logging # Замінено на централізований логер
-from typing import TypeVar, Generic, Optional, Any, Type # Додано Type
+from typing import TypeVar, Generic, Optional, Any, Type  # Додано Type
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select # Додано для get_object_or_none
+from sqlalchemy.future import select  # Додано для get_object_or_none
 
-from backend.app.src.config.logging import logger # Централізований логер
-from backend.app.src.config import settings # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
 # Генеричний тип для моделей SQLAlchemy, якщо буде потрібно в майбутньому для більш типізованих методів
 ModelType = TypeVar("ModelType")
+
 
 # Генеричний тип для репозиторію, якщо використовується патерн "Репозиторій".
 # Наразі не використовується активно в сервісах, але залишено для можливого розширення.
 # from backend.app.src.repositories.base import BaseRepository # Приклад базового репозиторію
 # RepositoryType = TypeVar("RepositoryType", bound=BaseRepository)
 
-class BaseService(Generic[ModelType]): # Прибрано RepositoryType, оскільки не використовується
+class BaseService(Generic[ModelType]):  # Прибрано RepositoryType, оскільки не використовується
     """
     Базовий клас для всіх сервісів.
     Надає спільні функціональні можливості та залежності для класів сервісів,
@@ -61,7 +62,8 @@ class BaseService(Generic[ModelType]): # Прибрано RepositoryType, оск
             await self.db_session.commit()
             logger.info(f"Сесію бази даних {id(self.db_session)} успішно закомічено класом {self.__class__.__name__}.")
         except Exception as e:
-            logger.error(f"Помилка коміту сесії бази даних {id(self.db_session)} в {self.__class__.__name__}: {e}", exc_info=settings.DEBUG)
+            logger.error(f"Помилка коміту сесії бази даних {id(self.db_session)} в {self.__class__.__name__}: {e}",
+                         exc_info=settings.DEBUG)
             # Залежно від стратегії обробки помилок, тут можна або відкотити, або передати виняток далі.
             # Наразі логуємо, намагаємося відкотити та передаємо виняток далі.
             await self.rollback()
@@ -76,7 +78,8 @@ class BaseService(Generic[ModelType]): # Прибрано RepositoryType, оск
             await self.db_session.rollback()
             logger.warning(f"Сесію бази даних {id(self.db_session)} відкочено класом {self.__class__.__name__}.")
         except Exception as e:
-            logger.error(f"Помилка відкату сесії бази даних {id(self.db_session)} в {self.__class__.__name__}: {e}", exc_info=settings.DEBUG)
+            logger.error(f"Помилка відкату сесії бази даних {id(self.db_session)} в {self.__class__.__name__}: {e}",
+                         exc_info=settings.DEBUG)
             # Якщо відкат не вдався, сесія може бути в неузгодженому стані.
             # Це критична помилка.
             raise
@@ -95,7 +98,7 @@ class BaseService(Generic[ModelType]): # Прибрано RepositoryType, оск
         # Припускаємо, що модель має атрибут 'id'
         if not hasattr(model_cls, 'id'):
             logger.error(f"Модель {model_cls.__name__} не має атрибута 'id'. Неможливо виконати get_object_or_none.")
-            return None # Або кинути AttributeError
+            return None  # Або кинути AttributeError
 
         stmt = select(model_cls).where(getattr(model_cls, 'id') == object_id)
         result = await self.db_session.execute(stmt)
@@ -106,5 +109,6 @@ class BaseService(Generic[ModelType]): # Прибрано RepositoryType, оск
         else:
             logger.debug(f"{model_cls.__name__} з ID: {object_id} не знайдено.")
         return instance
+
 
 logger.info("BaseService (базовий клас сервісів) успішно визначено.")

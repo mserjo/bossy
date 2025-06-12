@@ -11,26 +11,27 @@ from sqlalchemy.exc import IntegrityError
 
 # Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.groups.invitation import GroupInvitation # Модель SQLAlchemy GroupInvitation
-from backend.app.src.models.groups.group import Group # Для контексту групи
-from backend.app.src.models.auth.user import User # Для запрошеного користувача та того, хто запрошує
-from backend.app.src.models.dictionaries.user_roles import UserRole # Для ролі, яка буде призначена при прийнятті
-from backend.app.src.models.groups.membership import GroupMembership # Для перевірки існуючого членства
+from backend.app.src.models.groups.invitation import GroupInvitation  # Модель SQLAlchemy GroupInvitation
+from backend.app.src.models.groups.group import Group  # Для контексту групи
+from backend.app.src.models.auth.user import User  # Для запрошеного користувача та того, хто запрошує
+from backend.app.src.models.dictionaries.user_roles import UserRole  # Для ролі, яка буде призначена при прийнятті
+from backend.app.src.models.groups.membership import GroupMembership  # Для перевірки існуючого членства
 
-from backend.app.src.schemas.groups.invitation import ( # Схеми Pydantic
+from backend.app.src.schemas.groups.invitation import (  # Схеми Pydantic
     GroupInvitationCreate,
     GroupInvitationResponse,
     # GroupInvitationAccept # Не використовується як тип параметра, код передається напряму
 )
-from backend.app.src.schemas.groups.membership import GroupMembershipResponse # Для типу повернення accept_invitation
-from backend.app.src.services.groups.membership import GroupMembershipService # Для додавання користувача до групи
+from backend.app.src.schemas.groups.membership import GroupMembershipResponse  # Для типу повернення accept_invitation
+from backend.app.src.services.groups.membership import GroupMembershipService  # Для додавання користувача до групи
 
-from backend.app.src.config.logging import logger # Централізований логер
-from backend.app.src.config import settings # Для доступу до конфігурацій
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до конфігурацій
 
 # Термін дії запрошення за замовчуванням (наприклад, 7 днів)
 # TODO: Перенести DEFAULT_INVITATION_EXPIRE_DAYS до settings.py
 DEFAULT_INVITATION_EXPIRE_DAYS = getattr(settings, 'DEFAULT_INVITATION_EXPIRE_DAYS', 7)
+
 
 class GroupInvitationService(BaseService):
     """
@@ -40,10 +41,11 @@ class GroupInvitationService(BaseService):
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        self.membership_service = GroupMembershipService(db_session) # Ініціалізація сервісу членства
+        self.membership_service = GroupMembershipService(db_session)  # Ініціалізація сервісу членства
         logger.info("GroupInvitationService ініціалізовано.")
 
-    async def _get_orm_invitation_with_relations(self, invitation_id: Optional[UUID] = None, invitation_code: Optional[str] = None) -> Optional[GroupInvitation]:
+    async def _get_orm_invitation_with_relations(self, invitation_id: Optional[UUID] = None,
+                                                 invitation_code: Optional[str] = None) -> Optional[GroupInvitation]:
         """Внутрішній метод для отримання ORM моделі GroupInvitation з усіма зв'язками."""
         if not invitation_id and not invitation_code:
             return None
@@ -56,18 +58,17 @@ class GroupInvitationService(BaseService):
         )
         if invitation_id:
             stmt = stmt.where(GroupInvitation.id == invitation_id)
-        elif invitation_code: # Додано можливість пошуку за кодом
-             stmt = stmt.where(GroupInvitation.invitation_code == invitation_code)
+        elif invitation_code:  # Додано можливість пошуку за кодом
+            stmt = stmt.where(GroupInvitation.invitation_code == invitation_code)
 
         return (await self.db_session.execute(stmt)).scalar_one_or_none()
 
-
     async def create_invitation(
-        self,
-        group_id: UUID,
-        inviter_user_id: UUID,
-        role_to_assign_code: str, # Код ролі для призначення користувачеві при вступі
-        invite_data: GroupInvitationCreate # Містить опціональний email, кастомний термін дії
+            self,
+            group_id: UUID,
+            inviter_user_id: UUID,
+            role_to_assign_code: str,  # Код ролі для призначення користувачеві при вступі
+            invite_data: GroupInvitationCreate  # Містить опціональний email, кастомний термін дії
     ) -> GroupInvitationResponse:
         """
         Створює нове запрошення для користувача приєднатися до групи.
@@ -82,18 +83,18 @@ class GroupInvitationService(BaseService):
         logger.debug(f"Спроба створення запрошення до групи ID '{group_id}' користувачем ID '{inviter_user_id}'.")
 
         group = await self.db_session.get(Group, group_id)
-        if not group: raise ValueError(f"Групу з ID '{group_id}' не знайдено.") # i18n
+        if not group: raise ValueError(f"Групу з ID '{group_id}' не знайдено.")  # i18n
 
         # Перевірка прав запрошуючого (має бути адміном групи або суперюзером) - логіка API шару
         # Тут припускаємо, що перевірка вже пройдена.
 
         inviter = await self.db_session.get(User, inviter_user_id)
-        if not inviter: raise ValueError(f"Користувача, що запрошує, з ID '{inviter_user_id}' не знайдено.") # i18n
+        if not inviter: raise ValueError(f"Користувача, що запрошує, з ID '{inviter_user_id}' не знайдено.")  # i18n
 
         role_to_assign = (await self.db_session.execute(
             select(UserRole).where(UserRole.code == role_to_assign_code)
         )).scalar_one_or_none()
-        if not role_to_assign: raise ValueError(f"Роль з кодом '{role_to_assign_code}' не знайдено.") # i18n
+        if not role_to_assign: raise ValueError(f"Роль з кодом '{role_to_assign_code}' не знайдено.")  # i18n
 
         invited_user_id: Optional[UUID] = None
         normalized_email: Optional[str] = None
@@ -113,7 +114,8 @@ class GroupInvitationService(BaseService):
                 )).scalar_one_or_none()
                 if active_member_id:
                     # i18n
-                    raise ValueError(f"Користувач з email '{normalized_email}' вже є активним членом групи '{group.name}'.")
+                    raise ValueError(
+                        f"Користувач з email '{normalized_email}' вже є активним членом групи '{group.name}'.")
 
             # Перевірка на існуюче активне запрошення для цього email/користувача до цієї групи
             conditions = [
@@ -122,26 +124,27 @@ class GroupInvitationService(BaseService):
                 GroupInvitation.expires_at > datetime.now(timezone.utc)
             ]
             email_condition = GroupInvitation.email == normalized_email
-            user_id_condition = GroupInvitation.invited_user_id == invited_user_id if invited_user_id else False # type: ignore
+            user_id_condition = GroupInvitation.invited_user_id == invited_user_id if invited_user_id else False  # type: ignore
             conditions.append(or_(email_condition, user_id_condition))
 
             if (await self.db_session.execute(select(GroupInvitation.id).where(*conditions))).scalar_one_or_none():
                 # i18n
-                raise ValueError(f"Активне запрошення для '{normalized_email or f'користувача ID {invited_user_id}'}' до групи '{group.name}' вже існує.")
+                raise ValueError(
+                    f"Активне запрошення для '{normalized_email or f'користувача ID {invited_user_id}'}' до групи '{group.name}' вже існує.")
 
-        invitation_code = str(uuid4()) # Унікальний код запрошення
+        invitation_code = str(uuid4())  # Унікальний код запрошення
         expire_duration_days = invite_data.custom_expire_days if invite_data.custom_expire_days is not None \
-                               else DEFAULT_INVITATION_EXPIRE_DAYS
+            else DEFAULT_INVITATION_EXPIRE_DAYS
         expires_at = datetime.now(timezone.utc) + timedelta(days=expire_duration_days)
 
         new_invitation_db = GroupInvitation(
             group_id=group_id,
             inviter_user_id=inviter_user_id,
-            invited_user_id=invited_user_id, # Може бути None, якщо запрошення не на конкретного користувача
-            email=normalized_email, # Може бути None
+            invited_user_id=invited_user_id,  # Може бути None, якщо запрошення не на конкретного користувача
+            email=normalized_email,  # Може бути None
             role_id_to_assign=role_to_assign.id,
             invitation_code=invitation_code,
-            status="pending", # Початковий статус
+            status="pending",  # Початковий статус
             expires_at=expires_at
             # created_at, updated_at встановлюються автоматично
         )
@@ -149,17 +152,18 @@ class GroupInvitationService(BaseService):
         try:
             await self.commit()
             refreshed_invitation = await self._get_orm_invitation_with_relations(invitation_id=new_invitation_db.id)
-            if not refreshed_invitation: # Малоймовірно
+            if not refreshed_invitation:  # Малоймовірно
                 # i18n
                 raise RuntimeError("Критична помилка: не вдалося отримати створене запрошення після збереження.")
         except IntegrityError as e:
             await self.rollback()
-            logger.error(f"Помилка цілісності при створенні запрошення до групи ID '{group_id}': {e}", exc_info=settings.DEBUG)
+            logger.error(f"Помилка цілісності при створенні запрошення до групи ID '{group_id}': {e}",
+                         exc_info=settings.DEBUG)
             # i18n
             raise ValueError(f"Не вдалося створити запрошення через конфлікт даних: {e}")
 
         logger.info(f"Запрошення з кодом '{invitation_code}' до групи ID '{group_id}' успішно створено.")
-        return GroupInvitationResponse.model_validate(refreshed_invitation) # Pydantic v2
+        return GroupInvitationResponse.model_validate(refreshed_invitation)  # Pydantic v2
 
     async def get_invitation_by_code(self, invitation_code: str) -> Optional[GroupInvitationResponse]:
         """Отримує запрошення за його унікальним кодом, якщо воно дійсне (в очікуванні та не прострочене)."""
@@ -171,16 +175,18 @@ class GroupInvitationService(BaseService):
             # Додаткова перевірка статусу та терміну дії тут, хоча _get_orm_invitation_with_relations може це робити
             if invitation_db.status == "pending" and invitation_db.expires_at > datetime.now(timezone.utc):
                 logger.info(f"Дійсне активне запрошення знайдено за кодом '{invitation_code}'.")
-                return GroupInvitationResponse.model_validate(invitation_db) # Pydantic v2
+                return GroupInvitationResponse.model_validate(invitation_db)  # Pydantic v2
             else:
-                logger.warning(f"Запрошення за кодом '{invitation_code}' знайдено, але воно не активне (статус: {invitation_db.status}, термін дії: {invitation_db.expires_at}).")
-                return None # Повертаємо None, якщо не відповідає критеріям "дійсного для прийняття"
+                logger.warning(
+                    f"Запрошення за кодом '{invitation_code}' знайдено, але воно не активне (статус: {invitation_db.status}, термін дії: {invitation_db.expires_at}).")
+                return None  # Повертаємо None, якщо не відповідає критеріям "дійсного для прийняття"
 
-        logger.warning(f"Дійсне активне запрошення за кодом '{invitation_code}' не знайдено. Можливо, недійсне, прострочене або вже використане.")
+        logger.warning(
+            f"Дійсне активне запрошення за кодом '{invitation_code}' не знайдено. Можливо, недійсне, прострочене або вже використане.")
         return None
 
     async def accept_invitation(
-        self, invitation_code: str, accepting_user_id: UUID
+            self, invitation_code: str, accepting_user_id: UUID
     ) -> GroupMembershipResponse:
         """
         Обробляє прийняття запрошення користувачем.
@@ -221,10 +227,10 @@ class GroupInvitationService(BaseService):
 
         invitation_db_record.status = "accepted"
         invitation_db_record.accepted_at = datetime.now(timezone.utc)
-        invitation_db_record.responded_at = invitation_db_record.accepted_at # Час відповіді = час прийняття
+        invitation_db_record.responded_at = invitation_db_record.accepted_at  # Час відповіді = час прийняття
         self.db_session.add(invitation_db_record)
 
-        if not invitation_db_record.role_to_assign: # Мало бути завантажено
+        if not invitation_db_record.role_to_assign:  # Мало бути завантажено
             # i18n
             raise RuntimeError("Внутрішня помилка: не вдалося визначити роль для призначення.")
 
@@ -238,36 +244,42 @@ class GroupInvitationService(BaseService):
                 user_id=accepting_user_id,
                 role_code=invitation_db_record.role_to_assign.code,
                 added_by_user_id=invitation_db_record.inviter_user_id,
-                commit_session=False # Контролюємо коміт тут
+                commit_session=False  # Контролюємо коміт тут
             )
-            await self.commit() # Атомарний коміт для зміни статусу запрошення та створення членства
-            logger.info(f"Запрошення з кодом '{invitation_code}' прийнято користувачем ID '{accepting_user_id}'. Користувача додано до групи.")
+            await self.commit()  # Атомарний коміт для зміни статусу запрошення та створення членства
+            logger.info(
+                f"Запрошення з кодом '{invitation_code}' прийнято користувачем ID '{accepting_user_id}'. Користувача додано до групи.")
             return new_membership
-        except ValueError as ve: # Наприклад, якщо користувач вже активний член (обробка в add_member_to_group)
+        except ValueError as ve:  # Наприклад, якщо користувач вже активний член (обробка в add_member_to_group)
             await self.rollback()
-            logger.error(f"Помилка створення членства при прийнятті запрошення '{invitation_code}': {ve}", exc_info=True)
+            logger.error(f"Помилка створення членства при прийнятті запрошення '{invitation_code}': {ve}",
+                         exc_info=True)
             # i18n
             raise ValueError(f"Не вдалося приєднатися до групи після прийняття запрошення: {ve}")
         except Exception as e:
             await self.rollback()
-            logger.error(f"Неочікувана помилка при прийнятті запрошення '{invitation_code}': {e}", exc_info=settings.DEBUG)
+            logger.error(f"Неочікувана помилка при прийнятті запрошення '{invitation_code}': {e}",
+                         exc_info=settings.DEBUG)
             raise
 
     async def decline_invitation(self, invitation_code: str, declining_user_id: Optional[UUID] = None) -> bool:
         """Відхиляє запрошення."""
-        logger.info(f"Користувач ID '{declining_user_id or 'Анонім'}' намагається відхилити запрошення з кодом '{invitation_code}'.")
+        logger.info(
+            f"Користувач ID '{declining_user_id or 'Анонім'}' намагається відхилити запрошення з кодом '{invitation_code}'.")
 
         invitation_db = await self._get_orm_invitation_with_relations(invitation_code=invitation_code)
         if not invitation_db:
             logger.warning(f"Запрошення '{invitation_code}' не знайдено.")
             return False
         if invitation_db.status != "pending" or invitation_db.expires_at <= datetime.now(timezone.utc):
-            logger.warning(f"Запрошення '{invitation_code}' не активне або прострочене. Статус: {invitation_db.status}.")
+            logger.warning(
+                f"Запрошення '{invitation_code}' не активне або прострочене. Статус: {invitation_db.status}.")
             return False
 
         if declining_user_id and invitation_db.invited_user_id and invitation_db.invited_user_id != declining_user_id:
-            logger.warning(f"Невідповідність ID користувача '{declining_user_id}' для відхилення запрошення '{invitation_code}', призначеного для ID '{invitation_db.invited_user_id}'.")
-            return False # Або кинути помилку дозволу
+            logger.warning(
+                f"Невідповідність ID користувача '{declining_user_id}' для відхилення запрошення '{invitation_code}', призначеного для ID '{invitation_db.invited_user_id}'.")
+            return False  # Або кинути помилку дозволу
 
         invitation_db.status = "declined"
         invitation_db.responded_at = datetime.now(timezone.utc)
@@ -291,7 +303,8 @@ class GroupInvitationService(BaseService):
         #     raise PermissionError("Користувач не авторизований для відкликання цього запрошення.") # i18n
 
         if invitation_db.status != "pending":
-            logger.warning(f"Запрошення ID '{invitation_id}' не в статусі 'pending' (статус: {invitation_db.status}). Неможливо відкликати.")
+            logger.warning(
+                f"Запрошення ID '{invitation_id}' не в статусі 'pending' (статус: {invitation_db.status}). Неможливо відкликати.")
             return False
         if invitation_db.expires_at < datetime.now(timezone.utc):
             # Якщо вже прострочене, можна просто оновити статус на 'expired'
@@ -300,16 +313,17 @@ class GroupInvitationService(BaseService):
                 self.db_session.add(invitation_db)
                 await self.commit()
             logger.warning(f"Запрошення ID '{invitation_id}' вже прострочене.")
-            return False # Вже не було активним для відкликання
+            return False  # Вже не було активним для відкликання
 
         invitation_db.status = "revoked"
-        invitation_db.responded_at = datetime.now(timezone.utc) # Час відкликання
+        invitation_db.responded_at = datetime.now(timezone.utc)  # Час відкликання
         self.db_session.add(invitation_db)
         await self.commit()
         logger.info(f"Запрошення ID '{invitation_id}' успішно відкликано користувачем ID '{revoker_user_id}'.")
         return True
 
-    async def list_pending_invitations_for_group(self, group_id: UUID, skip: int = 0, limit: int = 100) -> List[GroupInvitationResponse]:
+    async def list_pending_invitations_for_group(self, group_id: UUID, skip: int = 0, limit: int = 100) -> List[
+        GroupInvitationResponse]:
         """Перелічує активні (pending, не прострочені) запрошення для вказаної групи."""
         logger.debug(f"Перелік активних запрошень для групи ID: {group_id}, пропустити={skip}, ліміт={limit}")
 
@@ -324,7 +338,7 @@ class GroupInvitationService(BaseService):
         ).order_by(GroupInvitation.created_at.desc()).offset(skip).limit(limit)
 
         invitations_db = (await self.db_session.execute(stmt)).scalars().all()
-        response_list = [GroupInvitationResponse.model_validate(inv) for inv in invitations_db] # Pydantic v2
+        response_list = [GroupInvitationResponse.model_validate(inv) for inv in invitations_db]  # Pydantic v2
         logger.info(f"Отримано {len(response_list)} активних запрошень для групи ID '{group_id}'.")
         return response_list
 
@@ -337,10 +351,10 @@ class GroupInvitationService(BaseService):
         update_stmt = GroupInvitation.__table__.update().where(
             GroupInvitation.status == "pending",
             GroupInvitation.expires_at < now
-        ).values(status="expired", responded_at=now) # responded_at як час "завершення"
+        ).values(status="expired", responded_at=now)  # responded_at як час "завершення"
 
         result = await self.db_session.execute(update_stmt)
-        await self.commit() # Застосовуємо зміни
+        await self.commit()  # Застосовуємо зміни
 
         count = result.rowcount
         if count > 0:
@@ -348,5 +362,6 @@ class GroupInvitationService(BaseService):
         else:
             logger.info("Не знайдено 'pending' запрошень для позначення як 'expired'.")
         return count
+
 
 logger.debug(f"{GroupInvitationService.__name__} (сервіс запрошень до груп) успішно визначено.")

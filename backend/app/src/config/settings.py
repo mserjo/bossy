@@ -1,4 +1,5 @@
-# /backend/app/src/config/settings.py
+# backend/app/src/config/settings.py
+# -*- coding: utf-8 -*-
 """
 Конфігурація FastAPI програми Kudos.
 
@@ -101,6 +102,42 @@ class Settings(BaseSettings):
             host=server,
             port=int(port), # Порт має бути числом
             path=f"/{db_name.lstrip('/')}", # Шлях до бази даних (видаляємо можливий слеш на початку)
+        ))
+
+    # --- Синхронний URL для Alembic (офлайн режим) ---
+    SYNC_DATABASE_URL: Optional[PostgresDsn] = None # Синхронний URL для Alembic
+
+    @field_validator("SYNC_DATABASE_URL", mode="before")
+    @classmethod
+    def assemble_sync_db_connection(cls, v: Optional[str], info: ValidationInfo) -> Any:
+        """Збирає синхронний URL для підключення до PostgreSQL для Alembic офлайн режиму."""
+        if isinstance(v, str): # Якщо SYNC_DATABASE_URL вже надано, використовуємо його
+            return v
+        # Отримуємо дані з інших полів моделі для побудови URL
+        data = info.data if info and hasattr(info, 'data') else {} # Залишаємо перевірку info.data для безпеки
+        user = data.get("POSTGRES_USER", "postgres")
+        password = data.get("POSTGRES_PASSWORD", "password")
+        server = data.get("POSTGRES_SERVER", "localhost")
+        port = data.get("POSTGRES_PORT", 5432)
+        db_name = data.get("POSTGRES_DB", "kudos_db")
+
+        if not all([user, password, server, db_name]):
+            # Помилка вже буде викликана валідатором DATABASE_URL, якщо компоненти відсутні,
+            # але для повноти можна залишити перевірку або просто покластися на наявність DATABASE_URL.
+            # Якщо DATABASE_URL не зміг зібратися, то і цей не зможе.
+            # Можна просто повернути None, якщо попередні обов'язкові поля не пройшли валідацію.
+            # Або, якщо припустити, що DATABASE_URL вже успішно валідовано:
+            if not data.get("DATABASE_URL"): # Якщо основний URL не зміг зібратися
+                 # TODO i18n: Translatable message
+                raise ValueError("Неможливо зібрати SYNC_DATABASE_URL через відсутність основних компонентів БД.")
+
+        return str(PostgresDsn.build(
+            scheme="postgresql", # Використовуємо синхронний драйвер postgresql (psycopg2 зазвичай)
+            username=user,
+            password=password,
+            host=server,
+            port=int(port),
+            path=f"/{db_name.lstrip('/')}",
         ))
 
     # --- Налаштування Redis ---

@@ -2,9 +2,9 @@
 # import logging # Замінено на централізований логер
 from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
-from datetime import datetime # Додано для позначки часу в мок-відповіді
+from datetime import datetime  # Додано для позначки часу в мок-відповіді
 
-from sqlalchemy.ext.asyncio import AsyncSession # Не використовується прямо, але може бути потрібен для BaseService
+from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо, але може бути потрібен для BaseService
 
 # Повні шляхи імпорту
 from backend.app.src.services.integrations.messenger_base import (
@@ -14,9 +14,10 @@ from backend.app.src.services.integrations.messenger_base import (
     MessageSendCommand,
     MessageSendResponse
 )
-from backend.app.src.models.integrations.user_integration import UserIntegration # Припустима модель для зберігання Viber User ID
-from backend.app.src.config.settings import settings # Для Viber Auth Token
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.models.integrations.user_integration import \
+    UserIntegration  # Припустима модель для зберігання Viber User ID
+from backend.app.src.config.settings import settings  # Для Viber Auth Token
+from backend.app.src.config.logging import logger  # Централізований логер
 
 # TODO: Додати залежність: pip install viberbot (або viber-bot-python) або httpx
 # from viberbot import Api
@@ -28,8 +29,10 @@ VIBER_SERVICE_NAME = "VIBER"
 # TODO: Переконатися, що VIBER_AUTH_TOKEN, VIBER_BOT_NAME, VIBER_BOT_AVATAR правильно налаштовані в settings.py
 VIBER_AUTH_TOKEN = getattr(settings, 'VIBER_AUTH_TOKEN', None)
 VIBER_BOT_NAME = getattr(settings, 'VIBER_BOT_NAME', 'YourAppViberBot')
-VIBER_BOT_AVATAR = getattr(settings, 'VIBER_BOT_AVATAR', None) # URL до аватара бота
-VIBER_API_BASE_URL = getattr(settings, 'VIBER_API_BASE_URL', "https://chatapi.viber.com/pa") # Використовується для прямих HTTP запитів
+VIBER_BOT_AVATAR = getattr(settings, 'VIBER_BOT_AVATAR', None)  # URL до аватара бота
+VIBER_API_BASE_URL = getattr(settings, 'VIBER_API_BASE_URL',
+                             "https://chatapi.viber.com/pa")  # Використовується для прямих HTTP запитів
+
 
 class ViberIntegrationService(BaseMessengerIntegrationService):
     """
@@ -43,7 +46,7 @@ class ViberIntegrationService(BaseMessengerIntegrationService):
 
     def __init__(self, db_session: AsyncSession, user_id_for_context: Optional[UUID] = None):
         super().__init__(db_session, user_id_for_context)
-        self.viber_client: Optional[Any] = None # Заглушка для клієнта viberbot.Api
+        self.viber_client: Optional[Any] = None  # Заглушка для клієнта viberbot.Api
 
         if VIBER_AUTH_TOKEN:
             # from viberbot import Api
@@ -56,7 +59,8 @@ class ViberIntegrationService(BaseMessengerIntegrationService):
             # self.viber_client = Api(bot_configuration)
             logger.info("Клієнт Viber був би ініціалізований тут з реальним токеном та конфігурацією.")
         else:
-            logger.warning("Автентифікаційний токен Viber не налаштовано. ViberIntegrationService використовуватиме мок-відповіді або не працюватиме.")
+            logger.warning(
+                "Автентифікаційний токен Viber не налаштовано. ViberIntegrationService використовуватиме мок-відповіді або не працюватиме.")
         logger.info(f"ViberIntegrationService ініціалізовано для користувача: {self.user_id_for_context or 'N/A'}.")
 
     async def connect_bot_or_webhook(self, app_settings: Dict[str, Any]) -> bool:
@@ -126,13 +130,14 @@ class ViberIntegrationService(BaseMessengerIntegrationService):
 
     async def send_message(self, command: MessageSendCommand) -> MessageSendResponse:
         """[ЗАГЛУШКА/TODO] Надсилає повідомлення в Viber."""
-        viber_recipient_id = command.recipient_platform_id # Це має бути Viber User ID
+        viber_recipient_id = command.recipient_platform_id  # Це має бути Viber User ID
         message_text = command.message.text
         # TODO: Реалізувати конвертацію MessengerMessage в формат Viber (текст, кнопки, каруселі тощо).
 
         if not message_text:
             # i18n
-            return MessageSendResponse(status="failed", error_message="Текст повідомлення не може бути порожнім для Viber.")
+            return MessageSendResponse(status="failed",
+                                       error_message="Текст повідомлення не може бути порожнім для Viber.")
 
         # if not self.viber_client:
         #     logger.warning("Клієнт Viber не доступний для надсилання повідомлення.")
@@ -153,7 +158,8 @@ class ViberIntegrationService(BaseMessengerIntegrationService):
         #     return MessageSendResponse(status="failed", error_message=str(e))
 
         platform_msg_id = f"mock_viber_msg_token_{datetime.now().timestamp()}"
-        logger.info(f"[ЗАГЛУШКА] Надсилання повідомлення Viber до {viber_recipient_id}: '{message_text[:50]}...'. Токен: {platform_msg_id}")
+        logger.info(
+            f"[ЗАГЛУШКА] Надсилання повідомлення Viber до {viber_recipient_id}: '{message_text[:50]}...'. Токен: {platform_msg_id}")
         # i18n
         return MessageSendResponse(status="success", platform_message_id=platform_msg_id, error_message=None)
 
@@ -182,9 +188,11 @@ class ViberIntegrationService(BaseMessengerIntegrationService):
             return MessengerUserProfile(
                 id=platform_user_id,
                 username=f"MockViberUser_{platform_user_id[-6:].lower()}",
-                full_name=f"Мок Користувач Viber {platform_user_id[-6:].lower()}" # i18n
+                full_name=f"Мок Користувач Viber {platform_user_id[-6:].lower()}"  # i18n
             )
         # i18n
-        raise NotImplementedError(f"Метод 'get_platform_user_profile' не повністю реалізовано для {self.__class__.__name__}")
+        raise NotImplementedError(
+            f"Метод 'get_platform_user_profile' не повністю реалізовано для {self.__class__.__name__}")
+
 
 logger.info("ViberIntegrationService (сервіс інтеграції з Viber) клас визначено (реалізація-заглушка).")

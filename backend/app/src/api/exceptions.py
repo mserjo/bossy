@@ -17,15 +17,17 @@ from fastapi.exceptions import RequestValidationError
 # from starlette.exceptions import HTTPException as StarletteHTTPException # Можна також обробляти винятки Starlette
 
 # Повні шляхи імпорту
-from backend.app.src.config.logging import logger # Централізований логер
-from backend.app.src.config import settings as global_settings # Для доступу до DEBUG тощо
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings  # Для доступу до DEBUG тощо
+
+
 # from backend.app.src.core.exceptions import CustomAppException # Приклад, якщо визначено
 
 
 # --- Кастомний обробник для помилок валідації Pydantic (RequestValidationError) ---
 async def custom_request_validation_exception_handler(
-    request: Request,
-    exc: RequestValidationError
+        request: Request,
+        exc: RequestValidationError
 ) -> JSONResponse:
     """
     Обробляє винятки `RequestValidationError` від FastAPI, які виникають, коли дані запиту
@@ -35,8 +37,8 @@ async def custom_request_validation_exception_handler(
     """
     error_details = []
     for error in exc.errors():
-        location_str = ".".join(str(loc) for loc in error.get("loc", ("unknown",))) # unknown - i18n
-        location_str = location_str.replace(".[", "[").replace("body.", "") # Спрощення шляху
+        location_str = ".".join(str(loc) for loc in error.get("loc", ("unknown",)))  # unknown - i18n
+        location_str = location_str.replace(".[", "[").replace("body.", "")  # Спрощення шляху
 
         error_details.append({
             "field": location_str,
@@ -56,17 +58,18 @@ async def custom_request_validation_exception_handler(
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={
             "error": {
-                "type": "VALIDATION_ERROR", # i18n
+                "type": "VALIDATION_ERROR",  # i18n
                 "message": response_message,
                 "details": error_details,
             }
         },
     )
 
+
 # --- Кастомний обробник для HTTPException ---
 async def custom_http_exception_handler(
-    request: Request,
-    exc: HTTPException
+        request: Request,
+        exc: HTTPException
 ) -> JSONResponse:
     """
     Обробляє стандартні винятки `HTTPException` з FastAPI.
@@ -78,14 +81,14 @@ async def custom_http_exception_handler(
         f"Заголовки: {exc.headers}. Клієнт: {request.client.host if request.client else 'N/A'}"
     )
 
-    error_type = "HTTP_EXCEPTION" # i18n
+    error_type = "HTTP_EXCEPTION"  # i18n
     # Спробуємо отримати більш конкретний тип помилки, якщо він переданий через X-Error-Type
     # (нестандартний, але може бути корисним для внутрішніх потреб)
     if exc.headers and "X-Error-Type" in exc.headers:
         error_type = exc.headers["X-Error-Type"]
 
     if 500 <= exc.status_code < 600:
-        logger.error(log_message, exc_info=exc if global_settings.DEBUG else True) # traceback для серверних помилок
+        logger.error(log_message, exc_info=exc if global_settings.DEBUG else True)  # traceback для серверних помилок
     else:
         logger.warning(log_message)
 
@@ -94,16 +97,17 @@ async def custom_http_exception_handler(
         content={
             "error": {
                 "type": error_type,
-                "message": exc.detail, # Повідомлення з HTTPException
+                "message": exc.detail,  # Повідомлення з HTTPException
             }
         },
-        headers=exc.headers, # Передаємо оригінальні заголовки (наприклад, WWW-Authenticate)
+        headers=exc.headers,  # Передаємо оригінальні заголовки (наприклад, WWW-Authenticate)
     )
+
 
 # --- Загальний обробник для всіх інших винятків (500 Internal Server Error) ---
 async def generic_exception_handler(
-    request: Request,
-    exc: Exception
+        request: Request,
+        exc: Exception
 ) -> JSONResponse:
     """
     Обробляє будь-які неперехоплені винятки, повертаючи стандартизовану відповідь 500.
@@ -111,19 +115,20 @@ async def generic_exception_handler(
     """
     logger.error(
         f"Необроблений виняток: {request.method} {request.url.path}. Помилка: {exc}",
-        exc_info=True # Завжди логуємо повний traceback для невідомих помилок
+        exc_info=True  # Завжди логуємо повний traceback для невідомих помилок
     )
     # i18n
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={
             "error": {
-                "type": "INTERNAL_SERVER_ERROR", # i18n
-                "message": "Виникла непередбачена помилка на сервері. Будь ласка, спробуйте пізніше.", # i18n
+                "type": "INTERNAL_SERVER_ERROR",  # i18n
+                "message": "Виникла непередбачена помилка на сервері. Будь ласка, спробуйте пізніше.",  # i18n
                 # Не передаємо деталі винятку клієнту з міркувань безпеки
             }
         },
     )
+
 
 # --- Приклад обробника для кастомного винятку з backend.app.src.core.exceptions ---
 # TODO: Визначити CustomAppException в backend/app/src/core/exceptions.py
@@ -165,7 +170,6 @@ def register_exception_handlers(app_or_router: Union[FastAPI, APIRouter]) -> Non
     app_or_router.add_exception_handler(Exception, generic_exception_handler)
     logger.debug("Зареєстровано загальний обробник для Exception (500 Internal Server Error).")
 
-
     # TODO: Зареєструвати обробник для CustomAppException, коли він буде визначений
     # from backend.app.src.core.exceptions import CustomAppException # Приклад
     # app_or_router.add_exception_handler(CustomAppException, custom_app_exception_handler)
@@ -174,4 +178,5 @@ def register_exception_handlers(app_or_router: Union[FastAPI, APIRouter]) -> Non
     logger.info("Кастомні обробники винятків API успішно зареєстровано.")
 
 
-logger.info("Модуль 'api.exceptions' завантажено. Визначено обробники для RequestValidationError, HTTPException та загальний Exception.")
+logger.info(
+    "Модуль 'api.exceptions' завантажено. Визначено обробники для RequestValidationError, HTTPException та загальний Exception.")

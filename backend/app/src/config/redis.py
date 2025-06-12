@@ -1,4 +1,5 @@
-# /backend/app/src/config/redis.py
+# backend/app/src/config/redis.py
+# -*- coding: utf-8 -*-
 """
 Налаштування та управління з'єднанням з Redis для FastAPI програми Kudos.
 

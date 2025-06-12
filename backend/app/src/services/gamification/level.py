@@ -2,25 +2,25 @@
 # import logging # Замінено на централізований логер
 from typing import List, Optional, Any
 from uuid import UUID
-from datetime import datetime, timezone # Додано для updated_at
+from datetime import datetime, timezone  # Додано для updated_at
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload # Додано для завантаження зв'язків
+from sqlalchemy.orm import selectinload  # Додано для завантаження зв'язків
 
 # Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
-from backend.app.src.models.gamification.level import Level # Модель SQLAlchemy Level
-from backend.app.src.models.auth.user import User # Для зв'язків created_by_user, updated_by_user
-from backend.app.src.models.files.file import FileRecord # Для зв'язку icon_file
-from backend.app.src.models.groups.group import Group # Для зв'язку group
-from backend.app.src.schemas.gamification.level import ( # Схеми Pydantic
+from backend.app.src.models.gamification.level import Level  # Модель SQLAlchemy Level
+from backend.app.src.models.auth.user import User  # Для зв'язків created_by_user, updated_by_user
+from backend.app.src.models.files.file import FileRecord  # Для зв'язку icon_file
+from backend.app.src.models.groups.group import Group  # Для зв'язку group
+from backend.app.src.schemas.gamification.level import (  # Схеми Pydantic
     LevelCreate,
     LevelUpdate,
     LevelResponse,
 )
-from backend.app.src.config.logging import logger # Централізований логер
-from backend.app.src.config import settings # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
 
 class LevelService(BaseDictionaryService[Level, LevelCreate, LevelUpdate, LevelResponse]):
@@ -84,35 +84,36 @@ class LevelService(BaseDictionaryService[Level, LevelCreate, LevelUpdate, LevelR
         logger.info(f"{self._model_name} з ім'ям '{name}' (група ID: {group_id}) не знайдено.")
         return None
 
-    async def _check_uniqueness(self, name: str, min_points: int, group_id: Optional[UUID], item_id_to_exclude: Optional[UUID] = None) -> None:
+    async def _check_uniqueness(self, name: str, min_points: int, group_id: Optional[UUID],
+                                item_id_to_exclude: Optional[UUID] = None) -> None:
         """Перевіряє унікальність імені та min_points_required в межах групи або глобально."""
         # Перевірка імені
         stmt_name = select(self.model.id).where(self.model.name == name)
         # Перевірка min_points_required
         stmt_points = select(self.model.id).where(self.model.min_points_required == min_points)
 
-        scope_log_msg = "глобальній області" # i18n
+        scope_log_msg = "глобальній області"  # i18n
         if group_id:
             stmt_name = stmt_name.where(self.model.group_id == group_id)
             stmt_points = stmt_points.where(self.model.group_id == group_id)
-            scope_log_msg = f"групі ID '{group_id}'" # i18n
+            scope_log_msg = f"групі ID '{group_id}'"  # i18n
         else:
             stmt_name = stmt_name.where(self.model.group_id.is_(None))
             stmt_points = stmt_points.where(self.model.group_id.is_(None))
 
-        if item_id_to_exclude: # При оновленні виключаємо поточний елемент
+        if item_id_to_exclude:  # При оновленні виключаємо поточний елемент
             stmt_name = stmt_name.where(self.model.id != item_id_to_exclude)
             stmt_points = stmt_points.where(self.model.id != item_id_to_exclude)
 
         existing_by_name = (await self.db_session.execute(stmt_name)).scalar_one_or_none()
         if existing_by_name:
-            msg = f"{self._model_name} з ім'ям '{name}' вже існує в {scope_log_msg}." # i18n
+            msg = f"{self._model_name} з ім'ям '{name}' вже існує в {scope_log_msg}."  # i18n
             logger.warning(msg)
             raise ValueError(msg)
 
         existing_by_points = (await self.db_session.execute(stmt_points)).scalar_one_or_none()
         if existing_by_points:
-            msg = f"{self._model_name} з min_points_required '{min_points}' вже існує в {scope_log_msg}." # i18n
+            msg = f"{self._model_name} з min_points_required '{min_points}' вже існує в {scope_log_msg}."  # i18n
             logger.warning(msg)
             raise ValueError(msg)
 
@@ -133,12 +134,12 @@ class LevelService(BaseDictionaryService[Level, LevelCreate, LevelUpdate, LevelR
         self.db_session.add(new_item_db)
         try:
             await self.commit()
-            refreshed_item = await self.get_by_id(new_item_db.id) # Отримуємо з усіма зв'язками
-            if not refreshed_item: raise RuntimeError("Не вдалося отримати створений рівень.") # Малоймовірно
+            refreshed_item = await self.get_by_id(new_item_db.id)  # Отримуємо з усіма зв'язками
+            if not refreshed_item: raise RuntimeError("Не вдалося отримати створений рівень.")  # Малоймовірно
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності '{data.name}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося створити {self._model_name}: конфлікт даних.") # i18n
+            raise ValueError(f"Не вдалося створити {self._model_name}: конфлікт даних.")  # i18n
 
         logger.info(f"{self._model_name} '{refreshed_item.name}' ID: {refreshed_item.id} успішно створено.")
         return refreshed_item
@@ -161,17 +162,16 @@ class LevelService(BaseDictionaryService[Level, LevelCreate, LevelUpdate, LevelR
         new_min_points = update_data.get('min_points_required', item_db.min_points_required)
         new_group_id = update_data.get('group_id', item_db.group_id)
         if 'group_id' not in update_data and item_db.group_id is not None:
-             new_group_id = item_db.group_id
-
+            new_group_id = item_db.group_id
 
         # Перевірка унікальності, якщо name, min_points_required або group_id змінюються
         if ('name' in update_data and new_name != item_db.name) or \
-           ('min_points_required' in update_data and new_min_points != item_db.min_points_required) or \
-           ('group_id' in update_data and new_group_id != item_db.group_id):
+                ('min_points_required' in update_data and new_min_points != item_db.min_points_required) or \
+                ('group_id' in update_data and new_group_id != item_db.group_id):
             await self._check_uniqueness(new_name, new_min_points, new_group_id, item_id_to_exclude=item_id)
 
         if 'icon_file_id' in update_data and update_data['icon_file_id'] is not None \
-           and update_data['icon_file_id'] != item_db.icon_file_id:
+                and update_data['icon_file_id'] != item_db.icon_file_id:
             if not await self.db_session.get(FileRecord, update_data['icon_file_id']):
                 # i18n
                 raise ValueError(f"Файл іконки з ID '{update_data['icon_file_id']}' не знайдено.")
@@ -185,17 +185,18 @@ class LevelService(BaseDictionaryService[Level, LevelCreate, LevelUpdate, LevelR
         self.db_session.add(item_db)
         try:
             await self.commit()
-            refreshed_item = await self.get_by_id(item_db.id) # Отримуємо з усіма зв'язками
-            if not refreshed_item: raise RuntimeError("Не вдалося отримати оновлений рівень.") # Малоймовірно
+            refreshed_item = await self.get_by_id(item_db.id)  # Отримуємо з усіма зв'язками
+            if not refreshed_item: raise RuntimeError("Не вдалося отримати оновлений рівень.")  # Малоймовірно
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності ID '{item_id}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося оновити {self._model_name}: конфлікт даних.") # i18n
+            raise ValueError(f"Не вдалося оновити {self._model_name}: конфлікт даних.")  # i18n
 
         logger.info(f"{self._model_name} '{refreshed_item.name}' ID: {refreshed_item.id} успішно оновлено.")
         return refreshed_item
 
-    async def get_levels_ordered_by_points(self, group_id: Optional[UUID] = None, ascending: bool = True, skip: int = 0, limit: int = 100) -> List[LevelResponse]:
+    async def get_levels_ordered_by_points(self, group_id: Optional[UUID] = None, ascending: bool = True, skip: int = 0,
+                                           limit: int = 100) -> List[LevelResponse]:
         """
         Отримує всі рівні, відсортовані за min_points_required.
         Може фільтрувати за групою (показує рівні групи + глобальні, або тільки глобальні, або тільки групові).
@@ -214,7 +215,7 @@ class LevelService(BaseDictionaryService[Level, LevelCreate, LevelUpdate, LevelR
 
         stmt = select(self.model)
         conditions = []
-        if group_id is not None: # Показати рівні вказаної групи + глобальні
+        if group_id is not None:  # Показати рівні вказаної групи + глобальні
             conditions.append(or_(self.model.group_id == group_id, self.model.group_id.is_(None)))
         if conditions:
             stmt = stmt.where(*conditions)
@@ -226,7 +227,7 @@ class LevelService(BaseDictionaryService[Level, LevelCreate, LevelUpdate, LevelR
         # Додаткове сортування за level_order для стабільності або якщо точки однакові
         secondary_order_field = getattr(self.model, 'level_order', self.model.id)
         stmt = stmt.order_by(order_field, secondary_order_field).offset(skip).limit(limit)
-        stmt = await self._load_relations(stmt) # Завантажуємо зв'язки
+        stmt = await self._load_relations(stmt)  # Завантажуємо зв'язки
         items_db = (await self.db_session.execute(stmt)).scalars().unique().all()
 
         return [self.response_schema.model_validate(item) for item in items_db]
@@ -249,21 +250,22 @@ class LevelService(BaseDictionaryService[Level, LevelCreate, LevelUpdate, LevelR
         conditions = [or_(self.model.group_id == group_id, self.model.group_id.is_(None))]
         # Якщо group_id не надано, то group_id is None, що означає пошук тільки серед глобальних рівнів.
         if group_id is None:
-             conditions = [self.model.group_id.is_(None)]
+            conditions = [self.model.group_id.is_(None)]
 
         stmt = stmt.where(*conditions)
 
         # Сортування: спочатку за спаданням балів, потім за спаданням level_order (вища перевага), потім за ID
         stmt = stmt.order_by(
             self.model.min_points_required.desc(),
-            self.model.level_order.desc(), # Припускаємо, що вищий level_order кращий
-            self.model.id.desc() # Для детермінізму
+            self.model.level_order.desc(),  # Припускаємо, що вищий level_order кращий
+            self.model.id.desc()  # Для детермінізму
         )
-        stmt = await self._load_relations(stmt) # Завантажуємо зв'язки
-        level_db = (await self.db_session.execute(stmt)).scalars().first() # Беремо перший (найвищий підходящий)
+        stmt = await self._load_relations(stmt)  # Завантажуємо зв'язки
+        level_db = (await self.db_session.execute(stmt)).scalars().first()  # Беремо перший (найвищий підходящий)
 
         if level_db:
-            logger.info(f"Рівень '{level_db.name}' (ID: {level_db.id}) визначено для {points} балів (група ID: {group_id}).")
+            logger.info(
+                f"Рівень '{level_db.name}' (ID: {level_db.id}) визначено для {points} балів (група ID: {group_id}).")
             return self.response_schema.model_validate(level_db)
 
         logger.info(f"Специфічний рівень для {points} балів не знайдено (група ID: {group_id}).")
@@ -272,5 +274,6 @@ class LevelService(BaseDictionaryService[Level, LevelCreate, LevelUpdate, LevelR
     # `delete` успадковується.
     # TODO: Розглянути захист від видалення рівнів, якщо вони вже присвоєні користувачам
     # (через UserLevel) або якщо є залежні правила.
+
 
 logger.debug(f"{LevelService.__name__} (сервіс рівнів) успішно визначено.")

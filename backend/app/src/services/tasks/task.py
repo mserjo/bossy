@@ -11,27 +11,28 @@ from sqlalchemy.exc import IntegrityError
 
 # Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.tasks.task import Task # Модель SQLAlchemy Task
+from backend.app.src.models.tasks.task import Task  # Модель SQLAlchemy Task
 from backend.app.src.models.auth.user import User
 from backend.app.src.models.groups.group import Group
 from backend.app.src.models.dictionaries.task_types import TaskType
-from backend.app.src.models.dictionaries.statuses import Status # Для статусу завдання
+from backend.app.src.models.dictionaries.statuses import Status  # Для статусу завдання
 
 from backend.app.src.models.tasks.assignment import TaskAssignment
 from backend.app.src.models.tasks.completion import TaskCompletion
 from backend.app.src.models.tasks.review import TaskReview
 
-from backend.app.src.schemas.tasks.task import ( # Схеми Pydantic Task
+from backend.app.src.schemas.tasks.task import (  # Схеми Pydantic Task
     TaskCreate,
     TaskUpdate,
     TaskResponse,
-    TaskDetailedResponse # Розширена схема відповіді
+    TaskDetailedResponse  # Розширена схема відповіді
 )
-from backend.app.src.config.logging import logger # Централізований логер
-from backend.app.src.config import settings as global_settings # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
 # TODO: Винести коди статусів за замовчуванням (наприклад, "OPEN") в конфігурацію або константи.
 DEFAULT_TASK_STATUS_CODE = "OPEN"
+
 
 class TaskService(BaseService):
     """
@@ -44,7 +45,8 @@ class TaskService(BaseService):
         super().__init__(db_session)
         logger.info("TaskService ініціалізовано.")
 
-    async def get_task_by_id(self, task_id: UUID, include_details: bool = False) -> Optional[TaskResponse]: # Або TaskDetailedResponse
+    async def get_task_by_id(self, task_id: UUID, include_details: bool = False) -> Optional[
+        TaskResponse]:  # Або TaskDetailedResponse
         """
         Отримує завдання за його ID.
         Опціонально може включати більше деталей, таких як виконавці, завершення, тип, статус тощо.
@@ -58,7 +60,7 @@ class TaskService(BaseService):
         query = select(Task).where(Task.id == task_id)
         if include_details:
             query = query.options(
-                selectinload(Task.group), # Завжди завантажуємо групу, якщо є
+                selectinload(Task.group),  # Завжди завантажуємо групу, якщо є
                 selectinload(Task.task_type),
                 selectinload(Task.status),
                 selectinload(Task.created_by_user).options(selectinload(User.user_type)),
@@ -74,9 +76,9 @@ class TaskService(BaseService):
                 )
                 # TODO: selectinload(Task.bonus_rules), якщо є прямий зв'язок
             )
-        else: # Для звичайного TaskResponse
+        else:  # Для звичайного TaskResponse
             query = query.options(
-                selectinload(Task.group).options(noload("*")), # Тільки ID, якщо GroupResponse не потрібен повністю
+                selectinload(Task.group).options(noload("*")),  # Тільки ID, якщо GroupResponse не потрібен повністю
                 selectinload(Task.task_type),
                 selectinload(Task.status),
                 selectinload(Task.created_by_user).options(noload("*"))
@@ -87,7 +89,7 @@ class TaskService(BaseService):
         if task_db:
             logger.info(f"Завдання з ID '{task_id}' знайдено.")
             response_model = TaskDetailedResponse if include_details else TaskResponse
-            return response_model.model_validate(task_db) # Pydantic v2
+            return response_model.model_validate(task_db)  # Pydantic v2
 
         logger.info(f"Завдання з ID '{task_id}' не знайдено.")
         return None
@@ -113,50 +115,58 @@ class TaskService(BaseService):
             raise ValueError(f"Тип завдання з ID '{task_create_data.task_type_id}' не знайдено.")
 
         status_id_to_set = task_create_data.status_id
-        if not status_id_to_set: # Якщо статус не надано, встановлюємо за замовчуванням
+        if not status_id_to_set:  # Якщо статус не надано, встановлюємо за замовчуванням
             default_status_id = (await self.db_session.execute(
                 select(Status.id).where(Status.code == DEFAULT_TASK_STATUS_CODE))
-            ).scalar_one_or_none()
+                                 ).scalar_one_or_none()
             if not default_status_id:
-                logger.error(f"Статус за замовчуванням '{DEFAULT_TASK_STATUS_CODE}' не знайдено. Створення завдання не вдалося.")
+                logger.error(
+                    f"Статус за замовчуванням '{DEFAULT_TASK_STATUS_CODE}' не знайдено. Створення завдання не вдалося.")
                 # i18n
-                raise ValueError(f"Статус завдання є обов'язковим, але статус за замовчуванням '{DEFAULT_TASK_STATUS_CODE}' не знайдено.")
+                raise ValueError(
+                    f"Статус завдання є обов'язковим, але статус за замовчуванням '{DEFAULT_TASK_STATUS_CODE}' не знайдено.")
             status_id_to_set = default_status_id
-            logger.info(f"Для нового завдання не надано ID статусу, використано статус за замовчуванням ID: {status_id_to_set}")
-        elif not await self.db_session.get(Status, status_id_to_set): # Якщо ID статусу надано, перевіряємо його
-             # i18n
+            logger.info(
+                f"Для нового завдання не надано ID статусу, використано статус за замовчуванням ID: {status_id_to_set}")
+        elif not await self.db_session.get(Status, status_id_to_set):  # Якщо ID статусу надано, перевіряємо його
+            # i18n
             raise ValueError(f"Статус з ID '{status_id_to_set}' не знайдено.")
 
         # Створення завдання
         # `created_at`, `updated_at` встановлюються автоматично моделлю
         new_task_db = Task(
-            **task_create_data.model_dump(exclude={'status_id'}), # Виключаємо status_id, бо він встановлюється окремо
-            status_id=status_id_to_set, # Встановлюємо перевірений/дефолтний status_id
+            **task_create_data.model_dump(exclude={'status_id'}),  # Виключаємо status_id, бо він встановлюється окремо
+            status_id=status_id_to_set,  # Встановлюємо перевірений/дефолтний status_id
             created_by_user_id=creator_user_id,
-            updated_by_user_id=creator_user_id # При створенні
+            updated_by_user_id=creator_user_id  # При створенні
         )
         self.db_session.add(new_task_db)
         try:
             await self.commit()
             # Отримуємо завдання з усіма деталями для відповіді
             created_task_detailed = await self.get_task_by_id(new_task_db.id, include_details=True)
-            if not created_task_detailed: # Малоймовірно
+            if not created_task_detailed:  # Малоймовірно
                 # i18n
-                raise RuntimeError(f"Критична помилка: не вдалося отримати створене завдання ID {new_task_db.id} після коміту.")
+                raise RuntimeError(
+                    f"Критична помилка: не вдалося отримати створене завдання ID {new_task_db.id} після коміту.")
 
-            logger.info(f"Завдання '{new_task_db.title}' (ID: {new_task_db.id}) успішно створено користувачем ID '{creator_user_id}'.")
+            logger.info(
+                f"Завдання '{new_task_db.title}' (ID: {new_task_db.id}) успішно створено користувачем ID '{creator_user_id}'.")
             return created_task_detailed
         except IntegrityError as e:
             await self.rollback()
-            logger.error(f"Помилка цілісності при створенні завдання '{task_create_data.title}': {e}", exc_info=global_settings.DEBUG)
+            logger.error(f"Помилка цілісності при створенні завдання '{task_create_data.title}': {e}",
+                         exc_info=global_settings.DEBUG)
             # i18n
             raise ValueError(f"Не вдалося створити завдання через конфлікт даних: {e}")
         except Exception as e:
             await self.rollback()
-            logger.error(f"Неочікувана помилка при створенні завдання '{task_create_data.title}': {e}", exc_info=global_settings.DEBUG)
+            logger.error(f"Неочікувана помилка при створенні завдання '{task_create_data.title}': {e}",
+                         exc_info=global_settings.DEBUG)
             raise
 
-    async def update_task(self, task_id: UUID, task_update_data: TaskUpdate, current_user_id: UUID) -> Optional[TaskDetailedResponse]:
+    async def update_task(self, task_id: UUID, task_update_data: TaskUpdate, current_user_id: UUID) -> Optional[
+        TaskDetailedResponse]:
         """Оновлює деталі завдання."""
         # Перевірка прав (наприклад, чи є користувач адміном групи або творцем завдання) - на рівні API.
         logger.debug(f"Спроба оновлення завдання ID: {task_id} користувачем ID: {current_user_id}")
@@ -166,7 +176,7 @@ class TaskService(BaseService):
             logger.warning(f"Завдання ID '{task_id}' не знайдено для оновлення.")
             return None
 
-        update_data = task_update_data.model_dump(exclude_unset=True) # Pydantic v2
+        update_data = task_update_data.model_dump(exclude_unset=True)  # Pydantic v2
 
         # Перевірка існування пов'язаних сутностей, якщо вони змінюються
         if 'task_type_id' in update_data and task_db.task_type_id != update_data['task_type_id']:
@@ -183,20 +193,22 @@ class TaskService(BaseService):
             setattr(task_db, field, value)
 
         task_db.updated_by_user_id = current_user_id
-        task_db.updated_at = datetime.now(timezone.utc) # Явне оновлення
+        task_db.updated_at = datetime.now(timezone.utc)  # Явне оновлення
 
         self.db_session.add(task_db)
         try:
             await self.commit()
             updated_task_detailed = await self.get_task_by_id(task_id, include_details=True)
-            if not updated_task_detailed: # Малоймовірно
+            if not updated_task_detailed:  # Малоймовірно
                 # i18n
-                raise RuntimeError(f"Критична помилка: не вдалося отримати оновлене завдання ID {task_id} після коміту.")
+                raise RuntimeError(
+                    f"Критична помилка: не вдалося отримати оновлене завдання ID {task_id} після коміту.")
             logger.info(f"Завдання ID '{task_id}' успішно оновлено користувачем ID '{current_user_id}'.")
             return updated_task_detailed
-        except IntegrityError as e: # Наприклад, якщо назва завдання має бути унікальною в групі (не реалізовано)
+        except IntegrityError as e:  # Наприклад, якщо назва завдання має бути унікальною в групі (не реалізовано)
             await self.rollback()
-            logger.error(f"Помилка цілісності при оновленні завдання ID '{task_id}': {e}", exc_info=global_settings.DEBUG)
+            logger.error(f"Помилка цілісності при оновленні завдання ID '{task_id}': {e}",
+                         exc_info=global_settings.DEBUG)
             # i18n
             raise ValueError(f"Не вдалося оновити завдання через конфлікт даних: {e}")
         except Exception as e:
@@ -220,11 +232,13 @@ class TaskService(BaseService):
         try:
             await self.db_session.delete(task_db)
             await self.commit()
-            logger.info(f"Завдання ID '{task_id}' (Назва: '{task_db.title}') успішно видалено користувачем ID '{current_user_id}'.")
+            logger.info(
+                f"Завдання ID '{task_id}' (Назва: '{task_db.title}') успішно видалено користувачем ID '{current_user_id}'.")
             return True
-        except IntegrityError as e: # Якщо є залежності, що блокують видалення (FK constraints)
+        except IntegrityError as e:  # Якщо є залежності, що блокують видалення (FK constraints)
             await self.rollback()
-            logger.error(f"Помилка цілісності '{task_id}': {e}. Можливо, завдання використовується.", exc_info=global_settings.DEBUG)
+            logger.error(f"Помилка цілісності '{task_id}': {e}. Можливо, завдання використовується.",
+                         exc_info=global_settings.DEBUG)
             # i18n
             raise ValueError(f"Завдання '{task_db.title}' використовується і не може бути видалене.")
         except Exception as e:
@@ -233,16 +247,17 @@ class TaskService(BaseService):
             raise
 
     async def list_tasks_for_group(
-        self, group_id: UUID, skip: int = 0, limit: int = 100,
-        status_code: Optional[str] = None, task_type_code: Optional[str] = None,
-        assignee_user_id: Optional[UUID] = None, # Фільтр за призначеним користувачем
-        is_recurring_filter: Optional[bool] = None, # Фільтр за повторюваністю
-        due_date_before: Optional[datetime] = None, # Фільтр за терміном виконання (до)
-        due_date_after: Optional[datetime] = None,  # Фільтр за терміном виконання (після)
-        include_details: bool = False
-    ) -> List[TaskResponse]: # Або List[TaskDetailedResponse]
+            self, group_id: UUID, skip: int = 0, limit: int = 100,
+            status_code: Optional[str] = None, task_type_code: Optional[str] = None,
+            assignee_user_id: Optional[UUID] = None,  # Фільтр за призначеним користувачем
+            is_recurring_filter: Optional[bool] = None,  # Фільтр за повторюваністю
+            due_date_before: Optional[datetime] = None,  # Фільтр за терміном виконання (до)
+            due_date_after: Optional[datetime] = None,  # Фільтр за терміном виконання (після)
+            include_details: bool = False
+    ) -> List[TaskResponse]:  # Або List[TaskDetailedResponse]
         """Перелічує завдання для групи з розширеними фільтрами та пагінацією."""
-        logger.debug(f"Перелік завдань для групи ID: {group_id}, статус: {status_code}, тип: {task_type_code}, деталі: {include_details}")
+        logger.debug(
+            f"Перелік завдань для групи ID: {group_id}, статус: {status_code}, тип: {task_type_code}, деталі: {include_details}")
 
         query = select(Task).where(Task.group_id == group_id)
 
@@ -257,11 +272,12 @@ class TaskService(BaseService):
                 ),
                 selectinload(Task.completions), selectinload(Task.reviews)
             )
-        else: # Мінімум для TaskResponse
-             query = query.options(
-                 selectinload(Task.task_type),
-                 selectinload(Task.status),
-                 selectinload(Task.created_by_user).options(noload("*")) # Тільки ID, якщо UserResponse не потрібен повністю
+        else:  # Мінімум для TaskResponse
+            query = query.options(
+                selectinload(Task.task_type),
+                selectinload(Task.status),
+                selectinload(Task.created_by_user).options(noload("*"))
+                # Тільки ID, якщо UserResponse не потрібен повністю
             )
 
         # Застосування фільтрів
@@ -273,7 +289,7 @@ class TaskService(BaseService):
             # Потрібен join з TaskAssignment
             query = query.join(TaskAssignment, Task.id == TaskAssignment.task_id).where(
                 TaskAssignment.user_id == assignee_user_id,
-                TaskAssignment.is_active == True # Тільки активні призначення
+                TaskAssignment.is_active == True  # Тільки активні призначення
             )
         if is_recurring_filter is not None:
             query = query.where(Task.is_recurring == is_recurring_filter)
@@ -288,9 +304,10 @@ class TaskService(BaseService):
         tasks_db = (await self.db_session.execute(query)).scalars().unique().all()
 
         response_model = TaskDetailedResponse if include_details else TaskResponse
-        response_list = [response_model.model_validate(t) for t in tasks_db] # Pydantic v2
+        response_list = [response_model.model_validate(t) for t in tasks_db]  # Pydantic v2
 
         logger.info(f"Отримано {len(response_list)} завдань для групи ID '{group_id}'.")
         return response_list
+
 
 logger.debug(f"{TaskService.__name__} (сервіс завдань) успішно визначено.")

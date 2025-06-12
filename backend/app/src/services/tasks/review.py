@@ -11,19 +11,20 @@ from sqlalchemy.exc import IntegrityError
 
 # Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.tasks.review import TaskReview # Модель SQLAlchemy TaskReview
-from backend.app.src.models.tasks.task import Task # Для контексту завдання
+from backend.app.src.models.tasks.review import TaskReview  # Модель SQLAlchemy TaskReview
+from backend.app.src.models.tasks.task import Task  # Для контексту завдання
 # from backend.app.src.models.tasks.event import Event # Якщо відгуки можуть бути і для подій
-from backend.app.src.models.auth.user import User # Для контексту користувача (рецензента)
-from backend.app.src.models.tasks.completion import TaskCompletion # Відгуки можуть бути пов'язані з конкретним виконанням
+from backend.app.src.models.auth.user import User  # Для контексту користувача (рецензента)
+from backend.app.src.models.tasks.completion import \
+    TaskCompletion  # Відгуки можуть бути пов'язані з конкретним виконанням
 
-from backend.app.src.schemas.tasks.review import ( # Схеми Pydantic
+from backend.app.src.schemas.tasks.review import (  # Схеми Pydantic
     TaskReviewCreate,
     TaskReviewUpdate,
     TaskReviewResponse
 )
-from backend.app.src.config.logging import logger # Централізований логер
-from backend.app.src.config import settings as global_settings # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
 
 class TaskReviewService(BaseService):
@@ -43,18 +44,18 @@ class TaskReviewService(BaseService):
             selectinload(TaskReview.task).options(
                 selectinload(Task.task_type), selectinload(Task.status), selectinload(Task.group)
             ),
-            selectinload(TaskReview.completion).options( # Якщо відгук пов'язаний з виконанням
-                selectinload(TaskCompletion.user).options(selectinload(User.user_type)) # Користувач, що виконав
+            selectinload(TaskReview.completion).options(  # Якщо відгук пов'язаний з виконанням
+                selectinload(TaskCompletion.user).options(selectinload(User.user_type))  # Користувач, що виконав
             )
         ).where(TaskReview.id == review_id)
         return (await self.db_session.execute(stmt)).scalar_one_or_none()
 
     async def create_task_review(
-        self,
-        task_id: UUID,
-        reviewer_user_id: UUID,
-        review_data: TaskReviewCreate,
-        completion_id: Optional[UUID] = None # Опціонально, якщо відгук стосується конкретного виконання
+            self,
+            task_id: UUID,
+            reviewer_user_id: UUID,
+            review_data: TaskReviewCreate,
+            completion_id: Optional[UUID] = None  # Опціонально, якщо відгук стосується конкретного виконання
     ) -> TaskReviewResponse:
         """
         Створює новий відгук для завдання.
@@ -69,14 +70,14 @@ class TaskReviewService(BaseService):
         logger.debug(f"Користувач ID '{reviewer_user_id}' намагається створити відгук для завдання ID '{task_id}'.")
 
         if not await self.db_session.get(Task, task_id):
-            raise ValueError(f"Завдання з ID '{task_id}' не знайдено.") # i18n
+            raise ValueError(f"Завдання з ID '{task_id}' не знайдено.")  # i18n
         if not await self.db_session.get(User, reviewer_user_id):
-            raise ValueError(f"Рецензента з ID '{reviewer_user_id}' не знайдено.") # i18n
+            raise ValueError(f"Рецензента з ID '{reviewer_user_id}' не знайдено.")  # i18n
 
         if completion_id:
             completion = await self.db_session.get(TaskCompletion, completion_id)
             if not completion:
-                raise ValueError(f"Виконання завдання з ID '{completion_id}' не знайдено.") # i18n
+                raise ValueError(f"Виконання завдання з ID '{completion_id}' не знайдено.")  # i18n
             if completion.task_id != task_id:
                 # i18n
                 raise ValueError(f"Виконання ID '{completion_id}' не належить завданню ID '{task_id}'.")
@@ -101,7 +102,7 @@ class TaskReviewService(BaseService):
         #     raise ValueError(f"Користувач ID '{reviewer_user_id}' вже залишив відгук для {context_msg}.") # i18n
 
         new_review_db = TaskReview(
-            **review_data.model_dump(), # Pydantic v2
+            **review_data.model_dump(),  # Pydantic v2
             task_id=task_id,
             reviewer_user_id=reviewer_user_id,
             completion_id=completion_id
@@ -111,15 +112,17 @@ class TaskReviewService(BaseService):
         try:
             await self.commit()
             refreshed_review = await self._get_orm_review_with_relations(new_review_db.id)
-            if not refreshed_review: raise RuntimeError("Не вдалося отримати створений відгук.") # i18n
+            if not refreshed_review: raise RuntimeError("Не вдалося отримати створений відгук.")  # i18n
         except IntegrityError as e:
             await self.rollback()
-            logger.error(f"Помилка цілісності при створенні відгуку для завдання ID '{task_id}': {e}", exc_info=global_settings.DEBUG)
+            logger.error(f"Помилка цілісності при створенні відгуку для завдання ID '{task_id}': {e}",
+                         exc_info=global_settings.DEBUG)
             # i18n
             raise ValueError(f"Не вдалося створити відгук через конфлікт даних: {e}")
 
-        logger.info(f"Відгук ID: {refreshed_review.id} успішно створено для завдання ID '{task_id}' користувачем ID '{reviewer_user_id}'.")
-        return TaskReviewResponse.model_validate(refreshed_review) # Pydantic v2
+        logger.info(
+            f"Відгук ID: {refreshed_review.id} успішно створено для завдання ID '{task_id}' користувачем ID '{reviewer_user_id}'.")
+        return TaskReviewResponse.model_validate(refreshed_review)  # Pydantic v2
 
     async def get_review_by_id(self, review_id: UUID) -> Optional[TaskReviewResponse]:
         """Отримує відгук за його ID."""
@@ -127,12 +130,12 @@ class TaskReviewService(BaseService):
         review_db = await self._get_orm_review_with_relations(review_id)
         if review_db:
             logger.info(f"Відгук на завдання з ID '{review_id}' знайдено.")
-            return TaskReviewResponse.model_validate(review_db) # Pydantic v2
+            return TaskReviewResponse.model_validate(review_db)  # Pydantic v2
         logger.info(f"Відгук на завдання з ID '{review_id}' не знайдено.")
         return None
 
     async def update_task_review(
-        self, review_id: UUID, review_update_data: TaskReviewUpdate, current_user_id: UUID
+            self, review_id: UUID, review_update_data: TaskReviewUpdate, current_user_id: UUID
     ) -> Optional[TaskReviewResponse]:
         """
         Оновлює існуючий відгук на завдання.
@@ -140,32 +143,34 @@ class TaskReviewService(BaseService):
         """
         logger.debug(f"Користувач ID '{current_user_id}' намагається оновити відгук ID: {review_id}")
 
-        review_db = await self.db_session.get(TaskReview, review_id) # Не завантажуємо зв'язки для простої перевірки власника
+        review_db = await self.db_session.get(TaskReview,
+                                              review_id)  # Не завантажуємо зв'язки для простої перевірки власника
         if not review_db:
             logger.warning(f"Відгук ID '{review_id}' не знайдено для оновлення.")
             return None
 
         # TODO: Додати перевірку прав адміністратора/суперкористувача для оновлення чужих відгуків.
         if review_db.reviewer_user_id != current_user_id:
-            logger.error(f"Користувач ID '{current_user_id}' не авторизований для оновлення відгуку ID '{review_id}' (власник: {review_db.reviewer_user_id}).")
+            logger.error(
+                f"Користувач ID '{current_user_id}' не авторизований для оновлення відгуку ID '{review_id}' (власник: {review_db.reviewer_user_id}).")
             # i18n
             raise PermissionError("Ви не маєте дозволу на оновлення цього відгуку.")
 
-        update_data = review_update_data.model_dump(exclude_unset=True) # Pydantic v2
+        update_data = review_update_data.model_dump(exclude_unset=True)  # Pydantic v2
         for field, value in update_data.items():
             setattr(review_db, field, value)
 
-        review_db.updated_at = datetime.now(timezone.utc) # Явне оновлення
+        review_db.updated_at = datetime.now(timezone.utc)  # Явне оновлення
 
         self.db_session.add(review_db)
         await self.commit()
 
         # Отримуємо оновлений запис з усіма зв'язками для відповіді
         updated_review = await self._get_orm_review_with_relations(review_id)
-        if not updated_review: raise RuntimeError("Не вдалося отримати оновлений відгук.") # i18n
+        if not updated_review: raise RuntimeError("Не вдалося отримати оновлений відгук.")  # i18n
 
         logger.info(f"Відгук ID '{review_id}' успішно оновлено користувачем ID '{current_user_id}'.")
-        return TaskReviewResponse.model_validate(updated_review) # Pydantic v2
+        return TaskReviewResponse.model_validate(updated_review)  # Pydantic v2
 
     async def delete_task_review(self, review_id: UUID, current_user_id: UUID) -> bool:
         """
@@ -181,9 +186,10 @@ class TaskReviewService(BaseService):
 
         # TODO: Додати перевірку прав адміністратора/суперкористувача для видалення чужих відгуків.
         if review_db.reviewer_user_id != current_user_id:
-             logger.warning(f"Користувач ID '{current_user_id}' не є власником відгуку ID '{review_id}'. Видалення заборонено.")
-             # i18n
-             raise PermissionError("Ви можете видаляти тільки власні відгуки.")
+            logger.warning(
+                f"Користувач ID '{current_user_id}' не є власником відгуку ID '{review_id}'. Видалення заборонено.")
+            # i18n
+            raise PermissionError("Ви можете видаляти тільки власні відгуки.")
 
         await self.db_session.delete(review_db)
         await self.commit()
@@ -196,29 +202,32 @@ class TaskReviewService(BaseService):
 
         stmt = select(TaskReview).options(
             selectinload(TaskReview.reviewer_user).options(selectinload(User.user_type)),
-            selectinload(TaskReview.task).options(noload("*")), # Завдання вже відоме
-            selectinload(TaskReview.completion) # Опціонально, може бути None
+            selectinload(TaskReview.task).options(noload("*")),  # Завдання вже відоме
+            selectinload(TaskReview.completion)  # Опціонально, може бути None
         ).where(TaskReview.task_id == task_id).order_by(TaskReview.created_at.desc()).offset(skip).limit(limit)
 
         reviews_db = (await self.db_session.execute(stmt)).scalars().unique().all()
 
-        response_list = [TaskReviewResponse.model_validate(r) for r in reviews_db] # Pydantic v2
+        response_list = [TaskReviewResponse.model_validate(r) for r in reviews_db]  # Pydantic v2
         logger.info(f"Отримано {len(response_list)} відгуків для завдання ID '{task_id}'.")
         return response_list
 
-    async def list_reviews_by_user(self, reviewer_user_id: UUID, skip: int = 0, limit: int = 100) -> List[TaskReviewResponse]:
+    async def list_reviews_by_user(self, reviewer_user_id: UUID, skip: int = 0, limit: int = 100) -> List[
+        TaskReviewResponse]:
         """Перелічує всі відгуки, залишені конкретним користувачем."""
         logger.debug(f"Перелік відгуків користувачем ID: {reviewer_user_id}, пропустити={skip}, ліміт={limit}")
 
         stmt = select(TaskReview).options(
-            selectinload(TaskReview.reviewer_user).options(noload("*")), # Рецензент вже відомий
+            selectinload(TaskReview.reviewer_user).options(noload("*")),  # Рецензент вже відомий
             selectinload(TaskReview.task).options(selectinload(Task.task_type), selectinload(Task.group)),
             selectinload(TaskReview.completion)
-        ).where(TaskReview.reviewer_user_id == reviewer_user_id).order_by(TaskReview.created_at.desc()).offset(skip).limit(limit)
+        ).where(TaskReview.reviewer_user_id == reviewer_user_id).order_by(TaskReview.created_at.desc()).offset(
+            skip).limit(limit)
 
         reviews_db = (await self.db_session.execute(stmt)).scalars().unique().all()
-        response_list = [TaskReviewResponse.model_validate(r) for r in reviews_db] # Pydantic v2
+        response_list = [TaskReviewResponse.model_validate(r) for r in reviews_db]  # Pydantic v2
         logger.info(f"Отримано {len(response_list)} відгуків користувачем ID '{reviewer_user_id}'.")
         return response_list
+
 
 logger.debug(f"{TaskReviewService.__name__} (сервіс відгуків на завдання) успішно визначено.")

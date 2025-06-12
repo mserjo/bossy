@@ -3,26 +3,27 @@ import logging
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 from decimal import Decimal
-from datetime import timedelta, datetime, timezone # Додано datetime, timezone
+from datetime import timedelta, datetime, timezone  # Додано datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy import func
 
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.bonuses.bonus import BonusRule # Повний шлях не потрібен, бо це той самий рівень
+from backend.app.src.models.bonuses.bonus import BonusRule  # Повний шлях не потрібен, бо це той самий рівень
 from backend.app.src.models.tasks.task import Task
 from backend.app.src.models.tasks.completion import TaskCompletion
 from backend.app.src.models.auth.user import User
 # from backend.app.src.models.groups.group import Group # Не використовується прямо
 
 from backend.app.src.schemas.bonuses.bonus_rule import BonusRuleResponse
-from backend.app.src.services.bonuses.bonus_rule import BonusRuleService # Імпорт сервісу правил
-from backend.app.src.config.logging import logger # Централізований логер
-from backend.app.src.config import settings # Для доступу до конфігурацій
+from backend.app.src.services.bonuses.bonus_rule import BonusRuleService  # Імпорт сервісу правил
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до конфігурацій
 
 # TODO: Винести COMPLETION_STATUS_APPROVED до спільного файлу констант/енумів, якщо він використовується в інших місцях.
-COMPLETION_STATUS_APPROVED = "APPROVED" # Статус для перевірки успішного виконання завдання
+COMPLETION_STATUS_APPROVED = "APPROVED"  # Статус для перевірки успішного виконання завдання
+
 
 class BonusCalculationService(BaseService):
     """
@@ -37,11 +38,11 @@ class BonusCalculationService(BaseService):
         logger.info("BonusCalculationService ініціалізовано.")
 
     async def calculate_bonus_for_task_completion(
-        self,
-        task: Task,
-        user: User,
-        task_completion: TaskCompletion
-    ) -> Tuple[Optional[Decimal], Optional[UUID]]: # Повертає суму бонусу та ID застосованого правила
+            self,
+            task: Task,
+            user: User,
+            task_completion: TaskCompletion
+    ) -> Tuple[Optional[Decimal], Optional[UUID]]:  # Повертає суму бонусу та ID застосованого правила
         """
         Розраховує бонус за виконання завдання.
 
@@ -61,18 +62,20 @@ class BonusCalculationService(BaseService):
         logger.info(f"Розрахунок бонусу за виконання завдання ID '{task.id}' користувачем ID '{user.id}'.")
 
         if task_completion.status != COMPLETION_STATUS_APPROVED:
-            logger.info(f"Завдання ID '{task.id}' не має статусу '{COMPLETION_STATUS_APPROVED}'. Бонус не нараховується.")
+            logger.info(
+                f"Завдання ID '{task.id}' не має статусу '{COMPLETION_STATUS_APPROVED}'. Бонус не нараховується.")
             return None, None
 
         if not task.group_id:
             # TODO: Уточнити в technical_task.txt, як обробляти завдання без групи.
             # Поки що логуємо попередження, але дозволяємо застосування глобальних правил.
-            logger.warning(f"Завдання ID '{task.id}' не має контексту групи. Можуть бути застосовані лише глобальні правила, не специфічні для групи.")
+            logger.warning(
+                f"Завдання ID '{task.id}' не має контексту групи. Можуть бути застосовані лише глобальні правила, не специфічні для групи.")
 
         bonus_rule_service = BonusRuleService(self.db_session)
         # get_applicable_bonus_rules вже сортує за специфічністю
         applicable_rules_schemas: List[BonusRuleResponse] = await bonus_rule_service.get_applicable_bonus_rules(
-            group_id=task.group_id, # Може бути None, якщо завдання не в групі
+            group_id=task.group_id,  # Може бути None, якщо завдання не в групі
             task_id=task.id,
             task_type_id=task.task_type_id
         )
@@ -83,8 +86,10 @@ class BonusCalculationService(BaseService):
 
         candidate_rules: List[BonusRuleResponse] = []
         for rule_schema in applicable_rules_schemas:
-            logger.debug(f"Оцінка правила ID '{rule_schema.id}' (Ім'я: '{rule_schema.name}', Бали: {rule_schema.points_amount})")
-            if rule_schema.points_amount is None or rule_schema.points_amount == Decimal("0"): # Правила без балів або з нульовими балами не розглядаються
+            logger.debug(
+                f"Оцінка правила ID '{rule_schema.id}' (Ім'я: '{rule_schema.name}', Бали: {rule_schema.points_amount})")
+            if rule_schema.points_amount is None or rule_schema.points_amount == Decimal(
+                    "0"):  # Правила без балів або з нульовими балами не розглядаються
                 logger.debug(f"Правило ID '{rule_schema.id}' пропущено: немає балів або бали нульові.")
                 continue
 
@@ -108,13 +113,12 @@ class BonusCalculationService(BaseService):
         logger.info(f"Застосовано правило '{best_rule.name}' (ID: {best_rule.id}): {final_bonus_amount} балів.")
         return final_bonus_amount, best_rule.id
 
-
     async def _check_rule_conditions(
-        self,
-        rule: BonusRuleResponse,
-        task: Task,
-        user: User,
-        task_completion: TaskCompletion
+            self,
+            rule: BonusRuleResponse,
+            task: Task,
+            user: User,
+            task_completion: TaskCompletion
     ) -> bool:
         """
         Перевіряє виконання умов конкретного правила.
@@ -129,10 +133,10 @@ class BonusCalculationService(BaseService):
 
         # Базова перевірка: завдання має бути ухвалене
         if task_completion.status != COMPLETION_STATUS_APPROVED:
-            return False # Умова не виконана, якщо завдання не ухвалене
+            return False  # Умова не виконана, якщо завдання не ухвалене
 
         condition_type = rule.condition_type
-        config = rule.condition_config if rule.condition_config else {} # Забезпечуємо наявність dict
+        config = rule.condition_config if rule.condition_config else {}  # Забезпечуємо наявність dict
 
         if condition_type == "DEFAULT":
             logger.debug(f"Умова 'DEFAULT' для правила '{rule.name}' завжди виконана.")
@@ -143,7 +147,8 @@ class BonusCalculationService(BaseService):
                 if task_completion.completed_at <= task.due_date:
                     logger.debug(f"Умова 'TASK_COMPLETED_ON_TIME' для правила '{rule.name}' виконана.")
                     return True
-            logger.debug(f"Умова 'TASK_COMPLETED_ON_TIME' для правила '{rule.name}' не виконана (немає due_date, completed_at або виконано із запізненням).")
+            logger.debug(
+                f"Умова 'TASK_COMPLETED_ON_TIME' для правила '{rule.name}' не виконана (немає due_date, completed_at або виконано із запізненням).")
             return False
 
         elif condition_type == "TASK_COMPLETED_EARLY":
@@ -151,22 +156,25 @@ class BonusCalculationService(BaseService):
             if task.due_date and task_completion.completed_at and min_hours_early > 0:
                 required_completion_time = task.due_date - timedelta(hours=float(min_hours_early))
                 if task_completion.completed_at <= required_completion_time:
-                    logger.debug(f"Умова 'TASK_COMPLETED_EARLY' (мін. {min_hours_early} год.) для правила '{rule.name}' виконана.")
+                    logger.debug(
+                        f"Умова 'TASK_COMPLETED_EARLY' (мін. {min_hours_early} год.) для правила '{rule.name}' виконана.")
                     return True
-            logger.debug(f"Умова 'TASK_COMPLETED_EARLY' для '{rule.name}' не виконана (не відповідає критеріям дострокового виконання).")
+            logger.debug(
+                f"Умова 'TASK_COMPLETED_EARLY' для '{rule.name}' не виконана (не відповідає критеріям дострокового виконання).")
             return False
 
         elif condition_type == "USER_FIRST_TASK_COMPLETION":
             stmt = select(func.count(TaskCompletion.id)).where(
                 TaskCompletion.user_id == user.id,
                 TaskCompletion.status == COMPLETION_STATUS_APPROVED,
-                TaskCompletion.id != task_completion.id # Не рахувати поточне виконання
+                TaskCompletion.id != task_completion.id  # Не рахувати поточне виконання
             )
             prior_completions_count = (await self.db_session.execute(stmt)).scalar_one()
             if prior_completions_count == 0:
                 logger.debug(f"Умова 'USER_FIRST_TASK_COMPLETION' для правила '{rule.name}' виконана.")
                 return True
-            logger.debug(f"Умова 'USER_FIRST_TASK_COMPLETION' для '{rule.name}' не виконана (є {prior_completions_count} попередніх виконань).")
+            logger.debug(
+                f"Умова 'USER_FIRST_TASK_COMPLETION' для '{rule.name}' не виконана (є {prior_completions_count} попередніх виконань).")
             return False
 
         elif condition_type == "USER_FIRST_SPECIFIC_TASK_COMPLETION":
@@ -174,13 +182,14 @@ class BonusCalculationService(BaseService):
                 TaskCompletion.user_id == user.id,
                 TaskCompletion.task_id == task.id,
                 TaskCompletion.status == COMPLETION_STATUS_APPROVED,
-                TaskCompletion.id != task_completion.id # Не рахувати поточне виконання
+                TaskCompletion.id != task_completion.id  # Не рахувати поточне виконання
             )
             prior_specific_completions_count = (await self.db_session.execute(stmt)).scalar_one()
             if prior_specific_completions_count == 0:
                 logger.debug(f"Умова 'USER_FIRST_SPECIFIC_TASK_COMPLETION' для правила '{rule.name}' виконана.")
                 return True
-            logger.debug(f"Умова 'USER_FIRST_SPECIFIC_TASK_COMPLETION' для '{rule.name}' не виконана (є {prior_specific_completions_count} попередніх виконань цього завдання).")
+            logger.debug(
+                f"Умова 'USER_FIRST_SPECIFIC_TASK_COMPLETION' для '{rule.name}' не виконана (є {prior_specific_completions_count} попередніх виконань цього завдання).")
             return False
 
         # TODO: Реалізувати інші типи умов з `technical_task.txt` (наприклад, `COMPLETION_STREAK`, якщо він обробляється тут).
@@ -190,7 +199,9 @@ class BonusCalculationService(BaseService):
         #     return False
 
         else:
-            logger.warning(f"Невідомий тип умови '{condition_type}' для правила '{rule.name}'. Умова вважається невиконаною.")
+            logger.warning(
+                f"Невідомий тип умови '{condition_type}' для правила '{rule.name}'. Умова вважається невиконаною.")
             return False
+
 
 logger.debug("BonusCalculationService клас визначено та завантажено.")

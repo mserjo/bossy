@@ -1,4 +1,5 @@
 # backend/app/src/core/dicts.py
+# -*- coding: utf-8 -*-
 """
 Системні переліки (Enums) для програми Kudos.
 

@@ -1,9 +1,9 @@
-# /backend/app/src/config/security.py
+# backend/app/src/config/security.py
+# -*- coding: utf-8 -*-
 """
-Модуль безпеки для FastAPI програми Kudos.
+Модуль конфігурацій та утиліт безпеки для FastAPI програми Kudos.
 
 Цей модуль відповідає за:
-- Хешування та перевірку паролів за допомогою Passlib (bcrypt).
 - Створення та декодування JWT (JSON Web Tokens) для автентифікації та авторизації.
   Включає токени доступу (access tokens) та токени оновлення (refresh tokens).
 - Додавання стандартних клеймів до JWT, таких як `exp` (час закінчення), `iss` (видавець),
@@ -11,13 +11,13 @@
 - Обробку помилок, пов'язаних з JWT, та їх логування.
 
 Налаштування, такі як секретний ключ JWT, алгоритм, час життя токенів, видавець та аудиторія,
-беруться з `settings.py`.
+беруться з `settings.py`. Утиліти для хешування паролів знаходяться в `backend.app.src.utils.hash`.
 """
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Any # Union було видалено, оскільки воно не використовується в цьому файлі.
+from typing import Optional, Any
 # `jose.exceptions` імпортується для типізації конкретних помилок JWT
 from jose import jwt, JWTError, exceptions as jose_exceptions
-from passlib.context import CryptContext
+# from passlib.context import CryptContext # Видалено, оскільки хешування паролів перенесено
 
 # Абсолютний імпорт налаштувань та логера
 from backend.app.src.config.settings import settings
@@ -26,49 +26,7 @@ from backend.app.src.config.logging import get_logger
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
-# --- Налаштування хешування паролів ---
-# `CryptContext` використовується для хешування та перевірки паролів.
-# "bcrypt" є надійним та широко рекомендованим алгоритмом хешування.
-# `deprecated="auto"` означає, що будь-які застарілі схеми (якщо вони були б вказані)
-# все ще будуть використовуватися для перевірки, але нові хеші генеруватимуться
-# схемою за замовчуванням (першою у списку `schemes`).
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """
-    Перевіряє наданий пароль у відкритому вигляді на відповідність збереженому хешованому паролю.
-
-    Args:
-        plain_password (str): Пароль у відкритому вигляді для перевірки.
-        hashed_password (str): Хешований пароль, що зберігається в базі даних.
-
-    Returns:
-        bool: `True`, якщо паролі збігаються, `False` в іншому випадку.
-    """
-    try:
-        is_valid = pwd_context.verify(plain_password, hashed_password)
-        if not is_valid:
-            logger.debug("Невдала спроба перевірки пароля: пароль не збігається.")
-        return is_valid
-    except Exception as e:
-        # З міркувань безпеки, не розголошуємо деталі помилки хешування або валідації.
-        # Логуємо помилку для внутрішнього аналізу, але повертаємо False.
-        logger.error(f"Помилка під час перевірки пароля: {e}", exc_info=True)
-        return False
-
-def get_password_hash(password: str) -> str:
-    """
-    Хешує пароль у відкритому вигляді за допомогою bcrypt.
-
-    Args:
-        password (str): Пароль у відкритому вигляді.
-
-    Returns:
-        str: Хешований пароль.
-    """
-    return pwd_context.hash(password)
-
+# --- Налаштування хешування паролів перенесено до backend.app.src.utils.hash ---
 
 # --- Утиліти для роботи з JWT (JSON Web Token) ---
 
@@ -199,18 +157,17 @@ if __name__ == "__main__":
         base_logging.basicConfig(level=base_logging.INFO)
         logger.warning("Не вдалося імпортувати setup_logging. Використовується базова конфігурація логування для тестів security.py.")
 
-
-    # --- Тестування хешування паролів ---
-    logger.info("--- Тестування хешування паролів ---")
-    raw_password = "s3cureP@sswOrd!"
-    hashed = get_password_hash(raw_password)
-    logger.info(f"Сирий пароль: {raw_password}")
-    logger.info(f"Хешований пароль: {hashed}")
-    logger.info(f"Перевірка (правильно): {verify_password(raw_password, hashed)}")
-    logger.info(f"Перевірка (неправильно): {verify_password('wrongpassword', hashed)}")
+    # --- Тестування хешування паролів (перенесено до utils/hash.py) ---
+    # logger.info("--- Тестування хешування паролів ---")
+    # raw_password = "s3cureP@sswOrd!"
+    # hashed = get_password_hash(raw_password) # Ця функція видалена звідси
+    # logger.info(f"Сирий пароль: {raw_password}")
+    # logger.info(f"Хешований пароль: {hashed}")
+    # logger.info(f"Перевірка (правильно): {verify_password(raw_password, hashed)}") # Ця функція видалена звідси
+    # logger.info(f"Перевірка (неправильно): {verify_password('wrongpassword', hashed)}") # Ця функція видалена звідси
 
     # --- Тестування створення та декодування JWT ---
-    logger.info("\n--- Тестування створення та декодування JWT ---")
+    logger.info("--- Тестування створення та декодування JWT ---")
     user_data_payload = {"sub": "testuser@example.com", "user_id": 123, "role": "user"}
 
     # Токен доступу

@@ -1,167 +1,102 @@
 # backend/app/src/api/v1/router.py
 # -*- coding: utf-8 -*-
 """
-Головний роутер для API версії 1 (v1).
+Головний агрегований маршрутизатор для API версії 1 (v1).
 
-Цей модуль визначає `v1_router` (екземпляр `APIRouter`), який агрегує
-всі роутери для окремих функціональних блоків API v1, таких як:
-- Системні ендпоінти (`system_router` з `api.v1.system.router`)
-- Автентифікація та авторизація (`auth_router` з `api.v1.auth.router`)
-- Керування користувачами (`users_router` з `api.v1.users.router`)
-- Керування групами (`groups_router` з `api.v1.groups.router`)
-- Керування завданнями (`tasks_router` з `api.v1.tasks.router`)
-- та інші.
+Цей модуль визначає `v1_api_router` (екземпляр `APIRouter`), який об'єднує
+всі окремі маршрутизатори для різних функціональних блоків API v1.
+Кожен функціональний блок (наприклад, автентифікація, користувачі, групи)
+має свій власний під-маршрутизатор, який імпортується та підключається тут
+з відповідним префіксом та тегами для документації OpenAPI.
 
-`v1_router` потім підключається до загального `api_router` в `app.src.api.router`.
+`v1_api_router` потім підключається до кореневого маршрутизатора додатка.
 """
 
-import logging
 from fastapi import APIRouter
 
-# Імпорт роутерів для окремих модулів v1.
-# Ці файли та роутери будуть створені пізніше.
-# Наприклад:
-from .system import system_router # Очікуємо, що system_router експортується з api/v1/system/__init__.py
-from .auth import auth_router # Імпортуємо агрегований auth_router з auth/__init__.py
-from .users import users_router # Імпортуємо агрегований users_router з users/__init__.py
-from .groups import groups_router # Імпортуємо агрегований groups_router з groups/__init__.py
-from .tasks import tasks_router # Імпортуємо агрегований tasks_router з tasks/__init__.py
-from .bonuses import bonuses_router # Імпортуємо агрегований bonuses_router з bonuses/__init__.py
-from .gamification import gamification_router # Імпортуємо агрегований gamification_router з gamification/__init__.py
-from .notifications import notifications_router # Імпортуємо агрегований notifications_router з notifications/__init__.py
-from .integrations import integrations_router # Імпортуємо агрегований integrations_router з integrations/__init__.py
-from .files import files_router # Імпортуємо агрегований files_router з files/__init__.py
-# from .dictionaries.router import router as dictionaries_router
+# --- Імпорт логера ---
+# Використовуємо централізований логер додатка.
+from backend.app.src.config.logging import logger
 
+# --- Імпорт під-маршрутизаторів для API v1 ---
+# Кожен з цих імпортів має вказувати на змінну типу APIRouter,
+# зазвичай названу `router` або `{module_name}_router` у відповідному файлі router.py.
+# Наприклад, `system_router` з `backend.app.src.api.v1.system.router`.
 
-logger = logging.getLogger(__name__)
+from backend.app.src.api.v1.system.router import system_router
+from backend.app.src.api.v1.auth.router import auth_router
+from backend.app.src.api.v1.users.router import users_router
+from backend.app.src.api.v1.dictionaries.router import dictionaries_router
+from backend.app.src.api.v1.groups.router import groups_router
+from backend.app.src.api.v1.tasks.router import tasks_router
+from backend.app.src.api.v1.bonuses.router import bonuses_router
+from backend.app.src.api.v1.gamification.router import gamification_router
+from backend.app.src.api.v1.notifications.router import notifications_router # Виправлено з notifications_router на notifications_router
+from backend.app.src.api.v1.files.router import files_router
+from backend.app.src.api.v1.integrations.router import integrations_router
 
-v1_router = APIRouter()
+# Базова функція-заглушка для інтернаціоналізації рядків (якщо потрібна в коментарях)
+def _(text: str) -> str:
+    return text
 
-# Підключення роутера для системних ендпоінтів v1
-# Коли `api/v1/system/router.py` та `system_router` в ньому будуть створені,
-# наступний блок потрібно буде розкоментувати.
-# try:
-#     from .system.router import router as system_router # Перейменовано для уникнення конфлікту імен
-#     v1_router.include_router(system_router, prefix="/system", tags=["V1 System"])
-#     logger.info("Роутер v1.system підключено до v1_router.")
-# except ImportError:
-#     logger.warning("Не вдалося імпортувати system_router з api.v1.system.router. Системні ендпоінти v1 не будуть доступні.")
-# logger.info("Концептуальне місце для підключення v1_router.system_router (з api.v1.system.router).") # Закоментуємо або видалимо цей рядок
-try:
-    # from .system.router import router as system_router # Якщо імпортуємо напряму з system/router.py
-    from .system import system_router # Якщо system_router експортується з system/__init__.py
-    v1_router.include_router(system_router, prefix="/system", tags=["V1 System"]) # Тег тут може бути зайвим, якщо вже є на system_router
-    logger.info("Роутер v1.system підключено до v1_router з префіксом /system.")
-except ImportError:
-    logger.error("КРИТИЧНО: Не вдалося імпортувати system_router з api.v1.system. Системні ендпоінти v1 не будуть доступні.", exc_info=True)
+# Створення головного маршрутизатора для API v1
+v1_api_router = APIRouter()
 
+# --- Підключення під-маршрутизаторів ---
+# Кожен роутер підключається з унікальним префіксом, що відповідає його функціоналу.
+# Теги використовуються для групування ендпоінтів в документації OpenAPI (Swagger).
 
-# Приклади підключення інших роутерів (будуть розкоментовані по мірі їх створення):
-try:
-    # auth_router вже імпортовано вище
-    v1_router.include_router(auth_router, prefix="/auth", tags=["V1 Authentication"])
-    logger.info("Роутер v1.auth (агрегований) підключено з префіксом /auth.")
-except ImportError:
-    logger.warning("Не вдалося імпортувати auth_router з api.v1.auth. Ендпоінти автентифікації v1 не будуть доступні.")
-except Exception as e:
-    logger.error(f"Помилка підключення auth_router: {e}", exc_info=True)
+ROUTERS_CONFIG = [
+    {"router": system_router, "prefix": "/system", "tags": ["V1 System"], "name": "system"},
+    {"router": auth_router, "prefix": "/auth", "tags": ["V1 Auth"], "name": "auth"},
+    {"router": users_router, "prefix": "/users", "tags": ["V1 Users"], "name": "users"},
+    {"router": dictionaries_router, "prefix": "/dictionaries", "tags": ["V1 Dictionaries"], "name": "dictionaries"},
+    {"router": groups_router, "prefix": "/groups", "tags": ["V1 Groups"], "name": "groups"},
+    {"router": tasks_router, "prefix": "/tasks", "tags": ["V1 Tasks & Events"], "name": "tasks"},
+    {"router": bonuses_router, "prefix": "/bonuses", "tags": ["V1 Bonuses & Rewards"], "name": "bonuses"},
+    {"router": gamification_router, "prefix": "/gamification", "tags": ["V1 Gamification"], "name": "gamification"},
+    {"router": notifications_router, "prefix": "/notifications", "tags": ["V1 Notifications"], "name": "notifications"},
+    {"router": files_router, "prefix": "/files", "tags": ["V1 Files"], "name": "files"},
+    {"router": integrations_router, "prefix": "/integrations", "tags": ["V1 Integrations"], "name": "integrations"},
+]
 
-# Підключення роутера для управління користувачами
-try:
-    # users_router вже імпортовано вище
-    v1_router.include_router(users_router, prefix="/users", tags=["V1 User Management"])
-    logger.info("Роутер v1.users (керування користувачами) підключено з префіксом /users.")
-except ImportError: # Цей ImportError тут малоймовірний, якщо імпорт вгорі успішний
-    logger.warning("Не вдалося імпортувати users_router з api.v1.users (мало б спрацювати з верхнього імпорту). Ендпоінти керування користувачами v1 не будуть доступні.")
-except Exception as e:
-    logger.error(f"Помилка підключення users_router: {e}", exc_info=True)
+for config in ROUTERS_CONFIG:
+    try:
+        v1_api_router.include_router(config["router"], prefix=config["prefix"], tags=config["tags"])
+        # i18n: Log message - Router connected successfully
+        logger.info(_("Маршрутизатор v1.{name} успішно підключено з префіксом '{prefix}'.").format(name=config['name'], prefix=config['prefix']))
+    except Exception as e:
+        # i18n: Critical error message - Failed to connect router
+        # Важливо логувати помилки на випадок, якщо якийсь роутер не вдалося підключити.
+        logger.critical(
+            _("КРИТИЧНО: Не вдалося підключити маршрутизатор v1.{name} з префіксом '{prefix}'. Помилка: {error}").format(
+                name=config['name'], prefix=config['prefix'], error=e
+            ),
+            exc_info=True # Додаємо traceback до логу
+        )
 
-# Підключення роутера для управління задачами та подіями
-try:
-    # tasks_router вже імпортовано вище
-    v1_router.include_router(tasks_router, prefix="/tasks", tags=["V1 Task & Event Management"])
-    logger.info("Роутер v1.tasks (керування задачами та подіями) підключено з префіксом /tasks.")
-except ImportError:
-    logger.warning("Не вдалося імпортувати tasks_router з api.v1.tasks (мало б спрацювати з верхнього імпорту). Ендпоінти керування задачами та подіями v1 не будуть доступні.")
-except Exception as e:
-    logger.error(f"Помилка підключення tasks_router: {e}", exc_info=True)
-
-# Підключення роутера для бонусної системи
-try:
-    # bonuses_router вже імпортовано вище
-    v1_router.include_router(bonuses_router, prefix="/bonuses", tags=["V1 Bonus System"])
-    logger.info("Роутер v1.bonuses (бонусна система) підключено з префіксом /bonuses.")
-except ImportError:
-    logger.warning("Не вдалося імпортувати bonuses_router з api.v1.bonuses (мало б спрацювати з верхнього імпорту). Ендпоінти бонусної системи v1 не будуть доступні.")
-except Exception as e:
-    logger.error(f"Помилка підключення bonuses_router: {e}", exc_info=True)
-
-# try:
-#     from .gamification.router import router as gamification_router
-#     v1_router.include_router(gamification_router, prefix="/gamification", tags=["V1 Gamification"])
-#     logger.info("Роутер v1.gamification підключено.")
-# except ImportError: logger.warning("Роутер v1.gamification не знайдено.")
-
-# try:
-#     from .groups.router import router as groups_router
-#     v1_router.include_router(groups_router, prefix="/groups", tags=["V1 Groups"])
-#     logger.info("Роутер v1.groups підключено.")
-# except ImportError: logger.warning("Роутер v1.groups не знайдено.")
-
-# try:
-#     from .tasks.router import router as tasks_router # Для завдань Kudos, подій тощо
-#     v1_router.include_router(tasks_router, prefix="/kudos-tasks", tags=["V1 Kudos Tasks & Events"])
-#     logger.info("Роутер v1.tasks (Kudos) підключено.")
-# except ImportError: logger.warning("Роутер v1.tasks (Kudos) не знайдено.")
-
-# try:
-#     from .bonuses.router import router as bonuses_router
-#     v1_router.include_router(bonuses_router, prefix="/bonuses", tags=["V1 Bonuses & Rewards"])
-#     logger.info("Роутер v1.bonuses підключено.")
-# except ImportError: logger.warning("Роутер v1.bonuses не знайдено.")
-
-# try:
-#     from .gamification.router import router as gamification_router
-#     v1_router.include_router(gamification_router, prefix="/gamification", tags=["V1 Gamification"])
-#     logger.info("Роутер v1.gamification підключено.")
-# except ImportError: logger.warning("Роутер v1.gamification не знайдено.")
-
-# try:
-#     from .notifications.router import router as notifications_router # Для керування налаштуваннями сповіщень, історії тощо.
-#     v1_router.include_router(notifications_router, prefix="/notifications-settings", tags=["V1 Notifications Settings"])
-#     logger.info("Роутер v1.notifications підключено.")
-# except ImportError: logger.warning("Роутер v1.notifications не знайдено.")
-
-# try:
-#     from .integrations.router import router as integrations_router # Для керування інтеграціями
-#     v1_router.include_router(integrations_router, prefix="/integrations-management", tags=["V1 Integrations Management"])
-#     logger.info("Роутер v1.integrations підключено.")
-# except ImportError: logger.warning("Роутер v1.integrations не знайдено.")
-
-# try:
-#     from .files.router import router as files_router
-#     v1_router.include_router(files_router, prefix="/files", tags=["V1 Files & Uploads"])
-#     logger.info("Роутер v1.files підключено.")
-# except ImportError: logger.warning("Роутер v1.files не знайдено.")
-
-
-@v1_router.get("/ping", summary="Перевірка доступності API v1", tags=["V1 Health"])
+# --- Базовий ендпоінт для перевірки доступності API v1 ---
+@v1_api_router.get(
+    "/ping",
+    summary="Перевірка доступності API v1", # i18n
+    description="Простий ендпоінт для перевірки, чи головний маршрутизатор API v1 (`v1_api_router`) активний та відповідає.", # i18n
+    tags=["V1 Health Check"] # i18n
+)
 async def ping_v1_api():
     """
-    Простий ендпоінт для перевірки, чи роутер API v1 (`v1_router`) працює.
-    Повертає статус "API v1 is alive!" та повідомлення "Pong from v1!".
+    Ендпоінт "ping" для API v1.
+    Використовується для моніторингу доступності сервісу.
     """
-    logger.debug("API v1 ping ендпоінт викликано.")
-    return {"status": "API v1 is alive!", "message": "Pong from v1!"}
+    logger.debug("API v1: /ping ендпоінт викликано.") # i18n
+    return {
+        "status": "API v1 is alive!", # i18n_key_example: api.v1.alive_status
+        "message": "Pong from v1 API!" # i18n_key_example: api.v1.pong_message
+    }
 
+# i18n: Log message - V1 API router configured
+logger.info(_("Головний маршрутизатор API v1 (`v1_api_router`) налаштовано та агреговано всі під-маршрутизатори."))
 
-logger.info("Головний роутер API v1 (`v1_router`) налаштовано з базовим ping ендпоінтом.")
-
-# Експорт v1_router для використання в app.src.api.v1.__init__.py та app.src.api.router.py
-# __all__ = ["v1_router"] # Необов'язково, якщо імпортується напряму як `from .router import v1_router`
-                          # Якщо ж `from . import router` і потім `router.v1_router`, то __all__ не потрібен.
-                          # Для простоти, часто використовують `from .router import v1_router`.
-# У нашому випадку, ми будемо імпортувати як: from app.src.api.v1.router import v1_router
-# Тому явно експортувати через __all__ не є критично необхідним.
-# Залишимо змінну як `v1_router` для ясності при імпорті.
+# Змінна, що експортується для підключення до основного FastAPI додатку
+# (зазвичай в backend/app/main.py або backend/app/src/api/router.py)
+# Наприклад: app.include_router(v1_api_router, prefix="/api/v1")
+# __all__ = ["v1_api_router"] # Не є строго необхідним для прямого імпорту

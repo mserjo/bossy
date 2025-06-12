@@ -1,10 +1,12 @@
 # backend/app/src/utils/hash.py
-
+# -*- coding: utf-8 -*-
 """
-Utility functions for hashing and verifying passwords.
-Uses passlib library for robust password hashing.
-"""
+Модуль для хешування та перевірки паролів.
 
+Цей модуль надає утиліти для безпечного хешування паролів користувачів
+та перевірки наданих паролів відносно збережених хешів.
+Використовує бібліотеку `passlib` з рекомендованою схемою `bcrypt`.
+"""
 import logging
 from passlib.context import CryptContext
 
@@ -15,81 +17,82 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def get_password_hash(password: str) -> str:
     """
-    Hashes a plain text password using the configured CryptContext.
+    Хешує текстовий пароль за допомогою налаштованого CryptContext.
 
     Args:
-        password: The plain text password to hash.
+        password: Текстовий пароль для хешування.
 
     Returns:
-        The hashed password string.
+        Рядок хешованого пароля.
     """
     try:
         hashed_password = pwd_context.hash(password)
-        logger.debug(f"Password hashed successfully (length of hash: {len(hashed_password)}).")
+        logger.debug(f"Пароль успішно хешовано (довжина хешу: {len(hashed_password)}).")
         return hashed_password
     except Exception as e:
-        logger.error(f"Error during password hashing: {e}", exc_info=True)
-        raise ValueError("Password hashing failed.")
+        logger.error(f"Помилка під час хешування пароля: {e}", exc_info=True)
+        raise ValueError("Хешування пароля не вдалося.")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """
-    Verifies a plain text password against a stored hashed password.
+    Перевіряє текстовий пароль відносно збереженого хешованого пароля.
 
     Args:
-        plain_password: The plain text password to verify.
-        hashed_password: The stored hashed password to compare against.
+        plain_password: Текстовий пароль для перевірки.
+        hashed_password: Збережений хешований пароль для порівняння.
 
     Returns:
-        True if the password matches the hash, False otherwise.
+        True, якщо пароль відповідає хешу, False в іншому випадку.
     """
     if not plain_password or not hashed_password:
-        logger.warning("Attempt to verify password with empty plain_password or hashed_password.")
+        logger.warning("Спроба перевірити пароль з порожнім текстовим паролем або хешованим паролем.")
         return False
     try:
         is_verified, new_hash = pwd_context.verify_and_update(plain_password, hashed_password)
         if new_hash:
-            logger.info(f"Password verified and hash was updated (old hash len: {len(hashed_password)}, new hash len: {len(new_hash)}). Consider updating stored hash.")
+            # Цей лог важливий, оскільки passlib може оновити хеш, якщо використовується застаріла схема
+            logger.info(f"Пароль перевірено, хеш оновлено (довжина старого хешу: {len(hashed_password)}, нового: {len(new_hash)}). Рекомендується оновити збережений хеш.")
 
         if is_verified:
-            logger.debug("Password verification successful.")
+            logger.debug("Перевірка пароля успішна.")
         else:
-            logger.debug("Password verification failed (password mismatch).")
+            logger.debug("Перевірка пароля не вдалася (паролі не співпадають).")
         return is_verified
-    except Exception as e:
-        logger.error(f"Error during password verification: {e}", exc_info=True)
+    except Exception as e: # Наприклад, passlib.exc.UnknownHashError
+        logger.error(f"Помилка під час перевірки пароля: {e}", exc_info=True)
         return False
 
 if __name__ == "__main__":
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
-    logger.info("--- Password Hashing Utilities --- Demonstration")
+    logger.info("--- Демонстрація Утиліт Хешування Паролів ---")
 
-    test_password = "MySecurePassword123!"
-    logger.info(f"Plain password: '{test_password}'")
+    test_password = "МійБезпечнийПароль123!"
+    logger.info(f"Текстовий пароль: '{test_password}'")
 
     try:
         hashed_pw = get_password_hash(test_password)
-        logger.info(f"Hashed password: '{hashed_pw}' (length: {len(hashed_pw)})")
+        logger.info(f"Хешований пароль: '{hashed_pw}' (довжина: {len(hashed_pw)})")
 
         is_correct = verify_password(test_password, hashed_pw)
-        logger.info(f"Verification with correct password ('{test_password}'): {is_correct}")
+        logger.info(f"Перевірка з правильним паролем ('{test_password}'): {is_correct}")
         assert is_correct
 
-        incorrect_password = "WrongPassword!"
+        incorrect_password = "НеправильнийПароль!"
         is_incorrect = verify_password(incorrect_password, hashed_pw)
-        logger.info(f"Verification with incorrect password ('{incorrect_password}'): {is_incorrect}")
+        logger.info(f"Перевірка з неправильним паролем ('{incorrect_password}'): {is_incorrect}")
         assert not is_incorrect
 
         empty_plain_result = verify_password("", hashed_pw)
-        logger.info(f"Verification with empty plain password: {empty_plain_result}")
+        logger.info(f"Перевірка з порожнім текстовим паролем: {empty_plain_result}")
         assert not empty_plain_result
 
         empty_hashed_result = verify_password(test_password, "")
-        logger.info(f"Verification with empty hashed password: {empty_hashed_result}")
+        logger.info(f"Перевірка з порожнім хешованим паролем: {empty_hashed_result}")
         assert not empty_hashed_result
 
     except ValueError as ve:
-        logger.error(f"A ValueError occurred during hashing demo: {ve}")
+        logger.error(f"Під час демонстрації хешування виникла помилка ValueError: {ve}")
     except Exception as e:
-        logger.error(f"An unexpected error occurred during hashing demo: {e}", exc_info=True)
+        logger.error(f"Під час демонстрації хешування виникла неочікувана помилка: {e}", exc_info=True)

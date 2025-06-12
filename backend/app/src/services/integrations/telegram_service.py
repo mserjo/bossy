@@ -3,7 +3,7 @@
 from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
 
-from sqlalchemy.ext.asyncio import AsyncSession # Не використовується прямо, але може бути потрібен для BaseService
+from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо, але може бути потрібен для BaseService
 
 # Повні шляхи імпорту
 from backend.app.src.services.integrations.messenger_base import (
@@ -13,9 +13,10 @@ from backend.app.src.services.integrations.messenger_base import (
     MessageSendCommand,
     MessageSendResponse
 )
-from backend.app.src.models.integrations.user_integration import UserIntegration # Припустима модель для зберігання telegram_chat_id
-from backend.app.src.config.settings import settings # Для Telegram Bot Token
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.models.integrations.user_integration import \
+    UserIntegration  # Припустима модель для зберігання telegram_chat_id
+from backend.app.src.config.settings import settings  # Для Telegram Bot Token
+from backend.app.src.config.logging import logger  # Централізований логер
 
 # TODO: Додати залежність: pip install python-telegram-bot --pre (для v20+) або httpx
 # import telegram # from python-telegram-bot
@@ -24,8 +25,8 @@ from backend.app.src.config.logging import logger # Централізовани
 # Назва сервісу та отримання токену з налаштувань
 TELEGRAM_SERVICE_NAME = "TELEGRAM"
 # TODO: Переконатися, що TELEGRAM_BOT_TOKEN правильно налаштований в settings.py
-TELEGRAM_BOT_TOKEN = getattr(settings, 'TELEGRAM_BOT_TOKEN', None) # None, якщо не знайдено
-TELEGRAM_API_BASE_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}" # Базовий URL для прямих HTTP запитів
+TELEGRAM_BOT_TOKEN = getattr(settings, 'TELEGRAM_BOT_TOKEN', None)  # None, якщо не знайдено
+TELEGRAM_API_BASE_URL = f"https://api.telegram.org/bot{TELEGRAM_BOT_TOKEN}"  # Базовий URL для прямих HTTP запитів
 
 
 class TelegramIntegrationService(BaseMessengerIntegrationService):
@@ -38,14 +39,15 @@ class TelegramIntegrationService(BaseMessengerIntegrationService):
 
     def __init__(self, db_session: AsyncSession, user_id_for_context: Optional[UUID] = None):
         super().__init__(db_session, user_id_for_context)
-        self.telegram_bot_client: Optional[Any] = None # Заглушка для клієнта python-telegram-bot ExtBot
+        self.telegram_bot_client: Optional[Any] = None  # Заглушка для клієнта python-telegram-bot ExtBot
 
         if TELEGRAM_BOT_TOKEN:
             # application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
             # self.telegram_bot_client = application.bot # ExtBot(TELEGRAM_BOT_TOKEN)
             logger.info("Клієнт Telegram Bot був би ініціалізований тут з реальним токеном.")
         else:
-            logger.warning("Токен Telegram Bot не налаштовано. TelegramIntegrationService використовуватиме мок-відповіді або не працюватиме.")
+            logger.warning(
+                "Токен Telegram Bot не налаштовано. TelegramIntegrationService використовуватиме мок-відповіді або не працюватиме.")
         logger.info(f"TelegramIntegrationService ініціалізовано для користувача: {self.user_id_for_context or 'N/A'}.")
 
     async def connect_bot_or_webhook(self, app_settings: Dict[str, Any]) -> bool:
@@ -55,7 +57,8 @@ class TelegramIntegrationService(BaseMessengerIntegrationService):
         """
         webhook_url = app_settings.get("TELEGRAM_WEBHOOK_URL", getattr(settings, 'TELEGRAM_WEBHOOK_URL', None))
         if not webhook_url:
-            logger.warning("URL вебхука для Telegram не налаштовано (перевірено app_settings та глобальні налаштування). Неможливо встановити вебхук.")
+            logger.warning(
+                "URL вебхука для Telegram не налаштовано (перевірено app_settings та глобальні налаштування). Неможливо встановити вебхук.")
             return False
 
         # if not self.telegram_bot_client:
@@ -111,13 +114,14 @@ class TelegramIntegrationService(BaseMessengerIntegrationService):
         # if record:
         #     logger.debug(f"Знайдено Telegram chat_id '{record}' для користувача {user_id}.")
         #     return str(record)
-        logger.warning(f"[ЗАГЛУШКА] get_user_platform_id (Telegram chat_id) для користувача {user_id}. Повернення мок-ID.")
+        logger.warning(
+            f"[ЗАГЛУШКА] get_user_platform_id (Telegram chat_id) для користувача {user_id}. Повернення мок-ID.")
         # Telegram chat_id - це ціле число, але повертаємо як рядок для уніфікації
-        return f"mock_telegram_chat_id_{user_id.fields[0]}" # Використовуємо частину UUID для мок-ID
+        return f"mock_telegram_chat_id_{user_id.fields[0]}"  # Використовуємо частину UUID для мок-ID
 
     async def send_message(self, command: MessageSendCommand) -> MessageSendResponse:
         """[ЗАГЛУШКА/TODO] Надсилає повідомлення в Telegram."""
-        chat_id = command.recipient_platform_id # Це має бути Telegram chat_id
+        chat_id = command.recipient_platform_id  # Це має бути Telegram chat_id
         message_text = command.message.text
         # TODO: Реалізувати конвертацію MessengerMessage в формат Telegram (Markdown, HTML, кнопки).
 
@@ -148,7 +152,8 @@ class TelegramIntegrationService(BaseMessengerIntegrationService):
         #     return MessageSendResponse(status="failed", error_message=str(e))
 
         platform_msg_id = f"mock_telegram_msg_id_{uuid4()}"
-        logger.info(f"[ЗАГЛУШКА] Надсилання повідомлення Telegram до chat_id {chat_id}: '{message_text[:50]}...'. ID Повідомлення: {platform_msg_id}")
+        logger.info(
+            f"[ЗАГЛУШКА] Надсилання повідомлення Telegram до chat_id {chat_id}: '{message_text[:50]}...'. ID Повідомлення: {platform_msg_id}")
         # i18n
         return MessageSendResponse(status="success", platform_message_id=platform_msg_id, error_message=None)
 
@@ -171,9 +176,11 @@ class TelegramIntegrationService(BaseMessengerIntegrationService):
             return MessengerUserProfile(
                 id=platform_user_id,
                 username=f"mock_tg_user_{platform_user_id.split('_')[-1]}",
-                full_name=f"Мок Користувач Telegram {platform_user_id.split('_')[-1]}" # i18n
+                full_name=f"Мок Користувач Telegram {platform_user_id.split('_')[-1]}"  # i18n
             )
         # i18n
-        raise NotImplementedError(f"Метод 'get_platform_user_profile' не повністю реалізовано для {self.__class__.__name__}")
+        raise NotImplementedError(
+            f"Метод 'get_platform_user_profile' не повністю реалізовано для {self.__class__.__name__}")
+
 
 logger.info("TelegramIntegrationService (сервіс інтеграції з Telegram) клас визначено (реалізація-заглушка).")

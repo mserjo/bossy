@@ -5,25 +5,25 @@
 """
 
 # import logging # Замінено на централізований логер
-from typing import AsyncGenerator, Optional, Any, Dict # AsyncGenerator для сесії БД
+from typing import AsyncGenerator, Optional, Any, Dict  # AsyncGenerator для сесії БД
 
-from fastapi import Depends, HTTPException, status, Path, Query # Додано Path, Query
+from fastapi import Depends, HTTPException, status, Path, Query  # Додано Path, Query
 from fastapi.security import OAuth2PasswordBearer
 
 # Повні шляхи імпорту
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config.settings import settings
-from backend.app.src.core.database import get_db_session # Припускаємо, що ця функція існує
+from backend.app.src.core.database import get_db_session  # Припускаємо, що ця функція існує
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.src.services import ( # Імпортуємо реальні сервіси
+from backend.app.src.services import (  # Імпортуємо реальні сервіси
     UserService,
     TokenService,
-    GroupMembershipService # Для перевірки адміна групи
+    GroupMembershipService  # Для перевірки адміна групи
 )
-from backend.app.src.models.auth.user import User as UserModel # Модель SQLAlchemy для користувача
-from backend.app.src.schemas.auth.token import TokenPayload # Схема Pydantic для payload токена
-from backend.app.src.models.dictionaries.user_roles import UserRole # Для перевірки ролі в групі
+from backend.app.src.models.auth.user import User as UserModel  # Модель SQLAlchemy для користувача
+from backend.app.src.schemas.auth.token import TokenPayload  # Схема Pydantic для payload токена
+from backend.app.src.models.dictionaries.user_roles import UserRole  # Для перевірки ролі в групі
 
 
 # --- Залежність для сесії бази даних ---
@@ -32,7 +32,7 @@ async def get_api_db_session() -> AsyncGenerator[AsyncSession, None]:
     Залежність FastAPI для надання асинхронної сесії бази даних.
     Використовує контекстний менеджер `get_db_session` з `core.database`.
     """
-    async for session in get_db_session(): # Припускаємо, що get_db_session є async generator
+    async for session in get_db_session():  # Припускаємо, що get_db_session є async generator
         logger.debug(f"Сесію БД {id(session)} надано для API ендпоінта.")
         yield session
 
@@ -53,9 +53,11 @@ async def get_token_service(session: AsyncSession = Depends(get_api_db_session))
     """Залежність для отримання екземпляра TokenService."""
     return TokenService(db_session=session)
 
+
 async def get_user_service(session: AsyncSession = Depends(get_api_db_session)) -> UserService:
     """Залежність для отримання екземпляра UserService."""
     return UserService(db_session=session)
+
 
 async def get_group_membership_service(session: AsyncSession = Depends(get_api_db_session)) -> GroupMembershipService:
     """Залежність для отримання екземпляра GroupMembershipService."""
@@ -63,8 +65,8 @@ async def get_group_membership_service(session: AsyncSession = Depends(get_api_d
 
 
 async def get_current_user_payload(
-    token: str = Depends(OAUTH2_SCHEME),
-    token_service: TokenService = Depends(get_token_service)
+        token: str = Depends(OAUTH2_SCHEME),
+        token_service: TokenService = Depends(get_token_service)
 ) -> TokenPayload:
     """
     Отримує та валідує JWT токен з Authorization header, повертає його payload.
@@ -72,7 +74,7 @@ async def get_current_user_payload(
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Не вдалося валідувати облікові дані", # i18n
+        detail="Не вдалося валідувати облікові дані",  # i18n
         headers={"WWW-Authenticate": "Bearer"},
     )
     payload_dict = await token_service.validate_access_token(token=token)
@@ -84,7 +86,7 @@ async def get_current_user_payload(
     #  і обробляє можливі помилки валідації Pydantic.
     try:
         token_payload = TokenPayload(**payload_dict)
-    except Exception as e: # Наприклад, pydantic.ValidationError
+    except Exception as e:  # Наприклад, pydantic.ValidationError
         logger.warning(f"Помилка валідації TokenPayload: {e}. Payload: {payload_dict}")
         raise credentials_exception
 
@@ -93,13 +95,13 @@ async def get_current_user_payload(
 
 
 async def get_current_user(
-    payload: TokenPayload = Depends(get_current_user_payload),
-    user_service: UserService = Depends(get_user_service)
-) -> UserModel: # Повертає модель SQLAlchemy User
+        payload: TokenPayload = Depends(get_current_user_payload),
+        user_service: UserService = Depends(get_user_service)
+) -> UserModel:  # Повертає модель SQLAlchemy User
     """
     Отримує поточного користувача з бази даних на основі user_id ('sub') з payload токена.
     """
-    if not payload.sub: # sub має бути UUID
+    if not payload.sub:  # sub має бути UUID
         logger.warning("Відсутній 'sub' (user_id) в payload токена.")
         # i18n
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Некоректний формат токена.")
@@ -119,7 +121,7 @@ async def get_current_user(
 
 
 async def get_current_active_user(
-    current_user: UserModel = Depends(get_current_user)
+        current_user: UserModel = Depends(get_current_user)
 ) -> UserModel:
     """
     Отримує поточного автентифікованого та активного користувача.
@@ -134,7 +136,7 @@ async def get_current_active_user(
 
 
 async def get_current_active_superuser(
-    current_user: UserModel = Depends(get_current_active_user)
+        current_user: UserModel = Depends(get_current_active_user)
 ) -> UserModel:
     """
     Перевіряє, чи поточний активний користувач є суперюзером.
@@ -154,9 +156,9 @@ async def get_current_active_superuser(
 
 
 async def get_current_active_group_admin(
-    group_id: UUID = Path(..., description="ID групи для перевірки прав адміністратора"), # i18n
-    current_user: UserModel = Depends(get_current_active_user),
-    membership_service: GroupMembershipService = Depends(get_group_membership_service)
+        group_id: UUID = Path(..., description="ID групи для перевірки прав адміністратора"),  # i18n
+        current_user: UserModel = Depends(get_current_active_user),
+        membership_service: GroupMembershipService = Depends(get_group_membership_service)
 ) -> UserModel:
     """
     Перевіряє, чи поточний активний користувач є адміністратором вказаної групи.
@@ -169,7 +171,8 @@ async def get_current_active_group_admin(
     :raises HTTPException: 403, якщо користувач не має відповідних прав.
                            404, якщо групу або членство не знайдено (обробляється в membership_service).
     """
-    logger.debug(f"Перевірка прав адміна групи для користувача '{current_user.username}' (ID: {current_user.id}) в групі ID: {group_id}")
+    logger.debug(
+        f"Перевірка прав адміна групи для користувача '{current_user.username}' (ID: {current_user.id}) в групі ID: {group_id}")
     if current_user.is_superuser:
         logger.debug(f"Користувач '{current_user.username}' є суперюзером, доступ дозволено.")
         return current_user
@@ -180,11 +183,13 @@ async def get_current_active_group_admin(
     membership = await membership_service.get_membership_details(group_id=group_id, user_id=current_user.id)
 
     if not membership or not membership.is_active or not membership.role:
-        logger.warning(f"Користувач '{current_user.username}' не є активним членом або не має ролі в групі ID '{group_id}'.")
+        logger.warning(
+            f"Користувач '{current_user.username}' не є активним членом або не має ролі в групі ID '{group_id}'.")
         # i18n
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ви не є активним членом цієї групи або не маєте призначеної ролі.")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Ви не є активним членом цієї групи або не маєте призначеної ролі.")
 
-    if membership.role.code != ADMIN_ROLE_CODE: # Припускаємо, що ADMIN_ROLE_CODE це "ADMIN"
+    if membership.role.code != ADMIN_ROLE_CODE:  # Припускаємо, що ADMIN_ROLE_CODE це "ADMIN"
         logger.warning(
             f"Користувач '{current_user.username}' (ID: {current_user.id}) не є адміністратором групи ID '{group_id}' (роль: {membership.role.code}). Доступ заборонено."
         )
@@ -200,13 +205,15 @@ async def get_current_active_group_admin(
 
 # --- Залежність для пагінації ---
 async def get_pagination_params(
-    skip: int = Query(0, ge=0, description="Кількість елементів для пропуску (для пагінації)"), # i18n
-    limit: int = Query(global_settings.DEFAULT_PAGE_SIZE, ge=1, le=global_settings.MAX_PAGE_SIZE, description="Максимальна кількість елементів для повернення (для пагінації)") # i18n
+        skip: int = Query(0, ge=0, description="Кількість елементів для пропуску (для пагінації)"),  # i18n
+        limit: int = Query(global_settings.DEFAULT_PAGE_SIZE, ge=1, le=global_settings.MAX_PAGE_SIZE,
+                           description="Максимальна кількість елементів для повернення (для пагінації)")  # i18n
 ) -> Dict[str, int]:
     """
     Отримує параметри пагінації `skip` та `limit` з параметрів запиту.
     Використовує значення за замовчуванням та максимальні ліміти з конфігурації.
     """
     return {"skip": skip, "limit": limit}
+
 
 logger.info("Модуль залежностей 'api.dependencies' завантажено та налаштовано з реальними сервісами.")

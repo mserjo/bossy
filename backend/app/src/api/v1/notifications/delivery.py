@@ -1,95 +1,103 @@
 # backend/app/src/api/v1/notifications/delivery.py
-from typing import List, Optional, Generic, TypeVar # Додано Generic, TypeVar для PaginatedResponse
-from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
-from pydantic import BaseModel # Додано BaseModel для PaginatedResponse, якщо визначається локально
-from sqlalchemy.ext.asyncio import AsyncSession
+# -*- coding: utf-8 -*-
+"""
+Ендпоінти для перегляду інформації про спроби доставки сповіщень.
 
-from app.src.core.dependencies import get_db_session, get_current_active_superuser # Адміністративні дії
-from app.src.models.auth import User as UserModel
-# from app.src.models.notifications import NotificationDeliveryAttempt as NotificationDeliveryAttemptModel # Потрібна модель
-from app.src.schemas.notifications.delivery import ( # Схеми для статусу доставки
-    NotificationDeliveryAttemptResponse
+Ці ендпоінти зазвичай призначені для адміністраторів або суперкористувачів
+з метою моніторингу та діагностики системи сповіщень.
+"""
+from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
+from uuid import UUID  # ID тепер UUID
+from fastapi import APIRouter, Depends, HTTPException, status, Path  # Query не використовується прямо тут
+from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо, якщо сесія в сервісі
+
+# Повні шляхи імпорту
+from backend.app.src.api.dependencies import get_api_db_session, get_current_active_superuser, paginator
+from backend.app.src.models.auth.user import User as UserModel  # Для типізації current_admin_user
+from backend.app.src.schemas.notifications.delivery import NotificationDeliveryAttemptResponse
+from backend.app.src.core.pagination import PagedResponse, PageParams
+from backend.app.src.services.notifications.delivery import NotificationDeliveryService
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings
+
+router = APIRouter(
+    # Префікс /delivery-attempts буде додано в __init__.py батьківського роутера notifications
+    # Теги також успадковуються/додаються звідти
+    dependencies=[Depends(get_current_active_superuser)]  # Всі ендпоінти тут вимагають прав суперкористувача
 )
-# Припускаємо, що ці схеми імпортуються, якщо ні - можна визначити як у users.py або groups.py
-from app.src.schemas.pagination import PaginatedResponse, PageParams
-from app.src.services.notifications.delivery import NotificationDeliveryService # Сервіс для статусу доставки
 
-router = APIRouter()
+
+# Залежність для отримання NotificationDeliveryService
+async def get_notification_delivery_service(
+        session: AsyncSession = Depends(get_api_db_session)) -> NotificationDeliveryService:
+    """Залежність FastAPI для отримання екземпляра NotificationDeliveryService."""
+    return NotificationDeliveryService(db_session=session)
+
 
 @router.get(
-    "/notification/{notification_id}", # Шлях відносно /notifications/delivery/notification/{notification_id}
-    response_model=PaginatedResponse[NotificationDeliveryAttemptResponse],
-    summary="Отримання статусів доставки для сповіщення (Адмін/Суперюзер)",
-    description="Повертає список спроб та статусів доставки для конкретного сповіщення, з пагінацією."
+    "/notification/{notification_id}",
+    response_model=PagedResponse[NotificationDeliveryAttemptResponse],
+    summary="Отримання спроб доставки для сповіщення (Адмін/Суперюзер)",  # i18n
+    description="Повертає список спроб та статусів доставки для конкретного сповіщення, з пагінацією."  # i18n
 )
-async def list_delivery_attempts_for_notification(
-    notification_id: int = Path(..., description="ID сповіщення, для якого запитуються статуси доставки"),
-    page_params: PageParams = Depends(),
-    db: AsyncSession = Depends(get_db_session),
-    current_admin_user: UserModel = Depends(get_current_active_superuser),
-    delivery_service: NotificationDeliveryService = Depends()
-):
-    '''
+async def list_delivery_attempts_for_notification_endpoint(  # Перейменовано
+        notification_id: UUID = Path(..., description="ID сповіщення, для якого запитуються статуси доставки"),  # i18n
+        page_params: PageParams = Depends(paginator),
+        # current_admin_user: UserModel = Depends(get_current_active_superuser), # Вже в router.dependencies
+        delivery_service: NotificationDeliveryService = Depends(get_notification_delivery_service)
+) -> PagedResponse[NotificationDeliveryAttemptResponse]:
+    """
     Отримує історію спроб доставки для вказаного сповіщення.
-    '''
-    if not hasattr(delivery_service, 'db_session') or delivery_service.db_session is None:
-        delivery_service.db_session = db
+    Доступно тільки суперкористувачам (або адміністраторам з відповідними правами).
+    """
+    logger.debug(f"Запит спроб доставки для сповіщення ID: {notification_id}, сторінка: {page_params.page}.")
 
-    total_attempts, attempts = await delivery_service.get_delivery_attempts_for_notification(
+    # TODO: NotificationDeliveryService.list_delivery_attempts_for_notification_paginated має повертати (items, total_count)
+    attempts_orm, total_attempts = await delivery_service.list_delivery_attempts_for_notification_paginated(
         notification_id=notification_id,
-        # requesting_user=current_admin_user, # Для можливої перевірки прав у сервісі
         skip=page_params.skip,
         limit=page_params.limit
     )
-    if not attempts and total_attempts == 0: # Якщо взагалі нічого не знайдено (можливо, і сповіщення немає)
-        # Можна перевірити існування самого notification_id окремо, якщо потрібно розрізняти
-        # "немає сповіщення" від "немає спроб доставки для існуючого сповіщення"
-        pass # Сервіс може повернути порожній список, що є нормальним
 
-    return PaginatedResponse[NotificationDeliveryAttemptResponse]( # Явно вказуємо тип Generic
+    return PagedResponse[NotificationDeliveryAttemptResponse](
         total=total_attempts,
         page=page_params.page,
         size=page_params.size,
-        results=[NotificationDeliveryAttemptResponse.model_validate(att) for att in attempts]
+        results=[NotificationDeliveryAttemptResponse.model_validate(att) for att in attempts_orm]  # Pydantic v2
     )
 
+
 @router.get(
-    "/{delivery_attempt_id}", # Шлях відносно /notifications/delivery/{delivery_attempt_id}
+    "/{delivery_attempt_id}",
     response_model=NotificationDeliveryAttemptResponse,
-    summary="Отримання деталей конкретної спроби доставки (Адмін/Суперюзер)",
-    description="Повертає детальну інформацію про конкретну спробу доставки сповіщення."
+    summary="Отримання деталей конкретної спроби доставки (Адмін/Суперюзер)",  # i18n
+    description="Повертає детальну інформацію про конкретну спробу доставки сповіщення."  # i18n
 )
-async def get_delivery_attempt_details(
-    delivery_attempt_id: int = Path(..., description="ID спроби доставки"),
-    db: AsyncSession = Depends(get_db_session),
-    current_admin_user: UserModel = Depends(get_current_active_superuser),
-    delivery_service: NotificationDeliveryService = Depends()
-):
-    '''
+async def get_delivery_attempt_details_endpoint(  # Перейменовано
+        delivery_attempt_id: UUID = Path(..., description="ID спроби доставки"),  # i18n
+        # current_admin_user: UserModel = Depends(get_current_active_superuser), # Вже в router.dependencies
+        delivery_service: NotificationDeliveryService = Depends(get_notification_delivery_service)
+) -> NotificationDeliveryAttemptResponse:
+    """
     Отримує деталі конкретної спроби доставки.
-    '''
-    if not hasattr(delivery_service, 'db_session') or delivery_service.db_session is None:
-        delivery_service.db_session = db
-
-    attempt = await delivery_service.get_delivery_attempt_by_id(
+    Доступно тільки суперкористувачам (або адміністраторам з відповідними правами).
+    """
+    logger.debug(f"Запит деталей спроби доставки ID: {delivery_attempt_id}.")
+    # TODO: NotificationDeliveryService.get_delivery_attempt_by_id_admin має перевіряти права або цей ендпоінт має бути захищений
+    attempt = await delivery_service.get_delivery_attempt_by_id(  # Припускаємо, що цей метод існує
         attempt_id=delivery_attempt_id
-        # requesting_user=current_admin_user # Якщо потрібна перевірка прав
-        )
+        # requesting_user_id=current_admin_user.id # Якщо сервіс потребує для аудиту/прав
+    )
     if not attempt:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Спроба доставки з ID {delivery_attempt_id} не знайдена."
-        )
-    return NotificationDeliveryAttemptResponse.model_validate(attempt)
+        logger.warning(f"Спроба доставки з ID '{delivery_attempt_id}' не знайдена.")
+        # i18n
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Спроба доставки з ID {delivery_attempt_id} не знайдена.")
+    return attempt  # Сервіс вже повертає Pydantic модель
 
-# Міркування:
-# 1.  Призначення: Ці ендпоінти переважно для діагностики та моніторингу системи сповіщень адміністраторами.
-# 2.  Схеми: `NotificationDeliveryAttemptResponse` з `app.src.schemas.notifications.delivery`.
-# 3.  Сервіс `NotificationDeliveryService`: Відповідає за отримання інформації про спроби доставки.
-#     Фактичне створення записів про спроби доставки відбувається в інших сервісах,
-#     які відповідають за відправку сповіщень (наприклад, EmailNotificationService, SMSNotificationService).
-# 4.  Права доступу: Тільки адміністратори/суперюзери.
-# 5.  Пагінація: Для списку спроб доставки для конкретного сповіщення.
-# 6.  URL-и: Цей роутер буде підключений до `notifications_router` з префіксом `/delivery`.
-#     Шляхи будуть `/api/v1/notifications/delivery/notification/{notification_id}` та `/api/v1/notifications/delivery/{delivery_attempt_id}`.
-# 7.  Коментарі: Українською мовою.
+
+# TODO: Розглянути ендпоінт для ініціювання повторної спроби доставки (POST /{delivery_attempt_id}/retry),
+#  якщо це потрібно для адміністрування. Він би викликав
+#  `delivery_service.retry_specific_failed_attempt(attempt_id)`.
+
+logger.info(f"Роутер для спроб доставки сповіщень (`{router.prefix}`) визначено.")

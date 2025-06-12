@@ -1,4 +1,5 @@
 # backend/app/src/models/mixins.py
+# -*- coding: utf-8 -*-
 """
 Модуль міксинів (домішок) для моделей SQLAlchemy.
 

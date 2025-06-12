@@ -4,34 +4,36 @@
 Ендпоінт для реєстрації нових користувачів.
 """
 # import logging # Замінено на централізований логер
-from fastapi import APIRouter, Depends, HTTPException, status, Response # Додано Response для set_cookie
+from fastapi import APIRouter, Depends, HTTPException, status, Response  # Додано Response для set_cookie
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Повні шляхи імпорту
 from backend.app.src.api.dependencies import get_api_db_session, get_user_service, get_token_service
 # from backend.app.src.models.auth.user import User as UserModel # UserModel не використовується прямо у відповіді, якщо є UserResponse
 from backend.app.src.schemas.auth.user import UserCreate, UserResponse
-from backend.app.src.schemas.auth.token import TokenResponse # Для опціонального авто-логіну
+from backend.app.src.schemas.auth.token import TokenResponse  # Для опціонального авто-логіну
 from backend.app.src.services.auth.user import UserService
-from backend.app.src.services.auth.token import TokenService # Для опціонального авто-логіну
-from backend.app.src.config.logging import logger # Централізований логер
-from backend.app.src.config import settings as global_settings # Для налаштувань cookie та авто-логіну
+from backend.app.src.services.auth.token import TokenService  # Для опціонального авто-логіну
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings  # Для налаштувань cookie та авто-логіну
 
 router = APIRouter()
+
 
 @router.post(
     "/register",
     # response_model=UserResponse, # Зміниться на TokenResponse, якщо буде авто-логін
     status_code=status.HTTP_201_CREATED,
-    summary="Реєстрація нового користувача", # i18n
-    description="Створює новий обліковий запис користувача в системі. За замовчуванням не виконує автоматичний вхід." # i18n
+    summary="Реєстрація нового користувача",  # i18n
+    description="Створює новий обліковий запис користувача в системі. За замовчуванням не виконує автоматичний вхід."
+    # i18n
 )
 async def register_user(
-    user_in: UserCreate, # Дані для створення користувача
-    response: Response, # Для встановлення cookie при авто-логіні
-    user_service: UserService = Depends(get_user_service),
-    token_service: TokenService = Depends(get_token_service) # Для авто-логіну
-) -> UserResponse: # Або TokenResponse при авто-логіні
+        user_in: UserCreate,  # Дані для створення користувача
+        response: Response,  # Для встановлення cookie при авто-логіні
+        user_service: UserService = Depends(get_user_service),
+        token_service: TokenService = Depends(get_token_service)  # Для авто-логіну
+) -> UserResponse:  # Або TokenResponse при авто-логіні
     """
     Реєструє нового користувача в системі.
 
@@ -41,7 +43,8 @@ async def register_user(
     - **first_name**: Ім'я (опціонально).
     - **last_name**: Прізвище (опціонально).
     """
-    logger.info(f"Спроба реєстрації нового користувача з email: {user_in.email}" + (f" та username: {user_in.username}" if user_in.username else ""))
+    logger.info(f"Спроба реєстрації нового користувача з email: {user_in.email}" + (
+        f" та username: {user_in.username}" if user_in.username else ""))
 
     # Логіка перевірки унікальності email/username тепер інкапсульована в UserService.create_user,
     # який має кидати ValueError у разі дублювання.
@@ -52,20 +55,22 @@ async def register_user(
         #  Наприклад, `user_service.create_user(user_create_data=user_in, user_type_code="USER_TYPE", role_codes=["USER"])`
         #  Це залежить від реалізації `create_user` в `UserService`. Припускаємо, що він має дефолти.
         created_user_orm = await user_service.create_user(user_create_data=user_in)
-        if not created_user_orm: # Малоймовірно, якщо сервіс кидає винятки при помилках
+        if not created_user_orm:  # Малоймовірно, якщо сервіс кидає винятки при помилках
             logger.error(f"UserService.create_user повернув None для email {user_in.email}")
             # i18n
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Не вдалося створити користувача.")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                                detail="Не вдалося створити користувача.")
 
-    except ValueError as e: # Обробка помилок валідації з сервісного шару (наприклад, email/username зайнято)
+    except ValueError as e:  # Обробка помилок валідації з сервісного шару (наприклад, email/username зайнято)
         logger.warning(f"Помилка валідації при реєстрації користувача (email: {user_in.email}): {e}")
         # i18n (повідомлення `e` вже має бути підготовленим для користувача з сервісу)
         raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, # Або 409 Conflict для дублікатів
+            status_code=status.HTTP_400_BAD_REQUEST,  # Або 409 Conflict для дублікатів
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"Неочікувана помилка під час створення користувача (email: {user_in.email}): {e}", exc_info=global_settings.DEBUG)
+        logger.error(f"Неочікувана помилка під час створення користувача (email: {user_in.email}): {e}",
+                     exc_info=global_settings.DEBUG)
         # i18n
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

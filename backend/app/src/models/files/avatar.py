@@ -1,4 +1,5 @@
 # backend/app/src/models/files/avatar.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для сутності "Аватар Користувача" (UserAvatar).
 

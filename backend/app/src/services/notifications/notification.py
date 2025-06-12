@@ -11,19 +11,20 @@ from sqlalchemy.exc import IntegrityError
 
 # Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.notifications.notification import Notification # Модель SQLAlchemy
-from backend.app.src.models.auth.user import User # Для user_id
-from backend.app.src.models.notifications.template import NotificationTemplate # Для використання шаблонів
+from backend.app.src.models.notifications.notification import Notification  # Модель SQLAlchemy
+from backend.app.src.models.auth.user import User  # Для user_id
+from backend.app.src.models.notifications.template import NotificationTemplate  # Для використання шаблонів
 
-from backend.app.src.schemas.notifications.notification import ( # Схеми Pydantic
-    NotificationCreateInternal, # Для створення на рівні сервісу
-    NotificationUpdate, # Для змін статусу, наприклад, позначити як прочитане
+from backend.app.src.schemas.notifications.notification import (  # Схеми Pydantic
+    NotificationCreateInternal,  # Для створення на рівні сервісу
+    NotificationUpdate,  # Для змін статусу, наприклад, позначити як прочитане
     NotificationResponse
 )
-from backend.app.src.services.notifications.template import NotificationTemplateService # Для отримання/рендерингу шаблонів
+from backend.app.src.services.notifications.template import \
+    NotificationTemplateService  # Для отримання/рендерингу шаблонів
 # from backend.app.src.services.notifications.delivery import NotificationDeliveryService # Для запуску доставки (буде викликано тут)
-from backend.app.src.config.logging import logger # Централізований логер
-from backend.app.src.config import settings # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
 
 class NotificationService(BaseService):
@@ -41,7 +42,8 @@ class NotificationService(BaseService):
         # self.delivery_service = NotificationDeliveryService(db_session) # Ініціалізуємо, якщо потрібно тут
         logger.info("NotificationService ініціалізовано.")
 
-    async def get_notification_by_id(self, notification_id: UUID, user_id: Optional[UUID] = None) -> Optional[NotificationResponse]:
+    async def get_notification_by_id(self, notification_id: UUID, user_id: Optional[UUID] = None) -> Optional[
+        NotificationResponse]:
         """
         Отримує сповіщення за його ID.
         Якщо надано `user_id`, перевіряє, чи належить сповіщення цьому користувачеві.
@@ -56,26 +58,27 @@ class NotificationService(BaseService):
         logger.debug(f"Спроба отримання {log_ctx}.")
 
         stmt = select(Notification).options(
-            selectinload(Notification.user).options(selectinload(User.user_type)) # Завантажуємо користувача та його тип
+            selectinload(Notification.user).options(selectinload(User.user_type))
+            # Завантажуємо користувача та його тип
             # TODO: Додати selectinload(Notification.template), якщо є зв'язок і він потрібен у відповіді.
         ).where(Notification.id == notification_id)
 
-        if user_id: # Якщо вказано user_id, фільтруємо за ним для безпеки
+        if user_id:  # Якщо вказано user_id, фільтруємо за ним для безпеки
             stmt = stmt.where(Notification.user_id == user_id)
 
         notification_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
         if notification_db:
             logger.info(f"Сповіщення з ID '{notification_id}' знайдено.")
-            return NotificationResponse.model_validate(notification_db) # Pydantic v2
+            return NotificationResponse.model_validate(notification_db)  # Pydantic v2
 
         logger.info(f"Сповіщення з ID '{notification_id}' не знайдено (або не належить користувачеві).")
         return None
 
     async def create_notification(
-        self,
-        notification_data: NotificationCreateInternal, # Вхідні дані для створення
-        trigger_delivery: bool = True # За замовчуванням намагаємося доставити
+            self,
+            notification_data: NotificationCreateInternal,  # Вхідні дані для створення
+            trigger_delivery: bool = True  # За замовчуванням намагаємося доставити
     ) -> NotificationResponse:
         """
         Створює новий запис сповіщення в БД.
@@ -86,22 +89,24 @@ class NotificationService(BaseService):
         :return: Pydantic схема створеного NotificationResponse.
         :raises ValueError: Якщо користувача не знайдено або конфлікт даних. # i18n
         """
-        logger.debug(f"Спроба створення сповіщення для користувача ID '{notification_data.user_id}', назва: '{notification_data.title}'.")
+        logger.debug(
+            f"Спроба створення сповіщення для користувача ID '{notification_data.user_id}', назва: '{notification_data.title}'.")
 
         # Перевірка існування користувача
         if not await self.db_session.get(User, notification_data.user_id):
-            msg = f"Користувача з ID '{notification_data.user_id}' не знайдено." # i18n
+            msg = f"Користувача з ID '{notification_data.user_id}' не знайдено."  # i18n
             logger.error(msg + " Неможливо створити сповіщення.")
             raise ValueError(msg)
 
         # Перевірка існування шаблону, якщо template_id надано
-        if notification_data.template_id and not await self.db_session.get(NotificationTemplate, notification_data.template_id):
-            msg = f"Шаблон сповіщення з ID '{notification_data.template_id}' не знайдено." # i18n
+        if notification_data.template_id and not await self.db_session.get(NotificationTemplate,
+                                                                           notification_data.template_id):
+            msg = f"Шаблон сповіщення з ID '{notification_data.template_id}' не знайдено."  # i18n
             logger.error(msg)
             raise ValueError(msg)
 
         # `created_at` встановлюється автоматично моделлю
-        new_notification_db = Notification(**notification_data.model_dump()) # Pydantic v2
+        new_notification_db = Notification(**notification_data.model_dump())  # Pydantic v2
 
         self.db_session.add(new_notification_db)
         try:
@@ -114,7 +119,8 @@ class NotificationService(BaseService):
             # i18n
             raise ValueError(f"Не вдалося створити сповіщення через конфлікт даних: {e}")
 
-        logger.info(f"Сповіщення ID '{new_notification_db.id}' успішно створено для користувача ID '{new_notification_db.user_id}'.")
+        logger.info(
+            f"Сповіщення ID '{new_notification_db.id}' успішно створено для користувача ID '{new_notification_db.user_id}'.")
 
         if trigger_delivery:
             logger.info(f"Ініціювання доставки для сповіщення ID '{new_notification_db.id}'.")
@@ -122,19 +128,20 @@ class NotificationService(BaseService):
             # from backend.app.src.services.notifications.delivery import NotificationDeliveryService
             # delivery_service = NotificationDeliveryService(self.db_session)
             # await delivery_service.queue_notification_for_delivery(new_notification_db.id)
-            logger.warning(f"[ЗАГЛУШКА] Ініціювання доставки для сповіщення ID '{new_notification_db.id}'. Потребує реалізації.")
+            logger.warning(
+                f"[ЗАГЛУШКА] Ініціювання доставки для сповіщення ID '{new_notification_db.id}'. Потребує реалізації.")
 
-        return NotificationResponse.model_validate(new_notification_db) # Pydantic v2
+        return NotificationResponse.model_validate(new_notification_db)  # Pydantic v2
 
     async def create_notification_from_template(
-        self,
-        template_name: str, # Унікальне ім'я шаблону
-        user_id: UUID,
-        context_data: Dict[str, Any], # Дані для заповнення шаблону
-        notification_type_override: Optional[str] = None, # Перевизначити тип сповіщення з шаблону
-        payload_override: Optional[Dict[str, Any]] = None, # Перевизначити/додати payload
-        trigger_delivery: bool = True
-    ) -> NotificationResponse: # Не Optional, бо помилки рендерингу/пошуку кидають винятки
+            self,
+            template_name: str,  # Унікальне ім'я шаблону
+            user_id: UUID,
+            context_data: Dict[str, Any],  # Дані для заповнення шаблону
+            notification_type_override: Optional[str] = None,  # Перевизначити тип сповіщення з шаблону
+            payload_override: Optional[Dict[str, Any]] = None,  # Перевизначити/додати payload
+            trigger_delivery: bool = True
+    ) -> NotificationResponse:  # Не Optional, бо помилки рендерингу/пошуку кидають винятки
         """
         Створює сповіщення на основі існуючого шаблону.
 
@@ -151,20 +158,20 @@ class NotificationService(BaseService):
 
         template = await self.template_service.get_template_by_name(template_name)
         if not template:
-            msg = f"Шаблон сповіщення '{template_name}' не знайдено." # i18n
+            msg = f"Шаблон сповіщення '{template_name}' не знайдено."  # i18n
             logger.error(msg + " Неможливо створити сповіщення.")
             raise ValueError(msg)
 
         try:
             # render_template тепер може кидати ValueError або KeyError
             rendered_subject, rendered_body = self.template_service.render_template(template, context_data)
-        except (ValueError, KeyError) as e: # Обробка помилок рендерингу, які ми кидаємо
-            logger.error(f"Помилка рендерингу шаблону '{template_name}' для користувача '{user_id}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося відрендерити шаблон сповіщення '{template_name}': {e}") # i18n
-        except Exception as e: # Інші непередбачені помилки рендерингу
+        except (ValueError, KeyError) as e:  # Обробка помилок рендерингу, які ми кидаємо
+            logger.error(f"Помилка рендерингу шаблону '{template_name}' для користувача '{user_id}': {e}",
+                         exc_info=settings.DEBUG)
+            raise ValueError(f"Не вдалося відрендерити шаблон сповіщення '{template_name}': {e}")  # i18n
+        except Exception as e:  # Інші непередбачені помилки рендерингу
             logger.error(f"Неочікувана помилка рендерингу '{template_name}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Неочікувана помилка рендерингу шаблону '{template_name}'.") # i18n
-
+            raise ValueError(f"Неочікувана помилка рендерингу шаблону '{template_name}'.")  # i18n
 
         final_payload = template.default_vars.copy() if template.default_vars else {}
         if payload_override:
@@ -174,19 +181,18 @@ class NotificationService(BaseService):
 
         create_data = NotificationCreateInternal(
             user_id=user_id,
-            title=rendered_subject or template.name, # Якщо тема не відрендерена, використовуємо ім'я шаблону
+            title=rendered_subject or template.name,  # Якщо тема не відрендерена, використовуємо ім'я шаблону
             message=rendered_body,
             notification_type=final_notification_type,
-            status="unread", # Статус за замовчуванням для нових сповіщень
+            status="unread",  # Статус за замовчуванням для нових сповіщень
             payload=final_payload if final_payload else None,
-            template_id=template.id # Зберігаємо ID шаблону, якщо модель це підтримує
+            template_id=template.id  # Зберігаємо ID шаблону, якщо модель це підтримує
         )
 
         return await self.create_notification(create_data, trigger_delivery=trigger_delivery)
 
-
     async def mark_notifications_as_status(
-        self, notification_ids: List[UUID], user_id: UUID, status: str
+            self, notification_ids: List[UUID], user_id: UUID, status: str
     ) -> int:
         """
         Встановлює вказаний статус для списку сповіщень, що належать користувачеві.
@@ -210,14 +216,15 @@ class NotificationService(BaseService):
         notifications_to_update_db = (await self.db_session.execute(stmt)).scalars().all()
 
         if not notifications_to_update_db:
-            logger.info(f"Не знайдено сповіщень для користувача ID '{user_id}', що відповідають ID {notification_ids} та потребують оновлення статусу на '{status}'.")
+            logger.info(
+                f"Не знайдено сповіщень для користувача ID '{user_id}', що відповідають ID {notification_ids} та потребують оновлення статусу на '{status}'.")
             return 0
 
         updated_count = 0
         current_time = datetime.now(timezone.utc)
         for notification_db in notifications_to_update_db:
             notification_db.status = status
-            if status == "read" and hasattr(notification_db, 'read_at'): # Перевірка наявності поля
+            if status == "read" and hasattr(notification_db, 'read_at'):  # Перевірка наявності поля
                 notification_db.read_at = current_time
             # `updated_at` оновлюється автоматично моделлю
             self.db_session.add(notification_db)
@@ -229,15 +236,17 @@ class NotificationService(BaseService):
         return updated_count
 
     async def get_user_notifications(
-        self, user_id: UUID, status: Optional[str] = None,
-        notification_type: Optional[str] = None,
-        skip: int = 0, limit: int = 20
+            self, user_id: UUID, status: Optional[str] = None,
+            notification_type: Optional[str] = None,
+            skip: int = 0, limit: int = 20
     ) -> List[NotificationResponse]:
         """Перелічує сповіщення для користувача з фільтрами та пагінацією."""
-        logger.debug(f"Перелік сповіщень для користувача ID: {user_id}, статус: {status}, тип: {notification_type}, пропустити={skip}, ліміт={limit}")
+        logger.debug(
+            f"Перелік сповіщень для користувача ID: {user_id}, статус: {status}, тип: {notification_type}, пропустити={skip}, ліміт={limit}")
 
         stmt = select(Notification).options(
-            selectinload(Notification.user).options(noload("*")) # Завантажуємо тільки ID користувача, якщо UserResponse не потрібен повністю
+            selectinload(Notification.user).options(noload("*"))
+            # Завантажуємо тільки ID користувача, якщо UserResponse не потрібен повністю
             # TODO: selectinload(Notification.template), якщо потрібно
         ).where(Notification.user_id == user_id)
 
@@ -249,7 +258,7 @@ class NotificationService(BaseService):
         stmt = stmt.order_by(Notification.created_at.desc()).offset(skip).limit(limit)
         notifications_db = (await self.db_session.execute(stmt)).scalars().all()
 
-        response_list = [NotificationResponse.model_validate(n) for n in notifications_db] # Pydantic v2
+        response_list = [NotificationResponse.model_validate(n) for n in notifications_db]  # Pydantic v2
         logger.info(f"Отримано {len(response_list)} сповіщень для користувача ID '{user_id}'.")
         return response_list
 
@@ -269,7 +278,8 @@ class NotificationService(BaseService):
 
         if notification_db.user_id != user_id:
             # i18n
-            logger.error(f"Користувач ID '{user_id}' не авторизований для видалення сповіщення ID '{notification_id}' (власник: {notification_db.user_id}).")
+            logger.error(
+                f"Користувач ID '{user_id}' не авторизований для видалення сповіщення ID '{notification_id}' (власник: {notification_db.user_id}).")
             # Можна кинути PermissionError або просто повернути False
             return False
 
@@ -277,5 +287,6 @@ class NotificationService(BaseService):
         await self.commit()
         logger.info(f"Сповіщення ID '{notification_id}' успішно видалено користувачем ID '{user_id}'.")
         return True
+
 
 logger.debug(f"{NotificationService.__name__} (сервіс сповіщень) успішно визначено.")

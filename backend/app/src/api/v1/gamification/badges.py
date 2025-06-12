@@ -1,179 +1,253 @@
 # backend/app/src/api/v1/gamification/badges.py
-from typing import List, Optional, Generic, TypeVar # Додано Generic, TypeVar для PaginatedResponse
+# -*- coding: utf-8 -*-
+"""
+Ендпоінти для управління визначеннями Значків (Бейджів).
+
+Бейджі є типом нагород, які користувачі можуть заробити. Цей модуль
+дозволяє адміністраторам та суперкористувачам створювати, переглядати,
+оновлювати та видаляти визначення цих бейджів.
+"""
+from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
+from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
-from pydantic import BaseModel # Додано BaseModel для PaginatedResponse, якщо визначається локально
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.src.core.dependencies import get_db_session, get_current_active_user, get_current_active_superuser
-from app.src.models.auth import User as UserModel
-# from app.src.models.gamification import Badge as BadgeModel # Потрібна модель бейджа
-from app.src.schemas.gamification.badge import ( # Схеми для бейджів
-    BadgeCreate,
-    BadgeUpdate,
-    BadgeResponse
+# Повні шляхи імпорту
+from backend.app.src.api.dependencies import (
+    get_api_db_session, get_current_active_user,
+    get_current_active_superuser, paginator
 )
-# Припускаємо, що ці схеми імпортуються, якщо ні - можна визначити як у users.py або groups.py
-from app.src.schemas.pagination import PaginatedResponse, PageParams
-from app.src.services.gamification.badge import BadgeService # Сервіс для визначень бейджів
+# TODO: Створити та використовувати гранульовані залежності для прав доступу, наприклад:
+#  `require_badge_editor_permission(badge_id: UUID = Path(...))`
+#  `require_badge_viewer_permission(badge_id: UUID = Path(...))`
+from backend.app.src.api.v1.groups.groups import check_group_edit_permission  # Тимчасово для адмінських дій в групі
+from backend.app.src.models.auth.user import User as UserModel
+from backend.app.src.schemas.gamification.badge import (
+    BadgeCreate, BadgeUpdate, BadgeResponse
+)
+from backend.app.src.core.pagination import PagedResponse, PageParams
+from backend.app.src.services.gamification.badge import BadgeService
+from backend.app.src.services.groups.group import GroupService  # Для перевірки групи при створенні
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings
 
-router = APIRouter()
+router = APIRouter(
+    # Префікс /badges буде додано в __init__.py батьківського роутера gamification
+    # Теги також успадковуються/додаються звідти
+)
+
+
+# Залежність для отримання BadgeService
+async def get_badge_service(session: AsyncSession = Depends(get_api_db_session)) -> BadgeService:
+    """Залежність FastAPI для отримання екземпляра BadgeService."""
+    return BadgeService(db_session=session)
+
+
+# Залежність для GroupService (для перевірки існування групи при створенні бейджа для групи)
+async def get_group_service_dep(session: AsyncSession = Depends(get_api_db_session)) -> GroupService:
+    return GroupService(db_session=session)
+
 
 @router.post(
-    "/", # Шлях відносно /gamification/badges
+    "/",
     response_model=BadgeResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Створення нового визначення бейджа (Адмін/Суперюзер)",
-    description="Дозволяє адміністратору або суперюзеру створити нове визначення бейджа (назва, опис, іконка, критерії)."
+    summary="Створення нового визначення бейджа (Адмін/Суперюзер)",  # i18n
+    description="""Дозволяє адміністратору групи (для бейджів своєї групи) або суперюзеру
+    (для будь-яких бейджів, включаючи глобальні) створити нове визначення бейджа."""  # i18n
 )
 async def create_badge_definition(
-    badge_in: BadgeCreate,
-    db: AsyncSession = Depends(get_db_session),
-    current_admin_user: UserModel = Depends(get_current_active_superuser), # Або інша залежність для адміна
-    badge_service: BadgeService = Depends()
+        badge_in: BadgeCreate,  # Схема містить group_id (опціонально)
+        current_user: UserModel = Depends(get_current_active_user),  # Поточний користувач для перевірки прав
+        badge_service: BadgeService = Depends(get_badge_service),
+        # group_service: GroupService = Depends(get_group_service_dep) # Не потрібен, якщо сервіс бейджів сам валідує групу
 ):
-    '''
+    """
     Створює нове визначення бейджа.
-    - `name`: Назва бейджа.
-    - `description`: Опис.
-    - `icon_url`: URL іконки.
-    - `criteria`: Критерії для отримання (може бути текстовим описом або структурованими даними).
-    - `group_id`: ID групи, якщо бейдж специфічний для групи (опціонально).
-    '''
-    if not hasattr(badge_service, 'db_session') or badge_service.db_session is None:
-        badge_service.db_session = db
+    Якщо `badge_in.group_id` вказано, користувач має бути адміном цієї групи або суперюзером.
+    Якщо `badge_in.group_id` не вказано (глобальний бейдж), тільки суперюзер може його створити.
+    """
+    logger.info(
+        f"Користувач ID '{current_user.id}' намагається створити бейдж '{badge_in.name}'. Група: {badge_in.group_id or 'Глобальний'}.")
 
-    created_badge_def = await badge_service.create_badge_definition(
-        badge_create_schema=badge_in,
-        requesting_user=current_admin_user # Для перевірки прав, якщо потрібно
-    )
-    # Сервіс має кидати HTTPException у разі помилок
-    return BadgeResponse.model_validate(created_badge_def)
+    # Перевірка прав доступу (має бути інкапсульована в сервісі або спеціальній залежності)
+    # TODO: Реалізувати перевірку прав: якщо badge_in.group_id, то current_user - адмін цієї групи або СУ.
+    #  Якщо badge_in.group_id is None, то current_user - СУ.
+    if badge_in.group_id:
+        # Приклад простої перевірки (потребує GroupMembershipService)
+        # if not current_user.is_superuser:
+        #     membership_service = GroupMembershipService(badge_service.db_session) # Або ін'єктувати
+        #     is_admin = await membership_service.is_user_group_admin(current_user.id, badge_in.group_id)
+        #     if not is_admin:
+        #         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ви не є адміністратором вказаної групи.") # i18n
+        pass  # Припускаємо, що сервіс `create` обробляє цю логіку або вона винесена в залежність
+    elif not current_user.is_superuser:
+        # i18n
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
+                            detail="Тільки суперкористувачі можуть створювати глобальні бейджі.")
+
+    try:
+        # BadgeService.create (успадкований та розширений) має обробляти унікальність імені в межах group_id/глобально
+        # та валідувати пов'язані ID (icon_file_id).
+        # Також передаємо created_by_user_id.
+        created_badge = await badge_service.create(data=badge_in, created_by_user_id=current_user.id)
+        return created_badge
+    except ValueError as e:
+        logger.warning(f"Помилка створення бейджа '{badge_in.name}': {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка при створенні бейджа '{badge_in.name}': {e}", exc_info=global_settings.DEBUG)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутрішня помилка сервера.")
+
 
 @router.get(
     "/",
-    response_model=PaginatedResponse[BadgeResponse],
-    summary="Отримання списку визначень бейджів",
-    description="Повертає список усіх визначень бейджів з пагінацією. Може фільтруватися за групою."
+    response_model=PagedResponse[BadgeResponse],
+    summary="Отримання списку визначень бейджів",  # i18n
+    description="""Повертає список визначень бейджів з пагінацією.
+    Доступно всім автентифікованим користувачам. Фільтрується за групою (`group_id`),
+    показуючи глобальні бейджі та бейджі вказаної групи (якщо користувач є її членом)."""  # i18n
 )
 async def read_badge_definitions(
-    group_id: Optional[int] = Query(None, description="ID групи для фільтрації визначень бейджів"),
-    page_params: PageParams = Depends(),
-    db: AsyncSession = Depends(get_db_session),
-    # current_user: UserModel = Depends(get_current_active_user), # Для загального доступу, якщо дозволено
-    badge_service: BadgeService = Depends()
-):
-    '''
+        group_id: Optional[UUID] = Query(None,
+                                         description="ID групи для фільтрації (показує бейджі групи + глобальні)"),
+        # i18n
+        is_active: Optional[bool] = Query(None, description="Фільтр за статусом активності"),  # i18n
+        page_params: PageParams = Depends(paginator),
+        current_user: UserModel = Depends(get_current_active_user),  # Для контексту доступу
+        badge_service: BadgeService = Depends(get_badge_service)
+) -> PagedResponse[BadgeResponse]:
+    """
     Отримує список визначень бейджів.
-    '''
-    if not hasattr(badge_service, 'db_session') or badge_service.db_session is None:
-        badge_service.db_session = db
+    Користувачі бачать глобальні бейджі та бейджі груп, до яких вони належать (якщо group_id вказано і вони є членами).
+    Суперюзери бачать усі бейджі.
+    """
+    # TODO: BadgeService.list_badges_paginated має враховувати права current_user
+    #  та параметр group_id для фільтрації (показувати глобальні + доступні групові).
+    #  Також має повертати (items, total_count).
+    logger.debug(f"Користувач ID '{current_user.id}' запитує список бейджів. Група: {group_id}, Активні: {is_active}.")
 
-    total_defs, badge_defs = await badge_service.get_badge_definitions(
-        group_id=group_id,
+    badges_orm, total_badges = await badge_service.list_badges_paginated(
+        requesting_user_id=current_user.id,
+        is_superuser=current_user.is_superuser,
+        group_id_filter=group_id,
+        is_active_filter=is_active,
         skip=page_params.skip,
         limit=page_params.limit
-        # requesting_user=current_user # Якщо потрібна перевірка доступу на перегляд
     )
-    return PaginatedResponse[BadgeResponse]( # Явно вказуємо тип Generic
-        total=total_defs,
+    return PagedResponse[BadgeResponse](
+        total=total_badges,
         page=page_params.page,
         size=page_params.size,
-        results=[BadgeResponse.model_validate(bd) for bd in badge_defs]
+        results=[BadgeResponse.model_validate(b) for b in badges_orm]  # Pydantic v2
     )
+
+
+# TODO: Створити залежність `check_badge_access_permission(badge_id: UUID, current_user: UserModel, ...)`
+#  яка перевіряє, чи може користувач бачити/редагувати цей бейдж.
 
 @router.get(
-    "/{badge_def_id}",
+    "/{badge_id}",  # Змінено з badge_def_id на badge_id для узгодженості
     response_model=BadgeResponse,
-    summary="Отримання інформації про визначення бейджа за ID",
-    description="Повертає детальну інформацію про конкретне визначення бейджа."
+    summary="Отримання інформації про визначення бейджа за ID",  # i18n
+    description="""Повертає детальну інформацію про конкретне визначення бейджа.
+    Доступно, якщо бейдж глобальний або користувач є членом групи бейджа."""  # i18n
+    # dependencies=[Depends(check_badge_access_permission)] # TODO
 )
 async def read_badge_definition_by_id(
-    badge_def_id: int,
-    db: AsyncSession = Depends(get_db_session),
-    badge_service: BadgeService = Depends()
-    # current_user: UserModel = Depends(get_current_active_user) # Якщо потрібна перевірка доступу
-):
-    '''
+        badge_id: UUID = Path(..., description="ID визначення бейджа"),  # i18n
+        current_user: UserModel = Depends(get_current_active_user),  # Для перевірки доступу
+        badge_service: BadgeService = Depends(get_badge_service)
+) -> BadgeResponse:
+    """
     Отримує інформацію про визначення бейджа за його ID.
-    '''
-    if not hasattr(badge_service, 'db_session') or badge_service.db_session is None:
-        badge_service.db_session = db
+    Сервіс має перевіряти доступність бейджа для користувача.
+    """
+    logger.debug(f"Користувач ID '{current_user.id}' запитує бейдж ID '{badge_id}'.")
+    # BadgeService.get_by_id_for_user має перевіряти права
+    badge = await badge_service.get_by_id_for_user(  # Потрібен такий метод в сервісі
+        item_id=badge_id,
+        requesting_user_id=current_user.id,
+        is_superuser=current_user.is_superuser
+    )
+    if not badge:
+        # i18n
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                            detail=f"Визначення бейджа з ID {badge_id} не знайдено або доступ заборонено.")
+    return badge
 
-    badge_def = await badge_service.get_badge_definition_by_id(
-        badge_def_id=badge_def_id
-        # requesting_user=current_user # Якщо потрібна перевірка доступу
-        )
-    if not badge_def:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Визначення бейджа з ID {badge_def_id} не знайдено."
-        )
-    return BadgeResponse.model_validate(badge_def)
 
 @router.put(
-    "/{badge_def_id}",
+    "/{badge_id}",
     response_model=BadgeResponse,
-    summary="Оновлення визначення бейджа (Адмін/Суперюзер)",
-    description="Дозволяє адміністратору або суперюзеру оновити існуюче визначення бейджа."
+    summary="Оновлення визначення бейджа (Адмін/Суперюзер)",  # i18n
+    description="Дозволяє адміністратору групи або суперюзеру оновити існуюче визначення бейджа.",  # i18n
+    # dependencies=[Depends(check_badge_editor_permission)] # TODO
 )
 async def update_badge_definition(
-    badge_def_id: int,
-    badge_in: BadgeUpdate,
-    db: AsyncSession = Depends(get_db_session),
-    current_admin_user: UserModel = Depends(get_current_active_superuser),
-    badge_service: BadgeService = Depends()
-):
-    '''
-    Оновлює дані визначення бейджа.
-    '''
-    if not hasattr(badge_service, 'db_session') or badge_service.db_session is None:
-        badge_service.db_session = db
+        badge_id: UUID,
+        badge_in: BadgeUpdate,
+        current_user: UserModel = Depends(get_current_active_superuser),
+        # TODO: Замінити на check_badge_editor_permission
+        badge_service: BadgeService = Depends(get_badge_service)
+) -> BadgeResponse:
+    """Оновлює дані визначення бейджа."""
+    logger.info(f"Користувач ID '{current_user.id}' намагається оновити бейдж ID '{badge_id}'.")
+    try:
+        # BadgeService.update (успадкований та розширений) має обробляти унікальність імені в межах group_id/глобально
+        # та валідувати пов'язані ID (icon_file_id).
+        # Також передаємо updated_by_user_id.
+        updated_badge = await badge_service.update(
+            item_id=badge_id,
+            data=badge_in,
+            updated_by_user_id=current_user.id  # Передаємо через kwargs в BaseDictionaryService.update
+        )
+        if not updated_badge:  # Малоймовірно, якщо права перевірено і сервіс кидає винятки
+            # i18n
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Бейдж не знайдено для оновлення.")
+        return updated_badge
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка: {e}", exc_info=global_settings.DEBUG)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Внутрішня помилка сервера.")  # i18n
 
-    updated_badge_def = await badge_service.update_badge_definition(
-        badge_def_id=badge_def_id,
-        badge_update_schema=badge_in,
-        requesting_user=current_admin_user
-    )
-    # Сервіс має кидати HTTPException у разі помилок
-    return BadgeResponse.model_validate(updated_badge_def)
 
 @router.delete(
-    "/{badge_def_id}",
+    "/{badge_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Видалення визначення бейджа (Адмін/Суперюзер)",
-    description="Дозволяє адміністратору або суперюзеру видалити визначення бейджа."
+    summary="Видалення визначення бейджа (Адмін/Суперюзер)",  # i18n
+    description="Дозволяє адміністратору групи або суперюзеру видалити визначення бейджа.",  # i18n
+    # dependencies=[Depends(check_badge_editor_permission)] # TODO
 )
 async def delete_badge_definition(
-    badge_def_id: int,
-    db: AsyncSession = Depends(get_db_session),
-    current_admin_user: UserModel = Depends(get_current_active_superuser),
-    badge_service: BadgeService = Depends()
+        badge_id: UUID,
+        current_user: UserModel = Depends(get_current_active_superuser),  # TODO: Замінити
+        badge_service: BadgeService = Depends(get_badge_service)
 ):
-    '''
-    Видаляє визначення бейджа.
-    '''
-    if not hasattr(badge_service, 'db_session') or badge_service.db_session is None:
-        badge_service.db_session = db
-
-    success = await badge_service.delete_badge_definition(
-        badge_def_id=badge_def_id,
-        requesting_user=current_admin_user
-    )
-    if not success: # Сервіс має кидати HTTPException
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Не вдалося видалити визначення бейджа з ID {badge_def_id}."
+    """Видаляє визначення бейджа."""
+    logger.info(f"Користувач ID '{current_user.id}' намагається видалити бейдж ID '{badge_id}'.")
+    try:
+        # TODO: BadgeService.delete має перевіряти права та чи не використовується бейдж.
+        success = await badge_service.delete_badge_with_permission_check(  # Потрібен такий метод
+            item_id=badge_id,
+            requesting_user_id=current_user.id,
+            is_superuser=current_user.is_superuser
         )
-    # HTTP 204 No Content
+        if not success:
+            # i18n
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,
+                                detail="Не вдалося видалити бейдж. Можливо, його не існує або у вас немає прав.")
+    except ValueError as e:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except PermissionError as e:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))  # i18n
 
-# Міркування:
-# 1.  Призначення: Цей модуль керує тільки визначеннями бейджів (як вони виглядають, як їх отримати).
-#     Фактичне нагородження користувачів бейджами (UserAchievements) буде оброблятися окремо,
-#     можливо, автоматично сервісами або через окремий API для адмінів (якщо потрібне ручне нагородження).
-# 2.  Схеми: `BadgeCreate`, `BadgeUpdate`, `BadgeResponse` з `app.src.schemas.gamification.badge`.
-# 3.  Сервіс `BadgeService`: CRUD операції для `BadgeModel` (визначення бейджів).
-# 4.  Права доступу: CRUD визначень бейджів - Адміністратори/Суперюзери. Перегляд списку - можливо, всі користувачі.
-#     Поточна реалізація GET-ендпоінтів не вимагає `current_user` для перегляду, але це може бути додано в сервісі.
-# 5.  Контекст групи: Якщо бейджі залежать від групи (`group_id`), це має бути враховано.
-# 6.  Коментарі: Українською мовою.
-# 7.  URL-и: Цей роутер буде підключений до `gamification_router` з префіксом `/badges`.
+    return None
+
+
+logger.info(f"Роутер для визначень бейджів (`{router.prefix}`) визначено.")

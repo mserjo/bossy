@@ -1,4 +1,5 @@
 # backend/app/src/models/dictionaries/messengers.py
+# -*- coding: utf-8 -*-
 """
 Модель SQLAlchemy для довідника "Месенджери" (платформи обміну повідомленнями).
 

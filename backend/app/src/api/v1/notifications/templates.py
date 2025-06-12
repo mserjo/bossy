@@ -1,178 +1,216 @@
 # backend/app/src/api/v1/notifications/templates.py
-from typing import List, Optional, Generic, TypeVar # Додано Generic, TypeVar для PaginatedResponse
+# -*- coding: utf-8 -*-
+"""
+Ендпоінти для управління шаблонами сповіщень.
+
+Дозволяє суперкористувачам створювати, отримувати, оновлювати та видаляти
+шаблони, які використовуються для генерації сповіщень різних типів.
+"""
+from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
+from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
-from pydantic import BaseModel # Додано BaseModel для PaginatedResponse, якщо визначається локально
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.src.core.dependencies import get_db_session, get_current_active_superuser # Адміністративні дії
-from app.src.models.auth import User as UserModel
-# from app.src.models.notifications import NotificationTemplate as NotificationTemplateModel # Потрібна модель шаблону
-from app.src.schemas.notifications.template import ( # Схеми для шаблонів
+# Повні шляхи імпорту
+from backend.app.src.api.dependencies import get_api_db_session, get_current_active_superuser, paginator
+from backend.app.src.models.auth.user import User as UserModel  # Для current_admin_user
+from backend.app.src.schemas.notifications.template import (
     NotificationTemplateCreate,
     NotificationTemplateUpdate,
     NotificationTemplateResponse
 )
-# Припускаємо, що ці схеми імпортуються, якщо ні - можна визначити як у users.py або groups.py
-from app.src.schemas.pagination import PaginatedResponse, PageParams
-from app.src.services.notifications.template import NotificationTemplateService # Сервіс для шаблонів
+from backend.app.src.core.pagination import PagedResponse, PageParams
+from backend.app.src.services.notifications.template import NotificationTemplateService
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings as global_settings
 
-router = APIRouter()
+router = APIRouter(
+    # Префікс /templates буде додано в __init__.py батьківського роутера notifications
+    # Теги також успадковуються/додаються звідти
+    dependencies=[Depends(get_current_active_superuser)]  # Всі операції з шаблонами - тільки для суперюзерів
+)
+
+
+# Залежність для отримання NotificationTemplateService
+async def get_notification_template_service(
+        session: AsyncSession = Depends(get_api_db_session)) -> NotificationTemplateService:
+    """Залежність FastAPI для отримання екземпляра NotificationTemplateService."""
+    return NotificationTemplateService(db_session=session)
+
 
 @router.post(
-    "/", # Шлях відносно /notifications/templates/
+    "/",
     response_model=NotificationTemplateResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Створення нового шаблону сповіщення (Адмін/Суперюзер)",
-    description="Дозволяє адміністратору або суперюзеру створити новий шаблон для генерації сповіщень."
+    summary="Створення нового шаблону сповіщення",  # i18n
+    description="Дозволяє суперкористувачу створити новий шаблон для генерації сповіщень."  # i18n
 )
 async def create_notification_template(
-    template_in: NotificationTemplateCreate,
-    db: AsyncSession = Depends(get_db_session),
-    current_admin_user: UserModel = Depends(get_current_active_superuser),
-    template_service: NotificationTemplateService = Depends()
-):
-    '''
+        template_in: NotificationTemplateCreate,
+        service: NotificationTemplateService = Depends(get_notification_template_service),
+        current_user: UserModel = Depends(get_current_active_superuser)  # Для аудиту (created_by_user_id)
+) -> NotificationTemplateResponse:
+    """
     Створює новий шаблон сповіщення.
-    - `name`: Унікальна назва/ідентифікатор шаблону.
-    - `description`: Опис шаблону.
-    - `subject_template`: Шаблон для теми сповіщення.
-    - `body_template`: Шаблон для тіла сповіщення (може містити HTML, Markdown, або плейсхолдери).
-    - `template_type`: Тип шаблону (наприклад, 'email', 'in_app', 'sms').
-    - `available_variables`: Список доступних змінних для цього шаблону.
-    '''
-    if not hasattr(template_service, 'db_session') or template_service.db_session is None:
-        template_service.db_session = db
+    Доступно тільки суперкористувачам.
+    `NotificationTemplateService` успадковує від `BaseDictionaryService`, тому використовуємо його метод `create`.
+    Унікальність поля `name` (яке діє як код для шаблонів) перевіряється в `BaseDictionaryService.create`.
+    """
+    logger.info(f"Суперкористувач ID '{current_user.id}' створює шаблон сповіщення '{template_in.name}'.")
+    try:
+        # BaseDictionaryService.create може приймати kwargs для дод. полів (напр. created_by_user_id)
+        # TODO: Переконатися, що модель NotificationTemplate та BaseDictionaryService обробляють created_by_user_id.
+        created_template = await service.create(data=template_in, created_by_user_id=current_user.id)
+        return created_template
+    except ValueError as e:  # Помилки унікальності або валідації з сервісу
+        logger.warning(f"Помилка створення шаблону '{template_in.name}': {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка при створенні шаблону '{template_in.name}': {e}",
+                     exc_info=global_settings.DEBUG)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутрішня помилка сервера.")
 
-    created_template = await template_service.create_template(
-        template_create_schema=template_in,
-        requesting_user=current_admin_user # Для перевірки прав або логування
-    )
-    # Сервіс має кидати HTTPException у разі помилок (наприклад, неунікальна назва)
-    return NotificationTemplateResponse.model_validate(created_template)
 
 @router.get(
     "/",
-    response_model=PaginatedResponse[NotificationTemplateResponse],
-    summary="Отримання списку шаблонів сповіщень (Адмін/Суперюзер)",
-    description="Повертає список усіх шаблонів сповіщень з пагінацією."
+    response_model=PagedResponse[NotificationTemplateResponse],
+    summary="Отримання списку шаблонів сповіщень",  # i18n
+    description="Повертає список усіх шаблонів сповіщень з пагінацією. Доступно суперкористувачам."  # i18n
 )
 async def read_notification_templates(
-    page_params: PageParams = Depends(),
-    template_type: Optional[str] = Query(None, description="Фільтр за типом шаблону (наприклад, 'email', 'in_app')"),
-    db: AsyncSession = Depends(get_db_session),
-    current_admin_user: UserModel = Depends(get_current_active_superuser),
-    template_service: NotificationTemplateService = Depends()
-):
-    '''
-    Отримує список шаблонів сповіщень.
-    '''
-    if not hasattr(template_service, 'db_session') or template_service.db_session is None:
-        template_service.db_session = db
+        template_type: Optional[str] = Query(None,
+                                             description="Фільтр за типом шаблону (наприклад, 'EMAIL', 'IN_APP')"),
+        # i18n
+        page_params: PageParams = Depends(paginator),
+        service: NotificationTemplateService = Depends(get_notification_template_service)
+        # current_user: UserModel = Depends(get_current_active_superuser) # Вже захищено на рівні роутера
+) -> PagedResponse[NotificationTemplateResponse]:
+    """
+    Отримує список шаблонів сповіщень. Доступно суперкористувачам.
+    Можлива фільтрація за типом шаблону.
+    """
+    logger.debug(
+        f"Запит списку шаблонів. Тип: {template_type}, сторінка: {page_params.page}, розмір: {page_params.size}")
 
-    total_templates, templates = await template_service.get_templates(
-        template_type=template_type,
-        skip=page_params.skip,
-        limit=page_params.limit
-        # requesting_user=current_admin_user # Якщо потрібна додаткова логіка доступу
-    )
-    return PaginatedResponse[NotificationTemplateResponse]( # Явно вказуємо тип Generic
-        total=total_templates,
+    # TODO: Додати фільтрацію за template_type в NotificationTemplateService.get_all або створити окремий метод.
+    # Поки що, якщо template_type надано, викликаємо list_templates_by_type, інакше get_all.
+    # Це також означає, що пагінація для list_templates_by_type має бути реалізована в сервісі.
+    if template_type:
+        templates_list = await service.list_templates_by_type(
+            template_type=template_type, skip=page_params.skip, limit=page_params.limit
+        )
+        # TODO: Для коректної пагінації з фільтром потрібен окремий count_by_type.
+        # total_count = await service.count_by_type(template_type=template_type)
+        total_count = len(templates_list)  # ЗАГЛУШКА для total_count при фільтрації
+        logger.warning("Використовується заглушка для total_count при фільтрації шаблонів за типом.")
+    else:
+        templates_list = await service.get_all(skip=page_params.skip, limit=page_params.limit)
+        total_count = await service.count_all()  # Потрібен метод count_all в BaseDictionaryService
+
+    return PagedResponse[NotificationTemplateResponse](
+        total=total_count,
         page=page_params.page,
         size=page_params.size,
-        results=[NotificationTemplateResponse.model_validate(t) for t in templates]
+        results=templates_list  # Сервіс вже повертає список Pydantic моделей
     )
+
 
 @router.get(
     "/{template_id}",
     response_model=NotificationTemplateResponse,
-    summary="Отримання інформації про шаблон за ID (Адмін/Суперюзер)",
-    description="Повертає детальну інформацію про конкретний шаблон сповіщення."
+    summary="Отримання інформації про шаблон за ID",  # i18n
+    description="Повертає детальну інформацію про конкретний шаблон сповіщення. Доступно суперкористувачам."  # i18n
 )
 async def read_notification_template_by_id(
-    template_id: int, # В структурі проекту було template_id, але часто використовують name або code як унікальний ідентифікатор
-    db: AsyncSession = Depends(get_db_session),
-    current_admin_user: UserModel = Depends(get_current_active_superuser),
-    template_service: NotificationTemplateService = Depends()
-):
-    '''
+        template_id: UUID,  # ID тепер UUID
+        service: NotificationTemplateService = Depends(get_notification_template_service)
+        # current_user: UserModel = Depends(get_current_active_superuser) # Вже захищено
+) -> NotificationTemplateResponse:
+    """
     Отримує інформацію про шаблон за його ID.
-    '''
-    if not hasattr(template_service, 'db_session') or template_service.db_session is None:
-        template_service.db_session = db
+    Доступно суперкористувачам.
+    """
+    logger.debug(f"Запит шаблону за ID: {template_id}")
+    db_template = await service.get_by_id(item_id=template_id)
+    if not db_template:
+        logger.warning(f"Шаблон сповіщення з ID '{template_id}' не знайдено.")
+        # i18n
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Шаблон сповіщення не знайдено.")
+    return db_template
 
-    template = await template_service.get_template_by_id(
-        template_id=template_id
-        # requesting_user=current_admin_user # Якщо потрібна перевірка доступу
-        )
-    if not template:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Шаблон сповіщення з ID {template_id} не знайдено."
-        )
-    return NotificationTemplateResponse.model_validate(template)
 
 @router.put(
     "/{template_id}",
     response_model=NotificationTemplateResponse,
-    summary="Оновлення шаблону сповіщення (Адмін/Суперюзер)",
-    description="Дозволяє адміністратору або суперюзеру оновити існуючий шаблон сповіщення."
+    summary="Оновлення шаблону сповіщення",  # i18n
+    description="Дозволяє суперкористувачу оновити існуючий шаблон сповіщення.",  # i18n
 )
 async def update_notification_template(
-    template_id: int,
-    template_in: NotificationTemplateUpdate,
-    db: AsyncSession = Depends(get_db_session),
-    current_admin_user: UserModel = Depends(get_current_active_superuser),
-    template_service: NotificationTemplateService = Depends()
-):
-    '''
+        template_id: UUID,  # ID тепер UUID
+        template_in: NotificationTemplateUpdate,
+        service: NotificationTemplateService = Depends(get_notification_template_service),
+        current_user: UserModel = Depends(get_current_active_superuser)  # Для updated_by_user_id
+) -> NotificationTemplateResponse:
+    """
     Оновлює дані шаблону сповіщення.
-    '''
-    if not hasattr(template_service, 'db_session') or template_service.db_session is None:
-        template_service.db_session = db
+    Доступно суперкористувачам.
+    """
+    logger.info(f"Суперкористувач ID '{current_user.id}' намагається оновити шаблон ID '{template_id}'.")
+    try:
+        # TODO: Переконатися, що BaseDictionaryService.update обробляє updated_by_user_id через kwargs.
+        updated_template = await service.update(item_id=template_id, data=template_in,
+                                                updated_by_user_id=current_user.id)
+        if not updated_template:  # Якщо сервіс повертає None при не знайденому об'єкті
+            logger.warning(f"Шаблон з ID '{template_id}' не знайдено для оновлення.")
+            # i18n
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Шаблон сповіщення не знайдено.")
+        return updated_template
+    except ValueError as e:  # Помилки унікальності або валідації з сервісу
+        logger.warning(f"Помилка оновлення шаблону ID '{template_id}': {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка при оновленні шаблону ID '{template_id}': {e}",
+                     exc_info=global_settings.DEBUG)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутрішня помилка сервера.")
 
-    updated_template = await template_service.update_template(
-        template_id=template_id,
-        template_update_schema=template_in,
-        requesting_user=current_admin_user
-    )
-    # Сервіс має кидати HTTPException у разі помилок
-    return NotificationTemplateResponse.model_validate(updated_template)
 
 @router.delete(
     "/{template_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Видалення шаблону сповіщення (Адмін/Суперюзер)",
-    description="Дозволяє адміністратору або суперюзеру видалити шаблон сповіщення."
+    summary="Видалення шаблону сповіщення",  # i18n
+    description="Дозволяє суперкористувачу видалити шаблон сповіщення.",  # i18n
 )
 async def delete_notification_template(
-    template_id: int,
-    db: AsyncSession = Depends(get_db_session),
-    current_admin_user: UserModel = Depends(get_current_active_superuser),
-    template_service: NotificationTemplateService = Depends()
+        template_id: UUID,  # ID тепер UUID
+        service: NotificationTemplateService = Depends(get_notification_template_service),
+        current_user: UserModel = Depends(get_current_active_superuser)  # Для логування аудиту
 ):
-    '''
+    """
     Видаляє шаблон сповіщення.
-    '''
-    if not hasattr(template_service, 'db_session') or template_service.db_session is None:
-        template_service.db_session = db
+    Доступно суперкористувачам.
+    """
+    logger.info(f"Суперкористувач ID '{current_user.id}' намагається видалити шаблон ID '{template_id}'.")
+    try:
+        # BaseDictionaryService.delete повертає bool
+        deleted = await service.delete(item_id=template_id)
+        if not deleted:
+            logger.warning(f"Шаблон з ID '{template_id}' не знайдено для видалення.")
+            # i18n
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Шаблон сповіщення не знайдено.")
+    except ValueError as e:  # Якщо сервіс кидає ValueError (наприклад, шаблон використовується)
+        logger.warning(f"Помилка видалення шаблону ID '{template_id}': {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка при видаленні шаблону ID '{template_id}': {e}",
+                     exc_info=global_settings.DEBUG)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутрішня помилка сервера.")
 
-    success = await template_service.delete_template(
-        template_id=template_id,
-        requesting_user=current_admin_user
-    )
-    if not success: # Сервіс має кидати HTTPException
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Не вдалося видалити шаблон сповіщення з ID {template_id}. Можливо, його не існує."
-        )
-    # HTTP 204 No Content
+    return None  # HTTP 204 No Content
 
-# Міркування:
-# 1.  Схеми: `NotificationTemplateCreate`, `NotificationTemplateUpdate`, `NotificationTemplateResponse` з `app.src.schemas.notifications.template`.
-# 2.  Сервіс `NotificationTemplateService`: CRUD операції для шаблонів.
-# 3.  Права доступу: Тільки адміністратори/суперюзери можуть керувати шаблонами.
-# 4.  Пагінація: Для списку шаблонів. Фільтр за `template_type`.
-# 5.  Унікальність: Назва (`name`) або код шаблону мають бути унікальними, це має забезпечуватися на рівні сервісу/БД.
-# 6.  URL-и: Цей роутер буде підключений до `notifications_router` з префіксом `/templates`.
-#     Шляхи будуть `/api/v1/notifications/templates/`, `/api/v1/notifications/templates/{template_id}`.
-# 7.  Коментарі: Українською мовою.
+
+# TODO: Розглянути ендпоінт для рендерингу шаблону з тестовими даними (POST /render-test) для адмінки.
+
+logger.info(f"Роутер для шаблонів сповіщень (`{router.prefix}`) визначено.")

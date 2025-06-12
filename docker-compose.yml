@@ -1,0 +1,55 @@
+# docker-compose.yml
+# # Базовий файл Docker Compose для запуску проекту.
+# # Визначає основні сервіси, їх конфігурацію та зв'язки.
+
+version: '3.8' # Використання однієї з останніх версій Docker Compose
+
+services:
+  # --- Сервіс бази даних PostgreSQL ---
+  db:
+    image: postgres:15-alpine # Рекомендується використовувати конкретну версію
+    container_name: project_db # Чітке ім'я контейнера
+    volumes:
+      - postgres_data:/var/lib/postgresql/data/ # Збереження даних БД
+    env_file:
+      - ./backend/.env # Шлях до файлу з конфігурацією БД
+    ports:
+      - "5432:5432" # Прокидання порту для локального доступу (за потреби)
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+      - POSTGRES_DB=${POSTGRES_DB}
+    restart: unless-stopped # Політика перезапуску
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # --- Сервіс Backend (FastAPI) ---
+  backend:
+    build:
+      context: ./backend # Шлях до Dockerfile та коду backend
+      dockerfile: Dockerfile
+    container_name: project_backend
+    # env_file визначатиметься в docker-compose.dev.yml або docker-compose.prod.yml
+    # для уникнення дублювання та для специфічних налаштувань середовища.
+    # Однак, якщо є загальні змінні, їх можна додати тут:
+    # env_file:
+    #   - ./backend/.env
+    ports:
+      - "8000:8000" # Прокидання порту FastAPI
+    depends_on:
+      db: # Залежність від сервісу бази даних
+        condition: service_healthy # Чекати, доки БД буде готова
+    restart: unless-stopped
+    # volumes: # Розкоментуйте для розробки, щоб зміни коду відображались миттєво
+    #   - ./backend:/app
+
+volumes:
+  postgres_data: # Іменований том для збереження даних PostgreSQL
+
+# --- Мережа (за потреби, якщо потрібна кастомна) ---
+# networks:
+#   app_network:
+#     driver: bridge

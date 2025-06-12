@@ -1,149 +1,147 @@
 # backend/scripts/run_seed.py
+# -*- coding: utf-8 -*-
+"""
+Скрипт для заповнення бази даних початковими даними (seed).
+
+Цей скрипт викликає `InitialDataService` для заповнення довідників
+та створення інших необхідних початкових записів у базі даних.
+Скрипт є ідемпотентним, тобто його можна безпечно запускати кілька разів.
+"""
 import asyncio
 import os
 import sys
-import logging
-from typing import List, Dict, Type, Any # Додано для типізації
+import logging  # Стандартний модуль логування
 
-# Додавання шляху до батьківської директорії (backend) для імпорту модулів додатку
+# --- Налаштування шляхів для імпорту модулів додатку ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
-PROJECT_ROOT = os.path.dirname(SCRIPT_DIR) # 'backend/'
-if PROJECT_ROOT not in sys.path:
-    sys.path.append(PROJECT_ROOT)
+BACKEND_DIR = os.path.dirname(SCRIPT_DIR)  # Директорія 'backend'
+if BACKEND_DIR not in sys.path:
+    sys.path.insert(0, BACKEND_DIR)
 
+# --- Налаштування логування ---
+try:
+    from backend.app.src.config.logging import logger
+
+    logger.info("Використовується логер додатку для скрипта run_seed.")  # i18n
+except ImportError:
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger(__name__)
+    logger.info("Логер додатку не знайдено, використовується базовий логер для run_seed.")  # i18n
+
+if BACKEND_DIR not in sys.path:  # Логуємо, якщо шлях було додано раніше
+    logger.info(f"Додано '{BACKEND_DIR}' до sys.path для run_seed.")  # i18n
+
+# --- Імпорт компонентів додатку ---
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel as PydanticBaseModel # Для типізації schema_class
+from typing import Optional
 
-from app.src.core.dependencies import get_db_session_context
-# Припускаємо, що існують сервіси або репозиторії для кожного довідника
-from app.src.services.dictionaries.user_role import UserRoleService
-from app.src.schemas.dictionaries.user_role import UserRoleCreate
-from app.src.services.dictionaries.user_type import UserTypeService
-from app.src.schemas.dictionaries.user_type import UserTypeCreate
-from app.src.services.dictionaries.group_type import GroupTypeService
-from app.src.schemas.dictionaries.group_type import GroupTypeCreate
-from app.src.services.dictionaries.task_type import TaskTypeService
-from app.src.schemas.dictionaries.task_type import TaskTypeCreate
-from app.src.services.dictionaries.bonus_type import BonusTypeService
-from app.src.schemas.dictionaries.bonus_type import BonusTypeCreate
-# Додайте інші сервіси та схеми для довідників за потреби (статуси, календарі, месенджери)
-from app.src.services.dictionaries.status import StatusService # Приклад для статусів
-from app.src.schemas.dictionaries.status import StatusCreate # Приклад для статусів
+from backend.app.src.core.database import get_db_session  # Для отримання сесії БД
+# Головний сервіс для ініціалізації даних
+from backend.app.src.services.system.initial_data_service import InitialDataService
 
-from app.src.core.constants import ( # Припускаємо, що константи для кодів і назв є тут
-    UserRoleEnum, UserTypeEnum, GroupTypeEnum, TaskTypeEnum, BonusTypeEnum, StatusEnum
-)
 
-# Налаштування логування
-logging.basicConfig(level=logging.INFO, format='%(levelname)s: %(message)s')
-logger = logging.getLogger(__name__)
+# Базова функція-заглушка для інтернаціоналізації рядків
+def _(text: str) -> str:
+    return text
 
-# --- Дані для заповнення довідників ---
-# Згідно з technical_task.txt
-SEED_DATA: Dict[str, List[Dict[str, Any]]] = {
-    "user_roles": [
-        {"code": UserRoleEnum.SUPERUSER.value if hasattr(UserRoleEnum.SUPERUSER, 'value') else UserRoleEnum.SUPERUSER, "name": "Суперюзер", "description": "Повний доступ до всієї системи"},
-        {"code": UserRoleEnum.ADMIN.value if hasattr(UserRoleEnum.ADMIN, 'value') else UserRoleEnum.ADMIN, "name": "Адміністратор групи", "description": "Керування в межах своєї групи"},
-        {"code": UserRoleEnum.USER.value if hasattr(UserRoleEnum.USER, 'value') else UserRoleEnum.USER, "name": "Користувач групи", "description": "Звичайний користувач в групі"},
-    ],
-    "user_types": [
-        {"code": UserTypeEnum.SUPERUSER.value if hasattr(UserTypeEnum.SUPERUSER, 'value') else UserTypeEnum.SUPERUSER, "name": "Суперюзер системи", "description": "Адміністратор найвищого рівня"},
-        {"code": UserTypeEnum.ADMIN.value if hasattr(UserTypeEnum.ADMIN, 'value') else UserTypeEnum.ADMIN, "name": "Адміністратор (тип)", "description": "Тип для адміністраторів груп"},
-        {"code": UserTypeEnum.USER.value if hasattr(UserTypeEnum.USER, 'value') else UserTypeEnum.USER, "name": "Користувач системи", "description": "Стандартний користувач системи"},
-        {"code": UserTypeEnum.BOT.value if hasattr(UserTypeEnum.BOT, 'value') else UserTypeEnum.BOT, "name": "Системний бот", "description": "Автоматизований системний аккаунт"},
-    ],
-    "group_types": [
-        {"code": GroupTypeEnum.FAMILY.value if hasattr(GroupTypeEnum.FAMILY, 'value') else GroupTypeEnum.FAMILY, "name": "Сім'я", "description": "Група для сімейного використання"},
-        {"code": GroupTypeEnum.DEPARTMENT.value if hasattr(GroupTypeEnum.DEPARTMENT, 'value') else GroupTypeEnum.DEPARTMENT, "name": "Відділ", "description": "Група для робочого відділу"},
-        {"code": GroupTypeEnum.ORGANIZATION.value if hasattr(GroupTypeEnum.ORGANIZATION, 'value') else GroupTypeEnum.ORGANIZATION, "name": "Організація", "description": "Група для цілої організації"},
-    ],
-    "task_types": [
-        {"code": TaskTypeEnum.REGULAR.value if hasattr(TaskTypeEnum.REGULAR, 'value') else TaskTypeEnum.REGULAR, "name": "Звичайне завдання", "description": "Стандартне завдання"},
-        {"code": TaskTypeEnum.COMPLEX.value if hasattr(TaskTypeEnum.COMPLEX, 'value') else TaskTypeEnum.COMPLEX, "name": "Складне завдання", "description": "Завдання підвищеної складності"},
-    ],
-    "bonus_types": [
-        {"code": BonusTypeEnum.STANDARD.value if hasattr(BonusTypeEnum.STANDARD, 'value') else BonusTypeEnum.STANDARD, "name": "Стандартний бонус", "description": "Звичайний тип бонусу"},
-        {"code": BonusTypeEnum.PENALTY.value if hasattr(BonusTypeEnum.PENALTY, 'value') else BonusTypeEnum.PENALTY, "name": "Штраф", "description": "Тип для штрафних балів"},
-        {"code": BonusTypeEnum.REWARD.value if hasattr(BonusTypeEnum.REWARD, 'value') else BonusTypeEnum.REWARD, "name": "Нагорода", "description": "Тип для бонусів-нагород"},
-    ],
-    "statuses": [
-        {"code": StatusEnum.ACTIVE.value if hasattr(StatusEnum.ACTIVE, 'value') else StatusEnum.ACTIVE, "name": "Активний", "description": "Запис активний"},
-        {"code": StatusEnum.INACTIVE.value if hasattr(StatusEnum.INACTIVE, 'value') else StatusEnum.INACTIVE, "name": "Неактивний", "description": "Запис неактивний"},
-        {"code": StatusEnum.PENDING.value if hasattr(StatusEnum.PENDING, 'value') else StatusEnum.PENDING, "name": "В очікуванні", "description": "Запис очікує дії"},
-        {"code": StatusEnum.COMPLETED.value if hasattr(StatusEnum.COMPLETED, 'value') else StatusEnum.COMPLETED, "name": "Завершено", "description": "Запис завершено"},
-        {"code": StatusEnum.ARCHIVED.value if hasattr(StatusEnum.ARCHIVED, 'value') else StatusEnum.ARCHIVED, "name": "Архівовано", "description": "Запис архівовано"},
-    ]
-}
 
-async def seed_dictionary(db: AsyncSession, service_class: Type[Any], schema_class: Type[PydanticBaseModel], data_list: List[Dict[str, Any]], dict_name: str):
+async def run_seeding_logic(db_session: AsyncSession):
     """
-    Загальна функція для заповнення одного довідника.
-    """
-    service = service_class(db)
-    logger.info(f"Заповнення довідника: {dict_name}...")
-    for item_data in data_list:
-        # Перевіряємо, чи існує запис з таким кодом
-        # Більшість сервісів довідників повинні мати метод get_by_code в своєму репозиторії
-        if not hasattr(service, 'repo') or not hasattr(service.repo, 'get_by_code'):
-            logger.error(f"Сервіс для '{dict_name}' не має репозиторію з методом 'get_by_code'. Пропускаємо.")
-            return
+    Асинхронна логіка для запуску сервісу заповнення початкових даних.
 
-        existing_item = await service.repo.get_by_code(code=item_data['code'])
-        if existing_item:
-            logger.info(f"Запис '{item_data['code']}' в довіднику '{dict_name}' вже існує. Пропускаємо.")
-        else:
+    Args:
+        db_session: Асинхронна сесія бази даних.
+    """
+    try:
+        initial_data_service = InitialDataService(db_session=db_session)
+
+        # i18n: Log message - Calling service to populate dictionaries
+        logger.info(_("Виклик InitialDataService для заповнення довідників..."))
+        # Припускаємо, що InitialDataService має метод populate_dictionaries()
+        # або run_full_initialization() також обробляє довідники ідемпотентно.
+        # Якщо InitialDataService.run_full_initialization() створює і користувачів,
+        # то це може бути те, що нам потрібно.
+        # Згідно з попереднім оглядом InitialDataService, він має метод run_full_initialization,
+        # який включає initialize_base_dictionaries, create_system_users, setup_default_settings.
+        # Це саме те, що потрібно для "заповнення початковими даними".
+
+        result = await initial_data_service.run_full_initialization()
+
+        if result.get("status") == "success" or result.get("status") == "skipped_already_done":
+            logger.info(
+                _("Заповнення початкових даних через InitialDataService пройшло успішно (або дані вже існували)."))  # i18n
+            logger.info(_("Деталі: {details}").format(details=result.get("details")))  # i18n
+        elif result.get("status") == "partial_success":
+            logger.warning(
+                _("InitialDataService завершив роботу з частковим успіхом. Деякі кроки могли не виконатись."))  # i18n
+            logger.warning(_("Деталі: {details}").format(details=result.get("details")))  # i18n
+        else:  # error, critical_error, conflict
+            logger.error(_("Помилка під час виконання InitialDataService: {message}").format(
+                message=result.get("message")))  # i18n
+            logger.error(_("Деталі: {details}").format(details=result.get("details")))  # i18n
+
+    except Exception as e:
+        # i18n: Error message - Error during seeding process
+        logger.error(_("Помилка під час процесу заповнення початкових даних: {error}").format(error=e), exc_info=True)
+
+
+async def run_script_async_logic():
+    """
+    Асинхронна функція для запуску логіки скрипта з отриманням сесії БД.
+    """
+    # i18n: Log message - Starting data seeding script
+    logger.info(_("Запуск скрипта заповнення початкових даних (seed)..."))
+
+    session_generator = get_db_session()
+    db_session: Optional[AsyncSession] = None
+    try:
+        db_session = await anext(session_generator)
+        if db_session is None:
+            raise StopAsyncIteration  # Якщо сесія None
+
+        await run_seeding_logic(db_session)
+
+    except StopAsyncIteration:
+        # i18n: Error message - Failed to get DB session
+        logger.error(_("Не вдалося отримати сесію бази даних для заповнення початкових даних."))
+    except Exception as e:
+        # i18n: Error message - Unexpected error during script execution
+        logger.error(_("Виникла непередбачена помилка під час виконання скрипта run_seed: {error}").format(error=e),
+                     exc_info=True)
+    finally:
+        if db_session is not None:
             try:
-                schema_instance = schema_class(**item_data)
-                # Більшість сервісів довідників повинні мати метод create
-                if not hasattr(service, 'create'):
-                     logger.error(f"Сервіс для '{dict_name}' не має методу 'create'. Пропускаємо створення запису '{item_data['code']}'.")
-                     continue
-                await service.create(create_schema=schema_instance)
-                logger.info(f"Додано запис '{item_data['code']}' в довідник '{dict_name}'.")
+                await session_generator.aclose()  # Закриваємо генератор (і сесію)
             except Exception as e:
-                logger.error(f"Помилка при додаванні запису '{item_data['code']}' в '{dict_name}': {e}", exc_info=True)
-    logger.info(f"Завершено заповнення довідника: {dict_name}.")
+                # i18n: Error message - Error closing DB session
+                logger.error(_("Помилка при закритті сесії БД: {error}").format(error=e), exc_info=True)
 
-async def main_async():
-    """
-    Асинхронна головна функція для заповнення всіх довідників.
-    """
-    logger.info("Запуск скрипта заповнення початкових даних (seed)...")
+    # i18n: Log message - Data seeding script finished
+    logger.info(_("Роботу скрипта заповнення початкових даних завершено."))
 
-    async with get_db_session_context() as db_session:
-        # Заповнення ролей користувачів
-        await seed_dictionary(db_session, UserRoleService, UserRoleCreate, SEED_DATA["user_roles"], "Ролі користувачів")
-
-        # Заповнення типів користувачів
-        await seed_dictionary(db_session, UserTypeService, UserTypeCreate, SEED_DATA["user_types"], "Типи користувачів")
-
-        # Заповнення типів груп
-        await seed_dictionary(db_session, GroupTypeService, GroupTypeCreate, SEED_DATA["group_types"], "Типи груп")
-
-        # Заповнення типів завдань
-        if SEED_DATA["task_types"]:
-             await seed_dictionary(db_session, TaskTypeService, TaskTypeCreate, SEED_DATA["task_types"], "Типи завдань")
-        else:
-            logger.info("Дані для довідника 'Типи завдань' відсутні, пропускаємо.")
-
-        # Заповнення типів бонусів
-        await seed_dictionary(db_session, BonusTypeService, BonusTypeCreate, SEED_DATA["bonus_types"], "Типи бонусів")
-
-        # Заповнення статусів (приклад)
-        await seed_dictionary(db_session, StatusService, StatusCreate, SEED_DATA["statuses"], "Статуси")
-
-        # Додайте сюди заповнення інших довідників (календарі, месенджери), якщо потрібно
-
-    logger.info("Завершено заповнення початкових даних.")
 
 def main():
+    """
+    Головна функція для запуску скрипта.
+    """
     if sys.version_info >= (3, 7):
-        asyncio.run(main_async())
+        asyncio.run(run_script_async_logic())
     else:
         loop = asyncio.get_event_loop()
-        loop.run_until_complete(main_async())
+        loop.run_until_complete(run_script_async_logic())
+
 
 if __name__ == "__main__":
-    # Для запуску: python backend/scripts/run_seed.py
-    # Переконайтеся, що DATABASE_URL правильно налаштований.
+    # Для запуску цього скрипта:
+    # python backend/scripts/run_seed.py
+    #
+    # Передумови:
+    # 1. Змінна середовища DATABASE_URL має бути правильно налаштована.
+    # 2. База даних має бути доступна, міграції Alembic застосовані.
+    # 3. `InitialDataService` має бути правильно налаштований та містити логіку
+    #    для створення всіх необхідних початкових даних (довідники, системні користувачі тощо).
+    #
+    # Цей скрипт тепер покладається на `InitialDataService` для виконання фактичної роботи,
+    # забезпечуючи централізовану та узгоджену логіку заповнення даних.
+    logger.info(_("Ініціалізація скрипта run_seed.py..."))  # i18n
     main()

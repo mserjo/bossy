@@ -2,7 +2,7 @@
 import logging
 from typing import List, Optional, Tuple
 from uuid import UUID
-from decimal import Decimal # Для точних сум та балансів
+from decimal import Decimal  # Для точних сум та балансів
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -11,20 +11,21 @@ from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.bonuses.transaction import AccountTransaction # Модель SQLAlchemy Transaction
-from backend.app.src.models.bonuses.account import UserAccount # Для зв'язку транзакції та оновлення балансу
-from backend.app.src.models.auth.user import User # Для контексту користувача в UserAccount
+from backend.app.src.models.bonuses.transaction import AccountTransaction  # Модель SQLAlchemy Transaction
+from backend.app.src.models.bonuses.account import UserAccount  # Для зв'язку транзакції та оновлення балансу
+from backend.app.src.models.auth.user import User  # Для контексту користувача в UserAccount
 # from backend.app.src.models.groups.group import Group # Не використовується прямо
 
-from backend.app.src.schemas.bonuses.transaction import ( # Pydantic Схеми
+from backend.app.src.schemas.bonuses.transaction import (  # Pydantic Схеми
     AccountTransactionCreate,
     AccountTransactionResponse
 )
 from backend.app.src.schemas.bonuses.account import UserAccountResponse
-from backend.app.src.services.bonuses.account import UserAccountService, InsufficientFundsError # Імпорт сервісу рахунків та його помилки
+from backend.app.src.services.bonuses.account import UserAccountService, \
+    InsufficientFundsError  # Імпорт сервісу рахунків та його помилки
 
-from backend.app.src.config.logging import logger # Централізований логер
-from backend.app.src.config import settings # Для доступу до конфігурацій
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до конфігурацій
 
 
 class AccountTransactionService(BaseService):
@@ -36,15 +37,15 @@ class AccountTransactionService(BaseService):
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        self.account_service = UserAccountService(db_session) # Ініціалізація сервісу рахунків
+        self.account_service = UserAccountService(db_session)  # Ініціалізація сервісу рахунків
         logger.info("AccountTransactionService ініціалізовано.")
 
     async def create_transaction(
-        self,
-        transaction_data: AccountTransactionCreate,
-        user_id_for_account_lookup: Optional[UUID] = None, # Якщо user_account_id не надано
-        group_id_for_account_lookup: Optional[UUID] = None, # Для визначення глобального чи групового рахунку
-        commit_session: bool = True
+            self,
+            transaction_data: AccountTransactionCreate,
+            user_id_for_account_lookup: Optional[UUID] = None,  # Якщо user_account_id не надано
+            group_id_for_account_lookup: Optional[UUID] = None,  # Для визначення глобального чи групового рахунку
+            commit_session: bool = True
     ) -> Tuple[AccountTransactionResponse, UserAccountResponse]:
         """
         Створює нову транзакцію та оновлює баланс відповідного рахунку.
@@ -76,9 +77,10 @@ class AccountTransactionService(BaseService):
             )
             if not user_account_db:
                 logger.error(f"Рахунок користувача з ID '{effective_account_id}' не знайдено.")
-                raise ValueError(f"Рахунок користувача з ID '{effective_account_id}' не знайдено.") # i18n
+                raise ValueError(f"Рахунок користувача з ID '{effective_account_id}' не знайдено.")  # i18n
         elif user_id_for_account_lookup:
-            logger.debug(f"ID рахунку не надано, пошук/створення для користувача ID '{user_id_for_account_lookup}', група ID '{group_id_for_account_lookup}'.")
+            logger.debug(
+                f"ID рахунку не надано, пошук/створення для користувача ID '{user_id_for_account_lookup}', група ID '{group_id_for_account_lookup}'.")
             # get_or_create_user_account повертає ORM модель, що добре для атомарності, якщо commit_session=False
             # Важливо: `get_or_create_user_account` не повинен комітити сесію сам, якщо ми хочемо повної атомарності тут.
             # Припускаємо, що якщо `get_or_create_user_account` створює новий рахунок, він може зробити проміжний коміт.
@@ -90,28 +92,29 @@ class AccountTransactionService(BaseService):
                 # initial_balance встановлюється за замовчуванням у get_or_create_user_account
             )
             # Перезавантажуємо, щоб бути впевненими, що об'єкт належить поточній сесії з усіма зв'язками
-            await self.db_session.refresh(user_account_db, attribute_names=['user', 'group'] if user_account_db.group_id else ['user'])
+            await self.db_session.refresh(user_account_db,
+                                          attribute_names=['user', 'group'] if user_account_db.group_id else ['user'])
 
         else:
             logger.error("Не надано ID рахунку або ID користувача для пошуку/створення рахунку.")
-            raise ValueError("Необхідно вказати user_account_id або user_id_for_account_lookup.") # i18n
+            raise ValueError("Необхідно вказати user_account_id або user_id_for_account_lookup.")  # i18n
 
-        if not user_account_db: # Додаткова перевірка після всіх гілок
-             logger.error("Рахунок користувача не вдалося ідентифікувати або створити.")
-             raise ValueError("Рахунок користувача не вдалося ідентифікувати або створити.") # i18n
+        if not user_account_db:  # Додаткова перевірка після всіх гілок
+            logger.error("Рахунок користувача не вдалося ідентифікувати або створити.")
+            raise ValueError("Рахунок користувача не вдалося ідентифікувати або створити.")  # i18n
 
-
-        logger.info(f"Обробка транзакції для Рахунку ID: {user_account_db.id}, Користувач ID: {user_account_db.user_id}")
+        logger.info(
+            f"Обробка транзакції для Рахунку ID: {user_account_db.id}, Користувач ID: {user_account_db.user_id}")
 
         current_balance = Decimal(user_account_db.balance)
         transaction_amount = Decimal(transaction_data.amount)
 
-        if transaction_amount.is_signed() and current_balance < abs(transaction_amount): # Перевірка для від'ємних сум
+        if transaction_amount.is_signed() and current_balance < abs(transaction_amount):  # Перевірка для від'ємних сум
             logger.warning(
                 f"Недостатньо коштів на Рахунку ID '{user_account_db.id}'. "
                 f"Поточний: {current_balance}, Спроба списання: {abs(transaction_amount)}."
             )
-            raise InsufficientFundsError(current_balance=current_balance) # i18n
+            raise InsufficientFundsError(current_balance=current_balance)  # i18n
 
         new_balance = current_balance + transaction_amount
 
@@ -121,7 +124,7 @@ class AccountTransactionService(BaseService):
             user_account_id=user_account_db.id,
             transaction_type=transaction_data.transaction_type,
             amount=transaction_amount,
-            balance_after_transaction=new_balance, # Розрахований новий баланс
+            balance_after_transaction=new_balance,  # Розрахований новий баланс
             description=transaction_data.description,
             related_entity_id=transaction_data.related_entity_id
             # created_at встановлюється автоматично
@@ -133,7 +136,7 @@ class AccountTransactionService(BaseService):
         # updated_at оновлюється автоматично
 
         self.db_session.add(new_transaction_db)
-        self.db_session.add(user_account_db) # Додаємо оновлений рахунок до сесії
+        self.db_session.add(user_account_db)  # Додаємо оновлений рахунок до сесії
 
         try:
             if commit_session:
@@ -144,18 +147,19 @@ class AccountTransactionService(BaseService):
                 await self.db_session.flush([new_transaction_db, user_account_db])
 
             # Оновлюємо об'єкти з БД для отримання фінального стану (наприклад, з default значеннями БД)
-            await self.db_session.refresh(new_transaction_db) # Зазвичай не має глибоких зв'язків
-            await self.db_session.refresh(user_account_db, attribute_names=['user', 'group'] if user_account_db.group_id else ['user'])
+            await self.db_session.refresh(new_transaction_db)  # Зазвичай не має глибоких зв'язків
+            await self.db_session.refresh(user_account_db,
+                                          attribute_names=['user', 'group'] if user_account_db.group_id else ['user'])
 
 
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності '{user_account_db.id}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося створити транзакцію: конфлікт даних.") # i18n
-        except SQLAlchemyError as e: # Більш загальна помилка БД
+            raise ValueError(f"Не вдалося створити транзакцію: конфлікт даних.")  # i18n
+        except SQLAlchemyError as e:  # Більш загальна помилка БД
             await self.rollback()
             logger.error(f"Помилка БД '{user_account_db.id}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Помилка бази даних під час обробки транзакції.") # i18n
+            raise ValueError(f"Помилка бази даних під час обробки транзакції.")  # i18n
 
         logger.info(
             f"Транзакція ID '{new_transaction_db.id}' успішно створена для Рахунку ID '{user_account_db.id}'. "
@@ -168,13 +172,13 @@ class AccountTransactionService(BaseService):
         )
 
     async def list_transactions_for_account(
-        self,
-        user_account_id: UUID,
-        skip: int = 0,
-        limit: int = 100,
-        start_date: Optional[datetime] = None,
-        end_date: Optional[datetime] = None,
-        transaction_type: Optional[str] = None
+            self,
+            user_account_id: UUID,
+            skip: int = 0,
+            limit: int = 100,
+            start_date: Optional[datetime] = None,
+            end_date: Optional[datetime] = None,
+            transaction_type: Optional[str] = None
     ) -> List[AccountTransactionResponse]:
         """
         Перелічує транзакції для конкретного бонусного рахунку.
@@ -195,7 +199,7 @@ class AccountTransactionService(BaseService):
         stmt = select(AccountTransaction).options(
             selectinload(AccountTransaction.user_account).options(
                 selectinload(UserAccount.user).options(selectinload(User.user_type)),
-                selectinload(UserAccount.group) # Завжди намагаємось завантажити, SQLAlchemy впорається
+                selectinload(UserAccount.group)  # Завжди намагаємось завантажити, SQLAlchemy впорається
             )
         ).where(AccountTransaction.user_account_id == user_account_id)
 
@@ -244,5 +248,6 @@ class AccountTransactionService(BaseService):
 
         logger.info(f"Транзакцію з ID '{transaction_id}' не знайдено.")
         return None
+
 
 logger.debug("AccountTransactionService клас визначено та завантажено.")

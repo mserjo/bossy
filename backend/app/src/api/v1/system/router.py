@@ -15,15 +15,15 @@ from fastapi import APIRouter, Depends
 
 # Імпорт роутерів з окремих файлів ендпоінтів
 # Кожен з цих модулів має експортувати змінну `router`, яка є APIRouter.
-from . import settings # Змінено з settings_endpoints
-from . import monitoring # Змінено з monitoring_endpoints
-from . import health # Змінено з health_endpoints
-from . import init_data # Змінено з init_data_endpoints
+from backend.app.src.api.v1.system import settings
+from backend.app.src.api.v1.system import monitoring
+from backend.app.src.api.v1.system import health
+from backend.app.src.api.v1.system import init_data
 
 # Можна імпортувати загальні залежності, якщо вони потрібні для всього /system шляху
-# from app.src.api.dependencies import get_current_active_superuser
-
-logger = logging.getLogger(__name__)
+# from backend.app.src.api.dependencies import get_current_active_superuser
+# Логер з конфігурації
+from backend.app.src.config.logging import logger # Використовуємо централізований логер
 
 system_router = APIRouter(
     # Префікс для всіх системних шляхів ("/system") буде додано при підключенні
@@ -74,7 +74,7 @@ logger.debug("Роутер system.init_data підключено до system_rou
 # Цей ендпоінт буде доступний за шляхом /system/ (якщо system_router підключено з префіксом /system).
 @system_router.get(
     "/",
-    summary="Кореневий ендпоінт системного API v1",
+    summary="Кореневий ендпоінт системного API v1", # i18n
     include_in_schema=True, # Включимо в схему для наочності
     tags=["V1 System Management"] # Використовуємо загальний тег
 )
@@ -82,15 +82,15 @@ async def system_root_info():
     """
     Надає базову інформацію про доступні системні під-модулі API v1.
     """
-    logger.debug("System root endpoint for v1 (/api/v1/system/) викликано.")
+    logger.debug("System root endpoint for v1 (/api/v1/system/) викликано.") # i18n
     return {
-        "message": "Ласкаво просимо до системного API v1 Kudos.",
-        "description": "Доступні під-модулі: /settings, /monitoring, /health, /data-initialization.",
+        "message": "Ласкаво просимо до системного API v1 Kudos.", # i18n
+        "description": "Доступні під-модулі: /settings, /monitoring, /health, /data-initialization.", # i18n
         "version": "v1"
     }
 
 
-logger.info("Системний роутер API v1 (`system_router`) налаштовано та агреговано всі під-роутери.")
+logger.info("Системний роутер API v1 (`system_router`) налаштовано та агреговано всі під-роутери.") # i18n
 
 # Експорт system_router для використання в app.src.api.v1.system.__init__.py
 # (і далі для підключення до v1_router)

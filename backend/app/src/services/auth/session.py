@@ -1,5 +1,5 @@
 # backend/app/src/services/auth/session.py
-import logging # Стандартний модуль логування Python
+import logging  # Стандартний модуль логування Python
 from typing import List, Optional, Type
 from uuid import UUID, uuid4
 from datetime import datetime, timedelta, timezone
@@ -10,21 +10,22 @@ from sqlalchemy.orm import selectinload
 
 # Виправлені повні шляхи імпорту
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.auth.session import UserSession # Модель SQLAlchemy для сесії користувача
-from backend.app.src.models.auth.user import User # Модель SQLAlchemy для користувача
+from backend.app.src.models.auth.session import UserSession  # Модель SQLAlchemy для сесії користувача
+from backend.app.src.models.auth.user import User  # Модель SQLAlchemy для користувача
 # TODO: Розглянути можливість переходу на повернення Pydantic схем замість ORM моделей з методів сервісу,
 #  коли відповідні схеми (UserSessionResponse, UserSessionCreate) будуть повністю визначені та інтегровані в API шар.
 #  Pydantic схеми (приклад):
 #  from backend.app.src.schemas.auth.session import UserSessionResponse # id, user_id, user_agent, ip_address, created_at, expires_at, last_active_at
 #  from backend.app.src.schemas.auth.session import UserSessionCreate # user_id, user_agent, ip_address
 
-from backend.app.src.config.logging import logger # Використання централізованого логера
-from backend.app.src.config import settings # Для доступу до конфігурацій, наприклад DEFAULT_SESSION_DURATION_DAYS
+from backend.app.src.config.logging import logger  # Використання централізованого логера
+from backend.app.src.config import settings  # Для доступу до конфігурацій, наприклад DEFAULT_SESSION_DURATION_DAYS
 
 # Тривалість сесії за замовчуванням (наприклад, для функції "запам'ятати мене")
 # Якщо в settings.py є своя константа, можна використовувати її:
 # DEFAULT_SESSION_DURATION_DAYS = settings.DEFAULT_SESSION_DURATION_DAYS
-DEFAULT_SESSION_DURATION_DAYS = 30 # Дні
+DEFAULT_SESSION_DURATION_DAYS = 30  # Дні
+
 
 class UserSessionService(BaseService):
     """
@@ -41,12 +42,12 @@ class UserSessionService(BaseService):
         logger.info("UserSessionService ініціалізовано.")
 
     async def create_session(
-        self,
-        user_id: UUID,
-        user_agent: Optional[str] = None,
-        ip_address: Optional[str] = None,
-        duration_days: Optional[int] = None
-    ) -> UserSession: # Наразі повертає модель ORM
+            self,
+            user_id: UUID,
+            user_agent: Optional[str] = None,
+            ip_address: Optional[str] = None,
+            duration_days: Optional[int] = None
+    ) -> UserSession:  # Наразі повертає модель ORM
         """
         Створює нову сесію користувача та зберігає її в базі даних.
 
@@ -62,7 +63,7 @@ class UserSessionService(BaseService):
         user = await self.db_session.get(User, user_id)
         if not user:
             logger.error(f"Користувача з ID '{user_id}' не знайдено. Неможливо створити сесію.")
-            raise ValueError(f"Користувача з ID '{user_id}' не знайдено.") # i18n
+            raise ValueError(f"Користувача з ID '{user_id}' не знайдено.")  # i18n
 
         session_duration = duration_days if duration_days is not None else DEFAULT_SESSION_DURATION_DAYS
         session_token_uuid = uuid4()
@@ -82,7 +83,8 @@ class UserSessionService(BaseService):
         await self.commit()
         await self.db_session.refresh(new_session_db)
 
-        logger.info(f"Сесію успішно створено для користувача ID '{user_id}' з токеном сесії (UUID): {new_session_db.session_token}")
+        logger.info(
+            f"Сесію успішно створено для користувача ID '{user_id}' з токеном сесії (UUID): {new_session_db.session_token}")
         # Приклад повернення Pydantic схеми, якщо UserSessionResponse визначено та використовується:
         # from backend.app.src.schemas.auth.session import UserSessionResponse
         # return UserSessionResponse.model_validate(new_session_db)
@@ -99,7 +101,8 @@ class UserSessionService(BaseService):
         """
         logger.debug(f"Спроба отримання сесії за токеном: {session_token}")
 
-        stmt = select(UserSession).options(selectinload(UserSession.user)).where(UserSession.session_token == session_token)
+        stmt = select(UserSession).options(selectinload(UserSession.user)).where(
+            UserSession.session_token == session_token)
         session_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
         if not session_db:
@@ -107,7 +110,8 @@ class UserSessionService(BaseService):
             return None
 
         if session_db.expires_at < datetime.now(timezone.utc):
-            logger.info(f"Термін дії токена сесії '{session_token}' для користувача ID '{session_db.user_id}' закінчився {session_db.expires_at.isoformat()}. Видалення.")
+            logger.info(
+                f"Термін дії токена сесії '{session_token}' для користувача ID '{session_db.user_id}' закінчився {session_db.expires_at.isoformat()}. Видалення.")
             await self.db_session.delete(session_db)
             await self.commit()
             # API шар, що викликає цей сервіс, має обробити повернення None і повідомити клієнта про прострочену сесію.
@@ -117,7 +121,8 @@ class UserSessionService(BaseService):
         self.db_session.add(session_db)
         await self.commit()
 
-        logger.info(f"Токен сесії '{session_token}' валідовано для користувача ID '{session_db.user_id}'. Поле 'last_active_at' оновлено.")
+        logger.info(
+            f"Токен сесії '{session_token}' валідовано для користувача ID '{session_db.user_id}'. Поле 'last_active_at' оновлено.")
         # Приклад повернення Pydantic схеми:
         # from backend.app.src.schemas.auth.session import UserSessionResponse
         # return UserSessionResponse.model_validate(session_db)
@@ -141,12 +146,14 @@ class UserSessionService(BaseService):
         session_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
         if not session_db:
-            logger.warning(f"Токен сесії '{session_token}' не знайдено або не належить користувачеві '{user_id}'. Неможливо інвалідувати.")
+            logger.warning(
+                f"Токен сесії '{session_token}' не знайдено або не належить користувачеві '{user_id}'. Неможливо інвалідувати.")
             return False
 
         await self.db_session.delete(session_db)
         await self.commit()
-        logger.info(f"Токен сесії '{session_token}' для користувача ID '{session_db.user_id}' успішно інвалідовано (видалено).")
+        logger.info(
+            f"Токен сесії '{session_token}' для користувача ID '{session_db.user_id}' успішно інвалідовано (видалено).")
         return True
 
     async def list_user_sessions(self, user_id: UUID, skip: int = 0, limit: int = 100) -> List[UserSession]:
@@ -197,7 +204,8 @@ class UserSessionService(BaseService):
         ids_to_delete = [row[0] for row in ids_to_delete_result.fetchall()]
 
         if not ids_to_delete:
-            logger.info(f"Не знайдено сесій для інвалідації для користувача ID '{user_id}' (виключаючи: {exclude_session_token}).")
+            logger.info(
+                f"Не знайдено сесій для інвалідації для користувача ID '{user_id}' (виключаючи: {exclude_session_token}).")
             return 0
 
         delete_stmt = UserSession.__table__.delete().where(UserSession.id.in_(ids_to_delete))
@@ -232,5 +240,6 @@ class UserSessionService(BaseService):
         else:
             logger.info("Не знайдено прострочених сесій користувачів для очищення.")
         return count
+
 
 logger.debug("UserSessionService клас визначено та завантажено.")

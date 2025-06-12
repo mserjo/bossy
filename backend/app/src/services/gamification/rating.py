@@ -1,34 +1,35 @@
 # backend/app/src/services/gamification/rating.py
 # import logging # Замінено на централізований логер
-from typing import List, Optional, Dict, Any # Dict, Any не використовуються, можна прибрати
+from typing import List, Optional, Dict, Any  # Dict, Any не використовуються, можна прибрати
 from uuid import UUID
-from datetime import datetime, timezone # date не використовується, можна прибрати
-from decimal import Decimal # Для балів рейтингу
+from datetime import datetime, timezone  # date не використовується, можна прибрати
+from decimal import Decimal  # Для балів рейтингу
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload # joinedload не використовується
+from sqlalchemy.orm import selectinload  # joinedload не використовується
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import func # Для агрегації, наприклад, func.count
+from sqlalchemy import func  # Для агрегації, наприклад, func.count
 
 # Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.gamification.rating import UserGroupRating # Модель SQLAlchemy UserGroupRating
+from backend.app.src.models.gamification.rating import UserGroupRating  # Модель SQLAlchemy UserGroupRating
 from backend.app.src.models.auth.user import User
 from backend.app.src.models.groups.group import Group
-from backend.app.src.services.bonuses.account import UserAccountService # Для отримання балів користувача
+from backend.app.src.services.bonuses.account import UserAccountService  # Для отримання балів користувача
 
-from backend.app.src.schemas.gamification.rating import ( # Схеми Pydantic
+from backend.app.src.schemas.gamification.rating import (  # Схеми Pydantic
     UserGroupRatingResponse,
     GroupLeaderboardResponse
     # UserGroupRatingCreate, UserGroupRatingUpdate - рейтинги зазвичай розраховуються, а не CRUD напряму
 )
-from backend.app.src.config.logging import logger # Централізований логер
-from backend.app.src.config import settings # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
 # TODO: Визначити конвенцію для `period_identifier` (наприклад, "all_time", "YYYY-MM", або ID сезону/події).
 #  Це має бути узгоджено з тим, як періоди визначаються та використовуються в системі.
-DEFAULT_PERIOD_IDENTIFIER = "all_time" # Приклад ідентифікатора для "за весь час"
+DEFAULT_PERIOD_IDENTIFIER = "all_time"  # Приклад ідентифікатора для "за весь час"
+
 
 class UserRatingService(BaseService):
     """
@@ -39,14 +40,14 @@ class UserRatingService(BaseService):
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        self.account_service = UserAccountService(db_session) # Ініціалізація сервісу рахунків
+        self.account_service = UserAccountService(db_session)  # Ініціалізація сервісу рахунків
         logger.info("UserRatingService ініціалізовано.")
 
     async def get_user_group_rating(
-        self,
-        user_id: UUID,
-        group_id: UUID,
-        period_identifier: Optional[str] = None # Якщо None, використовується DEFAULT_PERIOD_IDENTIFIER
+            self,
+            user_id: UUID,
+            group_id: UUID,
+            period_identifier: Optional[str] = None  # Якщо None, використовується DEFAULT_PERIOD_IDENTIFIER
     ) -> Optional[UserGroupRatingResponse]:
         """
         Отримує запис рейтингу користувача в групі за певний період.
@@ -66,24 +67,24 @@ class UserRatingService(BaseService):
         ).where(
             UserGroupRating.user_id == user_id,
             UserGroupRating.group_id == group_id,
-            UserGroupRating.period_identifier == effective_period # Використовуємо поле period_identifier
+            UserGroupRating.period_identifier == effective_period  # Використовуємо поле period_identifier
         )
 
         rating_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
         if rating_db:
             logger.info(f"Запис UserGroupRating знайдено для {log_ctx}.")
-            return UserGroupRatingResponse.model_validate(rating_db) # Pydantic v2
+            return UserGroupRatingResponse.model_validate(rating_db)  # Pydantic v2
 
         logger.info(f"Запис UserGroupRating не знайдено для {log_ctx}.")
         return None
 
     async def update_user_group_rating(
-        self,
-        user_id: UUID,
-        group_id: UUID,
-        period_identifier: Optional[str] = None # Якщо None, використовується DEFAULT_PERIOD_IDENTIFIER
-    ) -> UserGroupRatingResponse: # Повертає UserGroupRatingResponse, не Optional, бо створить якщо не існує
+            self,
+            user_id: UUID,
+            group_id: UUID,
+            period_identifier: Optional[str] = None  # Якщо None, використовується DEFAULT_PERIOD_IDENTIFIER
+    ) -> UserGroupRatingResponse:  # Повертає UserGroupRatingResponse, не Optional, бо створить якщо не існує
         """
         Оновлює або створює запис рейтингу користувача для вказаної групи та періоду.
         Рейтинг розраховується на основі поточного балансу бонусного рахунку користувача в цій групі.
@@ -107,7 +108,7 @@ class UserRatingService(BaseService):
 
         new_score = Decimal("0.00")
         if user_account:
-            new_score = user_account.balance # Баланс вже є Decimal
+            new_score = user_account.balance  # Баланс вже є Decimal
         else:
             logger.warning(f"Бонусний рахунок для {log_ctx} не знайдено. Рейтинг буде розраховано з 0 балами.")
 
@@ -122,15 +123,16 @@ class UserRatingService(BaseService):
         rating_db = (await self.db_session.execute(stmt_existing)).scalar_one_or_none()
 
         current_time = datetime.now(timezone.utc)
-        if rating_db: # Якщо запис існує, оновлюємо
+        if rating_db:  # Якщо запис існує, оновлюємо
             if rating_db.rating_score == new_score and rating_db.last_calculated_at and \
-               (current_time - rating_db.last_calculated_at) < timedelta(minutes=1): # Не оновлювати занадто часто, якщо бал не змінився
+                    (current_time - rating_db.last_calculated_at) < timedelta(
+                minutes=1):  # Не оновлювати занадто часто, якщо бал не змінився
                 logger.info(f"Рейтинг для {log_ctx} вже {new_score} і нещодавно оновлений. Оновлення не потрібне.")
             else:
                 logger.info(f"Оновлення рейтингу для {log_ctx} з {rating_db.rating_score} до {new_score}.")
                 rating_db.rating_score = new_score
                 rating_db.last_calculated_at = current_time
-        else: # Створюємо новий запис
+        else:  # Створюємо новий запис
             logger.info(f"Створення нового запису UserGroupRating для {log_ctx} з балом {new_score}.")
             rating_db = UserGroupRating(
                 user_id=user_id,
@@ -153,13 +155,13 @@ class UserRatingService(BaseService):
             raise ValueError(f"Не вдалося оновити/створити рейтинг через конфлікт даних: {e}")
 
         logger.info(f"UserGroupRating для {log_ctx} успішно встановлено на бал {new_score}.")
-        return UserGroupRatingResponse.model_validate(rating_db) # Pydantic v2
+        return UserGroupRatingResponse.model_validate(rating_db)  # Pydantic v2
 
     async def get_group_leaderboard(
-        self,
-        group_id: UUID,
-        period_identifier: Optional[str] = None, # Якщо None, використовується DEFAULT_PERIOD_IDENTIFIER
-        limit: int = 100
+            self,
+            group_id: UUID,
+            period_identifier: Optional[str] = None,  # Якщо None, використовується DEFAULT_PERIOD_IDENTIFIER
+            limit: int = 100
     ) -> GroupLeaderboardResponse:
         """
         Генерує таблицю лідерів для вказаної групи та періоду.
@@ -174,7 +176,8 @@ class UserRatingService(BaseService):
         logger.info(f"Генерація лідерборду для {log_ctx}, ліміт {limit}.")
 
         stmt = select(UserGroupRating).options(
-            selectinload(UserGroupRating.user).options(selectinload(User.user_type)), # Завантажуємо користувача для відповіді
+            selectinload(UserGroupRating.user).options(selectinload(User.user_type)),
+            # Завантажуємо користувача для відповіді
             # Група вже відома з group_id, але можна завантажити для консистентності, якщо потрібно
             # selectinload(UserGroupRating.group)
         ).where(
@@ -194,7 +197,7 @@ class UserRatingService(BaseService):
         # TODO: Якщо потрібен явний `rank` в UserGroupRatingResponse, його треба розрахувати тут.
         # Наприклад, на основі позиції в відсортованому списку ratings_db.
         # Або використовувати віконні функції SQL, якщо це підтримується і ефективно.
-        leaderboard_entries = [UserGroupRatingResponse.model_validate(r) for r in ratings_db] # Pydantic v2
+        leaderboard_entries = [UserGroupRatingResponse.model_validate(r) for r in ratings_db]  # Pydantic v2
 
         # Загальна кількість учасників рейтингу для цієї групи та періоду
         count_stmt = select(func.count(UserGroupRating.id)).where(
@@ -203,7 +206,7 @@ class UserRatingService(BaseService):
         )
         total_participants = (await self.db_session.execute(count_stmt)).scalar_one_or_none() or 0
 
-        group_name = "N/A" # i18n
+        group_name = "N/A"  # i18n
         group_obj = await self.db_session.get(Group, group_id)
         if group_obj:
             group_name = group_obj.name
@@ -221,5 +224,6 @@ class UserRatingService(BaseService):
 
     # TODO: Розглянути метод для періодичного перерахунку всіх рейтингів (наприклад, раз на день або після значних подій).
     # async def recalculate_all_ratings_for_period(period_identifier: str, group_id: Optional[UUID] = None): ...
+
 
 logger.debug(f"{UserRatingService.__name__} (сервіс рейтингів користувачів) успішно визначено.")

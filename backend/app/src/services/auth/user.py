@@ -20,7 +20,7 @@ from backend.app.src.schemas.auth.user import (
 )
 from backend.app.src.core.security import get_password_hash
 from backend.app.src.config.logging import logger
-from backend.app.src.config import settings # Для доступу до DEBUG тощо
+from backend.app.src.config import settings  # Для доступу до DEBUG тощо
 
 
 class UserService(BaseService):
@@ -42,7 +42,8 @@ class UserService(BaseService):
 
         if user_db:
             logger.info(f"Користувача з ID '{user_id}' знайдено.")
-            return UserResponseWithRoles.model_validate(user_db) if include_relations else UserResponse.model_validate(user_db)
+            return UserResponseWithRoles.model_validate(user_db) if include_relations else UserResponse.model_validate(
+                user_db)
         logger.info(f"Користувача з ID '{user_id}' не знайдено.")
         return None
 
@@ -56,7 +57,8 @@ class UserService(BaseService):
 
         if user_db:
             logger.info(f"Користувача з email '{email}' знайдено.")
-            return UserResponseWithRoles.model_validate(user_db) if include_relations else UserResponse.model_validate(user_db)
+            return UserResponseWithRoles.model_validate(user_db) if include_relations else UserResponse.model_validate(
+                user_db)
         logger.info(f"Користувача з email '{email}' не знайдено.")
         return None
 
@@ -70,7 +72,8 @@ class UserService(BaseService):
 
         if user_db:
             logger.info(f"Користувача з username '{username}' знайдено.")
-            return UserResponseWithRoles.model_validate(user_db) if include_relations else UserResponse.model_validate(user_db)
+            return UserResponseWithRoles.model_validate(user_db) if include_relations else UserResponse.model_validate(
+                user_db)
         logger.info(f"Користувача з username '{username}' не знайдено.")
         return None
 
@@ -82,7 +85,7 @@ class UserService(BaseService):
         )).scalar_one_or_none()
         if username_exists:
             logger.warning(f"Ім'я користувача '{username}' вже існує.")
-            raise ValueError(f"Ім'я користувача '{username}' вже існує.") # i18n
+            raise ValueError(f"Ім'я користувача '{username}' вже існує.")  # i18n
 
         # Перевірка email
         email_exists = (await self.db_session.execute(
@@ -90,14 +93,15 @@ class UserService(BaseService):
         )).scalar_one_or_none()
         if email_exists:
             logger.warning(f"Email '{email.lower()}' вже зареєстровано.")
-            raise ValueError(f"Email '{email.lower()}' вже зареєстровано.") # i18n
+            raise ValueError(f"Email '{email.lower()}' вже зареєстровано.")  # i18n
 
     async def create_user(self, user_create_data: UserCreate,
                           user_type_code: str = "USER",
                           role_codes: Optional[List[str]] = None,
                           is_superuser_creation: bool = False
-                         ) -> UserResponseWithRoles:
-        logger.debug(f"Спроба створення нового користувача: {user_create_data.username}, is_superuser: {is_superuser_creation}")
+                          ) -> UserResponseWithRoles:
+        logger.debug(
+            f"Спроба створення нового користувача: {user_create_data.username}, is_superuser: {is_superuser_creation}")
 
         await self._check_existing_user(user_create_data.username, user_create_data.email)
 
@@ -107,7 +111,7 @@ class UserService(BaseService):
         user_type_db = (await self.db_session.execute(type_stmt)).scalar_one_or_none()
         if not user_type_db:
             logger.error(f"UserType з кодом '{user_type_code}' не знайдено.")
-            raise ValueError(f"Тип користувача '{user_type_code}' не знайдено.") # i18n
+            raise ValueError(f"Тип користувача '{user_type_code}' не знайдено.")  # i18n
 
         # Згідно technical_task.txt: is_active=True, is_verified=False за замовчуванням.
         new_user_db = User(
@@ -118,19 +122,21 @@ class UserService(BaseService):
             is_superuser=is_superuser_creation,
             is_active=True,
             is_verified=False,
-            created_at=datetime.now(timezone.utc) # Явно встановлюємо created_at
+            created_at=datetime.now(timezone.utc)  # Явно встановлюємо created_at
         )
 
         if role_codes:
             roles_stmt = select(UserRole).where(UserRole.code.in_(role_codes))
             user_roles_db = (await self.db_session.execute(roles_stmt)).scalars().all()
 
-            if len(user_roles_db) != len(set(role_codes)): # Використовуємо set для унікальності вхідних кодів
+            if len(user_roles_db) != len(set(role_codes)):  # Використовуємо set для унікальності вхідних кодів
                 # Згідно technical_task.txt, створення користувача має завершитися помилкою, якщо ролі не знайдено.
                 found_role_codes = {role.code for role in user_roles_db}
                 missing_codes = set(role_codes) - found_role_codes
-                logger.error(f"Не знайдено ролі з кодами: {missing_codes} для нового користувача '{user_create_data.username}'.")
-                raise ValueError(f"Не вдалося створити користувача: не знайдено ролі з кодами: {missing_codes}.") # i18n
+                logger.error(
+                    f"Не знайдено ролі з кодами: {missing_codes} для нового користувача '{user_create_data.username}'.")
+                raise ValueError(
+                    f"Не вдалося створити користувача: не знайдено ролі з кодами: {missing_codes}.")  # i18n
             new_user_db.roles = user_roles_db
 
         self.db_session.add(new_user_db)
@@ -142,20 +148,19 @@ class UserService(BaseService):
             logger.error(f"Помилка цілісності: {e}", exc_info=settings.DEBUG)
             # ... (попередня логіка обробки IntegrityError залишається)
             err_detail = str(e.orig).lower() if hasattr(e, 'orig') and e.orig is not None else str(e).lower()
-            if "users_username_key" in err_detail or "unique_username" in err_detail or "constraint failed: users.username" in err_detail :
-                 raise ValueError(f"Ім'я користувача '{user_create_data.username}' вже існує.") # i18n
+            if "users_username_key" in err_detail or "unique_username" in err_detail or "constraint failed: users.username" in err_detail:
+                raise ValueError(f"Ім'я користувача '{user_create_data.username}' вже існує.")  # i18n
             if "users_email_key" in err_detail or "unique_email" in err_detail or "constraint failed: users.email" in err_detail:
-                 raise ValueError(f"Email '{user_create_data.email}' вже зареєстровано.") # i18n
-            raise ValueError(f"Не вдалося створити користувача через конфлікт даних: {e}") # i18n
-
+                raise ValueError(f"Email '{user_create_data.email}' вже зареєстровано.")  # i18n
+            raise ValueError(f"Не вдалося створити користувача через конфлікт даних: {e}")  # i18n
 
         logger.info(f"Користувача '{new_user_db.username}' (ID: {new_user_db.id}) успішно створено.")
         return UserResponseWithRoles.model_validate(new_user_db)
 
     async def update_user(self, user_id: UUID, user_update_data: UserUpdate,
                           # TODO: Розглянути передачу об'єкта поточного користувача (current_user) для перевірки прав на оновлення певних полів.
-                          is_admin_update: bool = False # Тимчасовий прапорець для розрізнення оновлень
-                         ) -> Optional[UserResponseWithRoles]:
+                          is_admin_update: bool = False  # Тимчасовий прапорець для розрізнення оновлень
+                          ) -> Optional[UserResponseWithRoles]:
         logger.debug(f"Спроба оновлення користувача ID: {user_id}")
         user_db = await self._get_user_model_by_id(user_id)
         if not user_db:
@@ -168,33 +173,34 @@ class UserService(BaseService):
             new_email = update_data['email'].lower()
             existing_email_user_stmt = select(User.id).where(User.email == new_email, User.id != user_id)
             if (await self.db_session.execute(existing_email_user_stmt)).scalar_one_or_none():
-                raise ValueError(f"Email '{new_email}' вже зареєстровано іншим користувачем.") # i18n
+                raise ValueError(f"Email '{new_email}' вже зареєстровано іншим користувачем.")  # i18n
             user_db.email = new_email
             # Згідно technical_task.txt, зміна email завжди скидає верифікацію.
             user_db.is_verified = False
-            user_db.verified_at = None # Також скидаємо дату верифікації
+            user_db.verified_at = None  # Також скидаємо дату верифікації
             logger.info(f"Email користувача ID '{user_id}' змінено. Статус верифікації скинуто.")
 
         # Поля, які може оновлювати сам користувач:
         user_allowed_fields: Set[str] = {"first_name", "last_name", "middle_name", "phone_number"}
         # Поля, які може оновлювати адміністратор (додатково до user_allowed_fields):
-        admin_allowed_fields: Set[str] = {"username", "is_active", "is_verified", "is_superuser", "user_type_id"} # email вже оброблено
+        admin_allowed_fields: Set[str] = {"username", "is_active", "is_verified", "is_superuser",
+                                          "user_type_id"}  # email вже оброблено
 
         current_allowed_fields = user_allowed_fields
-        if is_admin_update: # Тут має бути перевірка ролей/прав поточного користувача
+        if is_admin_update:  # Тут має бути перевірка ролей/прав поточного користувача
             current_allowed_fields = current_allowed_fields.union(admin_allowed_fields)
 
         # `user_type_id` та `roles` оновлюються окремими методами, не тут.
         # `is_superuser` теж має бути дуже захищеним полем.
 
         for field, value in update_data.items():
-            if field == 'email': continue # Вже оброблено
+            if field == 'email': continue  # Вже оброблено
 
             if field in current_allowed_fields:
-                if field == 'username' and value != user_db.username: # Потрібна перевірка унікальності для username
+                if field == 'username' and value != user_db.username:  # Потрібна перевірка унікальності для username
                     existing_username_stmt = select(User.id).where(User.username == value, User.id != user_id)
                     if (await self.db_session.execute(existing_username_stmt)).scalar_one_or_none():
-                        raise ValueError(f"Ім'я користувача '{value}' вже використовується.") # i18n
+                        raise ValueError(f"Ім'я користувача '{value}' вже використовується.")  # i18n
 
                 # Спеціальна обробка для is_verified, якщо воно є в update_data і is_admin_update
                 if field == 'is_verified' and is_admin_update:
@@ -202,13 +208,13 @@ class UserService(BaseService):
                     user_db.is_verified = value
                     user_db.verified_at = datetime.now(timezone.utc) if value else None
                     logger.info(f"Адміністратор оновив is_verified на {value} для ID {user_id}. verified_at оновлено.")
-                    continue # Переходимо до наступного поля
+                    continue  # Переходимо до наступного поля
 
                 setattr(user_db, field, value)
             else:
                 logger.warning(f"Поле '{field}' не дозволено для оновлення або не існує для ID '{user_id}'. Пропуск.")
 
-        user_db.updated_at = datetime.now(timezone.utc) # Явно оновлюємо updated_at
+        user_db.updated_at = datetime.now(timezone.utc)  # Явно оновлюємо updated_at
         self.db_session.add(user_db)
         await self.commit()
         await self.db_session.refresh(user_db, attribute_names=['roles', 'user_type'])
@@ -219,7 +225,8 @@ class UserService(BaseService):
         stmt = select(User).options(selectinload(User.roles), selectinload(User.user_type)).where(User.id == user_id)
         return (await self.db_session.execute(stmt)).scalar_one_or_none()
 
-    async def _manage_user_roles(self, user_id: UUID, role_codes: List[str], action: str) -> Optional[UserResponseWithRoles]:
+    async def _manage_user_roles(self, user_id: UUID, role_codes: List[str], action: str) -> Optional[
+        UserResponseWithRoles]:
         # ... (попередня реалізація _manage_user_roles залишається)
         user_db = await self._get_user_model_by_id(user_id)
         if not user_db:
@@ -227,12 +234,12 @@ class UserService(BaseService):
             return None
 
         made_changes = False
-        if not role_codes: # Якщо список кодів порожній
-            if action == "replace_add": # Замінити всі ролі на порожній список
-                if user_db.roles: # Якщо були ролі, то зміни відбулись
+        if not role_codes:  # Якщо список кодів порожній
+            if action == "replace_add":  # Замінити всі ролі на порожній список
+                if user_db.roles:  # Якщо були ролі, то зміни відбулись
                     made_changes = True
                 user_db.roles = []
-            else: # Для "assign" або "remove" порожній список кодів не призводить до змін
+            else:  # Для "assign" або "remove" порожній список кодів не призводить до змін
                 logger.info(f"Список кодів ролей порожній для дії '{action}' для ID '{user_id}'. Змін не відбулося.")
                 return UserResponseWithRoles.model_validate(user_db)
         else:
@@ -245,7 +252,7 @@ class UserService(BaseService):
                 found_codes = {r.code for r in roles_to_process_db}
                 missing_codes = set(role_codes) - found_codes
                 logger.error(f"Не знайдено ролі з кодами: {missing_codes} для ID '{user_id}'.")
-                raise ValueError(f"Не знайдено ролі: {missing_codes}.") # i18n
+                raise ValueError(f"Не знайдено ролі: {missing_codes}.")  # i18n
 
             current_role_ids = {role.id for role in user_db.roles}
             if action == "assign":
@@ -276,8 +283,8 @@ class UserService(BaseService):
 
         return UserResponseWithRoles.model_validate(user_db)
 
-
-    async def assign_roles_to_user(self, user_id: UUID, role_codes: List[str], replace_existing: bool = False) -> Optional[UserResponseWithRoles]:
+    async def assign_roles_to_user(self, user_id: UUID, role_codes: List[str], replace_existing: bool = False) -> \
+    Optional[UserResponseWithRoles]:
         logger.debug(f"Призначення ролей {role_codes} ID {user_id}. Заміна: {replace_existing}")
         action = "replace_add" if replace_existing else "assign"
         return await self._manage_user_roles(user_id, role_codes, action)
@@ -329,8 +336,9 @@ class UserService(BaseService):
                          user_type_code: Optional[str] = None,
                          role_code: Optional[str] = None,
                          # TODO: Додати параметри сортування (sort_by, sort_order) згідно `technical_task.txt` (напр. 'created_at', 'last_login_at')
-                        ) -> List[UserResponseWithRoles]:
-        logger.debug(f"Перелік користувачів: skip={skip}, limit={limit}, is_active={is_active}, type={user_type_code}, role={role_code}")
+                         ) -> List[UserResponseWithRoles]:
+        logger.debug(
+            f"Перелік користувачів: skip={skip}, limit={limit}, is_active={is_active}, type={user_type_code}, role={role_code}")
         stmt = select(User).options(selectinload(User.roles), selectinload(User.user_type))
 
         if is_active is not None:
@@ -341,12 +349,14 @@ class UserService(BaseService):
             # join(User.roles) використовує таблицю зв'язку user_x_user_roles
             stmt = stmt.join(User.roles).where(UserRole.code == role_code)
 
-        stmt = stmt.order_by(User.username).offset(skip).limit(limit) # Сортування за замовчуванням
+        stmt = stmt.order_by(User.username).offset(skip).limit(limit)  # Сортування за замовчуванням
 
-        users_db = (await self.db_session.execute(stmt)).scalars().unique().all() # .unique() для уникнення дублікатів через join
+        users_db = (await self.db_session.execute(
+            stmt)).scalars().unique().all()  # .unique() для уникнення дублікатів через join
 
         response_list = [UserResponseWithRoles.model_validate(user) for user in users_db]
         logger.info(f"Отримано {len(response_list)} користувачів.")
         return response_list
+
 
 logger.debug("UserService клас визначено та завантажено.")

@@ -8,23 +8,24 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import or_, and_ # Додано and_ для складних умов
+from sqlalchemy import or_, and_  # Додано and_ для складних умов
 
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.bonuses.bonus import BonusRule # Модель SQLAlchemy BonusRule
-from backend.app.src.models.groups.group import Group # Для правил, специфічних для групи
-from backend.app.src.models.dictionaries.task_types import TaskType # Для правил, пов'язаних з типами завдань
-from backend.app.src.models.tasks.task import Task # Для правил, пов'язаних з конкретними завданнями
+from backend.app.src.models.bonuses.bonus import BonusRule  # Модель SQLAlchemy BonusRule
+from backend.app.src.models.groups.group import Group  # Для правил, специфічних для групи
+from backend.app.src.models.dictionaries.task_types import TaskType  # Для правил, пов'язаних з типами завдань
+from backend.app.src.models.tasks.task import Task  # Для правил, пов'язаних з конкретними завданнями
 # from backend.app.src.models.tasks.event import Event # Якщо правила можуть бути пов'язані з подіями
-from backend.app.src.models.auth.user import User # Для created_by_user, updated_by_user
+from backend.app.src.models.auth.user import User  # Для created_by_user, updated_by_user
 
-from backend.app.src.schemas.bonuses.bonus_rule import ( # Pydantic Схеми
+from backend.app.src.schemas.bonuses.bonus_rule import (  # Pydantic Схеми
     BonusRuleCreate,
     BonusRuleUpdate,
     BonusRuleResponse
 )
-from backend.app.src.config.logging import logger # Централізований логер
-from backend.app.src.config import settings # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+
 
 class BonusRuleService(BaseService):
     """
@@ -59,7 +60,7 @@ class BonusRuleService(BaseService):
 
         if rule_db:
             logger.info(f"Правило нарахування бонусів з ID '{rule_id}' знайдено.")
-            return BonusRuleResponse.model_validate(rule_db) # Pydantic v2
+            return BonusRuleResponse.model_validate(rule_db)  # Pydantic v2
         logger.info(f"Правило нарахування бонусів з ID '{rule_id}' не знайдено.")
         return None
 
@@ -76,31 +77,31 @@ class BonusRuleService(BaseService):
 
         # Перевірка існування пов'язаних сутностей
         if rule_data.group_id and not await self.db_session.get(Group, rule_data.group_id):
-            raise ValueError(f"Групу з ID '{rule_data.group_id}' не знайдено.") # i18n
+            raise ValueError(f"Групу з ID '{rule_data.group_id}' не знайдено.")  # i18n
         if rule_data.task_type_id and not await self.db_session.get(TaskType, rule_data.task_type_id):
-            raise ValueError(f"Тип завдання з ID '{rule_data.task_type_id}' не знайдено.") # i18n
+            raise ValueError(f"Тип завдання з ID '{rule_data.task_type_id}' не знайдено.")  # i18n
         if rule_data.task_id and not await self.db_session.get(Task, rule_data.task_id):
-            raise ValueError(f"Завдання з ID '{rule_data.task_id}' не знайдено.") # i18n
+            raise ValueError(f"Завдання з ID '{rule_data.task_id}' не знайдено.")  # i18n
 
         # Перевірка унікальності імені правила в межах його області (глобальна або група)
         stmt_name_check = select(BonusRule.id).where(BonusRule.name == rule_data.name)
-        scope_log_msg = "глобальній області" # i18n
+        scope_log_msg = "глобальній області"  # i18n
         if rule_data.group_id:
             stmt_name_check = stmt_name_check.where(BonusRule.group_id == rule_data.group_id)
-            scope_log_msg = f"групі ID '{rule_data.group_id}'" # i18n
+            scope_log_msg = f"групі ID '{rule_data.group_id}'"  # i18n
         else:
             stmt_name_check = stmt_name_check.where(BonusRule.group_id.is_(None))
 
         if (await self.db_session.execute(stmt_name_check)).scalar_one_or_none():
             logger.warning(f"Правило з ім'ям '{rule_data.name}' вже існує в {scope_log_msg}.")
-            raise ValueError(f"Правило з ім'ям '{rule_data.name}' вже існує в {scope_log_msg}.") # i18n
+            raise ValueError(f"Правило з ім'ям '{rule_data.name}' вже існує в {scope_log_msg}.")  # i18n
 
         # Створення об'єкта моделі
         # created_at/updated_at встановлюються автоматично, якщо налаштовано в моделі
         new_rule_db = BonusRule(
-            **rule_data.model_dump(), # Pydantic v2
+            **rule_data.model_dump(),  # Pydantic v2
             created_by_user_id=creator_user_id,
-            updated_by_user_id=creator_user_id # При створенні updated_by_user_id = creator_user_id
+            updated_by_user_id=creator_user_id  # При створенні updated_by_user_id = creator_user_id
         )
 
         self.db_session.add(new_rule_db)
@@ -108,22 +109,21 @@ class BonusRuleService(BaseService):
             await self.commit()
             await self.db_session.refresh(new_rule_db, attribute_names=[
                 'group', 'task_type', 'task', 'created_by_user', 'updated_by_user'
-            ]) # Завантажуємо всі можливі зв'язки
+            ])  # Завантажуємо всі можливі зв'язки
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності при створенні правила '{rule_data.name}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося створити правило через конфлікт даних: {e}") # i18n
-        except Exception as e: # Обробка інших можливих помилок
+            raise ValueError(f"Не вдалося створити правило через конфлікт даних: {e}")  # i18n
+        except Exception as e:  # Обробка інших можливих помилок
             await self.rollback()
             logger.error(f"Неочікувана помилка при створенні правила '{rule_data.name}': {e}", exc_info=settings.DEBUG)
-            raise # Перекидаємо помилку далі
+            raise  # Перекидаємо помилку далі
 
         logger.info(f"Правило '{new_rule_db.name}' (ID: {new_rule_db.id}) успішно створено.")
         return BonusRuleResponse.model_validate(new_rule_db)
 
-
     async def update_bonus_rule(
-        self, rule_id: UUID, rule_update_data: BonusRuleUpdate, current_user_id: UUID
+            self, rule_id: UUID, rule_update_data: BonusRuleUpdate, current_user_id: UUID
     ) -> Optional[BonusRuleResponse]:
         """
         Оновлює існуюче правило нарахування бонусів.
@@ -141,18 +141,18 @@ class BonusRuleService(BaseService):
             logger.warning(f"Правило ID '{rule_id}' не знайдено для оновлення.")
             return None
 
-        update_data = rule_update_data.model_dump(exclude_unset=True) # Pydantic v2
+        update_data = rule_update_data.model_dump(exclude_unset=True)  # Pydantic v2
 
         # Перевірка існування нових пов'язаних сутностей, якщо вони змінюються
         if 'group_id' in update_data and rule_db.group_id != update_data['group_id']:
             if update_data['group_id'] and not await self.db_session.get(Group, update_data['group_id']):
-                raise ValueError(f"Нова група з ID '{update_data['group_id']}' не знайдена.") # i18n
+                raise ValueError(f"Нова група з ID '{update_data['group_id']}' не знайдена.")  # i18n
         if 'task_type_id' in update_data and rule_db.task_type_id != update_data['task_type_id']:
             if update_data['task_type_id'] and not await self.db_session.get(TaskType, update_data['task_type_id']):
-                raise ValueError(f"Новий тип завдання ID '{update_data['task_type_id']}' не знайдено.") # i18n
+                raise ValueError(f"Новий тип завдання ID '{update_data['task_type_id']}' не знайдено.")  # i18n
         if 'task_id' in update_data and rule_db.task_id != update_data['task_id']:
             if update_data['task_id'] and not await self.db_session.get(Task, update_data['task_id']):
-                raise ValueError(f"Нове завдання ID '{update_data['task_id']}' не знайдено.") # i18n
+                raise ValueError(f"Нове завдання ID '{update_data['task_id']}' не знайдено.")  # i18n
 
         # Перевірка унікальності імені, якщо ім'я або група змінюються
         new_name = update_data.get('name', rule_db.name)
@@ -160,20 +160,20 @@ class BonusRuleService(BaseService):
         new_group_id = update_data['group_id'] if 'group_id' in update_data else rule_db.group_id
 
         if ('name' in update_data and new_name != rule_db.name) or \
-           ('group_id' in update_data and new_group_id != rule_db.group_id):
+                ('group_id' in update_data and new_group_id != rule_db.group_id):
             stmt_name_check = select(BonusRule.id).where(
                 BonusRule.name == new_name,
-                BonusRule.id != rule_id # Виключаємо поточне правило
+                BonusRule.id != rule_id  # Виключаємо поточне правило
             )
-            scope_log_msg = "глобальній області" # i18n
+            scope_log_msg = "глобальній області"  # i18n
             if new_group_id is not None:
                 stmt_name_check = stmt_name_check.where(BonusRule.group_id == new_group_id)
-                scope_log_msg = f"групі ID '{new_group_id}'" # i18n
+                scope_log_msg = f"групі ID '{new_group_id}'"  # i18n
             else:
                 stmt_name_check = stmt_name_check.where(BonusRule.group_id.is_(None))
 
             if (await self.db_session.execute(stmt_name_check)).scalar_one_or_none():
-                raise ValueError(f"Інше правило з ім'ям '{new_name}' вже існує в {scope_log_msg}.") # i18n
+                raise ValueError(f"Інше правило з ім'ям '{new_name}' вже існує в {scope_log_msg}.")  # i18n
 
         # Оновлення полів
         for field, value in update_data.items():
@@ -183,7 +183,6 @@ class BonusRuleService(BaseService):
         # rule_db.updated_at оновлюється автоматично, якщо налаштовано в моделі, або:
         rule_db.updated_at = datetime.now(timezone.utc)
 
-
         self.db_session.add(rule_db)
         try:
             await self.commit()
@@ -192,10 +191,10 @@ class BonusRuleService(BaseService):
             ])
             logger.info(f"Правило ID '{rule_id}' успішно оновлено користувачем ID '{current_user_id}'.")
             return BonusRuleResponse.model_validate(rule_db)
-        except IntegrityError as e: # Обробка помилки унікальності на рівні БД
+        except IntegrityError as e:  # Обробка помилки унікальності на рівні БД
             await self.rollback()
             logger.error(f"Помилка цілісності при оновленні правила ID '{rule_id}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося оновити правило через конфлікт даних: {e}") # i18n
+            raise ValueError(f"Не вдалося оновити правило через конфлікт даних: {e}")  # i18n
         except Exception as e:
             await self.rollback()
             logger.error(f"Помилка при оновленні правила ID '{rule_id}': {e}", exc_info=settings.DEBUG)
@@ -225,15 +224,15 @@ class BonusRuleService(BaseService):
         return True
 
     async def list_bonus_rules(
-        self,
-        group_id: Optional[UUID] = None,
-        task_type_id: Optional[UUID] = None,
-        task_id: Optional[UUID] = None,
-        is_active: Optional[bool] = None, # За замовчуванням не фільтрує за активністю, щоб показати всі
-        valid_on_date: Optional[datetime] = None, # Дата для перевірки активності правила (valid_from/valid_until)
-        skip: int = 0,
-        limit: int = 100,
-        include_global_rules_if_group_given: bool = False
+            self,
+            group_id: Optional[UUID] = None,
+            task_type_id: Optional[UUID] = None,
+            task_id: Optional[UUID] = None,
+            is_active: Optional[bool] = None,  # За замовчуванням не фільтрує за активністю, щоб показати всі
+            valid_on_date: Optional[datetime] = None,  # Дата для перевірки активності правила (valid_from/valid_until)
+            skip: int = 0,
+            limit: int = 100,
+            include_global_rules_if_group_given: bool = False
     ) -> List[BonusRuleResponse]:
         """
         Перелічує правила нарахування бонусів з можливістю фільтрації та пагінації.
@@ -248,7 +247,8 @@ class BonusRuleService(BaseService):
         :param include_global_rules_if_group_given: Якщо True та group_id вказано, включає також глобальні правила.
         :return: Список Pydantic схем BonusRuleResponse.
         """
-        logger.debug(f"Перелік правил: group={group_id}, task_type={task_type_id}, task={task_id}, active={is_active}, valid_on={valid_on_date}, global_for_group={include_global_rules_if_group_given}")
+        logger.debug(
+            f"Перелік правил: group={group_id}, task_type={task_type_id}, task={task_id}, active={is_active}, valid_on={valid_on_date}, global_for_group={include_global_rules_if_group_given}")
 
         stmt = select(BonusRule).options(
             selectinload(BonusRule.group), selectinload(BonusRule.task_type),
@@ -266,7 +266,6 @@ class BonusRuleService(BaseService):
         # Якщо group_id не вказано, не фільтруємо за групою (показує всі: і глобальні, і групові)
         # Для фільтрації тільки глобальних, якщо group_id is None, треба додати:
         # elif group_id is None and filter_only_global: conditions.append(BonusRule.group_id.is_(None))
-
 
         if task_type_id: conditions.append(BonusRule.task_type_id == task_type_id)
         if task_id: conditions.append(BonusRule.task_id == task_id)
@@ -297,11 +296,11 @@ class BonusRuleService(BaseService):
         return response_list
 
     async def get_applicable_bonus_rules(
-        self,
-        group_id: UUID, # Контекст: поточна група
-        task_id: Optional[UUID] = None, # Контекст: конкретне завдання, якщо є
-        task_type_id: Optional[UUID] = None, # Контекст: тип завдання
-        # TODO: Розглянути `action_type: str` для більш складних умов, якщо потрібно (напр. 'TASK_COMPLETION')
+            self,
+            group_id: UUID,  # Контекст: поточна група
+            task_id: Optional[UUID] = None,  # Контекст: конкретне завдання, якщо є
+            task_type_id: Optional[UUID] = None,  # Контекст: тип завдання
+            # TODO: Розглянути `action_type: str` для більш складних умов, якщо потрібно (напр. 'TASK_COMPLETION')
     ) -> List[BonusRuleResponse]:
         """
         Отримує список правил, які потенційно застосовні до заданого контексту (група, завдання, тип завдання).
@@ -309,7 +308,8 @@ class BonusRuleService(BaseService):
         Повертає список, відсортований за специфічністю (найбільш специфічні перші).
         """
         current_time = datetime.now(timezone.utc)
-        logger.debug(f"Пошук застосовних правил для групи {group_id}, завдання {task_id}, типу завдання {task_type_id} на {current_time.isoformat()}")
+        logger.debug(
+            f"Пошук застосовних правил для групи {group_id}, завдання {task_id}, типу завдання {task_type_id} на {current_time.isoformat()}")
 
         # Базові умови: правило активне та валідне за датою
         base_conditions = [
@@ -331,8 +331,8 @@ class BonusRuleService(BaseService):
             clauses.append(and_(
                 *base_conditions,
                 BonusRule.task_type_id == task_type_id,
-                BonusRule.task_id.is_(None), # Не пов'язане з конкретним завданням
-                or_(BonusRule.group_id == group_id, BonusRule.group_id.is_(None)) # Або для цієї групи, або глобальне
+                BonusRule.task_id.is_(None),  # Не пов'язане з конкретним завданням
+                or_(BonusRule.group_id == group_id, BonusRule.group_id.is_(None))  # Або для цієї групи, або глобальне
             ))
 
         # 3. Загальні правила для конкретної групи
@@ -363,7 +363,7 @@ class BonusRuleService(BaseService):
             BonusRule.task_id.desc().nulls_last(),
             BonusRule.task_type_id.desc().nulls_last(),
             BonusRule.group_id.desc().nulls_last(),
-            BonusRule.name # Додаткове сортування для стабільності
+            BonusRule.name  # Додаткове сортування для стабільності
         )
 
         rules_db = (await self.db_session.execute(stmt)).scalars().unique().all()
@@ -371,5 +371,6 @@ class BonusRuleService(BaseService):
         response_list = [BonusRuleResponse.model_validate(r) for r in rules_db]
         logger.info(f"Отримано {len(response_list)} застосовних правил, відсортованих за специфічністю.")
         return response_list
+
 
 logger.debug("BonusRuleService клас визначено та завантажено.")

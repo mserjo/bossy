@@ -1,4 +1,5 @@
 # backend/app/src/models/dictionaries/base_dict.py
+# -*- coding: utf-8 -*-
 """
 Базовий клас для моделей-довідників SQLAlchemy.
 

@@ -1,129 +1,196 @@
 # backend/app/src/api/v1/dictionaries/user_types.py
-from typing import Any, List
+# -*- coding: utf-8 -*-
+"""
+Ендпоінти для управління довідником "Типи Користувачів".
+
+Дозволяє створювати, отримувати, оновлювати та видаляти типи користувачів.
+Доступ до операцій створення, оновлення та видалення обмежений для суперкористувачів.
+Перегляд списку та окремих елементів доступний автентифікованим користувачам.
+"""
+from typing import List  # Any не використовується, можна прибрати
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.src.core.dependencies import get_db_session, get_current_active_superuser
-from app.src.models.dictionaries import UserType as UserTypeModel
-from app.src.schemas.dictionaries import UserTypeCreate, UserTypeUpdate, UserTypeResponse
-from app.src.services.dictionaries import UserTypeService
-from app.src.repositories.dictionaries import UserTypeRepository
-from app.src.core.pagination import PagedResponse, PageParams
-from app.src.core.dependencies import paginator
-# from app.src.models.auth import User as UserModel # Для доступу на основі ролей
+# Повні шляхи імпорту
+from backend.app.src.api.dependencies import get_api_db_session, get_current_active_superuser, get_current_active_user, \
+    paginator
+from backend.app.src.models.auth.user import User as UserModel
+from backend.app.src.schemas.dictionaries.user_types import UserTypeCreate, UserTypeUpdate, UserTypeResponse
+from backend.app.src.services.dictionaries.user_types import UserTypeService
+# from backend.app.src.repositories.dictionaries import UserTypeRepository # Видалено
+from backend.app.src.core.pagination import PagedResponse, PageParams
+from backend.app.src.config.logging import logger  # Централізований логер
 
 router = APIRouter(
-    prefix="/user-types",
-    tags=["Dictionary - User Types"],
-    dependencies=[Depends(get_current_active_superuser)] # TODO: Налаштувати дозволи
+    # Префікс /user-types буде додано в __init__.py батьківського роутера
+    # Теги також успадковуються/додаються звідти
 )
 
+
 # Залежність для отримання UserTypeService
-async def get_user_type_service(session: AsyncSession = Depends(get_db_session)) -> UserTypeService:
+async def get_user_type_service(session: AsyncSession = Depends(get_api_db_session)) -> UserTypeService:
     """
-    Залежність для отримання екземпляра UserTypeService.
+    Залежність FastAPI для отримання екземпляра UserTypeService.
     """
-    return UserTypeService(UserTypeRepository(session))
+    return UserTypeService(db_session=session)  # Використовуємо db_session напряму
+
 
 @router.post(
     "/",
     response_model=UserTypeResponse,
     status_code=status.HTTP_201_CREATED,
-    summary="Створити новий тип користувача",
-    description="Дозволяє суперкористувачу створювати новий тип користувача.",
+    summary="Створити новий тип користувача",  # i18n
+    description="Дозволяє суперкористувачу створювати новий тип користувача.",  # i18n
+    dependencies=[Depends(get_current_active_superuser)]  # Тільки суперюзер
 )
 async def create_user_type(
-    user_type_in: UserTypeCreate,
-    service: UserTypeService = Depends(get_user_type_service),
-) -> UserTypeModel:
+        user_type_in: UserTypeCreate,
+        service: UserTypeService = Depends(get_user_type_service),
+        current_user: UserModel = Depends(get_current_active_superuser)
+) -> UserTypeResponse:
     """
-    Створити новий тип користувача.
+    Створює новий тип користувача.
+    Доступно тільки суперкористувачам.
     """
-    return await service.create(obj_in=user_type_in)
+    logger.info(
+        f"Спроба створення типу користувача '{user_type_in.name}' (код: {user_type_in.code}) користувачем ID '{current_user.id}'.")
+    try:
+        # TODO: Перевірити, чи модель UserType має created_by_user_id і чи BaseDictionaryService це обробляє.
+        created_item = await service.create(data=user_type_in)
+        return created_item
+    except ValueError as e:
+        logger.warning(f"Помилка створення типу користувача '{user_type_in.name}': {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка при створенні '{user_type_in.name}': {e}", exc_info=True)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутрішня помилка сервера.")
+
 
 @router.get(
     "/{user_type_id}",
     response_model=UserTypeResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Отримати тип користувача за ID",
-    description="Дозволяє автентифікованим користувачам отримувати конкретний тип користувача. (TODO: Перевірити дозволи)",
+    summary="Отримати тип користувача за ID",  # i18n
+    description="Дозволяє автентифікованим користувачам отримувати інформацію про конкретний тип користувача.",  # i18n
+    dependencies=[Depends(get_current_active_user)]  # Будь-який активний користувач
 )
 async def get_user_type(
-    user_type_id: UUID,
-    service: UserTypeService = Depends(get_user_type_service),
-    # current_user: UserModel = Depends(get_current_active_user) # TODO: Налаштувати
-) -> UserTypeModel:
+        user_type_id: UUID,
+        service: UserTypeService = Depends(get_user_type_service),
+) -> UserTypeResponse:
     """
-    Отримати тип користувача за його ID.
+    Отримує тип користувача за його ID.
+    Доступно будь-якому автентифікованому користувачеві.
     """
-    db_user_type = await service.get_by_id(obj_id=user_type_id)
-    if not db_user_type:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип користувача не знайдено")
-    return db_user_type
+    logger.debug(f"Запит на отримання типу користувача за ID: {user_type_id}")
+    db_item = await service.get_by_id(item_id=user_type_id)
+    if not db_item:
+        logger.warning(f"Тип користувача з ID '{user_type_id}' не знайдено.")
+        # i18n
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип користувача не знайдено.")
+    return db_item
+
 
 @router.get(
     "/",
     response_model=PagedResponse[UserTypeResponse],
-    status_code=status.HTTP_200_OK,
-    summary="Отримати всі типи користувачів",
-    description="Дозволяє автентифікованим користувачам отримувати сторінковий список типів користувачів. (TODO: Перевірити дозволи)",
+    summary="Отримати список всіх типів користувачів",  # i18n
+    description="Дозволяє автентифікованим користувачам отримувати сторінковий список всіх типів користувачів.",  # i18n
+    dependencies=[Depends(get_current_active_user)]  # Будь-який активний користувач
 )
 async def get_all_user_types(
-    page_params: PageParams = Depends(paginator),
-    service: UserTypeService = Depends(get_user_type_service),
-    # current_user: UserModel = Depends(get_current_active_user) # TODO: Налаштувати
-) -> PagedResponse[UserTypeModel]:
+        page_params: PageParams = Depends(paginator),
+        service: UserTypeService = Depends(get_user_type_service),
+) -> PagedResponse[UserTypeResponse]:
     """
-    Отримати всі типи користувачів з пагінацією.
+    Отримує всі типи користувачів з пагінацією.
+    Доступно будь-якому автентифікованому користувачеві.
     """
-    user_types = await service.get_multi(
-        skip=page_params.skip,
-        limit=page_params.limit,
-        sort=page_params.sort,
-        sort_by=page_params.sort_by
+    logger.debug(
+        f"Запит на отримання списку типів користувачів: сторінка {page_params.page}, розмір {page_params.size}")
+    items_page = await service.get_all(skip=page_params.skip, limit=page_params.limit)
+    # TODO: Реалізувати метод count_all() в BaseDictionaryService для коректної пагінації.
+    total_count = await service.count_all()
+
+    return PagedResponse(
+        results=items_page,
+        total=total_count,
+        page=page_params.page,
+        size=page_params.size
     )
-    count = await service.count()
-    return PagedResponse(results=user_types, total=count, page=page_params.page, size=page_params.size)
+
 
 @router.put(
     "/{user_type_id}",
     response_model=UserTypeResponse,
-    status_code=status.HTTP_200_OK,
-    summary="Оновити тип користувача",
-    description="Дозволяє суперкористувачу оновлювати існуючий тип користувача.",
+    summary="Оновити тип користувача",  # i18n
+    description="Дозволяє суперкористувачу оновлювати існуючий тип користувача.",  # i18n
+    dependencies=[Depends(get_current_active_superuser)]  # Тільки суперюзер
 )
 async def update_user_type(
-    user_type_id: UUID,
-    user_type_in: UserTypeUpdate,
-    service: UserTypeService = Depends(get_user_type_service),
-) -> UserTypeModel:
+        user_type_id: UUID,
+        user_type_in: UserTypeUpdate,
+        service: UserTypeService = Depends(get_user_type_service),
+        current_user: UserModel = Depends(get_current_active_superuser)
+) -> UserTypeResponse:
     """
-    Оновити існуючий тип користувача.
+    Оновлює існуючий тип користувача.
+    Доступно тільки суперкористувачам.
+    TODO: Додати перевірку, чи не змінюються системні типи (наприклад, SUPERUSER_TYPE), якщо це заборонено.
     """
-    db_user_type = await service.get_by_id(obj_id=user_type_id)
-    if not db_user_type:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип користувача не знайдено")
-    return await service.update(obj_db=db_user_type, obj_in=user_type_in)
+    logger.info(f"Спроба оновлення типу користувача ID '{user_type_id}' користувачем ID '{current_user.id}'.")
+    try:
+        # TODO: Перевірити, чи модель UserType має updated_by_user_id і чи BaseDictionaryService це обробляє.
+        updated_item = await service.update(item_id=user_type_id, data=user_type_in)
+        if not updated_item:
+            logger.warning(f"Тип користувача з ID '{user_type_id}' не знайдено для оновлення.")
+            # i18n
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип користувача не знайдено.")
+        return updated_item
+    except ValueError as e:
+        logger.warning(f"Помилка оновлення типу користувача ID '{user_type_id}': {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка при оновленні типу ID '{user_type_id}': {e}", exc_info=True)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутрішня помилка сервера.")
+
 
 @router.delete(
     "/{user_type_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Видалити тип користувача",
-    description="Дозволяє суперкористувачу видалити тип користувача. (Жорстке видалення)", # TODO: Підтвердити вимогу щодо м'якого видалення
+    summary="Видалити тип користувача",  # i18n
+    description="Дозволяє суперкористувачу видалити тип користувача. Виконується жорстке видалення.",  # i18n
+    dependencies=[Depends(get_current_active_superuser)]  # Тільки суперюзер
 )
 async def delete_user_type(
-    user_type_id: UUID,
-    service: UserTypeService = Depends(get_user_type_service),
-) -> None:
+        user_type_id: UUID,
+        service: UserTypeService = Depends(get_user_type_service),
+        current_user: UserModel = Depends(get_current_active_superuser)
+):
     """
-    Видалити тип користувача за його ID.
+    Видаляє тип користувача за його ID.
+    Доступно тільки суперкористувачам.
+    TODO: Додати перевірку, чи не видаляються системні типи (наприклад, SUPERUSER_TYPE), якщо це заборонено.
     """
-    db_user_type = await service.get_by_id(obj_id=user_type_id)
-    if not db_user_type:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип користувача не знайдено")
-    await service.delete(obj_id=user_type_id)
+    logger.info(f"Спроба видалення типу користувача ID '{user_type_id}' користувачем ID '{current_user.id}'.")
+    try:
+        deleted = await service.delete(item_id=user_type_id)
+        if not deleted:
+            logger.warning(f"Тип користувача з ID '{user_type_id}' не знайдено для видалення.")
+            # i18n
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип користувача не знайдено.")
+    except ValueError as e:  # Наприклад, якщо об'єкт використовується
+        logger.warning(f"Помилка видалення типу користувача ID '{user_type_id}': {e}")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(e))  # i18n
+    except Exception as e:
+        logger.error(f"Неочікувана помилка при видаленні типу ID '{user_type_id}': {e}", exc_info=True)
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутрішня помилка сервера.")
+
     return None
 
-# TODO: Розглянути можливість додавання ендпоінта get_user_type_by_code, якщо потрібно.
+
+logger.info(f"Роутер для довідника '{router.prefix}' (Типи Користувачів) визначено.")

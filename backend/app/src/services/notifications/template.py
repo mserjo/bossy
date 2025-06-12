@@ -7,14 +7,14 @@ from sqlalchemy.future import select
 
 # Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
-from backend.app.src.models.notifications.template import NotificationTemplate # Модель SQLAlchemy
-from backend.app.src.schemas.notifications.template import ( # Схеми Pydantic
+from backend.app.src.models.notifications.template import NotificationTemplate  # Модель SQLAlchemy
+from backend.app.src.schemas.notifications.template import (  # Схеми Pydantic
     NotificationTemplateCreate,
     NotificationTemplateUpdate,
     NotificationTemplateResponse,
 )
-from backend.app.src.config.logging import logger # Централізований логер
-from backend.app.src.config import settings # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
 # TODO: Додати jinja2 до залежностей проекту, якщо ще не додано (pip install Jinja2)
 try:
@@ -23,18 +23,23 @@ except ImportError:
     logger.error("Jinja2 не встановлено. Функціонал рендерингу шаблонів не працюватиме.")
     # Можна встановити заглушку або кидати помилку при спробі використання, якщо Jinja2 критично важливий.
     # Для прикладу, залишимо як є, але в реальному проекті це треба обробити.
-    StrictUndefined = type('StrictUndefined', (), {}) # Мінімальна заглушка, щоб код не падав при імпорті
+    StrictUndefined = type('StrictUndefined', (), {})  # Мінімальна заглушка, щоб код не падав при імпорті
     UndefinedError = type('UndefinedError', (Exception,), {})
     TemplateSyntaxError = type('TemplateSyntaxError', (Exception,), {})
-    class Environment: # Заглушка для Environment
+
+
+    class Environment:  # Заглушка для Environment
         def __init__(self, *args, **kwargs): pass
+
         def from_string(self, template_string):
             class MockTemplate:
                 def render(self, context): return f"Jinja2 не доступний. Необроблений шаблон: {template_string}"
+
             return MockTemplate()
 
 
-class NotificationTemplateService(BaseDictionaryService[NotificationTemplate, NotificationTemplateCreate, NotificationTemplateUpdate, NotificationTemplateResponse]):
+class NotificationTemplateService(BaseDictionaryService[
+                                      NotificationTemplate, NotificationTemplateCreate, NotificationTemplateUpdate, NotificationTemplateResponse]):
     """
     Сервіс для управління елементами довідника "Шаблони Сповіщень".
     Шаблони визначають структуру та стандартний вміст для різних типів сповіщень
@@ -55,11 +60,10 @@ class NotificationTemplateService(BaseDictionaryService[NotificationTemplate, No
         logger.info(f"NotificationTemplateService ініціалізовано для моделі: {self._model_name}")
         # Налаштування середовища Jinja2
         self.jinja_env = Environment(
-            autoescape=select_autoescape(['html', 'xml']), # Базове автоекранування
-            undefined=StrictUndefined, # Кидати помилку для невизначених змінних
-            enable_async=True # Для потенційного асинхронного рендерингу/фільтрів у майбутньому
+            autoescape=select_autoescape(['html', 'xml']),  # Базове автоекранування
+            undefined=StrictUndefined,  # Кидати помилку для невизначених змінних
+            enable_async=True  # Для потенційного асинхронного рендерингу/фільтрів у майбутньому
         )
-
 
     async def get_template_by_name(self, name: str) -> Optional[NotificationTemplateResponse]:
         """
@@ -85,20 +89,20 @@ class NotificationTemplateService(BaseDictionaryService[NotificationTemplate, No
         #  має бути більш гнучким щодо поля для унікального рядкового ідентифікатора.
         #  Поки що, реалізуємо прямий запит за полем 'name'.
 
-        stmt = select(self.model).where(self.model.name == name) # type: ignore
+        stmt = select(self.model).where(self.model.name == name)  # type: ignore
         item_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
         if item_db:
             logger.info(f"{self._model_name} з ім'ям '{name}' знайдено.")
-            return self.response_schema.model_validate(item_db) # Pydantic v2
+            return self.response_schema.model_validate(item_db)  # Pydantic v2
         logger.info(f"{self._model_name} з ім'ям '{name}' не знайдено.")
         return None
 
     async def list_templates_by_type(
-        self,
-        template_type: str, # Наприклад, 'EMAIL', 'SMS', 'PUSH'
-        skip: int = 0,
-        limit: int = 100
+            self,
+            template_type: str,  # Наприклад, 'EMAIL', 'SMS', 'PUSH'
+            skip: int = 0,
+            limit: int = 100
     ) -> List[NotificationTemplateResponse]:
         """
         Перелічує всі шаблони сповіщень вказаного типу.
@@ -115,19 +119,19 @@ class NotificationTemplateService(BaseDictionaryService[NotificationTemplate, No
             return []
 
         stmt = select(self.model).where(self.model.template_type == template_type) \
-             .order_by(self.model.name).offset(skip).limit(limit) # type: ignore
+            .order_by(self.model.name).offset(skip).limit(limit)  # type: ignore
 
         templates_db = (await self.db_session.execute(stmt)).scalars().all()
 
-        response_list = [self.response_schema.model_validate(t) for t in templates_db] # Pydantic v2
+        response_list = [self.response_schema.model_validate(t) for t in templates_db]  # Pydantic v2
         logger.info(f"Отримано {len(response_list)} шаблонів сповіщень типу '{template_type}'.")
         return response_list
 
     def render_template(
             self,
-            template_content: NotificationTemplateResponse, # Використовуємо Pydantic модель як джерело шаблонів
+            template_content: NotificationTemplateResponse,  # Використовуємо Pydantic модель як джерело шаблонів
             context: Dict[str, Any]
-        ) -> Tuple[Optional[str], str]:
+    ) -> Tuple[Optional[str], str]:
         """
         Рендерить тему та тіло шаблону з наданим контекстом, використовуючи Jinja2.
         Це синхронний метод, оскільки рендеринг Jinja2 є CPU-bound операцією.
@@ -162,18 +166,18 @@ class NotificationTemplateService(BaseDictionaryService[NotificationTemplate, No
             logger.error(err_msg, exc_info=True)
             # Можна кинути кастомний виняток або повернути помилку
             raise ValueError(err_msg)
-        except UndefinedError as e: # Jinja2 StrictUndefined кидає UndefinedError
+        except UndefinedError as e:  # Jinja2 StrictUndefined кидає UndefinedError
             # i18n
             err_msg = f"Відсутня змінна в контексті для шаблону '{template_name}': {e.message}"
             logger.error(err_msg, exc_info=True)
-            raise KeyError(err_msg) # KeyError може бути більш доречним для відсутніх змінних
-        except Exception as e: # Інші можливі помилки під час рендерингу
+            raise KeyError(err_msg)  # KeyError може бути більш доречним для відсутніх змінних
+        except Exception as e:  # Інші можливі помилки під час рендерингу
             # i18n
             err_msg = f"Помилка рендерингу шаблону '{template_name}': {e}"
             logger.error(err_msg, exc_info=True)
             # Для надійності системи сповіщень, можна повернути запасне повідомлення
-            fallback_body = f"Помилка відображення сповіщення '{template_name}'. Будь ласка, зв'яжіться з підтримкою. Деталі: {str(e)}" # i18n
-            fallback_subject = f"Помилка сповіщення: {template_name}" if template_content.subject_template else None # i18n
+            fallback_body = f"Помилка відображення сповіщення '{template_name}'. Будь ласка, зв'яжіться з підтримкою. Деталі: {str(e)}"  # i18n
+            fallback_subject = f"Помилка сповіщення: {template_name}" if template_content.subject_template else None  # i18n
             return fallback_subject, fallback_body
 
     # CRUD операції (create, update, delete, get_by_id, get_all) успадковуються з BaseDictionaryService.
@@ -182,5 +186,6 @@ class NotificationTemplateService(BaseDictionaryService[NotificationTemplate, No
     # або якщо логіка перевірки унікальності в BaseDictionaryService налаштована на поле 'name'.
     # Поточна BaseDictionaryService перевіряє 'code' та 'name' якщо вони є в схемі даних.
     # Для NotificationTemplate, 'name' слугує як унікальний ідентифікатор.
+
 
 logger.debug(f"{NotificationTemplateService.__name__} (сервіс шаблонів сповіщень) успішно визначено.")

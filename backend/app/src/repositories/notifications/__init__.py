@@ -10,9 +10,9 @@
 інтерфейс для роботи з конкретною моделлю даних.
 """
 
-from .notification_template_repository import NotificationTemplateRepository
-from .notification_repository import NotificationRepository
-from .delivery_attempt_repository import NotificationDeliveryAttemptRepository
+from backend.app.src.repositories.notifications.notification_template_repository import NotificationTemplateRepository
+from backend.app.src.repositories.notifications.notification_repository import NotificationRepository
+from backend.app.src.repositories.notifications.delivery_attempt_repository import NotificationDeliveryAttemptRepository
 
 __all__ = [
     "NotificationTemplateRepository",

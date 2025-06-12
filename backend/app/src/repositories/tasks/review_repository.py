@@ -1,4 +1,4 @@
-# /backend/app/src/repositories/tasks/review_repository.py
+# backend/app/src/repositories/tasks/review_repository.py
 """
 Репозиторій для моделі "Відгук на Завдання" (TaskReview).
 
@@ -17,9 +17,7 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.tasks.review import TaskReview
 from backend.app.src.schemas.tasks.review import TaskReviewCreateSchema, TaskReviewUpdateSchema
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
-logger = get_logger(__name__)
+from backend.app.src.config import logger  # Використання спільного логера
 
 
 class TaskReviewRepository(BaseRepository[TaskReview, TaskReviewCreateSchema, TaskReviewUpdateSchema]):
@@ -32,40 +30,52 @@ class TaskReviewRepository(BaseRepository[TaskReview, TaskReviewCreateSchema, Ta
     та списку всіх відгуків для конкретного завдання.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self):
         """
         Ініціалізує репозиторій для моделі `TaskReview`.
-
-        Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        super().__init__(db_session=db_session, model=TaskReview)
+        super().__init__(model=TaskReview)
+        logger.info(f"Репозиторій для моделі '{self.model.__name__}' ініціалізовано.")
 
-    async def get_by_task_and_user(self, task_id: int, user_id: int) -> Optional[TaskReview]:
+    async def get_by_task_and_user(
+            self, session: AsyncSession, task_id: int, user_id: int
+    ) -> Optional[TaskReview]:
         """
         Отримує відгук, залишений конкретним користувачем на конкретне завдання.
         Передбачається, що користувач може залишити лише один відгук на одне завдання
         (забезпечується UniqueConstraint в моделі).
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             task_id (int): ID завдання.
             user_id (int): ID користувача, який залишив відгук.
 
         Returns:
             Optional[TaskReview]: Екземпляр моделі `TaskReview`, якщо знайдено, інакше None.
         """
+        logger.debug(f"Отримання TaskReview для task_id {task_id}, user_id {user_id}")
         stmt = select(self.model).where(
             self.model.task_id == task_id,
             self.model.user_id == user_id
         )
-        result = await self.db_session.execute(stmt)
-        return result.scalar_one_or_none()
+        try:
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(
+                f"Помилка при отриманні TaskReview для task_id {task_id}, user_id {user_id}: {e}",
+                exc_info=True
+            )
+            return None
 
-    async def get_reviews_for_task(self, task_id: int, skip: int = 0, limit: int = 100) -> Tuple[List[TaskReview], int]:
+    async def get_reviews_for_task(
+            self, session: AsyncSession, task_id: int, skip: int = 0, limit: int = 100
+    ) -> Tuple[List[TaskReview], int]:
         """
         Отримує список всіх відгуків для вказаного завдання з пагінацією.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             task_id (int): ID завдання.
             skip (int): Кількість записів для пропуску.
             limit (int): Максимальна кількість записів для повернення.
@@ -73,10 +83,22 @@ class TaskReviewRepository(BaseRepository[TaskReview, TaskReviewCreateSchema, Ta
         Returns:
             Tuple[List[TaskReview], int]: Кортеж зі списком відгуків та їх загальною кількістю.
         """
-        filters = [self.model.task_id == task_id]
-        order_by = [self.model.created_at.desc()]  # Показувати новіші відгуки першими
+        logger.debug(f"Отримання відгуків для task_id: {task_id}, skip: {skip}, limit: {limit}")
+        filters_dict: Dict[str, Any] = {"task_id": task_id}
+        sort_by_field = "created_at"
+        sort_order_str = "desc"  # Показувати новіші відгуки першими
         # options = [selectinload(self.model.user)] # Жадібне завантаження автора відгуку
-        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)  # , options=options)
+        try:
+            items = await super().get_multi(
+                session=session, skip=skip, limit=limit, filters=filters_dict,
+                sort_by=sort_by_field, sort_order=sort_order_str #, options=options
+            )
+            total_count = await super().count(session=session, filters=filters_dict)
+            logger.debug(f"Знайдено {total_count} відгуків для task_id: {task_id}")
+            return items, total_count
+        except Exception as e:
+            logger.error(f"Помилка при отриманні відгуків для task_id {task_id}: {e}", exc_info=True)
+            return [], 0
 
 
 if __name__ == "__main__":

@@ -15,9 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
-logger = get_logger(__name__)
+from backend.app.src.config import logger # Використання спільного логера
 
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.notifications.notification import Notification
@@ -38,17 +36,16 @@ class NotificationRepository(BaseRepository[Notification, NotificationCreateSche
     методи для отримання сповіщень для користувача, позначки їх як прочитаних.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self):
         """
         Ініціалізує репозиторій для моделі `Notification`.
-
-        Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        super().__init__(db_session=db_session, model=Notification)
+        super().__init__(model=Notification)
+        logger.info(f"Репозиторій для моделі '{self.model.__name__}' ініціалізовано.")
 
     async def get_notifications_for_user(
             self,
+            session: AsyncSession,
             user_id: int,
             *,
             is_read: Optional[bool] = None,
@@ -60,33 +57,56 @@ class NotificationRepository(BaseRepository[Notification, NotificationCreateSche
         Отримує список сповіщень для вказаного користувача з пагінацією та фільтрами.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             user_id (int): ID користувача.
             is_read (Optional[bool]): Фільтр за статусом прочитання.
-            notification_type (Optional[str]): Фільтр за типом сповіщення
-                                               (значення з `core.dicts.NotificationType`).
+            notification_type (Optional[str]): Фільтр за типом сповіщення.
+                                               # TODO: [Enum Validation] Переконатися, що notification_type
+                                               #       передається як Enum.value або валідується згідно з
+                                               #       `technical_task.txt` / `core.enums`.
             skip (int): Кількість записів для пропуску.
             limit (int): Максимальна кількість записів для повернення.
 
         Returns:
             Tuple[List[Notification], int]: Кортеж зі списком сповіщень та їх загальною кількістю.
         """
-        filters = [self.model.user_id == user_id]
+        logger.debug(
+            f"Отримання сповіщень для user_id {user_id}, is_read: {is_read}, type: {notification_type}, "
+            f"skip: {skip}, limit: {limit}"
+        )
+        filters_dict: Dict[str, Any] = {"user_id": user_id}
         if is_read is not None:
-            filters.append(self.model.is_read == is_read)
+            filters_dict["is_read"] = is_read
         if notification_type is not None:
-            # TODO: Переконатися, що notification_type передається як Enum.value або валідується
-            filters.append(self.model.notification_type == notification_type)
+            filters_dict["notification_type"] = notification_type
 
-        order_by = [self.model.created_at.desc()]  # Новіші сповіщення першими
+        sort_by_field = "created_at"
+        sort_order_str = "desc"  # Новіші сповіщення першими
 
         # options = [selectinload(self.model.template)] # Приклад жадібного завантаження
-        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)  # , options=options)
+        try:
+            items = await super().get_multi(
+                session=session,
+                skip=skip,
+                limit=limit,
+                filters=filters_dict,
+                sort_by=sort_by_field,
+                sort_order=sort_order_str
+                # options=options
+            )
+            total_count = await super().count(session=session, filters=filters_dict)
+            logger.debug(f"Знайдено {total_count} сповіщень для user_id {user_id} з фільтрами.")
+            return items, total_count
+        except Exception as e:
+            logger.error(f"Помилка при отриманні сповіщень для user_id {user_id}: {e}", exc_info=True)
+            return [], 0
 
-    async def mark_as_read(self, notification_id: int, user_id: int) -> Optional[Notification]:
+    async def mark_as_read(self, session: AsyncSession, notification_id: int, user_id: int) -> Optional[Notification]:
         """
         Позначає конкретне сповіщення як прочитане для вказаного користувача.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             notification_id (int): ID сповіщення, яке потрібно позначити як прочитане.
             user_id (int): ID користувача, для якого позначається сповіщення (для перевірки прав).
 
@@ -94,40 +114,65 @@ class NotificationRepository(BaseRepository[Notification, NotificationCreateSche
             Optional[Notification]: Оновлений екземпляр сповіщення, якщо операція успішна
                                     і сповіщення належало користувачеві та не було вже прочитане.
                                     None, якщо сповіщення не знайдено, не належить користувачеві,
-                                    або вже було прочитане.
+                                    або вже було прочитане, або у разі помилки.
         """
-        db_obj = await self.get(notification_id)
+        logger.debug(f"Позначення сповіщення ID {notification_id} як прочитаного для user_id {user_id}")
+        try:
+            db_obj = await super().get(session, notification_id)
 
-        if db_obj and db_obj.user_id == user_id and not db_obj.is_read:
-            update_data = {
-                "is_read": True,
-                "read_at": datetime.now(timezone.utc)
-            }
-            # Використовуємо успадкований метод update, передаючи словник
-            return await super().update(db_obj=db_obj, obj_in=update_data)
+            if db_obj and db_obj.user_id == user_id and not db_obj.is_read:
+                update_data = {
+                    "is_read": True,
+                    "read_at": datetime.now(timezone.utc)
+                }
+                updated_notification = await super().update(session, db_obj=db_obj, obj_in=update_data)
+                logger.info(f"Сповіщення ID {notification_id} позначено як прочитане для user_id {user_id}.")
+                return updated_notification
+            elif db_obj:
+                logger.warning(
+                    f"Сповіщення ID {notification_id} для user_id {user_id} не оновлено: "
+                    f"is_owner={db_obj.user_id == user_id}, is_unread={not db_obj.is_read}"
+                )
+            else:
+                logger.warning(f"Сповіщення ID {notification_id} не знайдено для user_id {user_id}.")
+            return None
+        except Exception as e:
+            logger.error(
+                f"Помилка при позначенні сповіщення ID {notification_id} як прочитаного: {e}",
+                exc_info=True
+            )
+            return None
 
-        # logger.warning(f"Сповіщення ID {notification_id} не знайдено для користувача ID {user_id} або вже прочитано.")
-        return None  # Або повернути db_obj, якщо він знайдений, але не оновлений
-
-    async def mark_all_as_read_for_user(self, user_id: int) -> int:
+    async def mark_all_as_read_for_user(self, session: AsyncSession, user_id: int) -> int:
         """
         Позначає всі непрочитані сповіщення для вказаного користувача як прочитані.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             user_id (int): ID користувача.
 
         Returns:
             int: Кількість сповіщень, позначених як прочитані.
         """
+        logger.debug(f"Позначення всіх сповіщень як прочитаних для user_id {user_id}")
         stmt = (
             sqlalchemy_update(self.model)
             .where(self.model.user_id == user_id, self.model.is_read == False)
             .values(is_read=True, read_at=datetime.now(timezone.utc))
-            # .execution_options(synchronize_session=False) # Може бути потрібно для деяких діалектів/ситуацій
         )
-        result = await self.db_session.execute(stmt)
-        await self.db_session.commit()
-        # logger.info(f"{result.rowcount} сповіщень позначено як прочитані для користувача ID {user_id}.")
+        try:
+            async with session.begin_nested() if session.in_transaction() else session.begin():
+                result = await session.execute(stmt)
+                # await session.commit() # Commit керується контекстним менеджером або зовнішньою транзакцією
+            rowcount = result.rowcount
+            logger.info(f"{rowcount} сповіщень позначено як прочитані для користувача ID {user_id}.")
+            return rowcount
+        except Exception as e:
+            logger.error(
+                f"Помилка при позначенні всіх сповіщень як прочитаних для user_id {user_id}: {e}",
+                exc_info=True
+            )
+            return 0
         return result.rowcount
 
 

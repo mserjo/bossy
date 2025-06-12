@@ -7,7 +7,7 @@
 отримання рахунку за парою користувач-група та оновлення балансу.
 """
 
-from typing import List, Optional, Tuple, Any
+from typing import List, Optional, Tuple, Dict, Any
 from decimal import Decimal
 
 from sqlalchemy import select, func, update as sqlalchemy_update  # update для атомарного оновлення
@@ -19,13 +19,9 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.bonuses.account import UserAccount
 from backend.app.src.schemas.bonuses.account import UserAccountCreateSchema, UserAccountUpdateSchema
-from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.config import logging # Імпорт logging з конфігурації
 # Отримання логера для цього модуля
-logger = get_logger(__name__)
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 class UserAccountRepository(BaseRepository[UserAccount, UserAccountCreateSchema, UserAccountUpdateSchema]):
     """
@@ -35,40 +31,51 @@ class UserAccountRepository(BaseRepository[UserAccount, UserAccountCreateSchema,
     додаткові методи для роботи з рахунками.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self):
         """
         Ініціалізує репозиторій для моделі `UserAccount`.
-
-        Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        super().__init__(db_session=db_session, model=UserAccount)
+        super().__init__(model=UserAccount)
+        logger.info(f"Репозиторій для моделі '{self.model.__name__}' ініціалізовано.")
 
-    async def get_by_user_and_group(self, user_id: int, group_id: int) -> Optional[UserAccount]:
+    async def get_by_user_and_group(
+            self, session: AsyncSession, user_id: int, group_id: int
+    ) -> Optional[UserAccount]:
         """
         Отримує запис рахунку за ID користувача та ID групи.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             user_id (int): ID користувача.
             group_id (int): ID групи.
 
         Returns:
             Optional[UserAccount]: Екземпляр моделі `UserAccount`, якщо знайдено, інакше None.
         """
+        logger.debug(f"Отримання UserAccount для user_id: {user_id}, group_id: {group_id}")
         stmt = select(self.model).where(
             self.model.user_id == user_id,
             self.model.group_id == group_id
         )
-        result = await self.db_session.execute(stmt)
-        return result.scalar_one_or_none()
+        try:
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(
+                f"Помилка при отриманні UserAccount для user_id {user_id}, group_id {group_id}: {e}",
+                exc_info=True
+            )
+            return None
 
-    async def get_accounts_for_user(self, user_id: int, skip: int = 0, limit: int = 100) -> Tuple[
-        List[UserAccount], int]:
+    async def get_accounts_for_user(
+            self, session: AsyncSession, user_id: int, skip: int = 0, limit: int = 100
+    ) -> Tuple[List[UserAccount], int]:
         """
         Отримує список всіх рахунків для вказаного користувача з пагінацією.
         (Користувач може мати рахунки в різних групах).
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             user_id (int): ID користувача.
             skip (int): Кількість записів для пропуску.
             limit (int): Максимальна кількість записів для повернення.
@@ -76,16 +83,28 @@ class UserAccountRepository(BaseRepository[UserAccount, UserAccountCreateSchema,
         Returns:
             Tuple[List[UserAccount], int]: Кортеж зі списком рахунків та їх загальною кількістю.
         """
-        filters = [self.model.user_id == user_id]
+        logger.debug(f"Отримання рахунків для user_id: {user_id}, skip: {skip}, limit: {limit}")
+        filters_dict: Dict[str, Any] = {"user_id": user_id}
         # options = [selectinload(self.model.group)] # Жадібне завантаження групи
-        return await self.get_multi(skip=skip, limit=limit, filters=filters)  # , options=options)
+        try:
+            items = await super().get_multi(
+                session=session, skip=skip, limit=limit, filters=filters_dict #, options=options
+            )
+            total_count = await super().count(session=session, filters=filters_dict)
+            logger.debug(f"Знайдено {total_count} рахунків для user_id: {user_id}")
+            return items, total_count
+        except Exception as e:
+            logger.error(f"Помилка при отриманні рахунків для user_id {user_id}: {e}", exc_info=True)
+            return [], 0
 
-    async def get_accounts_for_group(self, group_id: int, skip: int = 0, limit: int = 100) -> Tuple[
-        List[UserAccount], int]:
+    async def get_accounts_for_group(
+            self, session: AsyncSession, group_id: int, skip: int = 0, limit: int = 100
+    ) -> Tuple[List[UserAccount], int]:
         """
         Отримує список всіх рахунків у вказаній групі з пагінацією.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             group_id (int): ID групи.
             skip (int): Кількість записів для пропуску.
             limit (int): Максимальна кількість записів для повернення.
@@ -93,11 +112,23 @@ class UserAccountRepository(BaseRepository[UserAccount, UserAccountCreateSchema,
         Returns:
             Tuple[List[UserAccount], int]: Кортеж зі списком рахунків та їх загальною кількістю.
         """
-        filters = [self.model.group_id == group_id]
+        logger.debug(f"Отримання рахунків для group_id: {group_id}, skip: {skip}, limit: {limit}")
+        filters_dict: Dict[str, Any] = {"group_id": group_id}
         # options = [selectinload(self.model.user)] # Жадібне завантаження користувача
-        return await self.get_multi(skip=skip, limit=limit, filters=filters)  # , options=options)
+        try:
+            items = await super().get_multi(
+                session=session, skip=skip, limit=limit, filters=filters_dict #, options=options
+            )
+            total_count = await super().count(session=session, filters=filters_dict)
+            logger.debug(f"Знайдено {total_count} рахунків для group_id: {group_id}")
+            return items, total_count
+        except Exception as e:
+            logger.error(f"Помилка при отриманні рахунків для group_id {group_id}: {e}", exc_info=True)
+            return [], 0
 
-    async def update_balance(self, account_id: int, amount_change: Decimal) -> Optional[UserAccount]:
+    async def update_balance(
+            self, session: AsyncSession, account_id: int, amount_change: Decimal
+    ) -> Optional[UserAccount]:
         """
         Атомарно оновлює баланс рахунку на вказану суму (може бути позитивною або від'ємною).
 
@@ -105,6 +136,7 @@ class UserAccountRepository(BaseRepository[UserAccount, UserAccountCreateSchema,
         що вимагають створення транзакційних записів, логіка має бути на сервісному рівні.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             account_id (int): ID рахунку для оновлення.
             amount_change (Decimal): Сума, на яку потрібно змінити баланс.
                                      Позитивна для збільшення, від'ємна для зменшення.
@@ -113,6 +145,7 @@ class UserAccountRepository(BaseRepository[UserAccount, UserAccountCreateSchema,
             Optional[UserAccount]: Оновлений екземпляр UserAccount, якщо операція успішна і запис знайдено,
                                    інакше None (якщо запис не знайдено або оновлення не відбулося).
         """
+        logger.debug(f"Оновлення балансу для рахунку ID: {account_id} на суму: {amount_change}")
         # TODO: Розглянути можливість використання select(for_update=True) для блокування рядка,
         #       якщо очікується висока конкуренція за оновлення одного рахунку.
         #       Однак, це може бути надмірним і краще обробляється на рівні транзакцій сервісу.
@@ -121,22 +154,30 @@ class UserAccountRepository(BaseRepository[UserAccount, UserAccountCreateSchema,
             sqlalchemy_update(self.model)
             .where(self.model.id == account_id)
             .values(balance=self.model.balance + amount_change)
-            .returning(self.model)  # Повертає оновлений запис
-            .execution_options(synchronize_session="fetch")  # Або "evaluate", або False з подальшим refresh
+            .returning(self.model)
+            .execution_options(synchronize_session="fetch")
         )
 
-        result = await self.db_session.execute(stmt)
-        await self.db_session.commit()  # Потрібен commit для persist змін від update
+        try:
+            async with session.begin_nested() if session.in_transaction() else session.begin():
+                result = await session.execute(stmt)
+                # Commit керується контекстним менеджером або зовнішньою транзакцією
 
-        updated_obj = result.scalar_one_or_none()
+            updated_obj = result.scalar_one_or_none()
 
-        if updated_obj:
-            # Якщо потрібно оновити екземпляр в поточній сесії (наприклад, якщо він вже завантажений)
-            # await self.db_session.refresh(updated_obj) # Не завжди потрібно, якщо synchronize_session="fetch"
-            # logger.info(f"Баланс рахунку ID {account_id} оновлено на {amount_change}. Новий баланс: {updated_obj.balance}")
-            pass
-        # else:
-        # logger.warning(f"Спроба оновити баланс для неіснуючого рахунку ID {account_id}")
+            if updated_obj:
+                logger.info(
+                    f"Баланс рахунку ID {account_id} оновлено на {amount_change}. "
+                    f"Новий баланс: {updated_obj.balance}"
+                )
+            else:
+                logger.warning(
+                    f"Спроба оновити баланс для неіснуючого рахунку ID {account_id} або оновлення не відбулося."
+                )
+            return updated_obj
+        except Exception as e:
+            logger.error(f"Помилка при оновленні балансу для рахунку {account_id}: {e}", exc_info=True)
+            # TODO: Розглянути підняття специфічного виключення
 
         return updated_obj
 

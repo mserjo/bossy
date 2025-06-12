@@ -10,11 +10,11 @@
 інтерфейс для роботи з конкретною моделлю даних.
 """
 
-from .level_repository import LevelRepository
-from .user_level_repository import UserLevelRepository
-from .badge_repository import BadgeRepository
-from .user_achievement_repository import UserAchievementRepository
-from .rating_repository import UserGroupRatingRepository
+from backend.app.src.repositories.gamification.level_repository import LevelRepository
+from backend.app.src.repositories.gamification.user_level_repository import UserLevelRepository
+from backend.app.src.repositories.gamification.badge_repository import BadgeRepository
+from backend.app.src.repositories.gamification.user_achievement_repository import UserAchievementRepository
+from backend.app.src.repositories.gamification.rating_repository import UserGroupRatingRepository
 
 __all__ = [
     "LevelRepository",

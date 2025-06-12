@@ -1,33 +1,38 @@
 # backend/app/src/services/groups/group.py
-# import logging # Замінено на централізований логер
-from typing import List, Optional, Any, Dict
+"""
+Сервіс для управління групами.
+
+Надає бізнес-логіку для створення, оновлення, видалення, отримання груп,
+а також для управління членством та іншими аспектами груп.
+"""
+from typing import List, Optional, Dict, Any # Tuple не використовується в сигнатурах
 from uuid import UUID
-from datetime import datetime, timezone  # Додано для updated_at
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload, joinedload, noload
+from sqlalchemy import select, func # Оновлено імпорт select, func може знадобитися
+from sqlalchemy.orm import selectinload, noload # joinedload видалено
 from sqlalchemy.exc import IntegrityError
 
 # Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.groups.group import Group  # Модель SQLAlchemy Group
-from backend.app.src.models.auth.user import User  # Для творця та членів
-from backend.app.src.models.dictionaries.group_types import GroupType  # Для типу групи
-from backend.app.src.models.groups.membership import GroupMembership  # Для додавання творця як адміна
-from backend.app.src.models.dictionaries.user_roles import UserRole  # Для ролі адміна за замовчуванням
-from backend.app.src.models.files.file import FileRecord  # Для icon_file
+from backend.app.src.models.groups.group import Group
+from backend.app.src.models.auth.user import User
+from backend.app.src.models.dictionaries.group_types import GroupType
+from backend.app.src.models.groups.membership import GroupMembership
+from backend.app.src.models.dictionaries.user_roles import UserRole
+from backend.app.src.models.files.file import FileRecord
 
-from backend.app.src.schemas.groups.group import (  # Схеми Pydantic Group
+from backend.app.src.schemas.groups.group import (
     GroupCreate,
     GroupUpdate,
     GroupResponse,
-    GroupDetailedResponse  # Розширена схема відповіді
+    GroupDetailedResponse
 )
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config import logger  # Використання спільного логера з конфігу
+from backend.app.src.config import settings
 
-# TODO: Визначити константу для коду ролі "ADMIN" в конфігурації або в спеціальному файлі констант.
+# TODO: [Configuration] Визначити константу для коду ролі "ADMIN" в конфігурації або в `core.constants`.
 ADMIN_ROLE_CODE = "ADMIN"
 
 
@@ -52,44 +57,47 @@ class GroupService(BaseService):
         :return: Pydantic схема GroupResponse або GroupDetailedResponse, або None, якщо не знайдено.
         """
         logger.debug(f"Спроба отримання групи за ID: {group_id}, include_details: {include_details}")
-
-        query = select(Group).where(Group.id == group_id)
-        if include_details:
-            query = query.options(
-                selectinload(Group.group_type),
-                selectinload(Group.icon_file),
-                selectinload(Group.created_by_user).options(selectinload(User.user_type)),
-                selectinload(Group.updated_by_user).options(selectinload(User.user_type)),
-                # Завантаження членів групи та їх деталей
-                selectinload(Group.members).options(
-                    selectinload(GroupMembership.user).options(
-                        selectinload(User.user_type),
-                        selectinload(User.roles)  # Ролі користувача в системі, не плутати з роллю в групі
+        try:
+            query = select(Group).where(Group.id == group_id)
+            if include_details:
+                query = query.options(
+                    selectinload(Group.group_type),
+                    selectinload(Group.icon_file),
+                    selectinload(Group.created_by_user).options(selectinload(User.user_type)),
+                    selectinload(Group.updated_by_user).options(selectinload(User.user_type)),
+                    selectinload(Group.members).options(
+                        selectinload(GroupMembership.user).options(
+                            selectinload(User.user_type),
+                            selectinload(User.roles)
+                        ),
+                        selectinload(GroupMembership.user_role)
                     ),
-                    selectinload(GroupMembership.user_role)  # Роль користувача в цій групі
-                ),
-                # TODO: Додати selectinload для Group.settings, якщо є прямий зв'язок і потрібно в GroupDetailedResponse
-                # selectinload(Group.settings),
-            )
-        else:  # Для звичайного GroupResponse можемо завантажити менше
-            query = query.options(
-                selectinload(Group.group_type),
-                selectinload(Group.icon_file),
-                selectinload(Group.created_by_user).options(noload("*"))
-                # Тільки ID, якщо UserResponse не потрібен повністю
-            )
+                    # TODO: [Feature] Додати selectinload для Group.settings, якщо є прямий зв'язок
+                    #       і це поле потрібно в GroupDetailedResponse.
+                    # selectinload(Group.settings),
+                )
+            else:
+                query = query.options(
+                    selectinload(Group.group_type),
+                    selectinload(Group.icon_file),
+                    selectinload(Group.created_by_user).options(noload("*"))
+                )
 
-        group_db = (await self.db_session.execute(query)).scalar_one_or_none()
+            group_db_result = await self.db_session.execute(query)
+            group_db = group_db_result.scalar_one_or_none()
 
-        if group_db:
-            logger.info(f"Групу з ID '{group_id}' знайдено.")
-            response_model = GroupDetailedResponse if include_details else GroupResponse
-            return response_model.model_validate(group_db)  # Pydantic v2
+            if group_db:
+                logger.info(f"Групу з ID '{group_id}' знайдено.")
+                response_model = GroupDetailedResponse if include_details else GroupResponse
+                return response_model.model_validate(group_db)
 
-        logger.info(f"Групу з ID '{group_id}' не знайдено.")
-        return None
+            logger.info(f"Групу з ID '{group_id}' не знайдено.")
+            return None
+        except Exception as e:
+            logger.error(f"Помилка при отриманні групи за ID {group_id}: {e}", exc_info=settings.DEBUG)
+            return None
 
-    async def create_group(self, group_create_data: GroupCreate, creator_id: UUID) -> GroupDetailedResponse:
+    async def create_group(self, group_create_data: GroupCreate, creator_id: UUID) -> GroupDetailedResponse: # type: ignore
         """
         Створює нову групу та встановлює творця як початкового адміністратора.
 

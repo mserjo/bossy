@@ -6,17 +6,15 @@
 та надає методи для роботи з довідником системних ролей користувачів.
 """
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 # Абсолютний імпорт базового репозиторію для довідників
 from backend.app.src.repositories.dictionaries.base_dict_repository import BaseDictionaryRepository
 
 # Абсолютний імпорт моделі та схем для Системних Ролей Користувачів
 from backend.app.src.models.dictionaries.user_roles import UserRole
 from backend.app.src.schemas.dictionaries.user_roles import UserRoleCreateSchema, UserRoleUpdateSchema
-from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.config import logging # Імпорт logging з конфігурації
 # Отримання логера для цього модуля
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class UserRoleRepository(BaseDictionaryRepository[UserRole, UserRoleCreateSchema, UserRoleUpdateSchema]):
@@ -27,17 +25,18 @@ class UserRoleRepository(BaseDictionaryRepository[UserRole, UserRoleCreateSchema
     від `BaseDictionaryRepository`.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self):
         """
         Ініціалізує репозиторій для моделі `UserRole`.
-
-        Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        super().__init__(db_session=db_session, model=UserRole)
+        super().__init__(model=UserRole)
+        logger.info(f"Репозиторій для моделі '{self.model.__name__}' ініціалізовано.")
 
     # Тут можна додати специфічні методи для UserRoleRepository, якщо вони потрібні.
     # Наприклад, отримання ролі "за замовчуванням для нового користувача" тощо.
+    # async def get_default_role(self, session: AsyncSession) -> Optional[UserRole]:
+    #     # логіка методу...
+    #     pass
 
 
 if __name__ == "__main__":

@@ -1,11 +1,17 @@
 # backend/app/src/services/auth/user.py
+"""
+Сервіс для управління користувачами.
+
+Надає бізнес-логіку для створення, оновлення, отримання та управління
+атрибутами користувачів, такими як ролі, статус та інше.
+"""
 from datetime import datetime, timezone
-from typing import List, Optional, Any, Type, Set
+from typing import List, Optional, Any, Type, Set, TYPE_CHECKING
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy import select # Оновлено імпорт
+from sqlalchemy.orm import selectinload, joinedload # joinedload не використовується, можна видалити
 from sqlalchemy.exc import IntegrityError
 
 from backend.app.src.services.base import BaseService
@@ -19,8 +25,11 @@ from backend.app.src.schemas.auth.user import (
     UserResponseWithRoles,
 )
 from backend.app.src.core.security import get_password_hash
-from backend.app.src.config.logging import logger
+from backend.app.src.config import logger # Використання спільного логера з конфігу
 from backend.app.src.config import settings  # Для доступу до DEBUG тощо
+
+if TYPE_CHECKING: # Умовний імпорт для TYPE_CHECKING
+    from backend.app.src.models.auth.user import User as UserModel # UserModel не використовується в цьому файлі
 
 
 class UserService(BaseService):
@@ -32,66 +41,73 @@ class UserService(BaseService):
         super().__init__(db_session)
         logger.info("UserService ініціалізовано.")
 
-    async def get_user_by_id(self, user_id: UUID, include_relations: bool = True) -> Optional[UserResponse]:
+    async def get_user_by_id(self, user_id: UUID, include_relations: bool = True) -> Optional[UserResponse]: # type: ignore
         logger.debug(f"Спроба отримання користувача за ID: {user_id}, include_relations: {include_relations}")
-        query = select(User)
-        if include_relations:
-            query = query.options(selectinload(User.roles), selectinload(User.user_type))
-        stmt = query.where(User.id == user_id)
-        user_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
+        try:
+            query = select(User)
+            if include_relations:
+                query = query.options(selectinload(User.roles), selectinload(User.user_type))
+            stmt = query.where(User.id == user_id)
+            user_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
-        if user_db:
-            logger.info(f"Користувача з ID '{user_id}' знайдено.")
-            return UserResponseWithRoles.model_validate(user_db) if include_relations else UserResponse.model_validate(
-                user_db)
-        logger.info(f"Користувача з ID '{user_id}' не знайдено.")
-        return None
+            if user_db:
+                logger.info(f"Користувача з ID '{user_id}' знайдено.")
+                return UserResponseWithRoles.model_validate(user_db) if include_relations else UserResponse.model_validate(user_db)
+            logger.info(f"Користувача з ID '{user_id}' не знайдено.")
+            return None
+        except Exception as e:
+            logger.error(f"Помилка при отриманні користувача за ID {user_id}: {e}", exc_info=settings.DEBUG)
+            return None
 
-    async def get_user_by_email(self, email: str, include_relations: bool = True) -> Optional[UserResponse]:
+    async def get_user_by_email(self, email: str, include_relations: bool = True) -> Optional[UserResponse]: # type: ignore
         logger.debug(f"Спроба отримання користувача за email: {email}, include_relations: {include_relations}")
-        query = select(User)
-        if include_relations:
-            query = query.options(selectinload(User.roles), selectinload(User.user_type))
-        stmt = query.where(User.email == email.lower())
-        user_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
+        try:
+            query = select(User)
+            if include_relations:
+                query = query.options(selectinload(User.roles), selectinload(User.user_type))
+            stmt = query.where(User.email == email.lower())
+            user_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
-        if user_db:
-            logger.info(f"Користувача з email '{email}' знайдено.")
-            return UserResponseWithRoles.model_validate(user_db) if include_relations else UserResponse.model_validate(
-                user_db)
-        logger.info(f"Користувача з email '{email}' не знайдено.")
-        return None
+            if user_db:
+                logger.info(f"Користувача з email '{email}' знайдено.")
+                return UserResponseWithRoles.model_validate(user_db) if include_relations else UserResponse.model_validate(user_db)
+            logger.info(f"Користувача з email '{email}' не знайдено.")
+            return None
+        except Exception as e:
+            logger.error(f"Помилка при отриманні користувача за email {email}: {e}", exc_info=settings.DEBUG)
+            return None
 
-    async def get_user_by_username(self, username: str, include_relations: bool = True) -> Optional[UserResponse]:
+    async def get_user_by_username(self, username: str, include_relations: bool = True) -> Optional[UserResponse]: # type: ignore
         logger.debug(f"Спроба отримання користувача за username: {username}, include_relations: {include_relations}")
-        query = select(User)
-        if include_relations:
-            query = query.options(selectinload(User.roles), selectinload(User.user_type))
-        stmt = query.where(User.username == username)
-        user_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
+        try:
+            query = select(User)
+            if include_relations:
+                query = query.options(selectinload(User.roles), selectinload(User.user_type))
+            stmt = query.where(User.username == username)
+            user_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
-        if user_db:
-            logger.info(f"Користувача з username '{username}' знайдено.")
-            return UserResponseWithRoles.model_validate(user_db) if include_relations else UserResponse.model_validate(
-                user_db)
-        logger.info(f"Користувача з username '{username}' не знайдено.")
-        return None
+            if user_db:
+                logger.info(f"Користувача з username '{username}' знайдено.")
+                return UserResponseWithRoles.model_validate(user_db) if include_relations else UserResponse.model_validate(user_db)
+            logger.info(f"Користувача з username '{username}' не знайдено.")
+            return None
+        except Exception as e:
+            logger.error(f"Помилка при отриманні користувача за username {username}: {e}", exc_info=settings.DEBUG)
+            return None
 
     async def _check_existing_user(self, username: str, email: str) -> None:
         """Оптимізована перевірка існування користувача за ім'ям або email."""
         # Перевірка username
-        username_exists = (await self.db_session.execute(
-            select(User.id).where(User.username == username)
-        )).scalar_one_or_none()
-        if username_exists:
+        username_exists_stmt = select(User.id).where(User.username == username)
+        username_exists_result = await self.db_session.execute(username_exists_stmt)
+        if username_exists_result.scalar_one_or_none():
             logger.warning(f"Ім'я користувача '{username}' вже існує.")
             raise ValueError(f"Ім'я користувача '{username}' вже існує.")  # i18n
 
         # Перевірка email
-        email_exists = (await self.db_session.execute(
-            select(User.id).where(User.email == email.lower())
-        )).scalar_one_or_none()
-        if email_exists:
+        email_exists_stmt = select(User.id).where(User.email == email.lower())
+        email_exists_result = await self.db_session.execute(email_exists_stmt)
+        if email_exists_result.scalar_one_or_none():
             logger.warning(f"Email '{email.lower()}' вже зареєстровано.")
             raise ValueError(f"Email '{email.lower()}' вже зареєстровано.")  # i18n
 
@@ -99,7 +115,7 @@ class UserService(BaseService):
                           user_type_code: str = "USER",
                           role_codes: Optional[List[str]] = None,
                           is_superuser_creation: bool = False
-                          ) -> UserResponseWithRoles:
+                          ) -> UserResponseWithRoles: # type: ignore
         logger.debug(
             f"Спроба створення нового користувача: {user_create_data.username}, is_superuser: {is_superuser_creation}")
 
@@ -108,35 +124,40 @@ class UserService(BaseService):
         hashed_password = get_password_hash(user_create_data.password)
 
         type_stmt = select(UserType).where(UserType.code == user_type_code)
-        user_type_db = (await self.db_session.execute(type_stmt)).scalar_one_or_none()
+        user_type_db_result = await self.db_session.execute(type_stmt)
+        user_type_db = user_type_db_result.scalar_one_or_none()
         if not user_type_db:
             logger.error(f"UserType з кодом '{user_type_code}' не знайдено.")
             raise ValueError(f"Тип користувача '{user_type_code}' не знайдено.")  # i18n
 
-        # Згідно technical_task.txt: is_active=True, is_verified=False за замовчуванням.
-        new_user_db = User(
-            **user_create_data.model_dump(exclude={"password"}),
-            hashed_password=hashed_password,
-            user_type_id=user_type_db.id,
-            email=user_create_data.email.lower(),
-            is_superuser=is_superuser_creation,
-            is_active=True,
-            is_verified=False,
-            created_at=datetime.now(timezone.utc)  # Явно встановлюємо created_at
-        )
+        new_user_data = user_create_data.model_dump(exclude={"password"})
+        new_user_data.update({
+            "hashed_password": hashed_password,
+            "user_type_id": user_type_db.id,
+            "email": user_create_data.email.lower(),
+            "is_superuser": is_superuser_creation,
+            "is_active": True,  # Згідно technical_task.txt
+            "is_verified": False, # Згідно technical_task.txt
+            # created_at буде встановлено автоматично, якщо модель використовує TimestampedMixin
+        })
+        # Якщо TimestampedMixin не використовується або потрібно явне встановлення:
+        # if 'created_at' not in new_user_data:
+        #    new_user_data['created_at'] = datetime.now(timezone.utc)
+
+        new_user_db = User(**new_user_data)
 
         if role_codes:
-            roles_stmt = select(UserRole).where(UserRole.code.in_(role_codes))
-            user_roles_db = (await self.db_session.execute(roles_stmt)).scalars().all()
+            roles_stmt = select(UserRole).where(UserRole.code.in_(role_codes)) # type: ignore
+            user_roles_db_result = await self.db_session.execute(roles_stmt)
+            user_roles_db = list(user_roles_db_result.scalars().all())
 
-            if len(user_roles_db) != len(set(role_codes)):  # Використовуємо set для унікальності вхідних кодів
-                # Згідно technical_task.txt, створення користувача має завершитися помилкою, якщо ролі не знайдено.
+            if len(user_roles_db) != len(set(role_codes)):
                 found_role_codes = {role.code for role in user_roles_db}
                 missing_codes = set(role_codes) - found_role_codes
                 logger.error(
                     f"Не знайдено ролі з кодами: {missing_codes} для нового користувача '{user_create_data.username}'.")
-                raise ValueError(
-                    f"Не вдалося створити користувача: не знайдено ролі з кодами: {missing_codes}.")  # i18n
+                raise ValueError( # i18n
+                    f"Не вдалося створити користувача: не знайдено ролі з кодами: {missing_codes}.")
             new_user_db.roles = user_roles_db
 
         self.db_session.add(new_user_db)

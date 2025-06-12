@@ -1,31 +1,37 @@
 # backend/app/src/services/files/file_record_service.py
-# import logging # Замінено на централізований логер
-from typing import List, Optional, Any
+"""
+Сервіс для управління метаданими файлів (FileRecord).
+
+Відповідає за створення, отримання, оновлення та видалення записів про файли в базі даних.
+Фактичне завантаження або видалення файлів зі сховища координується з іншими сервісами
+(наприклад, FileUploadService).
+"""
+from typing import List, Optional # Any, Tuple видалено
 from uuid import UUID
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+from sqlalchemy import select # Оновлено імпорт
 from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.files.file import FileRecord  # Модель SQLAlchemy FileRecord
-from backend.app.src.models.auth.user import User  # Для зв'язку uploader_user
-from backend.app.src.models.groups.group import Group  # Для зв'язку group
+from backend.app.src.models.files.file import FileRecord
+from backend.app.src.models.auth.user import User
+from backend.app.src.models.groups.group import Group
 
-from backend.app.src.schemas.files.file import (  # Схеми Pydantic
+from backend.app.src.schemas.files.file import (
     FileRecordCreate,
     FileRecordUpdate,
     FileRecordResponse
 )
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config import logger  # Використання спільного логера з конфігу
+from backend.app.src.config import settings
 
 
 # from .file_upload_service import FileUploadService # Розглянути переміщення імпорту, якщо немає циркулярності
 
-class FileRecordService(BaseService):
+class FileRecordService(BaseService): # type: ignore
     """
     Сервіс для управління записами метаданих файлів (сутності FileRecord).
     Обробляє CRUD-операції для цих записів. Фактичне зберігання/видалення файлів
@@ -46,32 +52,34 @@ class FileRecordService(BaseService):
         :return: Pydantic схема FileRecordResponse або None, якщо не знайдено.
         """
         logger.debug(f"Спроба отримання запису файлу за ID: {file_id}")
+        try:
+            query = select(FileRecord)
+            if load_relations:
+                options_to_load = []
+                if hasattr(FileRecord, 'uploader_user'):
+                    options_to_load.append(selectinload(FileRecord.uploader_user).options(selectinload(User.user_type)))
+                if hasattr(FileRecord, 'group'):
+                    options_to_load.append(selectinload(FileRecord.group))
+                if options_to_load:
+                    query = query.options(*options_to_load)
+            else:
+                if hasattr(FileRecord, 'uploader_user'): query = query.options(noload(FileRecord.uploader_user))
+                if hasattr(FileRecord, 'group'): query = query.options(noload(FileRecord.group))
 
-        query = select(FileRecord)
-        if load_relations:
-            options_to_load = []
-            if hasattr(FileRecord, 'uploader_user'):
-                options_to_load.append(selectinload(FileRecord.uploader_user).options(selectinload(User.user_type)))
-            if hasattr(FileRecord, 'group'):
-                options_to_load.append(selectinload(FileRecord.group))
-            if options_to_load:
-                query = query.options(*options_to_load)
-        else:
-            # Якщо зв'язки не потрібні, можна їх явно виключити для оптимізації
-            if hasattr(FileRecord, 'uploader_user'): query = query.options(noload(FileRecord.uploader_user))
-            if hasattr(FileRecord, 'group'): query = query.options(noload(FileRecord.group))
+            stmt = query.where(FileRecord.id == file_id)
+            record_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
-        stmt = query.where(FileRecord.id == file_id)
-        record_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
-
-        if record_db:
-            logger.info(f"Запис файлу з ID '{file_id}' (Ім'я: '{record_db.file_name}') знайдено.")
-            return FileRecordResponse.model_validate(record_db)  # Pydantic v2
-        logger.info(f"Запис файлу з ID '{file_id}' не знайдено.")
-        return None
+            if record_db:
+                logger.info(f"Запис файлу з ID '{file_id}' (Ім'я: '{record_db.file_name}') знайдено.")
+                return FileRecordResponse.model_validate(record_db)
+            logger.info(f"Запис файлу з ID '{file_id}' не знайдено.")
+            return None
+        except Exception as e:
+            logger.error(f"Помилка при отриманні запису файлу ID {file_id}: {e}", exc_info=settings.DEBUG)
+            return None
 
     async def create_file_record(self, record_data: FileRecordCreate,
-                                 uploader_user_id: Optional[UUID] = None) -> FileRecordResponse:
+                                 uploader_user_id: Optional[UUID] = None) -> FileRecordResponse: # type: ignore
         """
         Створює новий запис файлу.
         Зазвичай викликається *після* успішного завантаження файлу до сховища.

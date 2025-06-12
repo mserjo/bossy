@@ -3,12 +3,12 @@
 from typing import TypeVar, Generic, Optional, Any, Type  # Додано Type
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select  # Додано для get_object_or_none
+from sqlalchemy import select  # Оновлено імпорт
 
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import logger  # Використання спільного логера з конфігу
 from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
-# Генеричний тип для моделей SQLAlchemy, якщо буде потрібно в майбутньому для більш типізованих методів
+# Генеричний тип для моделей SQLAlchemy
 ModelType = TypeVar("ModelType")
 
 

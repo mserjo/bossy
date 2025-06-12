@@ -1,33 +1,37 @@
 # backend/app/src/services/bonuses/bonus_rule.py
-import logging
-from typing import List, Optional, Any, Dict
+"""
+Сервіс для управління правилами нарахування бонусів.
+
+Відповідає за створення, оновлення, видалення, отримання та пошук
+правил нарахування бонусів, враховуючи їх специфічність та умови застосування.
+"""
+from typing import List, Optional, Any, Dict # Any може бути корисним для Dict
 from uuid import UUID
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+from sqlalchemy import select, or_, and_ # Оновлено імпорт select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import or_, and_  # Додано and_ для складних умов
 
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.bonuses.bonus import BonusRule  # Модель SQLAlchemy BonusRule
-from backend.app.src.models.groups.group import Group  # Для правил, специфічних для групи
-from backend.app.src.models.dictionaries.task_types import TaskType  # Для правил, пов'язаних з типами завдань
-from backend.app.src.models.tasks.task import Task  # Для правил, пов'язаних з конкретними завданнями
+from backend.app.src.models.bonuses.bonus import BonusRule
+from backend.app.src.models.groups.group import Group
+from backend.app.src.models.dictionaries.task_types import TaskType
+from backend.app.src.models.tasks.task import Task
 # from backend.app.src.models.tasks.event import Event # Якщо правила можуть бути пов'язані з подіями
-from backend.app.src.models.auth.user import User  # Для created_by_user, updated_by_user
+from backend.app.src.models.auth.user import User
 
-from backend.app.src.schemas.bonuses.bonus_rule import (  # Pydantic Схеми
+from backend.app.src.schemas.bonuses.bonus_rule import (
     BonusRuleCreate,
     BonusRuleUpdate,
     BonusRuleResponse
 )
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config import logger  # Використання спільного логера з конфігу
+from backend.app.src.config import settings
 
 
-class BonusRuleService(BaseService):
+class BonusRuleService(BaseService): # type: ignore
     """
     Сервіс для управління правилами нарахування бонусів.
     Правила визначають умови, за яких нараховуються або списуються бали.

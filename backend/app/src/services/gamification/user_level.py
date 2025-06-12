@@ -1,33 +1,38 @@
 # backend/app/src/services/gamification/user_level.py
-# import logging # Замінено на централізований логер
-from typing import List, Optional
+"""
+Сервіс для управління рівнями користувачів в системі гейміфікації.
+
+Відповідає за розрахунок, оновлення та отримання інформації
+про рівні, досягнуті користувачами, на основі їхніх балів або інших критеріїв.
+"""
+from typing import List, Optional # Tuple, Any видалено
 from uuid import UUID
 from datetime import datetime, timezone
-from decimal import Decimal  # Для балів користувача
+from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+from sqlalchemy import select # Оновлено імпорт
 from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
 # Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.gamification.user_level import UserLevel  # Модель SQLAlchemy UserLevel
-from backend.app.src.models.gamification.level import Level  # Для визначень рівнів
+from backend.app.src.models.gamification.user_level import UserLevel
+from backend.app.src.models.gamification.level import Level
 from backend.app.src.models.auth.user import User
-from backend.app.src.models.groups.group import Group  # Якщо рівні залежать від групи
+from backend.app.src.models.groups.group import Group
 
 from backend.app.src.schemas.gamification.user_level import UserLevelResponse
-from backend.app.src.schemas.gamification.level import LevelResponse  # Для вкладених деталей рівня
+from backend.app.src.schemas.gamification.level import LevelResponse
 
-from backend.app.src.services.bonuses.account import UserAccountService  # Для отримання балів
-from backend.app.src.services.gamification.level import LevelService  # Для отримання визначень рівнів
+from backend.app.src.services.bonuses.account import UserAccountService
+from backend.app.src.services.gamification.level import LevelService
 
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config import logger  # Використання спільного логера з конфігу
+from backend.app.src.config import settings
 
 
-class UserLevelService(BaseService):
+class UserLevelService(BaseService): # type: ignore
     """
     Сервіс для управління рівнями користувачів на основі їхніх накопичених балів або досягнень.
     Обробляє розрахунок та оновлення записів UserLevel.
@@ -45,8 +50,6 @@ class UserLevelService(BaseService):
         """Внутрішній метод для отримання ORM моделі UserLevel."""
         stmt = select(UserLevel).where(UserLevel.user_id == user_id)
 
-        # Фільтрація за group_id: якщо group_id надано, шукаємо запис для цієї групи.
-        # Якщо group_id є None, шукаємо глобальний запис UserLevel (де group_id IS NULL).
         if group_id:
             stmt = stmt.where(UserLevel.group_id == group_id)
         else:
@@ -56,21 +59,26 @@ class UserLevelService(BaseService):
             options_to_load = [
                 selectinload(UserLevel.user).options(selectinload(User.user_type)),
                 selectinload(UserLevel.level).options(
-                    selectinload(Level.icon_file),  # Завантажуємо іконку рівня
-                    selectinload(Level.group)  # Завантажуємо групу визначення рівня (якщо є)
+                    selectinload(Level.icon_file),
+                    selectinload(Level.group)
                 )
             ]
-            if group_id:  # Завантажуємо групу самого UserLevel, якщо вона є
+            if group_id:
                 options_to_load.append(selectinload(UserLevel.group))
             stmt = stmt.options(*options_to_load)
 
-        return (await self.db_session.execute(stmt)).scalar_one_or_none()
+        try:
+            result = await self.db_session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(f"Помилка при отриманні ORM UserLevel для user {user_id}, group {group_id}: {e}", exc_info=settings.DEBUG)
+            return None
 
     async def get_user_level(
             self,
             user_id: UUID,
-            group_id: Optional[UUID] = None  # None для глобального рівня користувача
-    ) -> Optional[UserLevelResponse]:
+            group_id: Optional[UUID] = None
+    ) -> Optional[UserLevelResponse]: # type: ignore
         """
         Отримує поточний рівень користувача для вказаного контексту (глобально або для групи).
 
@@ -85,22 +93,25 @@ class UserLevelService(BaseService):
             log_ctx_parts.append("(глобальний контекст)")
         log_ctx = ", ".join(log_ctx_parts)
         logger.debug(f"Спроба отримання UserLevel для {log_ctx}.")
+        try:
+            user_level_db = await self._get_orm_user_level(user_id, group_id, load_relations=True)
 
-        user_level_db = await self._get_orm_user_level(user_id, group_id, load_relations=True)
+            if user_level_db:
+                level_name = getattr(user_level_db.level, 'name', 'N/A') if user_level_db.level else 'N/A'
+                logger.info(f"Запис UserLevel знайдено для {log_ctx} (Рівень: {level_name}).")
+                return UserLevelResponse.model_validate(user_level_db)
 
-        if user_level_db:
-            level_name = getattr(user_level_db.level, 'name', 'N/A') if user_level_db.level else 'N/A'
-            logger.info(f"Запис UserLevel знайдено для {log_ctx} (Рівень: {level_name}).")
-            return UserLevelResponse.model_validate(user_level_db)  # Pydantic v2
-
-        logger.info(f"Запис UserLevel не знайдено для {log_ctx}.")
-        return None
+            logger.info(f"Запис UserLevel не знайдено для {log_ctx}.")
+            return None
+        except Exception as e:
+            logger.error(f"Помилка при отриманні UserLevel для {log_ctx}: {e}", exc_info=settings.DEBUG)
+            return None
 
     async def update_user_level(
             self,
             user_id: UUID,
-            group_id: Optional[UUID] = None,  # None для глобального контексту
-    ) -> Optional[UserLevelResponse]:  # Може повернути None, якщо балів недостатньо для будь-якого рівня
+            group_id: Optional[UUID] = None,
+    ) -> Optional[UserLevelResponse]:
         """
         Оновлює (або створює/видаляє) запис про рівень користувача на основі його поточних балів.
 

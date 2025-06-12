@@ -10,10 +10,10 @@
 спеціалізований інтерфейс для роботи з конкретною моделлю даних.
 """
 
-from .group_repository import GroupRepository
-from .membership_repository import GroupMembershipRepository
-from .settings_repository import GroupSettingRepository
-from .invitation_repository import GroupInvitationRepository
+from backend.app.src.repositories.groups.group_repository import GroupRepository
+from backend.app.src.repositories.groups.membership_repository import GroupMembershipRepository
+from backend.app.src.repositories.groups.settings_repository import GroupSettingRepository
+from backend.app.src.repositories.groups.invitation_repository import GroupInvitationRepository
 
 __all__ = [
     "GroupRepository",

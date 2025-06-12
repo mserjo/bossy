@@ -1,33 +1,37 @@
 # backend/app/src/services/files/file_upload_service.py
-# import logging # Замінено на централізований логер
+"""
+Сервіс для обробки завантаження файлів.
+
+Відповідає за ініціалізацію процесу завантаження, обробку частин файлу,
+завершення завантаження (включаючи переміщення файлу до постійного сховища)
+та координацію з `FileRecordService` для збереження метаданих файлу.
+Наразі реалізовано для локального зберігання файлів.
+"""
 import os
 import aiofiles  # Для асинхронних файлових операцій
 import shutil  # Для переміщення файлів
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any # List не використовується в сигнатурах, але може бути в тілі методів
 from uuid import UUID, uuid4
-from datetime import datetime, timezone  # timedelta не використовується, можна прибрати
+from datetime import datetime, timezone # timedelta видалено
 from pathlib import Path
 
-from sqlalchemy.ext.asyncio import \
-    AsyncSession  # Не використовується прямо в цьому сервісі, але BaseService може вимагати
+from sqlalchemy.ext.asyncio import AsyncSession
 from werkzeug.utils import secure_filename  # Для очищення імен файлів
 
-from backend.app.src.services.base import BaseService  # Повний шлях
-from backend.app.src.config.settings import settings  # Повний шлях
-from backend.app.src.schemas.files.upload import (  # Повні шляхи
+from backend.app.src.services.base import BaseService
+from backend.app.src.config.settings import settings
+from backend.app.src.schemas.files.upload import (
     FileUploadInitiateRequest,
     FileUploadInitiateResponse,
-    # PresignedUrlRequest, # Не використовується для локального сховища
-    # PresignedUrlResponse, # Не використовується для локального сховища
     FileUploadCompleteRequest,
     FileUploadResponse
 )
-from backend.app.src.schemas.files.file import FileRecordCreate, FileRecordResponse  # Повні шляхи
-from backend.app.src.services.files.file_record_service import FileRecordService  # Повний шлях
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.schemas.files.file import FileRecordCreate, FileRecordResponse
+from backend.app.src.services.files.file_record_service import FileRecordService
+from backend.app.src.config import logger  # Використання спільного логера з конфігу
 
 
-class FileUploadService(BaseService):
+class FileUploadService(BaseService): # type: ignore
     """
     Сервіс для обробки процесу завантаження файлів.
     Включає ініціалізацію завантажень, обробку завантажених файлів (переміщення з тимчасового

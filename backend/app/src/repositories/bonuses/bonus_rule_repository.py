@@ -7,9 +7,9 @@
 наприклад, отримання активних правил для конкретного завдання або події.
 """
 
-from typing import List, Optional, Tuple, Any
+from typing import List, Dict, Any
 
-from sqlalchemy import select
+from sqlalchemy import select # select може знадобитися для складніших запитів, не через get_multi
 from sqlalchemy.ext.asyncio import AsyncSession
 # from sqlalchemy.orm import selectinload
 
@@ -18,14 +18,11 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.bonuses.bonus_rule import BonusRule
 from backend.app.src.schemas.bonuses.bonus_rule import BonusRuleCreateSchema, BonusRuleUpdateSchema
-from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.config import logging # Імпорт logging з конфігурації
 # Отримання логера для цього модуля
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # from backend.app.src.core.dicts import SomeStateEnum # Якщо поле state використовує Enum
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 class BonusRuleRepository(BaseRepository[BonusRule, BonusRuleCreateSchema, BonusRuleUpdateSchema]):
     """
@@ -35,68 +32,93 @@ class BonusRuleRepository(BaseRepository[BonusRule, BonusRuleCreateSchema, Bonus
     додаткові методи для специфічного пошуку та фільтрації правил.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self):
         """
         Ініціалізує репозиторій для моделі `BonusRule`.
-
-        Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        super().__init__(db_session=db_session, model=BonusRule)
+        super().__init__(model=BonusRule)
+        logger.info(f"Репозиторій для моделі '{self.model.__name__}' ініціалізовано.")
 
-    async def get_rules_for_task(self, task_id: int, active_only: bool = True) -> List[BonusRule]:
+    async def get_rules_for_task(
+            self, session: AsyncSession, task_id: int, active_only: bool = True
+    ) -> List[BonusRule]:
         """
         Отримує список правил нарахування бонусів, пов'язаних із конкретним завданням.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             task_id (int): ID завдання.
             active_only (bool): Якщо True, повертає лише активні правила.
-                                Припускає, що модель BonusRule має поле `state` (успадковане від StateMixin).
+                                # TODO: [Перевірка Поля Стану] Узгодити з `technical_task.txt` та `structure-claude-v2.md`
+                                #       наявність та назву поля стану (напр., `state`, `is_active`) в моделі `BonusRule`.
 
         Returns:
             List[BonusRule]: Список правил нарахування бонусів.
         """
-        filters = [self.model.task_id == task_id]
+        logger.debug(f"Отримання правил для завдання ID: {task_id}, active_only: {active_only}")
+        filters_dict: Dict[str, Any] = {"task_id": task_id}
+
         if active_only:
-            # Припускаємо, що активний стан позначається як "active".
-            # Це може потребувати узгодження з Enum або конкретними значеннями стану.
-            if hasattr(self.model, "state"):
-                filters.append(self.model.state == "active")
-                # Або, якщо є поле is_active:
-            # elif hasattr(self.model, "is_active"):
-            #     filters.append(self.model.is_active == True)
-            # else:
-            #     logger.warning(f"Модель {self.model.__name__} не має поля 'state' або 'is_active' для фільтрації активних правил.")
+            # TODO: [Визначення Активного Стану] Уточнити значення для активного стану ("active", True, etc.)
+            #       згідно з `technical_task.txt` / моделлю даних.
+            if hasattr(self.model, "state"): # Припускаємо, що поле називається 'state'
+                filters_dict["state"] = "active" # Припускаємо, що активний стан це рядок "active"
+            elif hasattr(self.model, "is_active"): # Альтернативний варіант, якщо поле 'is_active' (Boolean)
+                 filters_dict["is_active"] = True
+            else:
+                logger.warning(
+                    f"Модель {self.model.__name__} не має стандартного поля 'state' або 'is_active' "
+                    f"для фільтрації активних правил. Повертаються всі правила для завдання {task_id}."
+                )
 
-        # Використовуємо get_multi з дуже великим лімітом для отримання всіх відповідних записів.
-        # Краще було б, якби get_multi міг приймати limit=None для відсутності ліміту.
-        # Альтернатива: прямий запит select.
-        items, _ = await self.get_multi(filters=filters, limit=1_000_000)  # Умовно великий ліміт
-        return items
+        try:
+            # Використовуємо get_multi з дуже великим лімітом для отримання всіх відповідних записів.
+            # TODO: [Оптимізація Get All] Розглянути додавання методу `get_all_filtered` до BaseRepository
+            #       або підтримку `limit=None` в `get_multi` для уникнення магічного числа 1_000_000.
+            items = await super().get_multi(session=session, filters=filters_dict, limit=1_000_000)
+            logger.debug(f"Знайдено {len(items)} правил для завдання ID: {task_id}")
+            return items
+        except Exception as e:
+            logger.error(f"Помилка при отриманні правил для завдання {task_id}: {e}", exc_info=True)
+            return []
 
-    async def get_rules_for_event_task(self, event_task_id: int, active_only: bool = True) -> List[BonusRule]:
+    async def get_rules_for_event_task(
+            self, session: AsyncSession, event_task_id: int, active_only: bool = True
+    ) -> List[BonusRule]:
         """
         Отримує список правил нарахування бонусів, пов'язаних із конкретною подією (завданням типу "подія").
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             event_task_id (int): ID завдання (події).
             active_only (bool): Якщо True, повертає лише активні правила.
+                                # TODO: [Перевірка Поля Стану] Аналогічно до get_rules_for_task.
 
         Returns:
             List[BonusRule]: Список правил нарахування бонусів.
         """
-        # TODO: Уточнити, чи поле event_id в BonusRule є окремим, чи це task_id для завдання з типом "подія".
-        # Поточна реалізація моделі BonusRule має обидва поля: task_id та event_id.
-        # Якщо події - це завдання з певним типом, то цей метод може бути схожим на get_rules_for_task,
-        # але з додатковою перевіркою типу завдання, або ж використовувати поле event_id.
-        filters = [self.model.event_id == event_task_id]
-        if active_only:
-            if hasattr(self.model, "state"):
-                filters.append(self.model.state == "active")
-            # elif hasattr(self.model, "is_active"):
-            #     filters.append(self.model.is_active == True)
+        # TODO: [Уточнення Поля Event ID] Перевірити `technical_task.txt` / `structure-claude-v2.md`:
+        #       Чи поле `event_id` в `BonusRule` є окремим ForeignKey, чи це `task_id` для завдання
+        #       з певним типом "подія"? Поточна реалізація передбачає наявність `event_id`.
+        logger.debug(f"Отримання правил для події ID: {event_task_id}, active_only: {active_only}")
+        filters_dict: Dict[str, Any] = {"event_id": event_task_id}
 
-        items, _ = await self.get_multi(filters=filters, limit=1_000_000)
+        if active_only:
+            # TODO: [Визначення Активного Стану] Аналогічно до get_rules_for_task.
+            if hasattr(self.model, "state"):
+                filters_dict["state"] = "active"
+            elif hasattr(self.model, "is_active"):
+                filters_dict["is_active"] = True
+            else:
+                logger.warning(
+                    f"Модель {self.model.__name__} не має стандартного поля 'state' або 'is_active' "
+                    f"для фільтрації активних правил. Повертаються всі правила для події {event_task_id}."
+                )
+
+        try:
+            # TODO: [Оптимізація Get All] Аналогічно до get_rules_for_task.
+            items = await super().get_multi(session=session, filters=filters_dict, limit=1_000_000)
+            logger.debug(f"Знайдено {len(items)} правил для події ID: {event_task_id}")
         return items
 
 

@@ -1,12 +1,17 @@
 # backend/app/src/services/bonuses/account.py
-import logging
-from typing import List, Optional, Tuple, Any
+"""
+Сервіс для управління бонусними рахунками користувачів.
+
+Надає функціонал для створення, отримання, оновлення балансу
+та перегляду бонусних рахунків, а також для запису транзакцій.
+"""
+from typing import List, Optional # Tuple, Any видалено, оскільки не використовуються в сигнатурах
 from uuid import UUID
 from decimal import Decimal  # Для точних розрахунків балансу
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+from sqlalchemy import select # Оновлено імпорт
 from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
@@ -22,11 +27,11 @@ from backend.app.src.schemas.bonuses.account import (  # Pydantic Схеми
     # UserAccountUpdate, # Для ручних коригувань адміністратором (не реалізовано в цьому сервісі)
 )
 from backend.app.src.schemas.bonuses.transaction import AccountTransactionResponse
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import logger  # Використання спільного логера з конфігу
 from backend.app.src.config import settings  # Для доступу до конфігурацій
 
 
-# TODO: Перенести кастомні помилки до backend/app/src/core/exceptions.py
+# TODO: [Exceptions] Перенести кастомні помилки до backend/app/src/core/exceptions.py
 class InsufficientFundsError(ValueError):
     """Помилка недостатньо коштів на рахунку."""
 

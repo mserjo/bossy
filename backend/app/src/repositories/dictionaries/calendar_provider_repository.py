@@ -6,17 +6,15 @@
 та надає методи для роботи з довідником постачальників календарів.
 """
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 # Абсолютний імпорт базового репозиторію для довідників
 from backend.app.src.repositories.dictionaries.base_dict_repository import BaseDictionaryRepository
 
 # Абсолютний імпорт моделі та схем для Постачальників Календарів
 from backend.app.src.models.dictionaries.calendars import CalendarProvider
 from backend.app.src.schemas.dictionaries.calendars import CalendarProviderCreateSchema, CalendarProviderUpdateSchema
-from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.config import logging # Імпорт logging з конфігурації
 # Отримання логера для цього модуля
-logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 
 class CalendarProviderRepository(
@@ -28,16 +26,18 @@ class CalendarProviderRepository(
     від `BaseDictionaryRepository`.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self):
         """
         Ініціалізує репозиторій для моделі `CalendarProvider`.
-
-        Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        super().__init__(db_session=db_session, model=CalendarProvider)
+        super().__init__(model=CalendarProvider)
+        logger.info(f"Репозиторій для моделі '{self.model.__name__}' ініціалізовано.")
 
     # Тут можна додати специфічні методи для CalendarProviderRepository, якщо вони потрібні.
+    # Наприклад:
+    # async def get_provider_by_integration_type(self, session: AsyncSession, integration_type: str) -> Optional[CalendarProvider]:
+    #     # логіка методу...
+    #     pass
 
 
 if __name__ == "__main__":

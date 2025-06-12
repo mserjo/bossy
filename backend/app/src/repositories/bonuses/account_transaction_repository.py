@@ -16,18 +16,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.bonuses.transaction import AccountTransaction
-from backend.app.src.schemas.bonuses.transaction import (
-    AccountTransactionCreateSchema,
-    # AccountTransactionUpdateSchema зазвичай не потрібна, транзакції незмінні
-)
+from backend.app.src.schemas.bonuses.transaction import AccountTransactionCreateSchema
+# AccountTransactionUpdateSchema зазвичай не потрібна, транзакції незмінні
 from pydantic import BaseModel as PydanticBaseModel  # Для "заглушки" UpdateSchema
-from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.config import logging # Імпорт logging з конфігурації
 # Отримання логера для цього модуля
-logger = get_logger(__name__)
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
+logger = logging.getLogger(__name__)
 
 # Транзакції зазвичай не оновлюються, а створюються нові (наприклад, коригуюча транзакція).
 # Тому UpdateSchema може бути простою заглушкою.
@@ -44,17 +38,16 @@ class AccountTransactionRepository(
     методи для отримання транзакцій для конкретного рахунку або за типом.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self):
         """
         Ініціалізує репозиторій для моделі `AccountTransaction`.
-
-        Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        super().__init__(db_session=db_session, model=AccountTransaction)
+        super().__init__(model=AccountTransaction)
+        logger.info(f"Репозиторій для моделі '{self.model.__name__}' ініціалізовано.")
 
     async def get_transactions_for_account(
             self,
+            session: AsyncSession,
             account_id: int,
             skip: int = 0,
             limit: int = 100,
@@ -64,6 +57,7 @@ class AccountTransactionRepository(
         Отримує список транзакцій для вказаного рахунку з пагінацією та сортуванням.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             account_id (int): ID рахунку користувача.
             skip (int): Кількість записів для пропуску.
             limit (int): Максимальна кількість записів для повернення.
@@ -72,19 +66,33 @@ class AccountTransactionRepository(
         Returns:
             Tuple[List[AccountTransaction], int]: Кортеж зі списком транзакцій та їх загальною кількістю.
         """
-        filters = [self.model.account_id == account_id]
-        order_by = [self.model.created_at.desc()] if order_by_desc_created_at else [self.model.created_at.asc()]
+        logger.debug(f"Отримання транзакцій для рахунку ID: {account_id}, skip: {skip}, limit: {limit}")
+        filters_dict = {"account_id": account_id}
+        sort_by_field = "created_at"
+        sort_order_str = "desc" if order_by_desc_created_at else "asc"
 
-        # Приклад жадібного завантаження пов'язаних сутностей, якщо вони часто потрібні разом з транзакцією:
-        # options = [
-        #     selectinload(self.model.task_completion).selectinload(TaskCompletion.task),
-        #     selectinload(self.model.reward),
-        #     selectinload(self.model.created_by)
-        # ]
-        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)  # , options=options)
+        try:
+            # Приклад жадібного завантаження не використовується тут, але залишений як коментар у BaseRepository
+            # Якщо потрібно, його можна передати в get_multi як параметр options.
+            items = await super().get_multi(
+                session=session,
+                skip=skip,
+                limit=limit,
+                filters=filters_dict,
+                sort_by=sort_by_field,
+                sort_order=sort_order_str
+            )
+            total_count = await super().count(session=session, filters=filters_dict)
+            logger.debug(f"Знайдено {total_count} транзакцій для рахунку ID: {account_id}")
+            return items, total_count
+        except Exception as e:
+            logger.error(f"Помилка при отриманні транзакцій для рахунку {account_id}: {e}", exc_info=True)
+            return [], 0
+
 
     async def get_transactions_by_type(
             self,
+            session: AsyncSession,
             account_id: int,
             transaction_type: str,  # Очікується значення з TransactionType Enum
             skip: int = 0,
@@ -94,6 +102,7 @@ class AccountTransactionRepository(
         Отримує список транзакцій для вказаного рахунку за певним типом транзакції.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             account_id (int): ID рахунку користувача.
             transaction_type (str): Тип транзакції (значення з `core.dicts.TransactionType`).
             skip (int): Кількість записів для пропуску.
@@ -102,12 +111,34 @@ class AccountTransactionRepository(
         Returns:
             Tuple[List[AccountTransaction], int]: Кортеж зі списком транзакций та їх загальною кількістю.
         """
-        filters = [
-            self.model.account_id == account_id,
-            self.model.transaction_type == transaction_type
-        ]
-        order_by = [self.model.created_at.desc()]
-        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
+        logger.debug(
+            f"Отримання транзакцій типу '{transaction_type}' для рахунку ID: {account_id}, skip: {skip}, limit: {limit}"
+        )
+        filters_dict = {
+            "account_id": account_id,
+            "transaction_type": transaction_type
+        }
+        sort_by_field = "created_at" # Зазвичай транзакції сортують за датою
+        sort_order_str = "desc"      # Новіші перші
+
+        try:
+            items = await super().get_multi(
+                session=session,
+                skip=skip,
+                limit=limit,
+                filters=filters_dict,
+                sort_by=sort_by_field,
+                sort_order=sort_order_str
+            )
+            total_count = await super().count(session=session, filters=filters_dict)
+            logger.debug(f"Знайдено {total_count} транзакцій типу '{transaction_type}' для рахунку ID: {account_id}")
+            return items, total_count
+        except Exception as e:
+            logger.error(
+                f"Помилка при отриманні транзакцій типу '{transaction_type}' для рахунку {account_id}: {e}",
+                exc_info=True
+            )
+            return [], 0
 
 
 if __name__ == "__main__":

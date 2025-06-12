@@ -1,19 +1,25 @@
 # backend/app/src/services/cache/redis_service.py
-# import logging # Замінено на централізований логер
+"""
+Сервіс кешування з використанням Redis.
+
+Конкретна реалізація `BaseCacheService`, що взаємодіє з Redis
+для зберігання, отримання та управління кешованими даними.
+Включає логіку серіалізації/десеріалізації даних.
+"""
 import json  # Для серіалізації/десеріалізації складних типів даних
-from typing import Optional, Any, Set, List  # Union прибрано, бо не використовується
+from typing import Optional, Any, Set, List
 from decimal import Decimal  # Для обробки типу Decimal
 
 import redis.asyncio as aioredis  # Використання асинхронних можливостей redis-py
 
-from backend.app.src.services.cache.base_cache import BaseCacheService  # Повний шлях
+from backend.app.src.services.cache.base_cache import BaseCacheService
 from backend.app.src.config.redis import get_redis_pool  # Функція для отримання пулу з'єднань Redis
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import logger  # Використання спільного логера з конфігу
 
 
 # from backend.app.src.config import settings # Якщо потрібні специфічні налаштування Redis напряму
 
-# TODO: Розглянути використання більш надійної бібліотеки для серіалізації/десеріалізації,
+# TODO: [Serialization] Розглянути використання більш надійної бібліотеки для серіалізації/десеріалізації,
 #  особливо якщо кешуються складні вкладені об'єкти або моделі Pydantic.
 #  Наприклад, msgpack або pickle (з обережністю щодо безпеки pickle).
 

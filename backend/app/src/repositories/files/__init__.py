@@ -10,8 +10,8 @@
 інтерфейс для роботи з конкретною моделлю даних.
 """
 
-from .file_record_repository import FileRecordRepository
-from .user_avatar_repository import UserAvatarRepository
+from backend.app.src.repositories.files.file_record_repository import FileRecordRepository
+from backend.app.src.repositories.files.user_avatar_repository import UserAvatarRepository
 
 # Можливо, в майбутньому тут будуть репозиторії для інших типів файлів,
 # якщо вони матимуть власну логіку (наприклад, GroupIconRepository).

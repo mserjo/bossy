@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 # backend/app/src/repositories/__init__.py
+# -*- coding: utf-8 -*-
 """
 Модуль `repositories` (__init__.py).
 
@@ -14,7 +14,7 @@
 """
 
 from backend.app.src.config import logger
-from .base import BaseRepository
+from backend.app.src.repositories.base import BaseRepository # Оновлено на абсолютний шлях
 
 __all__ = [
     "BaseRepository",

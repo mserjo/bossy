@@ -1,55 +1,68 @@
 # docker-compose.yml
-# # Базовий файл Docker Compose для запуску проекту.
-# # Визначає основні сервіси, їх конфігурацію та зв'язки.
+# Цей файл є базовим конфігураційним файлом Docker Compose для проекту.
+# Він визначає основні сервіси, такі як база даних та backend, їх налаштування,
+# томи для збереження даних та залежності між сервісами.
+# Цей файл може бути розширений або модифікований файлами
+# docker-compose.dev.yml (для розробки) та docker-compose.prod.yml (для продакшену).
 
-version: '3.8' # Використання однієї з останніх версій Docker Compose
+version: '3.8' # Рекомендується використовувати одну з останніх стабільних версій Docker Compose
 
 services:
   # --- Сервіс бази даних PostgreSQL ---
   db:
-    image: postgres:15-alpine # Рекомендується використовувати конкретну версію
-    container_name: project_db # Чітке ім'я контейнера
+    image: postgres:16-alpine # Використання актуальної та легкої версії PostgreSQL
+    container_name: app_db # Стандартизоване ім'я контейнера
     volumes:
-      - postgres_data:/var/lib/postgresql/data/ # Збереження даних БД
+      - postgres_data_volume:/var/lib/postgresql/data/ # Іменований том для надійного збереження даних БД
+    # Завантаження змінних середовища для бази даних.
+    # Переконайтеся, що файл .env існує в директорії backend/ та містить необхідні POSTGRES_USER, POSTGRES_PASSWORD, POSTGRES_DB.
     env_file:
-      - ./backend/.env # Шлях до файлу з конфігурацією БД
+      - ./backend/.env
     ports:
-      - "5432:5432" # Прокидання порту для локального доступу (за потреби)
+      - "5432:5432" # Прокидання порту PostgreSQL на хост (для локального доступу та налагодження)
     environment:
+      # Ці змінні використовуються образом PostgreSQL для ініціалізації бази даних.
+      # Значення беруться з файлу ./backend/.env, вказаного в env_file.
       - POSTGRES_USER=${POSTGRES_USER}
       - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
       - POSTGRES_DB=${POSTGRES_DB}
-    restart: unless-stopped # Політика перезапуску
+    restart: unless-stopped # Політика перезапуску контейнера
     healthcheck:
+      # Перевірка стану готовності бази даних PostgreSQL
       test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+      interval: 10s # Інтервал між перевірками
+      timeout: 5s   # Час очікування відповіді
+      retries: 5    # Кількість спроб перед позначенням сервісу як нездорового
 
-  # --- Сервіс Backend (FastAPI) ---
+  # --- Сервіс Backend (FastAPI додаток) ---
   backend:
     build:
-      context: ./backend # Шлях до Dockerfile та коду backend
-      dockerfile: Dockerfile
-    container_name: project_backend
-    # env_file визначатиметься в docker-compose.dev.yml або docker-compose.prod.yml
-    # для уникнення дублювання та для специфічних налаштувань середовища.
-    # Однак, якщо є загальні змінні, їх можна додати тут:
+      context: ./backend # Шлях до директорії, де знаходиться Dockerfile та код backend
+      dockerfile: Dockerfile # Назва Dockerfile
+    container_name: app_backend # Стандартизоване ім'я контейнера
+    # Змінні середовища для backend сервісу зазвичай визначаються у
+    # docker-compose.dev.yml або docker-compose.prod.yml,
+    # щоб відокремити конфігурації для різних середовищ.
+    # Якщо є загальні змінні, їх можна вказати тут через env_file:
     # env_file:
     #   - ./backend/.env
     ports:
-      - "8000:8000" # Прокидання порту FastAPI
+      - "8000:8000" # Прокидання порту FastAPI (8000 всередині контейнера на 8000 на хості)
     depends_on:
-      db: # Залежність від сервісу бази даних
-        condition: service_healthy # Чекати, доки БД буде готова
-    restart: unless-stopped
-    # volumes: # Розкоментуйте для розробки, щоб зміни коду відображались миттєво
-    #   - ./backend:/app
+      db: # Backend сервіс залежить від сервісу бази даних
+        condition: service_healthy # Запускати backend тільки після того, як база даних стане готовою
+    restart: unless-stopped # Політика перезапуску контейнера
+    # Приклад монтування томів для розробки (дозволяє миттєво бачити зміни в коді):
+    # volumes:
+    #   - ./backend:/app # Монтування локальної директорії backend до /app всередині контейнера
 
 volumes:
-  postgres_data: # Іменований том для збереження даних PostgreSQL
+  # Іменований том для збереження даних PostgreSQL між перезапусками контейнерів
+  postgres_data_volume:
+    driver: local # Використання локального драйвера для тому
 
-# --- Мережа (за потреби, якщо потрібна кастомна) ---
+# --- Мережа (опціонально, якщо потрібна кастомна конфігурація мережі) ---
 # networks:
 #   app_network:
-#     driver: bridge
+#     driver: bridge # Використання стандартного драйвера bridge для мережі
+#     name: custom_app_network # Назва кастомної мережі

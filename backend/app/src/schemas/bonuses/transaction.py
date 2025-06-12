@@ -30,7 +30,7 @@ class AccountTransactionBaseSchema(BaseSchema):
     """
     Базова схема для полів транзакції по рахунку.
     """
-    account_id: int = Field(description="Ідентифікатор рахунку користувача, до якого відноситься транзакція.")
+    account_id: Optional[int] = Field(None, description="Ідентифікатор рахунку користувача. Якщо None, буде визначений через user_id_for_account_lookup.")
     # TODO: Додати валідатор для transaction_type на основі Enum TransactionType
     transaction_type: str = Field(
         description=f"Тип транзакції. Допустимі значення: {', '.join([tt.value for tt in TransactionType])}."

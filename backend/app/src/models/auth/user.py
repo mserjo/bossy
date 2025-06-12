@@ -30,7 +30,7 @@ logger = get_logger(__name__)
 if TYPE_CHECKING:
     from backend.app.src.models.dictionaries.user_types import UserType
     from backend.app.src.models.dictionaries.user_roles import UserRole
-    from backend.app.src.models.auth.session import Session  # Модель сесій користувачів
+    from backend.app.src.models.auth.session import UserSession  # Модель сесій користувачів
     from backend.app.src.models.auth.token import RefreshToken  # Модель токенів оновлення
     from backend.app.src.models.files.avatar import UserAvatar  # Модель аватарів користувачів
     from backend.app.src.models.groups.membership import GroupMembership  # Модель членства в групах
@@ -99,7 +99,7 @@ class User(BaseMainModel):
     user_type: Mapped[Optional["UserType"]] = relationship(foreign_keys=[user_type_id], lazy="selectin")
     system_role: Mapped[Optional["UserRole"]] = relationship(foreign_keys=[system_role_id], lazy="selectin")
 
-    sessions: Mapped[List["Session"]] = relationship(
+    sessions: Mapped[List["UserSession"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", lazy="selectin"
     )
     refresh_tokens: Mapped[List["RefreshToken"]] = relationship(

@@ -7,7 +7,7 @@
 """
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-from uuid import UUID
+from uuid import UUID # Залишаємо, оскільки PasswordResetToken.user_id може бути UUID або для інших полів моделі
 import secrets # Для генерації безпечних випадкових токенів
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -66,7 +66,7 @@ class PasswordService(BaseService):
             logger.warning("Перевірка пароля не вдалася.")
         return is_valid
 
-    async def create_password_reset_token(self, user_id: UUID) -> str:
+    async def create_password_reset_token(self, user_id: int) -> str:
         """
         Генерує безпечний токен скидання пароля, зберігає його хеш та повертає звичайний токен.
         Звичайний токен призначений для надсилання користувачеві (наприклад, електронною поштою) і має бути короткотривалим.
@@ -112,7 +112,7 @@ class PasswordService(BaseService):
         logger.info(f"Токен скидання пароля створено для користувача ID '{user_id}'. Звичайний токен (перші 8 символів для логу): {plain_token[:8]}...")
         return plain_token
 
-    async def _get_valid_reset_token_db(self, plain_token: str, user_id: UUID) -> Optional[PasswordResetToken]:
+    async def _get_valid_reset_token_db(self, plain_token: str, user_id: int) -> Optional[PasswordResetToken]:
         """
         Внутрішній допоміжний метод: знаходить не прострочений, невикористаний запис токена скидання пароля,
         зіставляючи хеш plain_token для конкретного користувача.
@@ -135,7 +135,7 @@ class PasswordService(BaseService):
         return None
 
 
-    async def validate_password_reset_token(self, plain_token: str, user_id: UUID) -> bool:
+    async def validate_password_reset_token(self, plain_token: str, user_id: int) -> bool:
         """
         Перевіряє звичайний токен скидання пароля для користувача.
         """
@@ -147,7 +147,7 @@ class PasswordService(BaseService):
         logger.warning(f"Токен скидання пароля для користувача ID '{user_id}' невалідний, прострочений, використаний або не знайдений.")
         return False
 
-    async def reset_password_with_token(self, plain_token: str, user_id: UUID, new_password: str) -> bool:
+    async def reset_password_with_token(self, plain_token: str, user_id: int, new_password: str) -> bool:
         """
         Скидає пароль користувача за допомогою валідного токена. Токен позначається як використаний.
         Якщо новий пароль збігається зі старим, операція вважається успішною, токен використовується.
@@ -198,7 +198,7 @@ class PasswordService(BaseService):
             logger.error(f"Помилка під час комміту скидання пароля для користувача ID '{user_id}': {e}", exc_info=True)
             return False
 
-    async def change_password(self, user_id: UUID, old_password: str, new_password: str) -> bool:
+    async def change_password(self, user_id: int, old_password: str, new_password: str) -> bool:
         """
         Дозволяє автентифікованому користувачеві змінити свій поточний пароль.
         Новий пароль не може збігатися зі старим.

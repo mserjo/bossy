@@ -5,7 +5,7 @@
 Надає функціонал для створення, отримання, валідації та інвалідації
 користувацьких сесій, а також для очищення прострочених сесій.
 """
-from typing import List, Optional, Type # Type не використовується безпосередньо, але може бути корисним
+from typing import List, Optional # Type видалено
 from uuid import UUID, uuid4
 from datetime import datetime, timedelta, timezone
 
@@ -17,11 +17,7 @@ from sqlalchemy.orm import selectinload
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.auth.session import UserSession  # Модель SQLAlchemy для сесії користувача
 from backend.app.src.models.auth.user import User  # Модель SQLAlchemy для користувача
-# TODO: Розглянути можливість переходу на повернення Pydantic схем замість ORM моделей з методів сервісу,
-#  коли відповідні схеми (UserSessionResponse, UserSessionCreate) будуть повністю визначені та інтегровані в API шар.
-#  Pydantic схеми (приклад):
-#  from backend.app.src.schemas.auth.session import UserSessionResponse # id, user_id, user_agent, ip_address, created_at, expires_at, last_active_at
-#  from backend.app.src.schemas.auth.session import UserSessionCreate # user_id, user_agent, ip_address
+from backend.app.src.schemas.auth.session import UserSessionResponse, UserSessionCreate # Імпорт актуальних схем
 
 from backend.app.src.config import logger  # Використання спільного логера з конфігу
 from backend.app.src.config import settings  # Для доступу до конфігурацій, наприклад DEFAULT_SESSION_DURATION_DAYS
@@ -46,22 +42,22 @@ class UserSessionService(BaseService):
 
     async def create_session(
             self,
-            user_id: UUID,
+            user_id: int, # Змінено UUID на int
             user_agent: Optional[str] = None,
             ip_address: Optional[str] = None,
             duration_days: Optional[int] = None
-    ) -> UserSession:  # Наразі повертає модель ORM
+    ) -> UserSessionResponse:
         """
         Створює нову сесію користувача та зберігає її в базі даних.
 
-        :param user_id: ID користувача, для якого створюється сесія.
+        :param user_id: ID користувача (int), для якого створюється сесія.
         :param user_agent: Рядок User-Agent клієнта.
         :param ip_address: IP-адреса клієнта.
         :param duration_days: Тривалість сесії в днях. Якщо None, використовується DEFAULT_SESSION_DURATION_DAYS.
-        :return: Створений об'єкт UserSession (модель ORM).
+        :return: Об'єкт UserSessionResponse (Pydantic схема) для створеної сесії.
         :raises ValueError: Якщо користувача не знайдено. # i18n
         """
-        logger.debug(f"Створення нової сесії для користувача ID: {user_id}")
+        logger.debug(f"Створення нової сесії для користувача ID: {user_id}...")
 
         user = await self.db_session.get(User, user_id)
         if not user:
@@ -73,7 +69,7 @@ class UserSessionService(BaseService):
         expires_at = datetime.now(timezone.utc) + timedelta(days=session_duration_days_to_use)
 
         new_session_db = UserSession(
-            session_token=session_token_uuid,
+            session_token=str(session_token_uuid), # Зберігаємо UUID як рядок
             user_id=user_id,
             user_agent=user_agent,
             ip_address=ip_address,
@@ -88,28 +84,26 @@ class UserSessionService(BaseService):
 
         logger.info(
             f"Сесію успішно створено для користувача ID '{user_id}' з токеном сесії (UUID): {new_session_db.session_token}")
-        # Приклад повернення Pydantic схеми, якщо UserSessionResponse визначено та використовується:
-        # from backend.app.src.schemas.auth.session import UserSessionResponse
-        # return UserSessionResponse.model_validate(new_session_db)
-        return new_session_db
+        return UserSessionResponse.model_validate(new_session_db)
 
-    async def get_session_by_token(self, session_token: UUID) -> Optional[UserSession]:
+    async def get_session_by_token(self, session_token: UUID) -> Optional[UserSessionResponse]:
         """
         Отримує сесію користувача за її токеном.
         Перевіряє термін дії та валідність. Оновлює `last_active_at`.
-        Видаляє сесію, якщо вона прострочена. Повідомлення користувачу - відповідальність API шару.
+        Видаляє сесію, якщо вона прострочена.
 
         :param session_token: Токен сесії (UUID).
-        :return: Об'єкт UserSession, якщо знайдено та валідний, інакше None.
+        :return: Об'єкт UserSessionResponse, якщо знайдено та валідний, інакше None.
         """
-        logger.debug(f"Спроба отримання сесії за токеном: {session_token}")
+        logger.debug(f"Спроба отримання сесії за токеном (UUID): {session_token}")
 
         stmt = select(UserSession).options(selectinload(UserSession.user)).where(
-            UserSession.session_token == session_token)
+            UserSession.session_token == str(session_token) # Порівнюємо з рядковим представленням UUID
+        )
         session_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
 
         if not session_db:
-            logger.warning(f"Сесію з токеном '{session_token}' не знайдено.")
+            logger.warning(f"Сесію з токеном (UUID) '{session_token}' не знайдено.")
             return None
 
         if session_db.expires_at < datetime.now(timezone.utc):
@@ -125,24 +119,21 @@ class UserSessionService(BaseService):
         await self.commit()
 
         logger.info(
-            f"Токен сесії '{session_token}' валідовано для користувача ID '{session_db.user_id}'. Поле 'last_active_at' оновлено.")
-        # Приклад повернення Pydantic схеми:
-        # from backend.app.src.schemas.auth.session import UserSessionResponse
-        # return UserSessionResponse.model_validate(session_db)
-        return session_db
+            f"Токен сесії (UUID) '{session_token}' валідовано для користувача ID '{session_db.user_id}'. Поле 'last_active_at' оновлено.")
+        return UserSessionResponse.model_validate(session_db)
 
-    async def invalidate_session(self, session_token: UUID, user_id: Optional[UUID] = None) -> bool:
+    async def invalidate_session(self, session_token: UUID, user_id: Optional[int] = None) -> bool: # user_id змінено на Optional[int]
         """
         Інвалідує/видаляє конкретну сесію користувача за її токеном.
         Якщо надано user_id, переконується, що сесія належить цьому користувачеві.
 
-        :param session_token: Токен сесії для інвалідації.
-        :param user_id: Якщо надано, перевірити, чи сесія належить цьому користувачеві.
+        :param session_token: Токен сесії (UUID) для інвалідації.
+        :param user_id: ID користувача (int), якщо надано, перевірити, чи сесія належить цьому користувачеві.
         :return: True, якщо сесію знайдено та інвалідовано, інакше False.
         """
-        logger.debug(f"Спроба інвалідації токена сесії: {session_token} для користувача: {user_id or 'будь-який'}")
+        logger.debug(f"Спроба інвалідації токена сесії (UUID): {session_token} для користувача ID: {user_id or 'будь-який'}")
 
-        stmt = select(UserSession).where(UserSession.session_token == session_token)
+        stmt = select(UserSession).where(UserSession.session_token == str(session_token)) # Порівняння з рядком
         if user_id:
             stmt = stmt.where(UserSession.user_id == user_id)
 
@@ -150,24 +141,24 @@ class UserSessionService(BaseService):
 
         if not session_db:
             logger.warning(
-                f"Токен сесії '{session_token}' не знайдено або не належить користувачеві '{user_id}'. Неможливо інвалідувати.")
+                f"Токен сесії (UUID) '{session_token}' не знайдено або не належить користувачеві '{user_id}'. Неможливо інвалідувати.")
             return False
 
         await self.db_session.delete(session_db)
         await self.commit()
         logger.info(
-            f"Токен сесії '{session_token}' для користувача ID '{session_db.user_id}' успішно інвалідовано (видалено).")
+            f"Токен сесії (UUID) '{session_token}' для користувача ID '{session_db.user_id}' успішно інвалідовано (видалено).")
         return True
 
-    async def list_user_sessions(self, user_id: UUID, skip: int = 0, limit: int = 100) -> List[UserSession]:
+    async def list_user_sessions(self, user_id: int, skip: int = 0, limit: int = 100) -> List[UserSessionResponse]: # user_id змінено на int
         """
         Перелічує всі активні (не прострочені) сесії для даного користувача.
         Сортування за `last_active_at` у спадаючому порядку.
 
-        :param user_id: ID користувача.
+        :param user_id: ID користувача (int).
         :param skip: Кількість сесій для пропуску (пагінація).
         :param limit: Максимальна кількість сесій для повернення.
-        :return: Список активних об'єктів UserSession (моделі ORM).
+        :return: Список об'єктів UserSessionResponse (Pydantic схеми) активних сесій.
         """
         logger.debug(f"Перелік активних сесій для користувача ID: {user_id}, пропустити={skip}, ліміт={limit}")
 
@@ -180,28 +171,24 @@ class UserSessionService(BaseService):
 
         sessions_db = (await self.db_session.execute(stmt)).scalars().all()
 
-        # Приклад повернення списку Pydantic схем:
-        # from backend.app.src.schemas.auth.session import UserSessionResponse
-        # response_list = [UserSessionResponse.model_validate(s) for s in sessions_db]
-        # logger.info(f"Отримано {len(response_list)} активних сесій для користувача ID '{user_id}'.")
-        # return response_list
-        logger.info(f"Отримано {len(sessions_db)} активних сесій для користувача ID '{user_id}'.")
-        return sessions_db
+        response_list = [UserSessionResponse.model_validate(s) for s in sessions_db]
+        logger.info(f"Отримано {len(response_list)} активних сесій (UserSessionResponse) для користувача ID '{user_id}'.")
+        return response_list
 
-    async def invalidate_all_user_sessions(self, user_id: UUID, exclude_session_token: Optional[UUID] = None) -> int:
+    async def invalidate_all_user_sessions(self, user_id: int, exclude_session_token: Optional[UUID] = None) -> int: # user_id змінено на int
         """
         Інвалідує/видаляє всі сесії для даного користувача, опціонально виключаючи один токен сесії.
         Корисно для функції "вийти з усіх інших пристроїв".
 
-        :param user_id: ID користувача, чиї сесії потрібно інвалідувати.
-        :param exclude_session_token: Токен сесії, який потрібно залишити активним (наприклад, поточний).
+        :param user_id: ID користувача (int), чиї сесії потрібно інвалідувати.
+        :param exclude_session_token: Токен сесії (UUID), який потрібно залишити активним.
         :return: Кількість інвалідованих сесій.
         """
-        logger.info(f"Інвалідація всіх сесій для користувача ID: {user_id}, виключаючи токен: {exclude_session_token}")
+        logger.info(f"Інвалідація всіх сесій для користувача ID: {user_id}, виключаючи токен (UUID): {exclude_session_token}")
 
         stmt_select = select(UserSession.id).where(UserSession.user_id == user_id)
         if exclude_session_token:
-            stmt_select = stmt_select.where(UserSession.session_token != exclude_session_token)
+            stmt_select = stmt_select.where(UserSession.session_token != str(exclude_session_token)) # Порівняння з рядком
 
         ids_to_delete_result = await self.db_session.execute(stmt_select)
         ids_to_delete = [row[0] for row in ids_to_delete_result.fetchall()]

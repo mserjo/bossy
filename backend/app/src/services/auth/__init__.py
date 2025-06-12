@@ -12,13 +12,13 @@ from backend.app.src.config import logger
 from backend.app.src.services.auth.user import UserService
 from backend.app.src.services.auth.token import TokenService
 from backend.app.src.services.auth.password import PasswordService
-from backend.app.src.services.auth.session import UserSessionService # Або SessionService, якщо назва класу інша
+from backend.app.src.services.auth.session import UserSessionService
 
 __all__ = [
     "UserService",
     "TokenService",
     "PasswordService",
-    "UserSessionService", # Переконайтеся, що ця назва класу є правильною у файлі session.py
+    "UserSessionService",
 ]
 
 logger.info(f"Сервіси автентифікації експортують: {__all__}")

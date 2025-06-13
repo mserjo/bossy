@@ -21,7 +21,7 @@
 """
 
 # import logging # Замінено на централізований логер
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import logger # Стандартизований імпорт логера
 
 # Головний роутер API буде визначено в api.router та імпортовано звідти
 # для підключення в main.py додатку.

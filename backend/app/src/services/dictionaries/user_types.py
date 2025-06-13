@@ -2,21 +2,23 @@
 # import logging # Замінено на централізований логер
 from typing import Optional # Потрібно для прикладу кастомного методу
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.future import select # Для потенційних кастомних методів
+# from sqlalchemy.future import select # Видалено
 
 # Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.dictionaries.user_types import UserType # Модель SQLAlchemy
+from backend.app.src.repositories.dictionaries.user_type_repository import UserTypeRepository # Імпорт репозиторію
+from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.user_types import ( # Схеми Pydantic
     UserTypeCreate,
     UserTypeUpdate,
     UserTypeResponse,
 )
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import logger # Стандартизований імпорт логера
 from backend.app.src.config import settings # Для доступу до налаштувань системи (наприклад, коду типу користувача за замовчуванням)
 
 
-class UserTypeService(BaseDictionaryService[UserType, UserTypeCreate, UserTypeUpdate, UserTypeResponse]):
+class UserTypeService(BaseDictionaryService[UserType, UserTypeRepository, UserTypeCreate, UserTypeUpdate, UserTypeResponse]): # Додано UserTypeRepository до Generic
     """
     Сервіс для управління елементами довідника "Типи Користувачів".
     Типи користувачів визначають різні категорії користувачів у системі
@@ -24,13 +26,21 @@ class UserTypeService(BaseDictionaryService[UserType, UserTypeCreate, UserTypeUp
     Успадковує загальні CRUD-операції від BaseDictionaryService.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService):
         """
         Ініціалізує сервіс UserTypeService.
 
         :param db_session: Асинхронна сесія бази даних SQLAlchemy.
+        :param cache_service: Екземпляр сервісу кешування.
         """
-        super().__init__(db_session, model=UserType, response_schema=UserTypeResponse)
+        user_type_repo = UserTypeRepository(model=UserType)
+        super().__init__(
+            db_session,
+            repository=user_type_repo,
+            cache_service=cache_service,
+            response_schema=UserTypeResponse
+        )
+        # _model_name ініціалізується в BaseDictionaryService з repository.model.__name__
         logger.info(f"UserTypeService ініціалізовано для моделі: {self._model_name}")
 
     # --- Кастомні методи для UserTypeService (якщо потрібні) ---

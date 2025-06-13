@@ -5,8 +5,7 @@
 Обробляє логіку зв'язування користувачів з файлами-аватарами,
 встановлення активного аватара та отримання інформації про аватари.
 """
-from typing import List, Optional, Dict, Any # Tuple, Any видалено, Dict додано для update_values
-from uuid import UUID
+from typing import List, Optional, Dict, Any # Відновлено Dict, Any
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +24,7 @@ from backend.app.src.config import logger  # Використання спіль
 from backend.app.src.config import settings
 
 
-class UserAvatarService(BaseService): # type: ignore
+class UserAvatarService(BaseService): # type: ignore видалено
     """
     Сервіс для управління аватарами користувачів.
     Обробляє зв'язування користувачів з їхніми зображеннями-аватарами (FileRecords)
@@ -36,7 +35,7 @@ class UserAvatarService(BaseService): # type: ignore
         super().__init__(db_session)
         logger.info("UserAvatarService ініціалізовано.")
 
-    async def _get_user_avatar_link_by_id_orm(self, user_avatar_id: UUID) -> Optional[UserAvatar]:
+    async def _get_user_avatar_link_by_id_orm(self, user_avatar_id: int) -> Optional[UserAvatar]: # user_avatar_id: UUID -> int
         """Внутрішній метод для отримання ORM моделі UserAvatar з усіма зв'язками."""
         stmt = select(UserAvatar).options(
             selectinload(UserAvatar.user).options(selectinload(User.user_type)),
@@ -54,17 +53,17 @@ class UserAvatarService(BaseService): # type: ignore
 
     async def set_user_avatar(
             self,
-            user_id: UUID,
-            file_id: UUID,
-            set_by_user_id: Optional[UUID] = None
-    ) -> UserAvatarResponse: # type: ignore
+            user_id: int, # UUID -> int
+            file_id: int, # UUID -> int (FileRecord.id is int)
+            set_by_user_id: Optional[int] = None # Optional[UUID] -> Optional[int]
+    ) -> UserAvatarResponse: # type: ignore видалено
         """
         Встановлює або змінює активний аватар для користувача.
         Деактивує попередні активні аватари.
 
-        :param user_id: ID користувача, для якого встановлюється аватар.
-        :param file_id: ID запису файлу (FileRecord), який буде аватаром.
-        :param set_by_user_id: ID користувача, що виконує операцію (за замовчуванням = user_id).
+        :param user_id: ID користувача (int), для якого встановлюється аватар.
+        :param file_id: ID запису файлу (FileRecord) (int), який буде аватаром.
+        :param set_by_user_id: ID користувача (int), що виконує операцію (за замовчуванням = user_id).
         :return: Pydantic схема UserAvatarResponse для активного зв'язку аватара.
         :raises ValueError: Якщо користувача, файл не знайдено, або файл не є зображенням. # i18n
         """
@@ -89,9 +88,10 @@ class UserAvatarService(BaseService): # type: ignore
             raise ValueError(f"Файл '{file_record.file_name}' не є дійсним зображенням для аватара.")
 
         # Атомарна деактивація існуючих активних аватарів для цього користувача
+        # Логіка updated_by_user_id видалена, оскільки поле відсутнє в моделі UserAvatar
         update_values: Dict[str, Any] = {"is_active": False, "updated_at": datetime.now(timezone.utc)}
-        if hasattr(UserAvatar, 'updated_by_user_id'):  # Перевірка наявності поля перед додаванням
-            update_values["updated_by_user_id"] = actor_user_id
+        # if hasattr(UserAvatar, 'updated_by_user_id'):
+        #     update_values["updated_by_user_id"] = actor_user_id
 
         stmt_deactivate = UserAvatar.__table__.update().where(
             UserAvatar.user_id == user_id,
@@ -112,20 +112,21 @@ class UserAvatarService(BaseService): # type: ignore
                 f"Повторна активація існуючого зв'язку аватара між користувачем ID '{user_id}' та файлом ID '{file_id}'.")
             avatar_link_db.is_active = True
             avatar_link_db.updated_at = current_time
-            if hasattr(UserAvatar, 'updated_by_user_id'):
-                avatar_link_db.updated_by_user_id = actor_user_id
+            # Логіка updated_by_user_id видалена
+            # if hasattr(UserAvatar, 'updated_by_user_id'):
+            #     avatar_link_db.updated_by_user_id = actor_user_id
         else:  # Створюємо новий зв'язок
             logger.info(f"Створення нового зв'язку аватара для користувача ID '{user_id}' з файлом ID '{file_id}'.")
-            create_data: Dict[str, Any] = {
+            # Логіка created_by_user_id та updated_by_user_id видалена
+            create_data: Dict[str, Any] = { # Dict та Any тут ще потрібні
                 "user_id": user_id,
                 "file_id": file_id,
                 "is_active": True,
-                # created_at та updated_at встановлюються моделлю або БД за замовчуванням
             }
-            if hasattr(UserAvatar, 'created_by_user_id'):
-                create_data['created_by_user_id'] = actor_user_id
-            if hasattr(UserAvatar, 'updated_by_user_id'):
-                create_data['updated_by_user_id'] = actor_user_id  # Також встановлюємо при створенні
+            # if hasattr(UserAvatar, 'created_by_user_id'):
+            #     create_data['created_by_user_id'] = actor_user_id
+            # if hasattr(UserAvatar, 'updated_by_user_id'):
+            #     create_data['updated_by_user_id'] = actor_user_id
 
             avatar_link_db = UserAvatar(**create_data)
             self.db_session.add(avatar_link_db)
@@ -150,7 +151,7 @@ class UserAvatarService(BaseService): # type: ignore
             f"Аватар (Файл ID: '{file_id}') успішно встановлено як активний для користувача ID '{user_id}'. ID Зв'язку: {refreshed_avatar_link_db.id}")
         return UserAvatarResponse.model_validate(refreshed_avatar_link_db)  # Pydantic v2
 
-    async def get_active_user_avatar(self, user_id: UUID) -> Optional[UserAvatarResponse]:
+    async def get_active_user_avatar(self, user_id: int) -> Optional[UserAvatarResponse]: # user_id: UUID -> int
         """Отримує активний аватар для вказаного користувача."""
         logger.debug(f"Спроба отримання активного аватара для користувача ID: {user_id}")
 
@@ -178,7 +179,7 @@ class UserAvatarService(BaseService): # type: ignore
         logger.info(f"Активний аватар для користувача ID '{user_id}' не знайдено.")
         return None
 
-    async def list_user_avatars(self, user_id: UUID, skip: int = 0, limit: int = 10) -> List[UserAvatarResponse]:
+    async def list_user_avatars(self, user_id: int, skip: int = 0, limit: int = 10) -> List[UserAvatarResponse]: # user_id: UUID -> int
         """Перелічує всі аватари (активні та неактивні) для вказаного користувача."""
         logger.debug(f"Перелік всіх аватарів для користувача ID: {user_id}, пропустити={skip}, ліміт={limit}")
 
@@ -198,14 +199,12 @@ class UserAvatarService(BaseService): # type: ignore
         logger.info(f"Отримано {len(response_list)} записів аватарів для користувача ID '{user_id}'.")
         return response_list
 
-    async def deactivate_user_avatar(self, user_avatar_id: UUID, current_user_id: UUID) -> bool:
+    async def deactivate_user_avatar(self, user_avatar_id: int, current_user_id: int) -> bool: # ID змінено на int
         """
         Деактивує конкретний зв'язок аватара користувача.
         Користувач може деактивувати тільки власний аватар, якщо не має адмінських прав.
         """
-        # TODO: Розширити логіку авторизації: адміністратор може деактивувати чужий аватар.
-        #  Наразі користувач може деактивувати лише власний аватар через user_avatar_id.
-        #  Потрібно перевіряти, що user_avatar_id належить current_user_id.
+        # TODO: [Authorization] Розширити логіку авторизації: адміністратор (перевіряючи права `current_user_id`) повинен мати можливість деактивувати чужий аватар.
         logger.debug(f"Користувач ID '{current_user_id}' намагається деактивувати зв'язок аватара ID: {user_avatar_id}")
 
         user_avatar_db = await self.db_session.get(UserAvatar, user_avatar_id)
@@ -214,9 +213,8 @@ class UserAvatarService(BaseService): # type: ignore
             return False
 
         # Перевірка авторизації: користувач може деактивувати тільки свій зв'язок аватара
+        # Більш детальна логіка авторизації (адмін/суперюзер) має бути тут, як зазначено в TODO вище.
         if user_avatar_db.user_id != current_user_id:
-            # TODO: Додати перевірку, чи є `current_user_id` адміністратором/суперкористувачем,
-            #  який може мати право деактивувати чужі аватари.
             logger.error(
                 f"Користувач ID '{current_user_id}' не авторизований для деактивації зв'язку аватара ID '{user_avatar_id}', що належить користувачу ID '{user_avatar_db.user_id}'.")
             # i18n
@@ -228,8 +226,9 @@ class UserAvatarService(BaseService): # type: ignore
 
         user_avatar_db.is_active = False
         user_avatar_db.updated_at = datetime.now(timezone.utc)
-        if hasattr(user_avatar_db, 'updated_by_user_id'):
-            user_avatar_db.updated_by_user_id = current_user_id
+        # Логіка updated_by_user_id видалена
+        # if hasattr(user_avatar_db, 'updated_by_user_id'):
+        #     user_avatar_db.updated_by_user_id = current_user_id
 
         self.db_session.add(user_avatar_db)
         await self.commit()

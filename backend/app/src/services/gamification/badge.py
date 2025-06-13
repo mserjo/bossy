@@ -1,16 +1,17 @@
 # backend/app/src/services/gamification/badge.py
 # import logging # Замінено на централізований логер
-from typing import List, Optional, Any
-from uuid import UUID
+from typing import List, Optional # Any видалено
 from datetime import datetime, timezone  # Додано для updated_at
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+from sqlalchemy import select # sqlalchemy.future видалено
 from sqlalchemy.orm import selectinload  # Додано для завантаження зв'язків
 
 # Повні шляхи імпорту
-from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
+from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService # BaseDictionaryService -> BaseService (помилка в оригіналі, має бути BaseDictionaryService)
 from backend.app.src.models.gamification.badge import Badge  # Модель SQLAlchemy Badge
+from backend.app.src.repositories.gamification.badge_repository import BadgeRepository # Імпорт репозиторію
+from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.models.auth.user import User  # Для зв'язків created_by_user, updated_by_user
 from backend.app.src.models.files.file import FileRecord  # Для зв'язку icon_file
 from backend.app.src.models.groups.group import Group  # Для зв'язку group
@@ -19,11 +20,11 @@ from backend.app.src.schemas.gamification.badge import (  # Схеми Pydantic
     BadgeUpdate,
     BadgeResponse,
 )
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import logger  # Стандартизований імпорт логера
 from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
 
-class BadgeService(BaseDictionaryService[Badge, BadgeCreate, BadgeUpdate, BadgeResponse]):
+class BadgeService(BaseDictionaryService[Badge, BadgeRepository, BadgeCreate, BadgeUpdate, BadgeResponse]): # Додано BadgeRepository до Generic
     """
     Сервіс для управління визначеннями Значків (Бейджів).
     Бейджі - це нагороди, які користувачі можуть заробити, визначені критеріями,
@@ -32,13 +33,21 @@ class BadgeService(BaseDictionaryService[Badge, BadgeCreate, BadgeUpdate, BadgeR
     Унікальність поля `name` перевіряється в межах групи (якщо `group_id` вказано) або глобально.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService):
         """
         Ініціалізує сервіс BadgeService.
 
         :param db_session: Асинхронна сесія бази даних SQLAlchemy.
+        :param cache_service: Екземпляр сервісу кешування.
         """
-        super().__init__(db_session, model=Badge, response_schema=BadgeResponse)
+        badge_repo = BadgeRepository(model=Badge)
+        super().__init__(
+            db_session,
+            repository=badge_repo,
+            cache_service=cache_service,
+            response_schema=BadgeResponse
+        )
+        # _model_name ініціалізується в BaseDictionaryService з repository.model.__name__
         logger.info(f"BadgeService ініціалізовано для моделі: {self._model_name}")
 
     async def _load_relations(self, query: select) -> select:
@@ -50,8 +59,11 @@ class BadgeService(BaseDictionaryService[Badge, BadgeCreate, BadgeUpdate, BadgeR
             selectinload(Badge.updated_by_user).options(selectinload(User.user_type))
         )
 
-    async def get_by_id(self, item_id: UUID) -> Optional[BadgeResponse]:
-        """Отримує бейдж за ID з усіма пов'язаними сутностями."""
+    async def get_by_id(self, item_id: int) -> Optional[BadgeResponse]: # item_id: UUID -> int
+        """
+        Отримує бейдж за ID з усіма пов'язаними сутностями.
+        :param item_id: ID бейджа (int).
+        """
         logger.debug(f"Спроба отримання {self._model_name} (Бейдж) за ID: {item_id}")
         stmt = await self._load_relations(select(self.model).where(self.model.id == item_id))
         item_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
@@ -62,13 +74,13 @@ class BadgeService(BaseDictionaryService[Badge, BadgeCreate, BadgeUpdate, BadgeR
         logger.info(f"{self._model_name} з ID '{item_id}' не знайдено.")
         return None
 
-    async def get_badge_by_name(self, name: str, group_id: Optional[UUID] = None) -> Optional[BadgeResponse]:
+    async def get_badge_by_name(self, name: str, group_id: Optional[int] = None) -> Optional[BadgeResponse]: # group_id: Optional[UUID] -> Optional[int]
         """
         Отримує бейдж за його унікальним ім'ям в межах групи або глобально.
         (Замінює get_by_code з базового сервісу, якщо Badge не має поля 'code').
 
         :param name: Ім'я бейджа.
-        :param group_id: ID групи (None для глобальних бейджів).
+        :param group_id: ID групи (Optional[int], None для глобальних бейджів).
         :return: Pydantic схема BadgeResponse або None.
         """
         logger.debug(f"Спроба отримання Бейджа за ім'ям: '{name}', група ID: {group_id}")
@@ -88,7 +100,7 @@ class BadgeService(BaseDictionaryService[Badge, BadgeCreate, BadgeUpdate, BadgeR
         logger.info(f"{self._model_name} з ім'ям '{name}' (група ID: {group_id}) не знайдено.")
         return None
 
-    async def get_all(self, skip: int = 0, limit: int = 100, group_id: Optional[UUID] = None,
+    async def get_all(self, skip: int = 0, limit: int = 100, group_id: Optional[int] = None, # group_id: Optional[UUID] -> Optional[int]
                       include_global: bool = False) -> List[BadgeResponse]:
         """
         Отримує список бейджів з пагінацією.
@@ -96,7 +108,7 @@ class BadgeService(BaseDictionaryService[Badge, BadgeCreate, BadgeUpdate, BadgeR
 
         :param skip: Кількість записів для пропуску.
         :param limit: Максимальна кількість записів.
-        :param group_id: ID групи для фільтрації.
+        :param group_id: ID групи (Optional[int]) для фільтрації.
         :param include_global: Якщо True і group_id вказано, також включає глобальні бейджі.
                                Якщо group_id не вказано, цей параметр не має ефекту (показує всі).
                                Для показу ТІЛЬКИ глобальних, group_id має бути None, а include_global=True (або спец. параметр).
@@ -131,8 +143,8 @@ class BadgeService(BaseDictionaryService[Badge, BadgeCreate, BadgeUpdate, BadgeR
         logger.info(f"Отримано {len(response_list)} {self._model_name} елементів.")
         return response_list
 
-    async def _check_name_uniqueness(self, name: str, group_id: Optional[UUID],
-                                     item_id_to_exclude: Optional[UUID] = None) -> None:
+    async def _check_name_uniqueness(self, name: str, group_id: Optional[int], # group_id: Optional[UUID] -> Optional[int]
+                                     item_id_to_exclude: Optional[int] = None) -> None: # item_id_to_exclude: Optional[UUID] -> Optional[int]
         """Перевіряє унікальність імені бейджа в межах групи або глобально."""
         stmt = select(self.model.id).where(self.model.name == name)
         scope_log_msg = "глобальній області"  # i18n
@@ -151,8 +163,12 @@ class BadgeService(BaseDictionaryService[Badge, BadgeCreate, BadgeUpdate, BadgeR
             logger.warning(msg)
             raise ValueError(msg)
 
-    async def create(self, data: BadgeCreate, created_by_user_id: UUID) -> BadgeResponse:
-        """Створює новий бейдж."""
+    async def create(self, data: BadgeCreate, created_by_user_id: int) -> BadgeResponse: # created_by_user_id: UUID -> int
+        """
+        Створює новий бейдж.
+        :param data: Дані для створення.
+        :param created_by_user_id: ID користувача (int), що створює запис.
+        """
         logger.debug(f"Спроба створення нового {self._model_name} (Бейдж) з ім'ям: '{data.name}'")
         await self._check_name_uniqueness(data.name, data.group_id)
 
@@ -180,8 +196,13 @@ class BadgeService(BaseDictionaryService[Badge, BadgeCreate, BadgeUpdate, BadgeR
         logger.info(f"{self._model_name} '{refreshed_item.name}' ID: {refreshed_item.id} успішно створено.")
         return refreshed_item
 
-    async def update(self, item_id: UUID, data: BadgeUpdate, updated_by_user_id: UUID) -> Optional[BadgeResponse]:
-        """Оновлює існуючий бейдж."""
+    async def update(self, item_id: int, data: BadgeUpdate, updated_by_user_id: int) -> Optional[BadgeResponse]: # item_id, updated_by_user_id: UUID -> int
+        """
+        Оновлює існуючий бейдж.
+        :param item_id: ID бейджа (int) для оновлення.
+        :param data: Дані для оновлення.
+        :param updated_by_user_id: ID користувача (int), що виконує оновлення.
+        """
         logger.debug(f"Спроба оновлення {self._model_name} (Бейдж) з ID: {item_id}")
 
         item_db = (await self.db_session.execute(

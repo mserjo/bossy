@@ -2,11 +2,14 @@
 """
 Сервіс для управління досягненнями користувачів.
 
+# Примітка: Тип ID для UserAchievement (achievement_id) та Badge (badge_id) припускається як int, оскільки моделі не були надані для перевірки.
+"""
+Сервіс для управління досягненнями користувачів.
+
 Відповідає за логіку нагородження користувачів бейджами (досягненнями)
 та отримання інформації про їхні досягнення.
 """
-from typing import List, Optional, Dict, Any # Tuple, Any видалено, Dict може бути корисним
-from uuid import UUID
+from typing import List, Optional, Dict, Any # Dict, Any залишені для new_achievement_data
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,7 +31,7 @@ from backend.app.src.config import logger  # Використання спіль
 from backend.app.src.config import settings
 
 
-class UserAchievementService(BaseService): # type: ignore
+class UserAchievementService(BaseService): # type: ignore видалено
     """
     Сервіс для управління досягненнями користувачів (нагородження користувачів значками-бейджами).
     Обробляє створення та отримання записів UserAchievement.
@@ -40,8 +43,11 @@ class UserAchievementService(BaseService): # type: ignore
         super().__init__(db_session)
         logger.info("UserAchievementService ініціалізовано.")
 
-    async def _get_orm_user_achievement_by_id(self, achievement_id: UUID) -> Optional[UserAchievement]:
-        """Внутрішній метод для отримання ORM моделі UserAchievement з усіма зв'язками."""
+    async def _get_orm_user_achievement_by_id(self, achievement_id: int) -> Optional[UserAchievement]: # achievement_id: UUID -> int
+        """
+        Внутрішній метод для отримання ORM моделі UserAchievement з усіма зв'язками.
+        :param achievement_id: ID запису досягнення (int).
+        """
         stmt = select(UserAchievement).options(
             selectinload(UserAchievement.user).options(selectinload(User.user_type)),
             selectinload(UserAchievement.badge),
@@ -57,18 +63,18 @@ class UserAchievementService(BaseService): # type: ignore
 
     async def award_achievement_to_user(
             self,
-            user_id: UUID,
-            badge_id: UUID,
+            user_id: int, # UUID -> int
+            badge_id: int, # UUID -> int
             achievement_data: UserAchievementCreate,
-            awarded_by_user_id: Optional[UUID] = None
-    ) -> UserAchievementResponse: # type: ignore
+            awarded_by_user_id: Optional[int] = None # Optional[UUID] -> Optional[int]
+    ) -> UserAchievementResponse: # type: ignore видалено
         """
         Нагороджує користувача досягненням (бейджем).
 
-        :param user_id: ID користувача, якому надається досягнення.
-        :param badge_id: ID бейджа, що надається.
+        :param user_id: ID користувача (int), якому надається досягнення.
+        :param badge_id: ID бейджа (int), що надається.
         :param achievement_data: Дані для створення запису UserAchievement (контекст, група).
-        :param awarded_by_user_id: ID користувача, який нагородив (якщо застосовно).
+        :param awarded_by_user_id: ID користувача (int), який нагородив (якщо застосовно).
         :return: Pydantic схема UserAchievementResponse.
         :raises ValueError: Якщо користувача, бейдж, або групу не знайдено, або бейдж не повторюваний і вже є. # i18n
         :raises RuntimeError: У разі неконсистентності даних після коміту.
@@ -135,18 +141,21 @@ class UserAchievementService(BaseService): # type: ignore
             raise
 
         # Отримуємо повний об'єкт для відповіді після успішного коміту
-        refreshed_achievement = await self._get_orm_user_achievement_by_id(new_achievement_db.id) # type: ignore
+        refreshed_achievement = await self._get_orm_user_achievement_by_id(new_achievement_db.id) # type: ignore видалено
         if not refreshed_achievement:
             logger.critical(
-                f"Не вдалося отримати щойно створене досягнення ID {new_achievement_db.id} після коміту.") # type: ignore
+                f"Не вдалося отримати щойно створене досягнення ID {new_achievement_db.id} після коміту.")
             raise RuntimeError("Критична помилка: не вдалося отримати запис досягнення після збереження.") # i18n
 
         logger.info(
             f"Досягнення (Бейдж ID: '{badge_id}') успішно надано користувачу ID '{user_id}'. ID Запису: {refreshed_achievement.id}")
         return UserAchievementResponse.model_validate(refreshed_achievement)
 
-    async def get_user_achievement_by_id(self, achievement_id: UUID) -> Optional[UserAchievementResponse]:
-        """Отримує конкретний запис про нагородження досягненням за його ID."""
+    async def get_user_achievement_by_id(self, achievement_id: int) -> Optional[UserAchievementResponse]: # achievement_id: UUID -> int
+        """
+        Отримує конкретний запис про нагородження досягненням за його ID.
+        :param achievement_id: ID запису досягнення (int).
+        """
         logger.debug(f"Спроба отримання запису досягнення за ID: {achievement_id}")
         try:
             achievement_db = await self._get_orm_user_achievement_by_id(achievement_id)
@@ -162,16 +171,18 @@ class UserAchievementService(BaseService): # type: ignore
 
     async def list_achievements_for_user(
             self,
-            session: AsyncSession, # Додано session
-            user_id: UUID,
-            group_id: Optional[UUID] = None,
+            # session: AsyncSession, # Видалено параметр session
+            user_id: int, # UUID -> int
+            group_id: Optional[int] = None, # Optional[UUID] -> Optional[int]
             filter_global_only: bool = False,
             skip: int = 0,
             limit: int = 100
-    ) -> List[UserAchievementResponse]: # Tuple замінено на List, оскільки count не повертався
+    ) -> List[UserAchievementResponse]:
         """
         Перелічує досягнення для вказаного користувача.
         Може фільтрувати за групою або показувати тільки глобальні досягнення.
+        :param user_id: ID користувача (int).
+        :param group_id: ID групи (Optional[int]).
         """
         log_ctx_parts = [f"користувач ID '{user_id}'"]
         if group_id: log_ctx_parts.append(f"група ID '{group_id}'")
@@ -194,7 +205,7 @@ class UserAchievementService(BaseService): # type: ignore
 
             stmt = stmt.order_by(UserAchievement.achieved_at.desc()).offset(skip).limit(limit)
 
-            achievements_db_result = await session.execute(stmt) # Використовуємо передану сесію
+            achievements_db_result = await self.db_session.execute(stmt) # Використання self.db_session
             achievements_db = list(achievements_db_result.scalars().unique().all())
 
             response_list = [UserAchievementResponse.model_validate(ach) for ach in achievements_db]
@@ -206,9 +217,9 @@ class UserAchievementService(BaseService): # type: ignore
 
     async def list_users_for_badge(
             self,
-            session: AsyncSession, # Додано session
-            badge_id: UUID,
-            group_id: Optional[UUID] = None,
+            # session: AsyncSession, # Видалено параметр session
+            badge_id: int, # UUID -> int
+            group_id: Optional[int] = None, # Optional[UUID] -> Optional[int]
             filter_global_only: bool = False,
             skip: int = 0,
             limit: int = 100
@@ -216,6 +227,8 @@ class UserAchievementService(BaseService): # type: ignore
         """
         Перелічує користувачів (через їхні записи UserAchievement), які отримали вказаний бейдж.
         Може фільтрувати за групою або показувати тільки глобальні нагородження цим бейджем.
+        :param badge_id: ID бейджа (int).
+        :param group_id: ID групи (Optional[int]).
         """
         log_ctx_parts = [f"бейдж ID '{badge_id}'"]
         if group_id: log_ctx_parts.append(f"група ID '{group_id}'")
@@ -238,7 +251,7 @@ class UserAchievementService(BaseService): # type: ignore
 
             stmt = stmt.order_by(UserAchievement.achieved_at.desc()).offset(skip).limit(limit)
 
-            achievements_db_result = await session.execute(stmt) # Використовуємо передану сесію
+            achievements_db_result = await self.db_session.execute(stmt) # Використання self.db_session
             achievements_db = list(achievements_db_result.scalars().unique().all())
 
             response_list = [UserAchievementResponse.model_validate(ach) for ach in achievements_db]

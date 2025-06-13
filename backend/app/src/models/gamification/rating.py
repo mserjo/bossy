@@ -44,8 +44,7 @@ class UserGroupRating(Base, TimestampedMixin):
         rating_score (Mapped[int]): Розрахований рейтинг або кількість балів.
         period_start_date (Mapped[Optional[date]]): Дата початку періоду, за який розраховано рейтинг (якщо застосовно).
         period_end_date (Mapped[Optional[date]]): Дата кінця періоду, за який розраховано рейтинг (якщо застосовно).
-        rating_type (Mapped[Optional[str]]): Тип рейтингу (наприклад, "monthly", "overall").
-                                             TODO: Використовувати Enum `RatingType`.
+        rating_type (Mapped[Optional[RatingType]]): Тип рейтингу (наприклад, "monthly", "overall"). # Використовує Enum RatingType
 
         user (Mapped["User"]): Зв'язок з моделлю `User`.
         group (Mapped["Group"]): Зв'язок з моделлю `Group`.
@@ -127,7 +126,7 @@ if __name__ == "__main__":
         user_id=101,
         group_id=202,
         rating_score=1500,
-        rating_type=RatingType.OVERALL,  # Використання Enum
+        rating_type=RatingType.OVERALL,
         period_end_date=None  # Для загального рейтингу може не бути дати кінця періоду
     )
     # Імітуємо часові мітки

@@ -63,7 +63,7 @@ class AccountTransaction(Base, TimestampedMixin):
         primary_key=True, index=True, autoincrement=True, comment="Унікальний ідентифікатор транзакції"
     )
     account_id: Mapped[int] = mapped_column(
-        ForeignKey('user_accounts.id', name='fk_account_transaction_account_id', ondelete="RESTRICT"),
+        ForeignKey('user_accounts.id', name='fk_account_transaction_account_id', ondelete="CASCADE"), # Змінено на CASCADE
         nullable=False,
         index=True,
         comment="ID рахунку користувача, до якого відноситься транзакція"

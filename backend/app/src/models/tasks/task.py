@@ -79,9 +79,9 @@ class Task(BaseMainModel):
         nullable=False,
         comment="ID типу завдання з довідника dict_task_types"
     )
-    # TODO: Узгодити використання status_id та успадкованого поля state.
-    # Можливо, state буде використовувати значення з TaskStatus Enum, а state_id (успадковане) - це ForeignKey до dict_statuses.
-    # Локальний status_id більше не потрібен.
+    # Примітка: Поле `state` (str) успадковане від BaseMainModel. Зв'язок `status` (нижче) використовує
+    # успадковане поле `state_id` (FK до dict_statuses) для отримання детального об'єкта статусу.
+    # Локальний status_id було видалено для уникнення дублювання.
     # status_id: Mapped[Optional[int]] = mapped_column(
     #     ForeignKey('dict_statuses.id', name='fk_task_status_id', ondelete='SET NULL'),
     #     nullable=True,
@@ -241,4 +241,3 @@ if __name__ == "__main__":
 
     logger.info(
         "\nПримітка: Для повноцінної роботи з моделлю та її зв'язками потрібна сесія SQLAlchemy та підключення до БД.")
-    logger.info("TODO: Узгодити використання поля 'state' (успадковане) та 'status_id' (специфічне для Task).")

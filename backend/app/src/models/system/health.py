@@ -34,8 +34,7 @@ class ServiceHealthStatus(Base, TimestampedMixin):
     Атрибути:
         id (Mapped[int]): Унікальний ідентифікатор запису стану.
         service_name (Mapped[str]): Унікальна назва сервісу (наприклад, "database", "redis_cache", "payment_gateway").
-        status (Mapped[str]): Поточний статус сервісу (наприклад, "healthy", "unhealthy").
-                              TODO: Використовувати Enum `HealthStatusType`.
+        status (Mapped[HealthStatusType]): Поточний статус сервісу (використовує Enum `HealthStatusType`).
         details (Mapped[Optional[Text]]): Додаткові деталі про стан (наприклад, повідомлення про помилку).
 
         created_at, updated_at: Успадковано. `updated_at` - час останньої перевірки.

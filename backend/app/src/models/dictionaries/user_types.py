@@ -15,7 +15,8 @@
 # Абсолютний імпорт базової моделі для довідників
 from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Можливі додаткові імпорти, якщо будуть специфічні поля:
 # from sqlalchemy.orm import Mapped, mapped_column
@@ -79,11 +80,10 @@ if __name__ == "__main__":
         logger.info("  - %s", field)
 
     # Приклад створення екземпляра (без взаємодії з БД)
-    import uuid
     from datetime import datetime, timezone
 
     example_user_type = UserType(
-        id=uuid.uuid4(),
+        id=1, # id тепер Integer
         name="Звичайний користувач", # TODO i18n: "Звичайний користувач"
         description="Стандартний тип користувача з базовим набором прав та можливостей в системі.", # TODO i18n
         code="REGULAR_USER",  # Може відповідати значенням з core.dicts.UserType Enum

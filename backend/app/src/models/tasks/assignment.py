@@ -37,8 +37,7 @@ class TaskAssignment(Base, TimestampedMixin):
     Атрибути:
         task_id (Mapped[int]): ID завдання (частина складеного первинного ключа, зовнішній ключ до `tasks.id`).
         user_id (Mapped[int]): ID користувача (частина складеного первинного ключа, зовнішній ключ до `users.id`).
-        status (Mapped[Optional[str]]): Статус цього конкретного призначення (наприклад, "assigned", "accepted").
-                                        TODO: Використовувати Enum `TaskAssignmentStatus`.
+        status (Mapped[Optional[TaskAssignmentStatus]]): Статус цього конкретного призначення (використовує Enum `TaskAssignmentStatus`).
         task (Mapped["Task"]): Зв'язок з моделлю `Task`.
         user (Mapped["User"]): Зв'язок з моделлю `User`.
         created_at, updated_at: Часові мітки (успадковано). `created_at` позначає час призначення.

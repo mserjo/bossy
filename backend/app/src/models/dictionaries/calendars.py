@@ -18,7 +18,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 # Абсолютний імпорт базової моделі для довідників
 from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 class CalendarProvider(BaseDictionaryModel):
@@ -87,11 +88,10 @@ if __name__ == "__main__":
         logger.info("  - %s", field)
 
     # Приклад створення екземпляра (без взаємодії з БД)
-    import uuid
     from datetime import datetime, timezone
 
     example_calendar_provider = CalendarProvider(
-        id=uuid.uuid4(),
+        id=1, # id тепер Integer
         name="Google Calendar", # TODO i18n: "Google Calendar"
         description="Інтеграція з Google Calendar для синхронізації завдань та подій.", # TODO i18n
         code="GOOGLE_CALENDAR",

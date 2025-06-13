@@ -18,7 +18,8 @@
 """
 
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Імпорт моделей з відповідних файлів цього пакету
 from backend.app.src.models.auth.user import User

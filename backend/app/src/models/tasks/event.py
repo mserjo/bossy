@@ -55,7 +55,12 @@ class Event(BaseMainModel): # Змінено на BaseMainModel
     assignments: Mapped[List["TaskAssignment"]] = relationship(back_populates="event", cascade="all, delete-orphan", lazy="selectin")
     completions: Mapped[List["TaskCompletion"]] = relationship(back_populates="event", cascade="all, delete-orphan", lazy="selectin")
 
-    created_by_user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, comment="Користувач, який створив подію")
+    created_by_user_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("users.id", name="fk_event_created_by_user_id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Користувач, який створив подію"
+    )
     created_by: Mapped[Optional["User"]] = relationship(foreign_keys=[created_by_user_id], lazy="selectin")
 
     # Зв'язок з групою (group_id успадковано від BaseMainModel через GroupAffiliationMixin)

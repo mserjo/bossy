@@ -70,10 +70,8 @@ class BonusRule(Base, TimestampedMixin, NameDescriptionMixin, StateMixin):
         index=True,
         comment="ID завдання, до якого застосовується правило (якщо є)"
     )
-    # TODO: Розглянути, чи потрібне окреме поле event_id, якщо події є типом завдань.
-    # Якщо так, і 'tasks' є спільною таблицею, то event_id буде вказувати на ту саму таблицю 'tasks'.
-    # Це може бути корисно для семантичного розрізнення або якщо структура подій колись відійде від завдань.
-    # Поле event_id тепер посилається на таблицю 'events'.
+    # Поле event_id тепер посилається на таблицю 'events', що розрізняє Події від Завдань.
+    # Попереднє TODO щодо цього питання було вирішено.
     event_id: Mapped[Optional[int]] = mapped_column(
         ForeignKey('events.id', name='fk_bonus_rule_event_id', ondelete="SET NULL"), # Змінено на events.id
         nullable=True,

@@ -63,7 +63,7 @@ class UserAccount(Base, TimestampedMixin):
     balance: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), default=Decimal("0.00"), nullable=False, comment="Поточний баланс на рахунку"
     )
-    # TODO i18n: default value 'бали' for currency
+    # TODO i18n: Локалізація значення за замовчуванням 'бали' для поля currency.
     currency: Mapped[str] = mapped_column(
         String(10), default='бали', nullable=False, comment="Валюта рахунку (наприклад, бали, очки)"
     )

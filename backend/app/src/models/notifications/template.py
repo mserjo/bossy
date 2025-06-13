@@ -32,8 +32,7 @@ class NotificationTemplate(BaseDictionaryModel):
     Атрибути:
         subject_template (Mapped[str]): Шаблон теми сповіщення (може містити плейсхолдери).
         body_template (Mapped[str]): Шаблон тіла сповіщення (HTML для email, текст для SMS/push, Markdown/JSON для in-app).
-        template_type (Mapped[str]): Тип/канал сповіщення (наприклад, "email", "sms", "in_app").
-                                     TODO: Замінити на Enum `NotificationChannelType`.
+        template_type (Mapped[NotificationChannelType]): Тип/канал сповіщення (використовує Enum `NotificationChannelType`).
     """
     __tablename__ = "notification_templates"
 

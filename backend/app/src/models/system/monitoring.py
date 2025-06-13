@@ -36,8 +36,7 @@ class SystemLog(Base):
     Атрибути:
         id (Mapped[int]): Унікальний ідентифікатор запису логу.
         timestamp (Mapped[datetime]): Час виникнення події логу (за замовчуванням - поточний час сервера).
-        level (Mapped[str]): Рівень логу (наприклад, "INFO", "ERROR", "DEBUG").
-                             TODO: Використовувати Enum `LogLevel`.
+        level (Mapped[LogLevel]): Рівень логу (використовує Enum `LogLevel`).
         message (Mapped[Text]): Основне повідомлення логу.
         source (Mapped[Optional[str]]): Джерело події (наприклад, назва сервісу, модуля, функції).
         details (Mapped[Optional[Dict[str, Any]]]): Додаткові структуровані деталі у форматі JSON.

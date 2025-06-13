@@ -15,7 +15,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.src.models.base import Base  # Успадковуємо від Base
 from backend.app.src.models.mixins import TimestampedMixin  # Додаємо часові мітки
-from backend.app.src.config import logger # Імпорт логера
+from backend.app.src.config.logging import get_logger # Імпорт get_logger
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User  # Для зв'язку user

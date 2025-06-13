@@ -38,8 +38,7 @@ class SystemSetting(Base, TimestampedMixin, NameDescriptionMixin):
         value (Mapped[Optional[str]]): Значення налаштування, збережене як текст.
                                         Може потребувати перетворення залежно від `value_type`.
         description (Mapped[Optional[str]]): Опис налаштування (успадковано).
-        value_type (Mapped[str]): Тип значення ('string', 'integer', 'boolean', 'json', 'list_str').
-                                  TODO: Використовувати Enum `SettingValueType`.
+        value_type (Mapped[SettingValueType]): Тип значення (використовує Enum `SettingValueType`).
         is_editable (Mapped[bool]): Чи може суперкористувач редагувати це налаштування через UI/API.
         is_sensitive (Mapped[bool]): Чи є значення налаштування чутливим (наприклад, API ключ),
                                      що вимагає маскування у UI/логах.

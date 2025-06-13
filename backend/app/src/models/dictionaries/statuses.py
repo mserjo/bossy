@@ -17,7 +17,8 @@
 # Імпорт базової моделі для довідників
 from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 class Status(BaseDictionaryModel):
@@ -80,12 +81,11 @@ if __name__ == "__main__":
 
     # Приклад створення екземпляра (без взаємодії з БД)
     # У реальному коді це робиться через сесію SQLAlchemy.
-    # Для демонстрації потрібно імпортувати datetime та uuid, якщо id є UUID
-    import uuid
+    # Для демонстрації потрібно імпортувати datetime. uuid більше не використовується для id.
     from datetime import datetime, timezone
 
     example_status = Status(
-        id=uuid.uuid4(),  # ID тепер UUID з BaseMainModel
+        id=1,  # id тепер Integer
         name="Активний", # TODO i18n: "Активний"
         description="Статус для активних елементів системи.", # TODO i18n: "Статус для активних елементів системи."
         code="ACTIVE",

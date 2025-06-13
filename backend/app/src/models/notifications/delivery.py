@@ -37,10 +37,8 @@ class NotificationDeliveryAttempt(Base, TimestampedMixin):
     Атрибути:
         id (Mapped[int]): Унікальний ідентифікатор спроби доставки.
         notification_id (Mapped[int]): ID сповіщення, яке намагалися доставити.
-        channel (Mapped[str]): Канал доставки (наприклад, "email", "sms").
-                               TODO: Використовувати Enum `NotificationChannelType`.
-        status (Mapped[str]): Статус спроби доставки (наприклад, "sent", "failed").
-                              TODO: Використовувати Enum `DeliveryStatusType`.
+        channel (Mapped[NotificationChannelType]): Канал доставки (використовує Enum `NotificationChannelType`).
+        status (Mapped[DeliveryStatusType]): Статус спроби доставки (використовує Enum `DeliveryStatusType`).
         error_message (Mapped[Optional[str]]): Повідомлення про помилку, якщо доставка не вдалася.
         external_message_id (Mapped[Optional[str]]): ID повідомлення від зовнішнього провайдера (якщо є).
 

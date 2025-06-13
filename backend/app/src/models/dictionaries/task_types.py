@@ -15,7 +15,8 @@
 # Абсолютний імпорт базової моделі для довідників
 from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Можливі додаткові імпорти SQLAlchemy, якщо будуть специфічні поля:
 # from sqlalchemy.orm import Mapped, mapped_column
@@ -81,11 +82,10 @@ if __name__ == "__main__":
         logger.info("  - %s", field)
 
     # Приклад створення екземпляра (без взаємодії з БД)
-    import uuid
     from datetime import datetime, timezone
 
     example_task_type = TaskType(
-        id=uuid.uuid4(),
+        id=1, # id тепер Integer
         name="Звичайне завдання", # TODO i18n: "Звичайне завдання"
         description="Стандартний тип завдання з базовими параметрами та нарахуванням балів.", # TODO i18n
         code="REGULAR_TASK",  # Може відповідати значенням з core.dicts.TaskType Enum

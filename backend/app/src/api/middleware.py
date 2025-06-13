@@ -9,14 +9,14 @@ Middleware в FastAPI дозволяє обробляти кожен запит 
 """
 
 import time
-# import logging # Замінено на централізований логер
+import logging # Додано імпорт стандартного logging
 from typing import Callable, Awaitable
 
-from fastapi import Request, Response, HTTPException, status
-from starlette.types import ASGIApp  # Для типізації app при реєстрації middleware
+from fastapi import Request, Response # HTTPException, status видалено
+# ASGIApp імпорт видалено
 
 # Повні шляхи імпорту
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import logger  # Стандартизований імпорт логера
 from backend.app.src.config import settings  # Для доступу до налаштувань, наприклад, DEBUG або VALID_API_KEYS
 
 
@@ -54,8 +54,8 @@ async def add_process_time_header_middleware(
     response.headers["X-Process-Time"] = f"{process_time:.4f} сек"
 
     # Логування може бути більш детальним, включаючи статус відповіді
-    # Використовуємо global_settings.DEBUG для визначення рівня деталізації логування
-    log_level = logging.DEBUG if hasattr(global_settings, "DEBUG") and global_settings.DEBUG else logging.INFO
+    # Використовуємо settings.DEBUG для визначення рівня деталізації логування
+    log_level = logging.DEBUG if settings.DEBUG else logging.INFO
     logger.log(
         log_level,
         f"Запит {request.method} {request.url.path} - Статус {response.status_code} - "

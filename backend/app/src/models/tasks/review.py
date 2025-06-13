@@ -78,7 +78,9 @@ class TaskReview(Base, TimestampedMixin):
                                         lazy="selectin")  # back_populates="task_reviews" можна додати до User
 
     # Поля для __repr__
-    _repr_fields = ["id", "task_id", "user_id", "rating"]
+    # `id` автоматично додається через Base.__repr__
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
+    _repr_fields = ("task_id", "user_id", "rating")
 
 
 if __name__ == "__main__":

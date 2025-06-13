@@ -38,9 +38,9 @@ class UserRole(BaseDictionaryModel):
     # Наприклад:
     # permission_level: Mapped[int] = mapped_column(nullable=True, comment="Числовий рівень доступу для ролі")
 
-    # _repr_fields успадковуються та збираються автоматично.
-    # Додавання специфічних полів до __repr__:
-    # _repr_fields = ["permission_level"]
+    # _repr_fields успадковуються та збираються автоматично з BaseDictionaryModel.
+    # Немає додаткових специфічних полів для __repr__ на цьому рівні.
+    _repr_fields: tuple[str, ...] = ()
 
 
 if __name__ == "__main__":

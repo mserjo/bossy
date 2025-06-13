@@ -6,7 +6,7 @@
 # import logging # Замінено на централізований логер
 from typing import Annotated  # Для FastAPI.Depends з Python 3.9+
 
-from fastapi import APIRouter, Depends, HTTPException, status, Response
+from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm  # Для форми логіну
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -16,17 +16,18 @@ from backend.app.src.api.dependencies import (
     get_user_service,  # Отримуємо реальні сервіси
     get_token_service,
     # TODO: Створити/використати залежність, що витягує refresh_token з cookie та валідує його через TokenService
-    #  Наприклад: get_validated_refresh_token_cookie -> Tuple[str, UserModel] (токен_рядок, користувач)
+    #  Наприклад: get_validated_refresh_token_cookie -> Tuple[str, User] (токен_рядок, користувач)
     #  Поки що, будемо використовувати концептуальну залежність або спрощену логіку.
 )
 from backend.app.src.services.auth.user import UserService
 from backend.app.src.services.auth.token import TokenService
-from backend.app.src.models.auth.user import User as UserModel  # Модель SQLAlchemy
+from backend.app.src.models.auth.user import User  # Модель SQLAlchemy
 from backend.app.src.schemas.auth.token import TokenResponse
 # LoginRequest (Pydantic модель) може бути не потрібна, якщо використовувати OAuth2PasswordRequestForm
 # from backend.app.src.schemas.auth.login import LoginRequest # Якщо використовується кастомна схема
 from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings  # Для налаштувань cookie
+from fastapi import Response as FastAPIResponse # для HTTP_204_NO_CONTENT
 
 router = APIRouter()
 
@@ -58,7 +59,7 @@ async def login_for_access_token(
     logger.info(f"Спроба входу для користувача: {form_data.username}")
 
     # Автентифікація користувача через UserService
-    # TODO: UserService повинен мати метод authenticate_user, який повертає UserModel або кидає виняток
+    # TODO: UserService повинен мати метод authenticate_user, який повертає User або кидає виняток
     authenticated_user = await user_service.authenticate_user(
         email=form_data.username,  # OAuth2PasswordRequestForm використовує 'username' для email
         password=form_data.password
@@ -108,7 +109,7 @@ async def login_for_access_token(
 async def get_user_from_valid_refresh_token_cookie(  # Залежність для /refresh та /logout
         request: Request,
         token_service: TokenService = Depends(get_token_service)
-) -> UserModel:
+) -> User:
     """
     Витягує refresh token з cookie, валідує його через TokenService
     (який має обробити JTI, знайти в БД, перевірити revoke status, expiry),
@@ -121,7 +122,7 @@ async def get_user_from_valid_refresh_token_cookie(  # Залежність дл
         # i18n
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Refresh token відсутній.")
 
-    # TokenService.process_refresh_token має повернути UserModel або кинути помилку
+    # TokenService.process_refresh_token має повернути User або кинути помилку
     # Також він має відкликати цей refresh_token (JTI) для ротації.
     user = await token_service.process_refresh_token(refresh_token_jti_str=refresh_token_str)
     if not user:  # Якщо process_refresh_token повертає None при помилці валідації
@@ -143,7 +144,7 @@ async def refresh_access_token(
         response: Response,  # Для встановлення нового refresh_token cookie
         # Залежність, що валідує refresh token з cookie та повертає користувача.
         # TokenService.process_refresh_token має відкликати старий refresh token.
-        current_user: UserModel = Depends(get_user_from_valid_refresh_token_cookie),
+        current_user: User = Depends(get_user_from_valid_refresh_token_cookie),
         token_service: TokenService = Depends(get_token_service)  # Отримуємо TokenService
 ):
     """

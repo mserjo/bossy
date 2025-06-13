@@ -70,9 +70,9 @@ class Reward(BaseMainModel):
     # Можливий зв'язок з транзакціями, якщо потрібно відстежувати покупки нагород
     # transactions: Mapped[List["AccountTransaction"]] = relationship(back_populates="reward", lazy="selectin")
 
-    # _repr_fields успадковуються та збираються з BaseMainModel та його міксинів.
+    # _repr_fields успадковуються та збираються з BaseMainModel та його міксинів (id, name, state_id, group_id, created_at, updated_at тощо).
     # Додаємо специфічні для Reward поля.
-    _repr_fields = ["cost", "quantity_available"]
+    _repr_fields = ("cost", "quantity_available", "icon_url")
 
 
 if __name__ == "__main__":

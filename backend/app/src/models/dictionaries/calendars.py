@@ -21,7 +21,7 @@ from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
 from backend.app.src.config import logger
 
 
-class CalendarProviderModel(BaseDictionaryModel):
+class CalendarProvider(BaseDictionaryModel):
     """Модель SQLAlchemy для довідника "Провайдери Календарів".
 
     Успадковує всі поля від `BaseDictionaryModel` (включаючи `id`, `name`,
@@ -71,10 +71,10 @@ class CalendarProviderModel(BaseDictionaryModel):
 
 
 if __name__ == "__main__":
-    # Демонстраційний блок для моделі CalendarProviderModel.
-    logger.info("--- Модель Довідника: CalendarProviderModel ---")
-    logger.info("Назва таблиці: %s", CalendarProviderModel.__tablename__)
-    logger.info("Коментар до таблиці: %s", getattr(CalendarProviderModel, '__table_args__', ({},))[0].get('comment', ''))
+    # Демонстраційний блок для моделі CalendarProvider.
+    logger.info("--- Модель Довідника: CalendarProvider ---")
+    logger.info("Назва таблиці: %s", CalendarProvider.__tablename__)
+    logger.info("Коментар до таблиці: %s", getattr(CalendarProvider, '__table_args__', ({},))[0].get('comment', ''))
 
     logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = [
@@ -90,7 +90,7 @@ if __name__ == "__main__":
     import uuid
     from datetime import datetime, timezone
 
-    example_calendar_provider = CalendarProviderModel(
+    example_calendar_provider = CalendarProvider(
         id=uuid.uuid4(),
         name="Google Calendar", # TODO i18n: "Google Calendar"
         description="Інтеграція з Google Calendar для синхронізації завдань та подій.", # TODO i18n
@@ -102,8 +102,8 @@ if __name__ == "__main__":
     )
     example_calendar_provider.created_at = datetime.now(timezone.utc) # Імітація
 
-    logger.info("\nПриклад екземпляра CalendarProviderModel (без сесії):\n  %s", example_calendar_provider)
+    logger.info("\nПриклад екземпляра CalendarProvider (без сесії):\n  %s", example_calendar_provider)
     # Очікуваний __repr__ (порядок може відрізнятися):
-    # <CalendarProviderModel(id=..., name='Google Calendar', code='GOOGLE_CALENDAR', is_active=True, state_id=1, created_at=...)>
+    # <CalendarProvider(id=..., name='Google Calendar', code='GOOGLE_CALENDAR', is_active=True, state_id=1, created_at=...)>
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

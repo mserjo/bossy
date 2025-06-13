@@ -15,11 +15,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Абсолютний імпорт базових класів
 from backend.app.src.models.base import Base
 from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.core.dicts import LogLevel # Імпорт Enum
+from sqlalchemy import Enum as SQLEnum # Імпорт SQLEnum
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
-# TODO: Визначити Enum LogLevel в core.dicts.py (може бути схожий на стандартні рівні logging)
-# from backend.app.src.core.dicts import LogLevel as LogLevelEnum
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
@@ -54,10 +54,8 @@ class SystemLog(Base):
         default=func.now, nullable=False, index=True, comment="Час виникнення події логу"
     )
 
-    # TODO: Замінити String на Enum LogLevel, коли він буде визначений в core.dicts.py
-    # level: Mapped[LogLevelEnum] = mapped_column(SQLEnum(LogLevelEnum), nullable=False, index=True)
-    level: Mapped[str] = mapped_column(
-        String(50), nullable=False, index=True, comment="Рівень логу (INFO, ERROR, DEBUG тощо)"
+    level: Mapped[LogLevel] = mapped_column(
+        SQLEnum(LogLevel), nullable=False, index=True, comment="Рівень логу (INFO, ERROR, DEBUG тощо)"
     )
 
     message: Mapped[str] = mapped_column(Text, nullable=False,
@@ -79,7 +77,8 @@ class SystemLog(Base):
     user: Mapped[Optional["User"]] = relationship(lazy="selectin")
 
     # Поля для __repr__
-    _repr_fields = ["id", "timestamp", "level", "source", "user_id"]
+    # `id` автоматично додається через Base.__repr__
+    _repr_fields = ("timestamp", "level", "source", "user_id")
 
 
 class PerformanceMetric(Base):
@@ -119,7 +118,8 @@ class PerformanceMetric(Base):
     )
 
     # Поля для __repr__
-    _repr_fields = ["id", "timestamp", "metric_name", "value", "unit"]
+    # `id` автоматично додається через Base.__repr__
+    _repr_fields = ("timestamp", "metric_name", "value", "unit")
 
 
 if __name__ == "__main__":
@@ -133,7 +133,7 @@ if __name__ == "__main__":
     example_log = SystemLog(
         id=1,
         timestamp=datetime.now(timezone.utc),
-        level="INFO",  # TODO: Замінити на LogLevelEnum.INFO.value
+        level=LogLevel.INFO,  # Використання Enum
         message="Користувач успішно увійшов в систему.",  # TODO i18n
         source="auth_service",
         user_id=101
@@ -155,4 +155,3 @@ if __name__ == "__main__":
     logger.info(f"Приклад екземпляра PerformanceMetric (без сесії):\n  {example_metric}")
 
     logger.info("\nПримітка: Для повноцінної роботи з моделями потрібна сесія SQLAlchemy та підключення до БД.")
-    logger.info("TODO: Не забудьте визначити Enum 'LogLevel' в core.dicts.py та оновити поле 'level' в SystemLog.")

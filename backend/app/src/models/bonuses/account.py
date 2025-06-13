@@ -85,7 +85,9 @@ class UserAccount(Base, TimestampedMixin):
     )
 
     # Поля для __repr__
-    _repr_fields = ["id", "user_id", "group_id", "balance", "currency"]
+    # `id` автоматично додається через Base.__repr__
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
+    _repr_fields = ("user_id", "group_id", "balance", "currency")
 
 
 if __name__ == "__main__":

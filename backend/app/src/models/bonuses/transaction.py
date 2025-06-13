@@ -18,6 +18,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час транзакції
 from backend.app.src.core.dicts import TransactionType  # Enum для типів транзакцій
+from sqlalchemy import Enum as SQLEnum # Імпорт SQLEnum
 from backend.app.src.config.logging import get_logger # Імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
@@ -69,10 +70,8 @@ class AccountTransaction(Base, TimestampedMixin):
     )
 
     # Використовуємо значення з Enum TransactionType
-    # TODO: Переконатися, що SQLEnum імпортовано та використовується, якщо тип колонки в БД є Enum.
-    # transaction_type: Mapped[TransactionType] = mapped_column(SQLEnum(TransactionType), nullable=False)
-    transaction_type: Mapped[str] = mapped_column(
-        String(50), nullable=False, index=True, comment="Тип транзакції (credit, debit, refund тощо)"
+    transaction_type: Mapped[TransactionType] = mapped_column(
+        SQLEnum(TransactionType), nullable=False, index=True, comment="Тип транзакції (credit, debit, refund тощо)"
     )
 
     amount: Mapped[Decimal] = mapped_column(
@@ -111,7 +110,9 @@ class AccountTransaction(Base, TimestampedMixin):
     created_by: Mapped[Optional["User"]] = relationship(foreign_keys=[created_by_user_id], lazy="selectin")
 
     # Поля для __repr__
-    _repr_fields = ["id", "account_id", "transaction_type", "amount"]
+    # `id` автоматично додається через Base.__repr__
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
+    _repr_fields = ("account_id", "transaction_type", "amount")
 
 
 if __name__ == "__main__":
@@ -137,7 +138,7 @@ if __name__ == "__main__":
     example_transaction = AccountTransaction(
         id=1,
         account_id=1,  # ID рахунку UserAccount
-        transaction_type=TransactionType.CREDIT.value,  # Використання значення Enum
+        transaction_type=TransactionType.CREDIT,  # Використання Enum
         amount=Decimal("25.50"),
         description="Бонус за виконання завдання #123"  # TODO i18n
     )
@@ -147,7 +148,7 @@ if __name__ == "__main__":
 
     logger.info(f"\nПриклад екземпляра AccountTransaction (без сесії):\n  {example_transaction}")
     # Очікуваний __repr__ (порядок може відрізнятися):
-    # <AccountTransaction(id=1, account_id=1, transaction_type='credit', amount=Decimal('25.50'), created_at=...)>
+    # <AccountTransaction(id=1, account_id=1, transaction_type=<TransactionType.CREDIT: 'credit'>, amount=Decimal('25.50'), created_at=...)>
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
-    logger.info(f"Використовується TransactionType Enum для поля 'transaction_type', наприклад: TransactionType.DEBIT = '{TransactionType.DEBIT.value}'")
+    logger.info(f"Використовується TransactionType Enum для поля 'transaction_type', наприклад: TransactionType.DEBIT = {TransactionType.DEBIT}")

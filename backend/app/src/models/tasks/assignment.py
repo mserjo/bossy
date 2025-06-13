@@ -16,16 +16,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # Для відстеження часу призначення
 from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.core.dicts import TaskAssignmentStatus # Імпорт Enum
+from sqlalchemy import Enum as SQLEnum # Імпорт SQLEnum
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
-# TODO: Визначити Enum TaskAssignmentStatus в core.dicts.py, наприклад:
-# class TaskAssignmentStatus(str, Enum):
-#     ASSIGNED = "assigned"  # Завдання призначено, очікує на прийняття (якщо потрібно)
-#     ACCEPTED = "accepted"  # Користувач прийняв завдання
-#     DECLINED = "declined"  # Користувач відхилив завдання (якщо завдання не обов'язкове)
-#     IN_PROGRESS = "in_progress" # Користувач активно працює (якщо відрізняється від Task.state)
-# Потім імпортувати: from backend.app.src.core.dicts import TaskAssignmentStatus
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
@@ -63,10 +58,8 @@ class TaskAssignment(Base, TimestampedMixin):
     )
 
     # Статус призначення (може бути корисним, якщо відрізняється від загального статусу завдання)
-    # TODO: Замінити String на Enum TaskAssignmentStatus, коли він буде визначений в core.dicts.py
-    # status: Mapped[TaskAssignmentStatus] = mapped_column(SQLEnum(TaskAssignmentStatus), default=TaskAssignmentStatus.ASSIGNED, nullable=False)
-    status: Mapped[Optional[str]] = mapped_column(
-        String(50), nullable=True, index=True, comment="Статус призначення (напр., assigned, accepted, declined)"
+    status: Mapped[Optional[TaskAssignmentStatus]] = mapped_column(
+        SQLEnum(TaskAssignmentStatus), nullable=True, index=True, comment="Статус призначення (напр., assigned, accepted, declined)"
     )
 
     # Обмеження унікальності для пари task_id та user_id, щоб уникнути дублювання призначень.
@@ -80,7 +73,9 @@ class TaskAssignment(Base, TimestampedMixin):
     user: Mapped["User"] = relationship(lazy="selectin")  # back_populates="task_assignments" може бути додано до User
 
     # Поля для __repr__
-    _repr_fields = ["task_id", "user_id", "status"]  # created_at, updated_at з TimestampedMixin
+    # Ця модель має композитний ПК (task_id, user_id), тому вони повинні бути включені.
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields.
+    _repr_fields = ("task_id", "user_id", "status")
 
 
 if __name__ == "__main__":
@@ -102,7 +97,7 @@ if __name__ == "__main__":
     example_assignment = TaskAssignment(
         task_id=1,
         user_id=101,
-        status="assigned"  # TODO: Замінити на TaskAssignmentStatus.ASSIGNED.value
+        status=TaskAssignmentStatus.ASSIGNED  # Використання Enum
     )
     # Імітуємо часові мітки
     example_assignment.created_at = datetime.now(tz=timezone.utc)
@@ -110,7 +105,6 @@ if __name__ == "__main__":
 
     logger.info(f"\nПриклад екземпляра TaskAssignment (без сесії):\n  {example_assignment}")
     # Очікуваний __repr__ (порядок може відрізнятися):
-    # <TaskAssignment(task_id=1, user_id=101, status='assigned', created_at=...)>
+    # <TaskAssignment(task_id=1, user_id=101, status=<TaskAssignmentStatus.ASSIGNED: 'assigned'>, created_at=...)>
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
-    logger.info("TODO: Не забудьте визначити Enum 'TaskAssignmentStatus' в core.dicts.py та оновити поле 'status'.")

@@ -20,7 +20,7 @@ from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
 from backend.app.src.config import logger
 
 
-class StatusModel(BaseDictionaryModel):
+class Status(BaseDictionaryModel):
     """Модель SQLAlchemy для довідника "Статуси".
 
     Представляє загальні статуси, які можуть бути застосовані до різних
@@ -55,17 +55,17 @@ class StatusModel(BaseDictionaryModel):
     # (наприклад, `is_final_status: Mapped[bool]`), їх слід додати тут.
 
     # _repr_fields визначаються в BaseDictionaryModel та його батьківських класах.
-    # Якщо потрібно додати специфічні для StatusModel поля до __repr__,
+    # Якщо потрібно додати специфічні для Status поля до __repr__,
     # можна визначити тут _repr_fields = ("моє_додаткове_поле",)
     # Поточна реалізація __repr__ в Base збере всі _repr_fields з ієрархії.
     _repr_fields: tuple[str, ...] = () # Немає додаткових полів для __repr__ на цьому рівні
 
 
 if __name__ == "__main__":
-    # Демонстраційний блок для моделі StatusModel.
-    logger.info("--- Модель Довідника: StatusModel ---")
-    logger.info("Назва таблиці: %s", StatusModel.__tablename__)
-    logger.info("Коментар до таблиці: %s", getattr(StatusModel, '__table_args__', ({},))[0].get('comment', ''))
+    # Демонстраційний блок для моделі Status.
+    logger.info("--- Модель Довідника: Status ---")
+    logger.info("Назва таблиці: %s", Status.__tablename__)
+    logger.info("Коментар до таблиці: %s", getattr(Status, '__table_args__', ({},))[0].get('comment', ''))
 
 
     logger.info("\nОчікувані поля (успадковані та власні):")
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     import uuid
     from datetime import datetime, timezone
 
-    example_status = StatusModel(
+    example_status = Status(
         id=uuid.uuid4(),  # ID тепер UUID з BaseMainModel
         name="Активний", # TODO i18n: "Активний"
         description="Статус для активних елементів системи.", # TODO i18n: "Статус для активних елементів системи."

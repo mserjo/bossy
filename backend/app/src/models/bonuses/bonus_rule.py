@@ -28,6 +28,7 @@ from backend.app.src.models.mixins import (
 # Попереднє оголошення типів для уникнення циклічних імпортів
 if TYPE_CHECKING:
     from backend.app.src.models.tasks.task import Task
+    from backend.app.src.models.tasks.event import Event # Додано імпорт Event
     from backend.app.src.models.dictionaries.bonus_types import BonusType
 
 
@@ -43,15 +44,13 @@ class BonusRule(Base, TimestampedMixin, NameDescriptionMixin, StateMixin):
     Атрибути:
         id (Mapped[int]): Унікальний ідентифікатор правила.
         task_id (Mapped[Optional[int]]): ID завдання, до якого застосовується правило (якщо є).
-        event_id (Mapped[Optional[int]]): ID події (також завдання), до якої застосовується правило.
-                                          TODO: Уточнити зв'язок, якщо `event_id` та `task_id` вказують на одну таблицю `tasks`.
-                                                Можливо, достатньо `task_id` та перевірки типу завдання.
+        event_id (Mapped[Optional[int]]): ID події, до якої застосовується правило (якщо є).
         bonus_type_id (Mapped[int]): ID типу бонусу (наприклад, "нагорода", "штраф") з довідника `dict_bonus_types`.
         amount (Mapped[Decimal]): Розмір бонусу/штрафу.
         condition_description (Mapped[Optional[str]]): Текстовий опис умови, за якої спрацьовує правило.
 
         task (Mapped[Optional["Task"]]): Зв'язок з завданням.
-        event_task (Mapped[Optional["Task"]]): Зв'язок з подією (якщо це окреме поле від task_id).
+        event (Mapped[Optional["Event"]]): Зв'язок з подією.
         bonus_type (Mapped["BonusType"]): Зв'язок з типом бонусу.
         created_at, updated_at: Успадковано.
         name, description: Успадковано.
@@ -74,13 +73,12 @@ class BonusRule(Base, TimestampedMixin, NameDescriptionMixin, StateMixin):
     # TODO: Розглянути, чи потрібне окреме поле event_id, якщо події є типом завдань.
     # Якщо так, і 'tasks' є спільною таблицею, то event_id буде вказувати на ту саму таблицю 'tasks'.
     # Це може бути корисно для семантичного розрізнення або якщо структура подій колись відійде від завдань.
-    # Поки що, якщо подія - це Task з типом "event", event_id може бути зайвим або дублювати task_id.
-    # Залишимо його опціональним і з можливістю вказувати на ту ж таблицю.
+    # Поле event_id тепер посилається на таблицю 'events'.
     event_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey('tasks.id', name='fk_bonus_rule_event_id', ondelete="SET NULL"),
+        ForeignKey('events.id', name='fk_bonus_rule_event_id', ondelete="SET NULL"), # Змінено на events.id
         nullable=True,
         index=True,
-        comment="ID події (завдання типу 'event'), до якої застосовується правило (якщо є)"
+        comment="ID події, до якої застосовується правило (якщо є, FK до events.id)"
     )
 
     bonus_type_id: Mapped[int] = mapped_column(
@@ -100,16 +98,15 @@ class BonusRule(Base, TimestampedMixin, NameDescriptionMixin, StateMixin):
 
     # --- Зв'язки (Relationships) ---
     task: Mapped[Optional["Task"]] = relationship(foreign_keys=[task_id], back_populates="bonus_rules", lazy="selectin")
-    # Якщо event_id використовується і вказує на ту ж таблицю 'tasks', потрібен інший foreign_keys список
-    # або інша назва зв'язку, щоб уникнути конфлікту з 'task'.
-    event_task: Mapped[Optional["Task"]] = relationship(foreign_keys=[event_id],
-                                                        lazy="selectin")  # Немає back_populates, якщо Task не має окремого зв'язку для event_bonus_rules
+    event: Mapped[Optional["Event"]] = relationship(foreign_keys=[event_id],
+                                                     lazy="selectin")  # Змінено event_task на event, тип на Event. back_populates для Event.bonus_rules (якщо потрібно)
 
     bonus_type: Mapped["BonusType"] = relationship(foreign_keys=[bonus_type_id], lazy="selectin")
 
-    # _repr_fields збираються з Base та міксинів.
+    # _repr_fields збираються з Base та міксинів (name, state_id, created_at, updated_at).
+    # `id` автоматично додається через Base.__repr__.
     # Додаємо специфічні для BonusRule поля.
-    _repr_fields = ["id", "task_id", "event_id", "bonus_type_id", "amount"]
+    _repr_fields = ("task_id", "event_id", "bonus_type_id", "amount")
 
 
 if __name__ == "__main__":
@@ -128,7 +125,7 @@ if __name__ == "__main__":
         logger.info(f"  - {field}")
 
     logger.info("\nОчікувані зв'язки (relationships):")
-    expected_relationships = ['task', 'event_task', 'bonus_type']
+    expected_relationships = ['task', 'event', 'bonus_type'] # Змінено event_task на event
     for rel in expected_relationships:
         logger.info(f"  - {rel}")
 
@@ -150,4 +147,3 @@ if __name__ == "__main__":
     # <BonusRule(id=1, name='Бонус за перше завдання', state='active', amount=Decimal('50.00'), bonus_type_id=1, created_at=...)>
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
-    logger.info("TODO: Уточнити логіку полів task_id та event_id, особливо якщо події є типом завдань.")

@@ -38,9 +38,9 @@ class BonusType(BaseDictionaryModel):
     # Наприклад:
     # default_multiplier: Mapped[Optional[float]] = mapped_column(Float, nullable=True, comment="Множник за замовчуванням (наприклад, -1 для штрафів)")
 
-    # _repr_fields успадковуються та збираються автоматично.
-    # Додавання специфічних полів до __repr__:
-    # _repr_fields = ["default_multiplier"]
+    # _repr_fields успадковуються та збираються автоматично з BaseDictionaryModel (id, name, code, state_id тощо).
+    # Немає додаткових специфічних полів для __repr__ на цьому рівні.
+    _repr_fields: tuple[str, ...] = ()
 
 
 if __name__ == "__main__":

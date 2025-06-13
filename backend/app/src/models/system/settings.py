@@ -15,19 +15,11 @@ from sqlalchemy.orm import Mapped, mapped_column
 from backend.app.src.models.base import Base  # Системні налаштування можуть не мати всіх полів BaseMainModel
 from backend.app.src.models.mixins import TimestampedMixin, NameDescriptionMixin  # Name/Description можуть бути корисні
 from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.core.dicts import SettingValueType # Імпорт Enum
+from sqlalchemy import Enum as SQLEnum # Імпорт SQLEnum
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
-
-# TODO: Визначити Enum SettingValueType в core.dicts.py, наприклад:
-# class SettingValueType(str, Enum):
-#     STRING = "string"
-#     INTEGER = "integer"
-#     FLOAT = "float"
-#     BOOLEAN = "boolean"
-#     JSON = "json"
-#     LIST_STR = "list_str" # Список рядків, може зберігатися як JSON або розділений рядок
-# Потім імпортувати: from backend.app.src.core.dicts import SettingValueType
 
 class SystemSetting(Base, TimestampedMixin, NameDescriptionMixin):
     """
@@ -71,10 +63,9 @@ class SystemSetting(Base, TimestampedMixin, NameDescriptionMixin):
         Text, nullable=True, comment="Значення налаштування (як текст або JSON-рядок)"
     )
 
-    # value_type: Mapped[SettingValueType] = mapped_column(SQLEnum(SettingValueType), default=SettingValueType.STRING, nullable=False)
-    value_type: Mapped[str] = mapped_column(
-        String(50), default='string', nullable=False, comment="Тип значення (string, integer, boolean, json)"
-    )  # TODO: Замінити на Enum SettingValueType
+    value_type: Mapped[SettingValueType] = mapped_column(
+        SQLEnum(SettingValueType), default=SettingValueType.STRING, nullable=False, comment="Тип значення (string, integer, boolean, json)"
+    )
 
     is_editable: Mapped[bool] = mapped_column(
         Boolean, default=True, nullable=False, comment="Чи можна редагувати через UI/API суперкористувачем"
@@ -88,8 +79,9 @@ class SystemSetting(Base, TimestampedMixin, NameDescriptionMixin):
     # `description` - для детального опису призначення налаштування.
 
     # Поля для __repr__
-    # `created_at`, `updated_at`, `name` успадковуються.
-    _repr_fields = ["id", "key", "value_type", "is_editable"]
+    # `id` автоматично додається Base.__repr__.
+    # `created_at`, `updated_at`, `name` успадковуються з міксинів.
+    _repr_fields = ("key", "value_type", "is_editable")
 
 
 if __name__ == "__main__":
@@ -116,7 +108,7 @@ if __name__ == "__main__":
         name="Режим обслуговування сайту",  # TODO i18n
         description="Вмикає або вимикає режим обслуговування для всього сайту.",  # TODO i18n
         value="false",
-        value_type="boolean",  # TODO: Замінити на SettingValueType.BOOLEAN.value
+        value_type=SettingValueType.BOOLEAN,  # Використання Enum
         is_editable=True,
         is_sensitive=False
     )
@@ -124,7 +116,6 @@ if __name__ == "__main__":
 
     logger.info(f"\nПриклад екземпляра SystemSetting (без сесії):\n  {example_setting}")
     # Очікуваний __repr__ (порядок може відрізнятися):
-    # <SystemSetting(id=1, name='Режим обслуговування сайту', key='site_maintenance_mode', value_type='boolean', is_editable=True, created_at=...)>
+    # <SystemSetting(id=1, name='Режим обслуговування сайту', key='site_maintenance_mode', value_type=<SettingValueType.BOOLEAN: 'boolean'>, is_editable=True, created_at=...)>
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
-    logger.info("TODO: Не забудьте визначити Enum 'SettingValueType' в core.dicts.py та оновити поле 'value_type'.")

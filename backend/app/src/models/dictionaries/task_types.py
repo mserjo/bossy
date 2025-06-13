@@ -22,7 +22,7 @@ from backend.app.src.config import logger
 # from sqlalchemy import Boolean, Integer
 
 
-class TaskTypeModel(BaseDictionaryModel):
+class TaskType(BaseDictionaryModel):
     """Модель SQLAlchemy для довідника "Типи завдань".
 
     Представляє різні типи завдань, що можуть існувати в системі
@@ -65,10 +65,10 @@ class TaskTypeModel(BaseDictionaryModel):
 
 
 if __name__ == "__main__":
-    # Демонстраційний блок для моделі TaskTypeModel.
-    logger.info("--- Модель Довідника: TaskTypeModel ---")
-    logger.info("Назва таблиці: %s", TaskTypeModel.__tablename__)
-    logger.info("Коментар до таблиці: %s", getattr(TaskTypeModel, '__table_args__', ({},))[0].get('comment', ''))
+    # Демонстраційний блок для моделі TaskType.
+    logger.info("--- Модель Довідника: TaskType ---")
+    logger.info("Назва таблиці: %s", TaskType.__tablename__)
+    logger.info("Коментар до таблиці: %s", getattr(TaskType, '__table_args__', ({},))[0].get('comment', ''))
 
     logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = [
@@ -84,7 +84,7 @@ if __name__ == "__main__":
     import uuid
     from datetime import datetime, timezone
 
-    example_task_type = TaskTypeModel(
+    example_task_type = TaskType(
         id=uuid.uuid4(),
         name="Звичайне завдання", # TODO i18n: "Звичайне завдання"
         description="Стандартний тип завдання з базовими параметрами та нарахуванням балів.", # TODO i18n
@@ -95,8 +95,8 @@ if __name__ == "__main__":
     )
     example_task_type.created_at = datetime.now(timezone.utc) # Імітація
 
-    logger.info("\nПриклад екземпляра TaskTypeModel (без сесії):\n  %s", example_task_type)
+    logger.info("\nПриклад екземпляра TaskType (без сесії):\n  %s", example_task_type)
     # Очікуваний __repr__ (порядок може відрізнятися):
-    # <TaskTypeModel(id=..., name='Звичайне завдання', code='REGULAR_TASK', state_id=1, created_at=...)>
+    # <TaskType(id=..., name='Звичайне завдання', code='REGULAR_TASK', state_id=1, created_at=...)>
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

@@ -22,11 +22,11 @@ from backend.app.src.config import logger
 # from sqlalchemy import Boolean, String
 
 
-class UserTypeModel(BaseDictionaryModel):
+class UserType(BaseDictionaryModel):
     """Модель SQLAlchemy для довідника "Типи користувачів".
 
     Представляє системні типи користувачів (наприклад, "REGULAR_USER", "ADMIN_USER", "BOT_USER").
-    Ці типи відрізняються від системних ролей (`UserRoleModel`), які можуть надавати
+    Ці типи відрізняються від системних ролей (`UserRole`), які можуть надавати
     більш гранулярні дозволи. Тип користувача може визначати загальну категорію
     або набір базових можливостей.
 
@@ -63,10 +63,10 @@ class UserTypeModel(BaseDictionaryModel):
 
 
 if __name__ == "__main__":
-    # Демонстраційний блок для моделі UserTypeModel.
-    logger.info("--- Модель Довідника: UserTypeModel ---")
-    logger.info("Назва таблиці: %s", UserTypeModel.__tablename__)
-    logger.info("Коментар до таблиці: %s", getattr(UserTypeModel, '__table_args__', ({},))[0].get('comment', ''))
+    # Демонстраційний блок для моделі UserType.
+    logger.info("--- Модель Довідника: UserType ---")
+    logger.info("Назва таблиці: %s", UserType.__tablename__)
+    logger.info("Коментар до таблиці: %s", getattr(UserType, '__table_args__', ({},))[0].get('comment', ''))
 
     logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = [
@@ -82,7 +82,7 @@ if __name__ == "__main__":
     import uuid
     from datetime import datetime, timezone
 
-    example_user_type = UserTypeModel(
+    example_user_type = UserType(
         id=uuid.uuid4(),
         name="Звичайний користувач", # TODO i18n: "Звичайний користувач"
         description="Стандартний тип користувача з базовим набором прав та можливостей в системі.", # TODO i18n
@@ -92,8 +92,8 @@ if __name__ == "__main__":
     )
     example_user_type.created_at = datetime.now(timezone.utc) # Імітація
 
-    logger.info("\nПриклад екземпляра UserTypeModel (без сесії):\n  %s", example_user_type)
+    logger.info("\nПриклад екземпляра UserType (без сесії):\n  %s", example_user_type)
     # Очікуваний __repr__ (порядок може відрізнятися):
-    # <UserTypeModel(id=..., name='Звичайний користувач', code='REGULAR_USER', state_id=1, created_at=...)>
+    # <UserType(id=..., name='Звичайний користувач', code='REGULAR_USER', state_id=1, created_at=...)>
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

@@ -38,9 +38,9 @@ class GroupType(BaseDictionaryModel):
     # Наприклад:
     # default_max_members: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="Макс. учасників за замовчуванням")
 
-    # _repr_fields успадковуються та збираються автоматично.
-    # Додавання специфічних полів до __repr__:
-    # _repr_fields = ["default_max_members"]
+    # _repr_fields успадковуються та збираються автоматично з BaseDictionaryModel.
+    # Немає додаткових специфічних полів для __repr__ на цьому рівні.
+    _repr_fields: tuple[str, ...] = ()
 
 
 if __name__ == "__main__":

@@ -11,7 +11,7 @@ from fastapi import Depends, HTTPException, status, Path, Query  # Додано 
 from fastapi.security import OAuth2PasswordBearer
 
 # Повні шляхи імпорту
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config import logger  # Стандартизований імпорт логера
 from backend.app.src.config.settings import settings
 from backend.app.src.core.database import get_db_session  # Припускаємо, що ця функція існує
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,6 +25,16 @@ from backend.app.src.models.auth.user import User as UserModel  # Модель S
 from backend.app.src.schemas.auth.token import TokenPayload  # Схема Pydantic для payload токена
 from backend.app.src.models.dictionaries.user_roles import UserRole  # Для перевірки ролі в групі
 
+# Імпорти для кешу та сервісів довідників
+from backend.app.src.services.cache.base_cache import BaseCacheService
+from backend.app.src.services.cache.redis_service import RedisCacheService
+from backend.app.src.services.cache.memory_service import InMemoryCacheService
+from backend.app.src.services.dictionaries import (
+    StatusService, UserRoleService, UserTypeService, GroupTypeService,
+    TaskTypeService, BonusTypeService, CalendarProviderService, MessengerPlatformService
+)
+
+ADMIN_ROLE_CODE = "ADMIN" # TODO: Перенести до core.constants або відповідного Enum
 
 # --- Залежність для сесії бази даних ---
 async def get_api_db_session() -> AsyncGenerator[AsyncSession, None]:
@@ -101,15 +111,24 @@ async def get_current_user(
     """
     Отримує поточного користувача з бази даних на основі user_id ('sub') з payload токена.
     """
-    if not payload.sub:  # sub має бути UUID
+    if not payload.sub:
         logger.warning("Відсутній 'sub' (user_id) в payload токена.")
         # i18n
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Некоректний формат токена.")
 
-    # Повертаємо ORM модель, а не Pydantic схему, для внутрішнього використання в інших залежностях/ендпоінтах
-    user = await user_service.get_user_orm_by_id(user_id=payload.sub)
+    try:
+        user_id_from_token = int(payload.sub)
+    except (ValueError, TypeError):
+        logger.warning(f"Не вдалося конвертувати 'sub' з токена ('{payload.sub}') в int.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Некоректний формат ідентифікатора користувача в токені.", # i18n
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    # Використання захищеного методу, який повертає ORM модель, або get_user_by_id, якщо він повертає модель
+    user = await user_service._get_user_model_by_id(user_id=user_id_from_token)
     if user is None:
-        logger.warning(f"Користувача з id '{payload.sub}' (з токена) не знайдено в БД.")
+        logger.warning(f"Користувача з id '{user_id_from_token}' (з токена) не знайдено в БД.")
         # i18n
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -156,7 +175,7 @@ async def get_current_active_superuser(
 
 
 async def get_current_active_group_admin(
-        group_id: UUID = Path(..., description="ID групи для перевірки прав адміністратора"),  # i18n
+        group_id: int = Path(..., description="ID групи для перевірки прав адміністратора"),  # i18n, group_id змінено на int
         current_user: UserModel = Depends(get_current_active_user),
         membership_service: GroupMembershipService = Depends(get_group_membership_service)
 ) -> UserModel:
@@ -164,7 +183,7 @@ async def get_current_active_group_admin(
     Перевіряє, чи поточний активний користувач є адміністратором вказаної групи.
     Суперкористувачі також проходять цю перевірку.
 
-    :param group_id: ID групи, отриманий з шляху URL.
+    :param group_id: ID групи (int), отриманий з шляху URL.
     :param current_user: Поточний активний користувач (залежність).
     :param membership_service: Сервіс членства в групах (залежність).
     :return: Об'єкт поточного користувача, якщо він є адміном групи або суперюзером.
@@ -206,7 +225,7 @@ async def get_current_active_group_admin(
 # --- Залежність для пагінації ---
 async def get_pagination_params(
         skip: int = Query(0, ge=0, description="Кількість елементів для пропуску (для пагінації)"),  # i18n
-        limit: int = Query(global_settings.DEFAULT_PAGE_SIZE, ge=1, le=global_settings.MAX_PAGE_SIZE,
+        limit: int = Query(settings.DEFAULT_PAGE_SIZE, ge=1, le=settings.MAX_PAGE_SIZE, # Використання settings замість global_settings
                            description="Максимальна кількість елементів для повернення (для пагінації)")  # i18n
 ) -> Dict[str, int]:
     """
@@ -214,6 +233,102 @@ async def get_pagination_params(
     Використовує значення за замовчуванням та максимальні ліміти з конфігурації.
     """
     return {"skip": skip, "limit": limit}
+
+# --- Залежність для сервісу кешування ---
+# TODO: [DI/Singleton] Поточна реалізація singleton для _cache_service_instance є спрощеною
+# і не буде працювати як справжній singleton з кількома worker'ами (наприклад, Gunicorn/Uvicorn).
+# Розглянути використання механізмів FastAPI для управління життєвим циклом залежностей
+# (наприклад, ініціалізація кешу під час події 'startup' додатку та збереження його в app.state,
+# а потім залежність отримує його з app.state).
+_cache_service_instance: Optional[BaseCacheService] = None
+
+async def get_cache_service() -> BaseCacheService:
+    """
+    Залежність FastAPI для надання екземпляра сервісу кешування.
+    Використовує Redis, якщо налаштовано, інакше InMemory.
+    Поточна реалізація використовує спрощений singleton, який може не працювати
+    коректно з кількома worker'ами. Для production слід використовувати
+    механізми FastAPI для управління життєвим циклом (наприклад, app.state).
+
+    Примітка: Поточна реалізація RedisCacheService ініціалізує клієнта "ліниво".
+    """
+    global _cache_service_instance
+
+    if _cache_service_instance is None:
+        # TODO: Розглянути можливість вибору реалізації кешу (Redis/InMemory) через налаштування settings.CACHE_TYPE
+        # Поки що використовуємо RedisCacheService, якщо доступний, інакше InMemoryCacheService.
+        logger.info("Створення нового екземпляра CacheService.")
+        if settings.REDIS_HOST and settings.REDIS_PORT: # Припускаємо, що ці налаштування є
+            try:
+                # Спроба ініціалізувати RedisCacheService
+                # RedisCacheService сам обробляє підключення до пулу
+                _cache_service_instance = RedisCacheService()
+                # Можна додати перевірку з'єднання тут, якщо потрібно
+                # await _cache_service_instance._get_client() # Тест з'єднання
+                logger.info("Використовується RedisCacheService.")
+            except Exception as e:
+                logger.error(f"Помилка ініціалізації RedisCacheService: {e}. Перехід на InMemoryCacheService.")
+                _cache_service_instance = InMemoryCacheService()
+                logger.info("Використовується InMemoryCacheService як запасний варіант.")
+        else:
+            _cache_service_instance = InMemoryCacheService()
+            logger.info("Конфігурація Redis не знайдена. Використовується InMemoryCacheService.")
+
+    if _cache_service_instance is None: # Якщо ініціалізація все ще не вдалася
+        logger.error("Не вдалося створити жоден екземпляр CacheService!")
+        # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Сервіс кешування недоступний.")
+
+    return _cache_service_instance
+
+# --- Залежності для сервісів довідників ---
+async def get_status_service(
+    db_session: AsyncSession = Depends(get_api_db_session),
+    cache_service: BaseCacheService = Depends(get_cache_service)
+) -> StatusService:
+    return StatusService(db_session=db_session, cache_service=cache_service)
+
+async def get_user_role_service(
+    db_session: AsyncSession = Depends(get_api_db_session),
+    cache_service: BaseCacheService = Depends(get_cache_service)
+) -> UserRoleService:
+    return UserRoleService(db_session=db_session, cache_service=cache_service)
+
+async def get_user_type_service(
+    db_session: AsyncSession = Depends(get_api_db_session),
+    cache_service: BaseCacheService = Depends(get_cache_service)
+) -> UserTypeService:
+    return UserTypeService(db_session=db_session, cache_service=cache_service)
+
+async def get_group_type_service(
+    db_session: AsyncSession = Depends(get_api_db_session),
+    cache_service: BaseCacheService = Depends(get_cache_service)
+) -> GroupTypeService:
+    return GroupTypeService(db_session=db_session, cache_service=cache_service)
+
+async def get_task_type_service(
+    db_session: AsyncSession = Depends(get_api_db_session),
+    cache_service: BaseCacheService = Depends(get_cache_service)
+) -> TaskTypeService:
+    return TaskTypeService(db_session=db_session, cache_service=cache_service)
+
+async def get_bonus_type_service(
+    db_session: AsyncSession = Depends(get_api_db_session),
+    cache_service: BaseCacheService = Depends(get_cache_service)
+) -> BonusTypeService:
+    return BonusTypeService(db_session=db_session, cache_service=cache_service)
+
+async def get_calendar_provider_service(
+    db_session: AsyncSession = Depends(get_api_db_session),
+    cache_service: BaseCacheService = Depends(get_cache_service)
+) -> CalendarProviderService:
+    return CalendarProviderService(db_session=db_session, cache_service=cache_service)
+
+async def get_messenger_platform_service(
+    db_session: AsyncSession = Depends(get_api_db_session),
+    cache_service: BaseCacheService = Depends(get_cache_service)
+) -> MessengerPlatformService:
+    return MessengerPlatformService(db_session=db_session, cache_service=cache_service)
 
 
 logger.info("Модуль залежностей 'api.dependencies' завантажено та налаштовано з реальними сервісами.")

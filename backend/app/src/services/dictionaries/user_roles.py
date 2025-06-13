@@ -1,20 +1,22 @@
 # backend/app/src/services/dictionaries/user_roles.py
 # import logging # Замінено на централізований логер
-# from typing import Optional # Для потенційних кастомних методів
+# from typing import Optional # Видалено
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.future import select # Для потенційних кастомних методів
+# from sqlalchemy.future import select # Видалено
 
 # Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.dictionaries.user_roles import UserRole # Модель SQLAlchemy
+from backend.app.src.repositories.dictionaries.user_role_repository import UserRoleRepository # Імпорт репозиторію
+from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.user_roles import ( # Схеми Pydantic
     UserRoleCreate,
     UserRoleUpdate,
     UserRoleResponse,
 )
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import logger # Стандартизований імпорт логера
 
-class UserRoleService(BaseDictionaryService[UserRole, UserRoleCreate, UserRoleUpdate, UserRoleResponse]):
+class UserRoleService(BaseDictionaryService[UserRole, UserRoleRepository, UserRoleCreate, UserRoleUpdate, UserRoleResponse]): # Додано UserRoleRepository до Generic
     """
     Сервіс для управління елементами довідника "Ролі Користувачів".
     Ролі визначають набір прав та обов'язків користувачів у системі
@@ -26,13 +28,21 @@ class UserRoleService(BaseDictionaryService[UserRole, UserRoleCreate, UserRoleUp
     в моделі та Pydantic-схемах.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService):
         """
         Ініціалізує сервіс UserRoleService.
 
         :param db_session: Асинхронна сесія бази даних SQLAlchemy.
+        :param cache_service: Екземпляр сервісу кешування.
         """
-        super().__init__(db_session, model=UserRole, response_schema=UserRoleResponse)
+        user_role_repo = UserRoleRepository(model=UserRole)
+        super().__init__(
+            db_session,
+            repository=user_role_repo,
+            cache_service=cache_service,
+            response_schema=UserRoleResponse
+        )
+        # _model_name ініціалізується в BaseDictionaryService з repository.model.__name__
         logger.info(f"UserRoleService ініціалізовано для моделі: {self._model_name}")
 
     # --- Кастомні методи для UserRoleService (якщо потрібні) ---

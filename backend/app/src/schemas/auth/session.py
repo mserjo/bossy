@@ -12,8 +12,11 @@ from uuid import UUID # Для поля session_token
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.config import logger  # Імпорт логера
+from backend.app.src.config.logging import get_logger  # Імпорт логера
 from pydantic import Field
+
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class UserSessionResponse(BaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
@@ -27,7 +30,7 @@ class UserSessionResponse(BaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
     expires_at: datetime = Field(description="Час закінчення терміну дії сесії.")
     user_agent: Optional[str] = Field(None, description="User-Agent клієнта, з якого створено сесію.")
     ip_address: Optional[str] = Field(None, description="IP-адреса клієнта, з якого створено сесію.")
-    last_active_at: Optional[datetime] = Field(None, description="Час останньої активності сесії.")
+    last_active_at: datetime = Field(description="Час останньої активності сесії.") # Змінено на non-optional
 
     # model_config успадковується з BaseSchema (from_attributes=True)
 

@@ -15,7 +15,8 @@
 """
 
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Схеми, пов'язані з користувачем
 # Припускаємо, що класи в user.py будуть перейменовані/визначені як *Schema
@@ -24,22 +25,23 @@ from backend.app.src.schemas.auth.user import (
     UserCreateSchema,
     UserUpdateSchema,
     UserResponseSchema, # Очікувана назва для відповіді з даними користувача
-    # UserPublicProfileSchema # Якщо є окрема публічна схема
+    UserPublicProfileSchema
 )
 
 # Схеми, пов'язані з токенами
 from backend.app.src.schemas.auth.token import (
-    TokenDataSchema,    # Схема для даних всередині токена
-    TokenResponseSchema,  # Схема для відповіді з токенами
-    RefreshTokenRequestSchema # Схема для запиту на оновлення токена
+    TokenPayload,    # Схема для даних всередині токена (раніше TokenDataSchema)
+    TokenResponse,  # Схема для відповіді з токенами
+    RefreshTokenRequestSchema,
+    RefreshTokenCreateSchema
 )
 
 # Схеми, пов'язані з процесом входу та відновлення паролю
 from backend.app.src.schemas.auth.login import (
     LoginRequestSchema,
     PasswordResetRequestSchema,
-    PasswordResetConfirmSchema,
-    TwoFactorAuthRequestSchema # Додано згідно завдання
+    PasswordResetConfirmSchema
+    # TwoFactorAuthRequestSchema # Видалено, оскільки схема не визначена в login.py
 )
 
 # Схеми, пов'язані з сесіями користувачів
@@ -52,16 +54,17 @@ __all__ = [
     "UserCreateSchema",
     "UserUpdateSchema",
     "UserResponseSchema",
-    # "UserPublicProfileSchema", # Якщо буде визначено
+    "UserPublicProfileSchema",
     # Token schemas
-    "TokenDataSchema",
-    "TokenResponseSchema",
+    "TokenPayload", # Змінено з TokenDataSchema
+    "TokenResponse",
     "RefreshTokenRequestSchema",
+    "RefreshTokenCreateSchema",
     # Login/Password Reset schemas
     "LoginRequestSchema",
     "PasswordResetRequestSchema",
     "PasswordResetConfirmSchema",
-    "TwoFactorAuthRequestSchema",
+    # "TwoFactorAuthRequestSchema", # Видалено
     # Session schemas
     "UserSessionResponse",
     "UserSessionCreate",

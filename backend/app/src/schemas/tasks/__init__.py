@@ -14,18 +14,20 @@
 """
 
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Схеми, пов'язані з Завданням (Task)
 from backend.app.src.schemas.tasks.task import (
     TaskBaseSchema,
     TaskCreateSchema,
     TaskUpdateSchema,
-    TaskResponseSchema
-    # TaskDetailResponseSchema # Якщо буде окрема деталізована схема, наразі TaskResponseSchema використовується
+    TaskSchema,  # Використовуємо фактичну назву
+    TaskDetailSchema # Додано деталізовану схему
 )
 
 # Схеми, пов'язані з Подією (Event)
+# EventResponseSchema є фактичною назвою в event.py
 from backend.app.src.schemas.tasks.event import (
     EventBaseSchema,
     EventCreateSchema,
@@ -37,8 +39,8 @@ from backend.app.src.schemas.tasks.event import (
 from backend.app.src.schemas.tasks.assignment import (
     TaskAssignmentBaseSchema,
     TaskAssignmentCreateSchema,
-    # TaskAssignmentUpdateSchema, # Зазвичай призначення не оновлюються, а видаляються/створюються нові
-    TaskAssignmentResponseSchema
+    TaskAssignmentUpdateSchema, # Додано, оскільки схема існує
+    TaskAssignmentSchema # Використовуємо фактичну назву
 )
 
 # Схеми, пов'язані з Виконанням Завдання (TaskCompletion)
@@ -46,7 +48,7 @@ from backend.app.src.schemas.tasks.completion import (
     TaskCompletionBaseSchema,
     TaskCompletionCreateSchema,
     TaskCompletionUpdateSchema,
-    TaskCompletionResponseSchema
+    TaskCompletionSchema # Використовуємо фактичну назву
 )
 
 # Схеми, пов'язані з Відгуком на Завдання (TaskReview)
@@ -54,7 +56,7 @@ from backend.app.src.schemas.tasks.review import (
     TaskReviewBaseSchema,
     TaskReviewCreateSchema,
     TaskReviewUpdateSchema,
-    TaskReviewResponseSchema
+    TaskReviewSchema # Використовуємо фактичну назву
 )
 
 __all__ = [
@@ -62,28 +64,28 @@ __all__ = [
     "TaskBaseSchema",
     "TaskCreateSchema",
     "TaskUpdateSchema",
-    "TaskResponseSchema",
-    # "TaskDetailResponseSchema",
+    "TaskSchema",
+    "TaskDetailSchema",
     # Event schemas
     "EventBaseSchema",
     "EventCreateSchema",
     "EventUpdateSchema",
-    "EventResponseSchema",
+    "EventResponseSchema", # EventResponseSchema є фактичною назвою
     # TaskAssignment schemas
     "TaskAssignmentBaseSchema",
     "TaskAssignmentCreateSchema",
-    # "TaskAssignmentUpdateSchema", # Зазвичай не оновлюється
-    "TaskAssignmentResponseSchema",
+    "TaskAssignmentUpdateSchema", # Додано
+    "TaskAssignmentSchema",
     # TaskCompletion schemas
     "TaskCompletionBaseSchema",
     "TaskCompletionCreateSchema",
     "TaskCompletionUpdateSchema",
-    "TaskCompletionResponseSchema",
+    "TaskCompletionSchema",
     # TaskReview schemas
     "TaskReviewBaseSchema",
     "TaskReviewCreateSchema",
     "TaskReviewUpdateSchema",
-    "TaskReviewResponseSchema",
+    "TaskReviewSchema",
 ]
 
 logger.debug("Ініціалізація пакету схем Pydantic `tasks`...")

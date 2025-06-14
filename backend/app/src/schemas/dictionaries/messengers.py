@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    BaseDictionarySchema,
+    DictionaryBaseResponseSchema,  # Змінено на правильну назву базової схеми
     DictionaryCreateSchema,
     DictionaryUpdateSchema
 )
@@ -22,10 +22,10 @@ from backend.app.src.schemas.dictionaries.base_dict import (
 # from pydantic import Field
 
 # Схема для представлення запису Платформи Месенджера (у відповідях API)
-class MessengerPlatformSchema(BaseDictionarySchema):
+class MessengerPlatformResponseSchema(DictionaryBaseResponseSchema):
     """
     Pydantic схема для представлення запису довідника "Платформа Месенджера".
-    Успадковує всі поля від `BaseDictionarySchema`.
+    Успадковує всі поля від `DictionaryBaseResponseSchema`.
     """
     # Специфічні поля для MessengerPlatformSchema, якщо є, додаються тут.
     # Наприклад:
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     messenger_platform_data_from_db['updated_at'] = datetime.fromisoformat(
         messenger_platform_data_from_db['updated_at'].replace('Z', '+00:00'))
 
-    messenger_platform_schema_instance = MessengerPlatformSchema(**messenger_platform_data_from_db)
+    messenger_platform_schema_instance = MessengerPlatformResponseSchema(**messenger_platform_data_from_db) # Renamed
     logger.info(messenger_platform_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nMessengerPlatformCreateSchema (приклад для створення):")

@@ -16,7 +16,9 @@ from pydantic import Field
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import NotificationType as NotificationTypeEnum  # Реальний Enum
+from backend.app.src.core.dicts import RelatedEntityType # Імпорт RelatedEntityType
 from backend.app.src.config.logging import get_logger  # Імпорт логера
+from datetime import timedelta # Переміщено timedelta сюди
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
@@ -44,14 +46,13 @@ class NotificationBaseSchema(BaseSchema):
     message: str = Field(...,
                          description="Тіло сповіщення (вже відрендерений текст).")  # `Text` з моделі тут просто `str`
 
-    # TODO: Додати валідатор для notification_type на основі Enum NotificationTypeEnum
-    notification_type: str = Field(
-        description=f"Тип сповіщення. Використовує значення з `core.dicts.NotificationType` (наприклад, '{NotificationTypeEnum.TASK_ASSIGNED.value}')."
+    notification_type: NotificationTypeEnum = Field( # Змінено на NotificationTypeEnum
+        description="Тип сповіщення." # Використовує значення з core.dicts.NotificationType
     )
-    related_entity_type: Optional[str] = Field(
+    related_entity_type: Optional[RelatedEntityType] = Field( # Змінено на RelatedEntityType
         None,
-        max_length=NOTIFICATION_RELATED_ENTITY_TYPE_MAX_LENGTH,
-        description="Тип пов'язаної сутності (наприклад, 'task', 'group', 'bonus').",
+        # max_length більше не потрібен для Enum
+        description="Тип пов'язаної сутності.", # Використовує значення з core.dicts.RelatedEntityType
         examples=["task", "user_account"]
     )
     related_entity_id: Optional[int] = Field(
@@ -107,7 +108,7 @@ class NotificationSchema(NotificationBaseSchema, IDSchemaMixin, TimestampedSchem
 if __name__ == "__main__":
     # Демонстраційний блок для схем сповіщень.
     logger.info("--- Pydantic Схеми для Сповіщень (Notification) ---")
-    from datetime import timedelta  # Для timedelta в прикладах
+    # from datetime import timedelta  # Вже імпортовано вище
 
     logger.info("\nNotificationCreateSchema (приклад для створення):")
     create_notification_data = {
@@ -115,8 +116,8 @@ if __name__ == "__main__":
         "title": "Ваш щотижневий звіт готовий!",  # TODO i18n
         "message": "Шановний користувачу, ваш звіт за минулий тиждень згенеровано та доступний у вашому кабінеті.",
         # TODO i18n
-        "notification_type": NotificationTypeEnum.GENERAL_INFO.value,
-        "related_entity_type": "report",
+        "notification_type": NotificationTypeEnum.GENERAL_INFO, # Використовуємо Enum напряму
+        "related_entity_type": RelatedEntityType.REPORT, # Використовуємо Enum напряму
         "related_entity_id": 789,
         "data_payload": {"report_url": "/reports/789"}
     }
@@ -149,4 +150,4 @@ if __name__ == "__main__":
     logger.info("Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
     logger.info(
         f"Поле 'notification_type' використовує значення з Enum `NotificationType` (наприклад, '{NotificationTypeEnum.TASK_REMINDER.value}').")
-    logger.info("TODO: Додати валідатор для `notification_type` на основі Enum.")
+    # logger.info("TODO: Додати валідатор для `notification_type` на основі Enum.") # Валідатор не потрібен для Enum

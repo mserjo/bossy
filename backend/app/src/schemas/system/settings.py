@@ -16,23 +16,16 @@ from pydantic import Field
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.core.dicts import SettingValueType # Імпортовано Enum
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
-# TODO: Визначити та імпортувати Enum SettingValueType з core.dicts
-# from backend.app.src.core.dicts import SettingValueType
-
-# Заглушка для SettingValueType
-class TempSettingValueType:  # TODO: Видалити після імпорту Enum
-    STRING = "string"
-    INTEGER = "integer"
-    BOOLEAN = "boolean"
-    JSON = "json"
+# SettingValueType Enum імпортовано вище.
 
 
 SETTING_KEY_MAX_LENGTH = 255
 SETTING_NAME_MAX_LENGTH = 255
-SETTING_VALUE_TYPE_MAX_LENGTH = 50
+# SETTING_VALUE_TYPE_MAX_LENGTH = 50 # Не потрібен для Enum
 
 
 class SystemSettingBaseSchema(BaseSchema):
@@ -45,8 +38,8 @@ class SystemSettingBaseSchema(BaseSchema):
         description="Унікальний програмний ключ налаштування.",
         examples=["site_name", "maintenance_mode"]
     )
-    name: Optional[str] = Field(  # Людиночитана назва, успадкована з NameDescriptionMixin в моделі
-        None,
+    name: str = Field(  # Людиночитана назва, з моделі NameDescriptionMixin (non-nullable)
+        ...,
         max_length=SETTING_NAME_MAX_LENGTH,
         description="Людиночитана назва налаштування (для відображення в UI).",
         examples=["Назва Сайту", "Режим Обслуговування"]
@@ -58,11 +51,9 @@ class SystemSettingBaseSchema(BaseSchema):
     # `value` тут не визначаємо, бо в Create воно обов'язкове, а в Update - опціональне.
     # `value_type` також може відрізнятися.
 
-    # TODO: Замінити str на SettingValueType та додати валідатор на основі Enum.
-    value_type: str = Field(
-        default=TempSettingValueType.STRING,
-        max_length=SETTING_VALUE_TYPE_MAX_LENGTH,
-        description=f"Тип значення налаштування (наприклад, '{TempSettingValueType.STRING}', '{TempSettingValueType.BOOLEAN}')."
+    value_type: SettingValueType = Field( # Змінено на SettingValueType Enum
+        default=SettingValueType.STRING,
+        description="Тип значення налаштування."
     )
     is_editable: bool = Field(
         default=True,
@@ -123,7 +114,7 @@ if __name__ == "__main__":
         "name": "Макс. користувачів у групі",  # TODO i18n
         "description": "Максимальна кількість користувачів, яку можна додати до однієї групи.",  # TODO i18n
         "value": "100",  # Значення може бути рядком, потім конвертується відповідно до value_type
-        "value_type": TempSettingValueType.INTEGER,  # TODO: Замінити на Enum.value
+        "value_type": SettingValueType.INTEGER, # Використовуємо Enum
         "is_editable": True,
         "is_sensitive": False
     }
@@ -141,7 +132,7 @@ if __name__ == "__main__":
         "key": "api_key_external_service",
         "name": "API Ключ для Зовнішнього Сервісу X",  # TODO i18n
         "value": "********",  # Приклад маскованого значення, якщо is_sensitive=True
-        "value_type": TempSettingValueType.STRING,  # TODO: Замінити на Enum.value
+        "value_type": SettingValueType.STRING, # Використовуємо Enum
         "is_editable": False,
         "is_sensitive": True,
         "created_at": datetime.now(),
@@ -151,5 +142,5 @@ if __name__ == "__main__":
     logger.info(setting_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних системних налаштувань.")
-    logger.info("TODO: Інтегрувати Enum 'SettingValueType' з core.dicts для поля 'value_type' та додати валідацію.")
+    # logger.info("TODO: Інтегрувати Enum 'SettingValueType' з core.dicts для поля 'value_type' та додати валідацію.") # Вирішено
     logger.info("Маскування чутливих значень (`is_sensitive`) має оброблятися на рівні сервісу/API.")

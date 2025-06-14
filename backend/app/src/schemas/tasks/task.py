@@ -69,11 +69,11 @@ class TaskBaseSchema(BaseSchema):
     # Якщо `state` з BaseMainSchema є основним полем статусу, то `status_code` тут може бути зайвим
     # або використовуватися для передачі коду статусу, який сервіс перетворить на `state` або `status_id` моделі.
     # Поки що залишимо `state` для схем Create/Update, а `status` (об'єкт) та `status_code` для Response.
-    state: Optional[str] = Field(
-        default=TaskStatusEnum.OPEN.value,
-        max_length=50,
-        description=f"Стан завдання (за замовчуванням '{TaskStatusEnum.OPEN.value}'). Використовуйте значення з TaskStatus Enum.",
-        examples=[ts.value for ts in TaskStatusEnum]
+    state: Optional[TaskStatusEnum] = Field( # Змінено на TaskStatusEnum
+        default=TaskStatusEnum.OPEN, # Використовуємо Enum напряму
+        # max_length=50, # Не потрібен для Enum
+        description="Стан завдання. Використовуйте значення з TaskStatus Enum.",
+        examples=[ts for ts in TaskStatusEnum] # Приклади тепер є Enum членами
     )
     due_date: Optional[datetime] = Field(
         None,
@@ -164,7 +164,7 @@ class TaskUpdateSchema(TaskBaseSchema):
     name: Optional[str] = Field(None, max_length=TASK_NAME_MAX_LENGTH, description="Нова назва завдання.")
     description: Optional[str] = Field(None, description="Новий опис завдання.")
     task_type_code: Optional[str] = Field(None, description="Новий код типу завдання.")
-    state: Optional[str] = Field(None, max_length=50, description="Новий стан завдання.")
+    state: Optional[TaskStatusEnum] = Field(None, description="Новий стан завдання.") # Змінено на TaskStatusEnum
     due_date: Optional[datetime] = Field(None, description="Новий термін виконання.")
 
     is_recurring: Optional[bool] = Field(None, description="Оновити прапорець повторюваності екземпляра.")
@@ -193,14 +193,16 @@ class TaskSchema(
     """
     Схема для представлення даних завдання у відповідях API.
     """
-    # id, name, description, state, notes, group_id, created_at, updated_at, deleted_at - успадковані
+    # id, name, description, notes, group_id, created_at, updated_at, deleted_at - успадковані
+    # state успадковано, але тут буде перевизначено для використання Enum
 
     # Специфічні поля моделі Task, що не входять до BaseMainSchema або потребують іншого представлення
+    state: Optional[TaskStatusEnum] = Field(None, description="Стан завдання (використовує TaskStatus Enum).") # Перевизначено
     task_type_code: Optional[str] = Field(None, description="Код типу завдання.")
 
     status_code: Optional[str] = Field(None, description="Код поточного статусу завдання (з довідника dict_statuses).")
 
-    due_date: Optional[datetime] = Field(None, description="Термін виконання завдання.")
+    due_date: Optional[datetime] = Field(None, description="Термін виконання завдання.") # Вже є в BaseMainSchema через TaskBaseSchema успадкування, але тут для ясності
 
     # Поля повторення та нагадувань
     is_recurring: bool = Field(description="Чи є завдання екземпляром повторюваного (або старим полем шаблону).")
@@ -265,7 +267,7 @@ if __name__ == "__main__":
         "name": "Організувати корпоратив",  # TODO i18n
         "description": "Підготувати та провести корпоративний захід для команди.",  # TODO i18n
         "task_type_code": "EVENT",  # Має існувати в довіднику dict_task_types
-        "state": TaskStatusEnum.OPEN.value,
+        "state": TaskStatusEnum.OPEN, # Використовуємо Enum напряму
         "due_date": (datetime.now() + timedelta(days=30)).isoformat(),
         "event_start_time": (datetime.now() + timedelta(days=29)).isoformat(),
         "event_end_time": (datetime.now() + timedelta(days=29, hours=4)).isoformat(),
@@ -279,7 +281,7 @@ if __name__ == "__main__":
     update_data = {
         "description": "Оновлений опис: Підготувати та провести корпоративний захід для команди до кінця кварталу.",
         # TODO i18n
-        "state": TaskStatusEnum.IN_PROGRESS.value,
+        "state": TaskStatusEnum.IN_PROGRESS, # Використовуємо Enum напряму
         "is_mandatory": True
     }
     update_instance = TaskUpdateSchema(**update_data)
@@ -290,7 +292,7 @@ if __name__ == "__main__":
         "id": 1,
         "name": "Завершити звіт",  # TODO i18n
         "description": "Фіналізувати квартальний звіт по проекту Alpha.",  # TODO i18n
-        "state": TaskStatusEnum.IN_PROGRESS.value,
+        "state": TaskStatusEnum.IN_PROGRESS, # Використовуємо Enum напряму
         "group_id": 10,
         "created_at": datetime.now() - timedelta(days=2),
         "updated_at": datetime.now(),

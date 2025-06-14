@@ -2,18 +2,18 @@
 # -*- coding: utf-8 -*-
 """Модель SQLAlchemy для довідника "Типи користувачів".
 
-Цей модуль визначає модель `UserTypeModel`, яка представляє записи в довіднику
+Цей модуль визначає модель `UserType`, яка представляє записи в довіднику
 системних типів користувачів. Ці типи можуть використовуватися для класифікації
 користувачів та надання їм різних наборів можливостей або обмежень на рівні системи
 (наприклад, "звичайний користувач", "адміністратор платформи", "бот").
 
-Модель успадковує `BaseDictionaryModel`, що надає їй стандартний набір полів,
+Модель успадковує `BaseDictionary`, що надає їй стандартний набір полів,
 включаючи `id`, `name` (для людиночитаної назви типу), `description` (для опису),
 `code` (унікальний текстовий код типу), а також часові мітки та інші поля.
 """
 
 # Абсолютний імпорт базової моделі для довідників
-from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 # Імпорт централізованого логера
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 # from sqlalchemy import Boolean, String
 
 
-class UserType(BaseDictionaryModel):
+class UserType(BaseDictionary):
     """Модель SQLAlchemy для довідника "Типи користувачів".
 
     Представляє системні типи користувачів (наприклад, "REGULAR_USER", "ADMIN_USER", "BOT_USER").
@@ -35,7 +35,7 @@ class UserType(BaseDictionaryModel):
         __tablename__ (str): Назва таблиці в базі даних: `user_types`.
         __table_args__ (dict): Додаткові параметри таблиці, включаючи коментар.
 
-    Успадковані атрибути з `BaseDictionaryModel`:
+    Успадковані атрибути з `BaseDictionary`:
         id (Mapped[uuid.UUID]): Унікальний ідентифікатор.
         name (Mapped[str]): Людиночитана назва типу користувача.
         description (Mapped[Optional[str]]): Опис типу користувача.
@@ -58,7 +58,7 @@ class UserType(BaseDictionaryModel):
     #     comment="Максимальна кількість проектів, яку може створити користувач цього типу."
     # )
 
-    # _repr_fields визначаються в BaseDictionaryModel та його батьківських класах.
+    # _repr_fields визначаються в BaseDictionary та його батьківських класах.
     # На цьому рівні немає додаткових полів для __repr__.
     _repr_fields: tuple[str, ...] = ()
 

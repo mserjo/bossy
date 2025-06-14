@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Модель SQLAlchemy для довідника "Провайдери Календарів".
 
-Цей модуль визначає модель `CalendarProviderModel`, яка представляє записи
+Цей модуль визначає модель `CalendarProvider`, яка представляє записи
 в довіднику провайдерів календарів, з якими система може інтегруватися
 (наприклад, Google Calendar, Outlook Calendar, Apple iCloud Calendar).
 Довідник зберігає інформацію про назву провайдера, його код, опис,
@@ -16,16 +16,16 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 # Абсолютний імпорт базової моделі для довідників
-from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 # Імпорт централізованого логера
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 
-class CalendarProvider(BaseDictionaryModel):
+class CalendarProvider(BaseDictionary):
     """Модель SQLAlchemy для довідника "Провайдери Календарів".
 
-    Успадковує всі поля від `BaseDictionaryModel` (включаючи `id`, `name`,
+    Успадковує всі поля від `BaseDictionary` (включаючи `id`, `name`,
     `description`, `code`, `icon`, `color` та інші поля з `BaseMainModel`).
     `group_id` для цього типу довідника, ймовірно, буде `NULL`,
     оскільки це переважно системний довідник.
@@ -65,7 +65,7 @@ class CalendarProvider(BaseDictionaryModel):
         comment="Рекомендована частота синхронізації з цим календарем в хвилинах."
     )
 
-    # _repr_fields визначаються в BaseDictionaryModel та його батьківських класах.
+    # _repr_fields визначаються в BaseDictionary та його батьківських класах.
     # Оскільки цей клас додає специфічні поля, їх можна додати до _repr_fields,
     # якщо їх відображення в repr є корисним. За завданням - порожній кортеж.
     _repr_fields: tuple[str, ...] = ("is_active",) # Додамо is_active для прикладу, хоча завдання просить ()

@@ -21,7 +21,7 @@ from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # Імпорт базової моделі для довідників та всіх конкретних моделей-довідників.
-from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 from backend.app.src.models.dictionaries.statuses import Status
 from backend.app.src.models.dictionaries.user_roles import UserRole
 from backend.app.src.models.dictionaries.user_types import UserType
@@ -34,7 +34,7 @@ from backend.app.src.models.dictionaries.messengers import MessengerPlatform
 # Визначаємо, які символи будуть експортовані при використанні `from backend.app.src.models.dictionaries import *`.
 # Це допомагає контролювати публічний API пакету.
 __all__ = [
-    "BaseDictionaryModel",
+    "BaseDictionary",
     "Status",
     "UserRole",
     "UserType",

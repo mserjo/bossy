@@ -9,7 +9,7 @@
 """
 
 # Абсолютний імпорт базової моделі для довідників
-from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 from backend.app.src.config.logging import get_logger # Імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
@@ -19,11 +19,11 @@ logger = get_logger(__name__)
 # from sqlalchemy.orm import Mapped, mapped_column
 # from sqlalchemy import String
 
-class UserRole(BaseDictionaryModel):
+class UserRole(BaseDictionary):
     """
     Модель SQLAlchemy для довідника "Ролі користувачів".
 
-    Успадковує всі поля від `BaseDictionaryModel` (включаючи `id`, `name`, `description`, `code`,
+    Успадковує всі поля від `BaseDictionary` (включаючи `id`, `name`, `description`, `code`,
     часові мітки, м'яке видалення, стан, нотатки та опціональний `group_id`).
     `group_id` для системних ролей, ймовірно, буде NULL.
 
@@ -38,7 +38,7 @@ class UserRole(BaseDictionaryModel):
     # Наприклад:
     # permission_level: Mapped[int] = mapped_column(nullable=True, comment="Числовий рівень доступу для ролі")
 
-    # _repr_fields успадковуються та збираються автоматично з BaseDictionaryModel.
+    # _repr_fields успадковуються та збираються автоматично з BaseDictionary.
     # Немає додаткових специфічних полів для __repr__ на цьому рівні.
     _repr_fields: tuple[str, ...] = ()
 

@@ -14,7 +14,7 @@ from pydantic import Field, AnyHttpUrl, field_validator
 
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.core.dicts import FileType as FileTypeEnum
+from backend.app.src.core.dicts import FileType # Змінено імпорт FileTypeEnum на FileType
 from backend.app.src.config.logging import get_logger  # Імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
@@ -49,28 +49,17 @@ class FileRecordBaseSchema(BaseSchema):
         ge=0,
         description="Розмір файлу в байтах."
     )
-    # TODO: Додати валідатор для purpose на основі Enum FileTypeEnum
-    purpose: Optional[str] = Field(
+    purpose: Optional[FileType] = Field( # Змінено на FileType
         None,
-        max_length=PURPOSE_MAX_LENGTH,
-        description=f"Призначення файлу (наприклад, '{FileTypeEnum.AVATAR.value}', '{FileTypeEnum.TASK_ATTACHMENT.value}')."
+        # max_length більше не потрібен для Enum
+        description="Призначення файлу."
     )
     metadata: Optional[Dict[str, Any]] = Field(
         None,
         description="Додаткові метадані файлу у форматі JSON (наприклад, розміри зображення, тривалість аудіо/відео)."
     )
 
-    @field_validator('purpose')
-    @classmethod
-    def validate_purpose(cls, value: Optional[str]) -> Optional[str]:
-        """Перевіряє, чи надане значення призначення є допустимим членом Enum FileType."""
-        if value is None:
-            return value
-        allowed_purposes = {ft.value for ft in FileTypeEnum}
-        if value not in allowed_purposes:
-            # TODO i18n: Translatable error message
-            raise ValueError(f"Недопустиме призначення файлу '{value}'. Дозволені: {', '.join(allowed_purposes)}")
-        return value
+    # Валідатор validate_purpose більше не потрібен, Pydantic v2 обробляє Enum автоматично
 
     # model_config успадковується з BaseSchema (from_attributes=True)
 
@@ -88,7 +77,7 @@ class FileRecordCreateSchema(FileRecordBaseSchema):
     pass
 
 
-class FileRecordSchema(FileRecordBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+class FileRecordResponseSchema(FileRecordBaseSchema, IDSchemaMixin, TimestampedSchemaMixin): # Renamed
     """
     Схема для представлення даних про запис файлу у відповідях API.
     """
@@ -119,7 +108,7 @@ if __name__ == "__main__":
         "file_name": "мій_документ.pdf",  # TODO i18n
         "mime_type": "application/pdf",
         "file_size": 102400,  # 100KB
-        "purpose": FileTypeEnum.GENERAL_DOCUMENT.value,
+        "purpose": FileType.GENERAL_DOCUMENT.value, # Змінено на FileType
         "metadata": {"pages": 10, "author": "Іван Іваненко"}  # TODO i18n
     }
     base_file_instance = FileRecordBaseSchema(**base_file_data)
@@ -141,7 +130,7 @@ if __name__ == "__main__":
         "file_name": "аватар_користувача.png",  # TODO i18n
         "mime_type": "image/png",
         "file_size": 51200,  # 50KB
-        "purpose": FileTypeEnum.AVATAR.value,
+        "purpose": FileType.AVATAR.value, # Змінено на FileType
         "file_path": "s3://bucket-name/avatars/user_xyz/avatar.png",  # Приклад шляху
         "uploader_user_id": 101,
         "created_at": datetime.now(),
@@ -149,10 +138,10 @@ if __name__ == "__main__":
         "url": "https://cdn.example.com/avatars/user_xyz/avatar.png",
         # "uploader": {"id": 101, "name": "Завантажувач Користувач"} # Приклад UserPublicProfileSchema
     }
-    file_response_instance = FileRecordSchema(**file_response_data)
+    file_response_instance = FileRecordResponseSchema(**file_response_data) # Renamed
     logger.info(file_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nПримітка: Схеми для пов'язаних об'єктів (`uploader`) та поле `url`")
     logger.info("потребують заповнення на рівні сервісу або через @computed_field (для URL).")
     logger.info(
-        f"Поле 'purpose' використовує значення з Enum `FileType` (наприклад, '{FileTypeEnum.TASK_ATTACHMENT.value}').")
+        f"Поле 'purpose' використовує значення з Enum `FileType` (наприклад, '{FileType.TASK_ATTACHMENT.value}').")

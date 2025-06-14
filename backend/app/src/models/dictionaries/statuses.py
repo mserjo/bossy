@@ -2,26 +2,26 @@
 # -*- coding: utf-8 -*-
 """Модель SQLAlchemy для довідника "Статуси".
 
-Цей модуль визначає модель `StatusModel`, яка представляє записи в довіднику
+Цей модуль визначає модель `Status`, яка представляє записи в довіднику
 загальних статусів системи. Ці статуси можуть використовуватися для різних
 сутностей в системі, таких як завдання, користувачі, групи тощо, для
 відображення їх поточного стану (наприклад, "активний", "новий", "завершено",
 "архівний").
 
-Модель успадковує `BaseDictionaryModel`, що надає їй стандартний набір полів,
+Модель успадковує `BaseDictionary`, що надає їй стандартний набір полів,
 включаючи `id`, `name` (для людиночитаної назви статусу), `description` (для опису),
 `code` (унікальний текстовий код статусу), а також часові мітки,
 можливість м'якого видалення та інші поля з `BaseMainModel`.
 """
 
 # Імпорт базової моделі для довідників
-from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 # Імпорт централізованого логера
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 
-class Status(BaseDictionaryModel):
+class Status(BaseDictionary):
     """Модель SQLAlchemy для довідника "Статуси".
 
     Представляє загальні статуси, які можуть бути застосовані до різних
@@ -31,7 +31,7 @@ class Status(BaseDictionaryModel):
         __tablename__ (str): Назва таблиці в базі даних: `statuses`.
         __table_args__ (dict): Додаткові параметри таблиці, включаючи коментар.
 
-    Успадковані атрибути з `BaseDictionaryModel` (і, відповідно, з `BaseMainModel`):
+    Успадковані атрибути з `BaseDictionary` (і, відповідно, з `BaseMainModel`):
         id (Mapped[uuid.UUID]): Унікальний ідентифікатор (UUID).
         name (Mapped[str]): Людиночитана назва статусу (наприклад, "Активний", "В обробці").
         description (Mapped[Optional[str]]): Детальний опис статусу.
@@ -51,11 +51,11 @@ class Status(BaseDictionaryModel):
     __table_args__ = ({'comment': 'Довідник загальних статусів системи.'},)
 
     # Для цієї моделі не визначено власних полів, оскільки всі необхідні поля
-    # успадковуються від BaseDictionaryModel.
+    # успадковуються від BaseDictionary.
     # Якщо для статусів знадобляться специфічні додаткові атрибути
     # (наприклад, `is_final_status: Mapped[bool]`), їх слід додати тут.
 
-    # _repr_fields визначаються в BaseDictionaryModel та його батьківських класах.
+    # _repr_fields визначаються в BaseDictionary та його батьківських класах.
     # Якщо потрібно додати специфічні для Status поля до __repr__,
     # можна визначити тут _repr_fields = ("моє_додаткове_поле",)
     # Поточна реалізація __repr__ в Base збере всі _repr_fields з ієрархії.
@@ -70,7 +70,7 @@ if __name__ == "__main__":
 
 
     logger.info("\nОчікувані поля (успадковані та власні):")
-    # Поля з BaseMainModel та його міксинів + BaseDictionaryModel
+    # Поля з BaseMainModel та його міксинів + BaseDictionary
     expected_fields = [
         'id', 'name', 'description', 'code', 'icon', 'color',
         'created_at', 'updated_at', 'deleted_at', 'is_deleted',
@@ -95,8 +95,8 @@ if __name__ == "__main__":
         created_at=datetime.now(timezone.utc) # Імітація встановлення часу
     )
 
-    logger.info("\nПриклад екземпляра StatusModel (без сесії):\n  %s", example_status)
+    logger.info("\nПриклад екземпляра Status (без сесії):\n  %s", example_status)
     # Очікуваний __repr__ (порядок може відрізнятися):
-    # <StatusModel(id=..., name='Активний', code='ACTIVE', icon='fas fa-check-circle', color='#4CAF50', state_id=1, created_at=...)>
+    # <Status(id=..., name='Активний', code='ACTIVE', icon='fas fa-check-circle', color='#4CAF50', state_id=1, created_at=...)>
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

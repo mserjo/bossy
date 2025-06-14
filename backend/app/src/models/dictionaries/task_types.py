@@ -2,18 +2,18 @@
 # -*- coding: utf-8 -*-
 """Модель SQLAlchemy для довідника "Типи завдань".
 
-Цей модуль визначає модель `TaskTypeModel`, яка представляє записи в довіднику
+Цей модуль визначає модель `TaskType`, яка представляє записи в довіднику
 типів завдань. Ці типи використовуються для класифікації завдань в системі,
 наприклад: "Звичайне завдання", "Складне завдання", "Подія", "Штраф".
 Типи завдань можуть впливати на логіку їх обробки, нарахування балів,
 доступність для певних груп користувачів тощо.
 
-Модель успадковує `BaseDictionaryModel`, що надає їй стандартний набір полів
+Модель успадковує `BaseDictionary`, що надає їй стандартний набір полів
 (id, name, description, code, часові мітки, тощо).
 """
 
 # Абсолютний імпорт базової моделі для довідників
-from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 # Імпорт централізованого логера
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 # from sqlalchemy import Boolean, Integer
 
 
-class TaskType(BaseDictionaryModel):
+class TaskType(BaseDictionary):
     """Модель SQLAlchemy для довідника "Типи завдань".
 
     Представляє різні типи завдань, що можуть існувати в системі
@@ -33,10 +33,10 @@ class TaskType(BaseDictionaryModel):
         __tablename__ (str): Назва таблиці в базі даних: `task_types`.
         __table_args__ (dict): Додаткові параметри таблиці, включаючи коментар.
 
-    Успадковані атрибути з `BaseDictionaryModel`:
+    Успадковані атрибути з `BaseDictionary`:
         id (Mapped[uuid.UUID]): Унікальний ідентифікатор.
         name (Mapped[str]): Людиночитана назва типу завдання.
-        description (Mapped[Optional[str]]): Опис типу завдання.
+        description (Mappped[Optional[str]]): Опис типу завдання.
         code (Mapped[str]): Унікальний текстовий код типу завдання.
         icon (Mapped[Optional[str]]): Іконка.
         color (Mapped[Optional[str]]): Колір.
@@ -60,7 +60,7 @@ class TaskType(BaseDictionaryModel):
     #     comment="Чи є цей тип завдання штрафом (призводить до списання балів)."
     # )
 
-    # _repr_fields визначаються в BaseDictionaryModel та його батьківських класах.
+    # _repr_fields визначаються в BaseDictionary та його батьківських класах.
     # На цьому рівні немає додаткових полів для __repr__.
     _repr_fields: tuple[str, ...] = ()
 

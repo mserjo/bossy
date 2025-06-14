@@ -16,13 +16,12 @@ from pydantic import Field, EmailStr, field_validator
 
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.core.dicts import GroupRole  # Enum для ролей в групі
+from backend.app.src.core.dicts import GroupRole, InvitationStatus  # Enum для ролей в групі та статусу запрошення
 from backend.app.src.config.logging import get_logger  # Імпорт логера
+from datetime import timedelta # Переміщено timedelta сюди
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
-# TODO: Імпортувати InvitationStatus Enum з core.dicts, коли він буде визначений.
-# from backend.app.src.core.dicts import InvitationStatus
 
 class GroupInvitationBaseSchema(BaseSchema):
     """
@@ -33,20 +32,12 @@ class GroupInvitationBaseSchema(BaseSchema):
     # TODO: Додати валідацію номера телефону, коли буде доступний валідатор.
     phone_number: Optional[str] = Field(None, max_length=30,
                                         description="Номер телефону запрошеного (якщо запрошення по SMS).")
-    role_to_assign: str = Field(
-        default=GroupRole.MEMBER.value,
-        description=f"Роль, яка буде призначена користувачеві при прийнятті запрошення. Допустимі значення: {', '.join([r.value for r in GroupRole])}."
+    role_to_assign: GroupRole = Field( # Змінено на GroupRole Enum
+        default=GroupRole.MEMBER, # Використовуємо Enum напряму
+        description=f"Роль, яка буде призначена користувачеві при прийнятті запрошення."
     )
 
-    @field_validator('role_to_assign')
-    @classmethod
-    def validate_role_to_assign(cls, value: str) -> str:
-        """Перевіряє, чи надане значення ролі є допустимим членом Enum GroupRole."""
-        allowed_roles = {r.value for r in GroupRole}
-        if value not in allowed_roles:
-            # TODO i18n: Translatable error message
-            raise ValueError(f"Недопустима роль для призначення '{value}'. Дозволені ролі: {', '.join(allowed_roles)}")
-        return value
+    # Валідатор validate_role_to_assign більше не потрібен, Pydantic обробляє Enum
 
     # model_config успадковується з BaseSchema (from_attributes=True)
 
@@ -77,9 +68,7 @@ class GroupInvitationUpdateSchema(BaseSchema):
     """
     Схема для оновлення статусу запрошення (наприклад, скасування).
     """
-    # TODO: Замінити str на InvitationStatus Enum, коли він буде визначений.
-    status: str = Field(description="Новий статус запрошення (наприклад, 'cancelled', 'expired').")
-    # TODO: Додати валідатор для поля status на основі Enum InvitationStatus.
+    status: InvitationStatus = Field(description="Новий статус запрошення.") # Змінено на InvitationStatus Enum
 
 
 class GroupInvitationSchema(GroupInvitationBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
@@ -92,8 +81,7 @@ class GroupInvitationSchema(GroupInvitationBaseSchema, IDSchemaMixin, Timestampe
     group_id: int = Field(description="Ідентифікатор групи, до якої створено запрошення.")
     invitation_code: str = Field(description="Унікальний код запрошення.")
     expires_at: datetime = Field(description="Час закінчення терміну дії запрошення.")
-    # TODO: Замінити str на InvitationStatus Enum, коли він буде визначений.
-    status: str = Field(description="Поточний статус запрошення.")
+    status: InvitationStatus = Field(description="Поточний статус запрошення.") # Змінено на InvitationStatus Enum
     created_by_user_id: Optional[int] = Field(None, description="Ідентифікатор користувача, який створив запрошення.")
     # Можна додати інформацію про користувача, що створив, якщо потрібно:
     # created_by: Optional[UserPublicProfileSchema] = None
@@ -111,25 +99,25 @@ if __name__ == "__main__":
     logger.info("--- Pydantic Схеми для Запрошень до Груп (GroupInvitation) ---")
 
     logger.info("\nGroupInvitationBaseSchema (приклад):")
-    base_invite_data = {"email": "invitee@example.com", "role_to_assign": GroupRole.MEMBER.value}
+    base_invite_data = {"email": "invitee@example.com", "role_to_assign": GroupRole.MEMBER} # Використовуємо Enum
     base_invite_instance = GroupInvitationBaseSchema(**base_invite_data)
     logger.info(base_invite_instance.model_dump_json(indent=2))
     try:
-        GroupInvitationBaseSchema(email="test@test.com", role_to_assign="invalid_role")
+        GroupInvitationBaseSchema(email="test@test.com", role_to_assign="invalid_role") # Pydantic автоматично валідує Enum
     except Exception as e:
         logger.info(f"Помилка валідації GroupInvitationBaseSchema (очікувано): {e}")
 
     logger.info("\nGroupInvitationCreateSchema (приклад для створення):")
     create_invite_data = {
         "email": "new_invite@example.com",
-        "role_to_assign": GroupRole.ADMIN.value,
+        "role_to_assign": GroupRole.ADMIN, # Використовуємо Enum
         "expires_at": datetime.now() + timedelta(days=3)
     }
     create_invite_instance = GroupInvitationCreateSchema(**create_invite_data)
     logger.info(create_invite_instance.model_dump_json(indent=2))
 
     logger.info("\nGroupInvitationUpdateSchema (приклад для оновлення статусу):")
-    update_invite_data = {"status": "cancelled"}  # TODO: Замінити на InvitationStatus.CANCELLED.value
+    update_invite_data = {"status": InvitationStatus.CANCELLED}  # Використовуємо Enum
     update_invite_instance = GroupInvitationUpdateSchema(**update_invite_data)
     logger.info(update_invite_instance.model_dump_json(indent=2))
 
@@ -139,9 +127,9 @@ if __name__ == "__main__":
         "group_id": 10,
         "email": "invited.user@example.com",
         "invitation_code": "XYZ123ABC",
-        "role_to_assign": GroupRole.MEMBER.value,
+        "role_to_assign": GroupRole.MEMBER, # Використовуємо Enum
         "expires_at": datetime.now() + timedelta(days=1),
-        "status": "pending",  # TODO: Замінити на InvitationStatus.PENDING.value
+        "status": InvitationStatus.PENDING, # Використовуємо Enum
         "created_by_user_id": 101,
         "created_at": datetime.now() - timedelta(hours=1),
         "updated_at": datetime.now() - timedelta(minutes=30)
@@ -155,10 +143,8 @@ if __name__ == "__main__":
     logger.info(accept_instance.model_dump_json(indent=2))
 
     logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних запрошень до груп.")
-    logger.info("TODO: Інтегрувати Enum 'InvitationStatus' та валідацію 'phone_number'.")
+    logger.info("TODO: Валідацію 'phone_number'.") # TODO для InvitationStatus видалено
     logger.info(
         "TODO: Розглянути `model_validator` в `GroupInvitationCreateSchema` для перевірки наявності email або phone_number.")
 
-# Потрібно для timedelta в __main__
-from datetime import timedelta
 # from pydantic import model_validator # Для Pydantic v2, якщо використовується root_validator

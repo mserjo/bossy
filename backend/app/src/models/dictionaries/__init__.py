@@ -17,32 +17,32 @@
 """
 
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Імпорт базової моделі для довідників та всіх конкретних моделей-довідників.
-# Назви класів моделей оновлено до конвенції `ModelNameModel`.
-from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
-from backend.app.src.models.dictionaries.statuses import StatusModel
-from backend.app.src.models.dictionaries.user_roles import UserRoleModel
-from backend.app.src.models.dictionaries.user_types import UserTypeModel
-from backend.app.src.models.dictionaries.group_types import GroupTypeModel
-from backend.app.src.models.dictionaries.task_types import TaskTypeModel
-from backend.app.src.models.dictionaries.bonus_types import BonusTypeModel
-from backend.app.src.models.dictionaries.calendars import CalendarProviderModel
-from backend.app.src.models.dictionaries.messengers import MessengerPlatformModel
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
+from backend.app.src.models.dictionaries.statuses import Status
+from backend.app.src.models.dictionaries.user_roles import UserRole
+from backend.app.src.models.dictionaries.user_types import UserType
+from backend.app.src.models.dictionaries.group_types import GroupType
+from backend.app.src.models.dictionaries.task_types import TaskType
+from backend.app.src.models.dictionaries.bonus_types import BonusType
+from backend.app.src.models.dictionaries.calendars import CalendarProvider
+from backend.app.src.models.dictionaries.messengers import MessengerPlatform
 
 # Визначаємо, які символи будуть експортовані при використанні `from backend.app.src.models.dictionaries import *`.
 # Це допомагає контролювати публічний API пакету.
 __all__ = [
-    "BaseDictionaryModel",
-    "StatusModel",
-    "UserRoleModel",
-    "UserTypeModel",
-    "GroupTypeModel",
-    "TaskTypeModel",
-    "BonusTypeModel",
-    "CalendarProviderModel",
-    "MessengerPlatformModel",
+    "BaseDictionary",
+    "Status",
+    "UserRole",
+    "UserType",
+    "GroupType",
+    "TaskType",
+    "BonusType",
+    "CalendarProvider",
+    "MessengerPlatform",
 ]
 
 logger.debug("Ініціалізація пакету моделей `dictionaries`...")

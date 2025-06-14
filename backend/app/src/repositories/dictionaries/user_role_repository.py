@@ -12,9 +12,9 @@ from backend.app.src.repositories.dictionaries.base_dict_repository import BaseD
 # Абсолютний імпорт моделі та схем для Системних Ролей Користувачів
 from backend.app.src.models.dictionaries.user_roles import UserRole
 from backend.app.src.schemas.dictionaries.user_roles import UserRoleCreateSchema, UserRoleUpdateSchema
-from backend.app.src.config import logging # Імпорт logging з конфігурації
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 # Отримання логера для цього модуля
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class UserRoleRepository(BaseDictionaryRepository[UserRole, UserRoleCreateSchema, UserRoleUpdateSchema]):

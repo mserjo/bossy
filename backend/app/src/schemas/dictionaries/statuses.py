@@ -10,25 +10,26 @@
 """
 
 from typing import Optional
-from datetime import datetime # Для прикладу в __main__
-import uuid # Для прикладу в __main__
+from datetime import datetime, timezone # Для прикладу в __main__, додав timezone
+# import uuid # Видалено, оскільки id тепер int
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
     DictionaryCreateSchema,
-    DictionaryResponseSchema,
+    DictionaryBaseResponseSchema, # Змінено на фактичну назву базової схеми
     DictionaryUpdateSchema
 )
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # from pydantic import Field # Розкоментувати, якщо будуть специфічні поля з Field атрибутами
 
 
-class StatusResponseSchema(DictionaryResponseSchema):
+class StatusResponseSchema(DictionaryBaseResponseSchema):
     """Pydantic схема для представлення запису довідника "Статус" у відповідях API.
 
-    Успадковує всі поля від `DictionaryResponseSchema` (який, у свою чергу,
+    Успадковує всі поля від `DictionaryBaseResponseSchema` (який, у свою чергу,
     включає поля з `DictionaryBaseSchema`, `IDSchema`, `TimestampSchema`, `SoftDeleteSchema`).
     Якщо для статусів потрібні специфічні додаткові поля у відповідях API,
     їх можна визначити тут.
@@ -69,15 +70,15 @@ if __name__ == "__main__":
 
     logger.info("\nStatusResponseSchema (приклад для відповіді API):")
     status_data_from_db = {
-        "id": uuid.uuid4(), # ID тепер UUID
+        "id": 1, # ID тепер int
         "name": "Активний", # TODO i18n: "Активний"
         "code": "ACTIVE",
         "description": "Запис активний і використовується.", # TODO i18n
-        "icon": "fas fa-check",
-        "color": "#00FF00",
+        # "icon": "fas fa-check", # Видалено, оскільки немає в BaseDictionary/BaseMain моделях/схемах
+        # "color": "#00FF00",   # Видалено
         "created_at": datetime.now(timezone.utc),
         "updated_at": datetime.now(timezone.utc),
-        "is_deleted": False
+        # "is_deleted": False # is_deleted не є частиною BaseMainSchema, а deleted_at є (optional)
         # state_id, group_id, notes, deleted_at - опціональні або можуть бути None
     }
 

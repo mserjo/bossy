@@ -16,17 +16,17 @@
 # Імпорт централізованого логера
 from backend.app.src.config import logger
 
-# Імпорт моделей з відповідних файлів цього пакету, використовуючи нову конвенцію імен
-from backend.app.src.models.system.settings import SystemSettingModel
-from backend.app.src.models.system.monitoring import SystemLogModel, PerformanceMetricModel
-from backend.app.src.models.system.health import ServiceHealthStatusModel
+# Імпорт моделей з відповідних файлів цього пакету
+from backend.app.src.models.system.settings import SystemSetting
+from backend.app.src.models.system.monitoring import SystemLog, PerformanceMetric
+from backend.app.src.models.system.health import ServiceHealthStatus
 
 # Визначаємо, які символи будуть експортовані при використанні `from backend.app.src.models.system import *`.
 __all__ = [
-    "SystemSettingModel",
-    "SystemLogModel",
-    "PerformanceMetricModel",
-    "ServiceHealthStatusModel",
+    "SystemSetting",
+    "SystemLog",
+    "PerformanceMetric",
+    "ServiceHealthStatus",
 ]
 
 logger.debug("Ініціалізація пакету моделей `system`...")

@@ -63,7 +63,7 @@ class UserAccount(Base, TimestampedMixin):
     balance: Mapped[Decimal] = mapped_column(
         Numeric(12, 2), default=Decimal("0.00"), nullable=False, comment="Поточний баланс на рахунку"
     )
-    # TODO i18n: default value 'бали' for currency
+    # TODO i18n: Локалізація значення за замовчуванням 'бали' для поля currency.
     currency: Mapped[str] = mapped_column(
         String(10), default='бали', nullable=False, comment="Валюта рахунку (наприклад, бали, очки)"
     )
@@ -85,7 +85,9 @@ class UserAccount(Base, TimestampedMixin):
     )
 
     # Поля для __repr__
-    _repr_fields = ["id", "user_id", "group_id", "balance", "currency"]
+    # `id` автоматично додається через Base.__repr__
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
+    _repr_fields = ("user_id", "group_id", "balance", "currency")
 
 
 if __name__ == "__main__":

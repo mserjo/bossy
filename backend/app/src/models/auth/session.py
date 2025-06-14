@@ -15,7 +15,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.src.models.base import Base  # Успадковуємо від Base
 from backend.app.src.models.mixins import TimestampedMixin  # Додаємо часові мітки
-from backend.app.src.config import logger # Імпорт логера
+from backend.app.src.config.logging import get_logger # Імпорт get_logger
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User  # Для зв'язку user
@@ -60,17 +62,21 @@ class UserSession(Base, TimestampedMixin):
     ip_address: Mapped[Optional[str]] = mapped_column(
         String(100), nullable=True, comment="IP-адреса клієнта сесії"
     )
-    last_active_at: Mapped[Optional[datetime]] = mapped_column( # Додано DateTime з timezone=True
-        func.now(), server_default=func.now(), onupdate=func.now(), # Виправлено: func.now() має бути для server_default/onupdate
-        comment="Час останньої активності сесії"
+    last_active_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), # Явно вказуємо DateTime з timezone
+        server_default=func.now(),
+        onupdate=func.now(),
+        nullable=False, # Має бути non-nullable, якщо завжди оновлюється
+        comment="Час останньої активності сесії (автоматично оновлюється)"
     )
 
     # Зв'язок з користувачем
     user: Mapped["User"] = relationship(back_populates="sessions", lazy="selectin")
 
     # Поля для __repr__
+    # `id` автоматично додається через Base.__repr__
     # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
-    _repr_fields = ["id", "user_id", "session_token", "last_active_at"]
+    _repr_fields = ("user_id", "session_token", "last_active_at", "expires_at")
 
 
 if __name__ == "__main__":

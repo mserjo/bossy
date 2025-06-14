@@ -82,7 +82,9 @@ class UserAvatar(Base, TimestampedMixin):
         lazy="selectin")  # back_populates="user_avatar_link" можна додати до FileRecord
 
     # Поля для __repr__
-    _repr_fields = ["id", "user_id", "file_record_id", "is_active"]  # created_at з TimestampedMixin
+    # `id` автоматично додається через Base.__repr__
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
+    _repr_fields = ("user_id", "file_record_id", "is_active")
 
 
 if __name__ == "__main__":

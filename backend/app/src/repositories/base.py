@@ -31,16 +31,18 @@ from uuid import UUID # Хоча UUID не використовується пр
 from pydantic import BaseModel as PydanticBaseModel
 from sqlalchemy import select, update as sqlalchemy_update, delete as sqlalchemy_delete, func, asc, desc
 from sqlalchemy.ext.asyncio import AsyncSession
-# Для TypeVar bound, ми посилаємося на метаклас, який мають усі моделі SQLAlchemy
-from sqlalchemy.orm import DeclarativeMeta as SQLAlchemyModelDeclarativeMeta
+# Для TypeVar bound, ми посилаємося на наш базовий клас моделей SQLAlchemy
+from backend.app.src.models.base import Base as BaseModelSQLAlchemy
+from sqlalchemy.orm import DeclarativeMeta as SQLAlchemyModelDeclarativeMeta # Залишимо для довідки, якщо знадобиться
 
-from backend.app.src.config import logging # Changed import from logger to logging
-logger = logging.getLogger(__name__) # Added logger instantiation
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Визначення узагальнених типів для моделей та схем
-# ModelType прив'язаний до метакласу SQLAlchemy моделей. Це означає, що ModelType
-# буде типом класу моделі (наприклад, User), а не екземпляром моделі.
-ModelType = TypeVar("ModelType", bound=SQLAlchemyModelDeclarativeMeta)
+# ModelType тепер прив'язаний до нашого спільного базового класу моделей SQLAlchemy `BaseModelSQLAlchemy`.
+# Це означає, що ModelType буде типом класу моделі (наприклад, User),
+# успадкованого від BaseModelSQLAlchemy, а не просто будь-яким класом з метакласом SQLAlchemy.
+ModelType = TypeVar("ModelType", bound=BaseModelSQLAlchemy)
 CreateSchemaType = TypeVar("CreateSchemaType", bound=PydanticBaseModel)
 UpdateSchemaType = TypeVar("UpdateSchemaType", bound=PydanticBaseModel)
 
@@ -351,19 +353,10 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     #       Це може бути значно ефективніше для великої кількості записів.
     #       Наприклад: `async def bulk_create(self, session: AsyncSession, *, objs_in: List[CreateSchemaType]) -> List[ModelType]: ...`
 
-    # TODO: [Type Hinting for ModelType] Поточне `ModelType = TypeVar("ModelType", bound=SQLAlchemyModelDeclarativeMeta)`
-    #       є коректним для передачі *класу* моделі. Екземпляри моделі будуть типу `ModelType`.
-    #       Переконатися, що це узгоджується зі статичним аналізатором (mypy).
-    #       `SQLAlchemyModelDeclarativeMeta` - це метаклас `declarative_base()`.
-    #       Альтернативою для SQLAlchemy 2.0+ могло б бути використання `TypeVar("ModelType", bound=DeclarativeBase)`
-    #       якщо всі моделі успадковуються від спільного `DeclarativeBase`.
-    #       Або `TypeVar("ModelType", bound=Any)` якщо не вдається знайти спільний базовий тип,
-    #       але це менш безпечно з точки зору типів. Поточний варіант є прийнятним.
-
-    # TODO: [Pydantic Version] Код використовує синтаксис Pydantic V2 (`model_dump()`, `model_dump(exclude_unset=True)`).
-    #       Переконатися, що весь проект послідовно використовує Pydantic V2.
-    #       Якщо потрібна сумісність з V1, це потребуватиме умовного коду (наприклад, `obj_in.dict()` для V1).
-    #       Поточна реалізація орієнтована на Pydantic V2.
+    # TODO: [Type Hinting for ModelType] `ModelType` тепер обмежений `BaseModelSQLAlchemy`.
+    #       Це забезпечує, що всі моделі, які використовуються з цим репозиторієм,
+    #       мають спільний базовий клас, успадкований від `DeclarativeBase` SQLAlchemy.
+    #       Це покращує безпеку типів та автодоповнення.
 
     # TODO: [Specific Getters] Можливо, додати типові специфічні гетери, якщо вони часто потрібні,
     #       наприклад, `get_by_field(session: AsyncSession, field_name: str, field_value: Any) -> Optional[ModelType]: ...`

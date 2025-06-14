@@ -21,7 +21,7 @@ from backend.app.src.services import (  # Імпортуємо реальні с
     TokenService,
     GroupMembershipService  # Для перевірки адміна групи
 )
-from backend.app.src.models.auth.user import User as UserModel  # Модель SQLAlchemy для користувача
+from backend.app.src.models.auth.user import User  # Модель SQLAlchemy для користувача
 from backend.app.src.schemas.auth.token import TokenPayload  # Схема Pydantic для payload токена
 from backend.app.src.models.dictionaries.user_roles import UserRole  # Для перевірки ролі в групі
 
@@ -107,7 +107,7 @@ async def get_current_user_payload(
 async def get_current_user(
         payload: TokenPayload = Depends(get_current_user_payload),
         user_service: UserService = Depends(get_user_service)
-) -> UserModel:  # Повертає модель SQLAlchemy User
+) -> User:  # Повертає модель SQLAlchemy User
     """
     Отримує поточного користувача з бази даних на основі user_id ('sub') з payload токена.
     """
@@ -140,8 +140,8 @@ async def get_current_user(
 
 
 async def get_current_active_user(
-        current_user: UserModel = Depends(get_current_user)
-) -> UserModel:
+        current_user: User = Depends(get_current_user)
+) -> User:
     """
     Отримує поточного автентифікованого та активного користувача.
     Якщо користувач неактивний, викликає помилку HTTP 403 Forbidden.
@@ -155,8 +155,8 @@ async def get_current_active_user(
 
 
 async def get_current_active_superuser(
-        current_user: UserModel = Depends(get_current_active_user)
-) -> UserModel:
+        current_user: User = Depends(get_current_active_user)
+) -> User:
     """
     Перевіряє, чи поточний активний користувач є суперюзером.
     Якщо ні, викликає помилку HTTP 403 Forbidden.
@@ -176,9 +176,9 @@ async def get_current_active_superuser(
 
 async def get_current_active_group_admin(
         group_id: int = Path(..., description="ID групи для перевірки прав адміністратора"),  # i18n, group_id змінено на int
-        current_user: UserModel = Depends(get_current_active_user),
+        current_user: User = Depends(get_current_active_user),
         membership_service: GroupMembershipService = Depends(get_group_membership_service)
-) -> UserModel:
+) -> User:
     """
     Перевіряє, чи поточний активний користувач є адміністратором вказаної групи.
     Суперкористувачі також проходять цю перевірку.

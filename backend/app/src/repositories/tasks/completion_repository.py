@@ -6,18 +6,19 @@
 та надає специфічні методи для роботи з записами про виконання завдань.
 """
 
-from typing import List, Optional, Tuple, Any
+from typing import List, Optional, Tuple, Any, Dict # Додано Dict
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.orm import selectinload
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.tasks.completion import TaskCompletion
 from backend.app.src.schemas.tasks.completion import TaskCompletionCreateSchema, TaskCompletionUpdateSchema
-from backend.app.src.config import logger  # Використання спільного логера
+from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class TaskCompletionRepository(BaseRepository[TaskCompletion, TaskCompletionCreateSchema, TaskCompletionUpdateSchema]):

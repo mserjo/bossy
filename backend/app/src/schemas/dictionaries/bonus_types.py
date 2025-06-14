@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    BaseDictionarySchema,
+    DictionaryBaseResponseSchema,  # Змінено на правильну назву базової схеми
     DictionaryCreateSchema,
     DictionaryUpdateSchema
 )
@@ -22,10 +22,10 @@ from backend.app.src.schemas.dictionaries.base_dict import (
 # from pydantic import Field
 
 # Схема для представлення запису Типу Бонусу (у відповідях API)
-class BonusTypeSchema(BaseDictionarySchema):
+class BonusTypeResponseSchema(DictionaryBaseResponseSchema):
     """
     Pydantic схема для представлення запису довідника "Тип Бонусу".
-    Успадковує всі поля від `BaseDictionarySchema`.
+    Успадковує всі поля від `DictionaryBaseResponseSchema`.
     """
     # Специфічні поля для BonusTypeSchema, якщо є, додаються тут.
     # Наприклад, чи є цей тип бонусу позитивним чи негативним за замовчуванням
@@ -74,7 +74,7 @@ if __name__ == "__main__":
     bonus_type_data_from_db['updated_at'] = datetime.fromisoformat(
         bonus_type_data_from_db['updated_at'].replace('Z', '+00:00'))
 
-    bonus_type_schema_instance = BonusTypeSchema(**bonus_type_data_from_db)
+    bonus_type_schema_instance = BonusTypeResponseSchema(**bonus_type_data_from_db) # Renamed
     logger.info(bonus_type_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nBonusTypeCreateSchema (приклад для створення):")

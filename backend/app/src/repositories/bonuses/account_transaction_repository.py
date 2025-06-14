@@ -17,11 +17,12 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.bonuses.transaction import AccountTransaction
 from backend.app.src.schemas.bonuses.transaction import AccountTransactionCreateSchema
+from backend.app.src.core.dicts import TransactionType # Імпорт TransactionType Enum
 # AccountTransactionUpdateSchema зазвичай не потрібна, транзакції незмінні
 from pydantic import BaseModel as PydanticBaseModel  # Для "заглушки" UpdateSchema
-from backend.app.src.config import logging # Імпорт logging з конфігурації
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 # Отримання логера для цього модуля
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # Транзакції зазвичай не оновлюються, а створюються нові (наприклад, коригуюча транзакція).
 # Тому UpdateSchema може бути простою заглушкою.
@@ -94,7 +95,7 @@ class AccountTransactionRepository(
             self,
             session: AsyncSession,
             account_id: int,
-            transaction_type: str,  # Очікується значення з TransactionType Enum
+            transaction_type: TransactionType,  # Змінено на TransactionType Enum
             skip: int = 0,
             limit: int = 100
     ) -> Tuple[List[AccountTransaction], int]:
@@ -104,7 +105,7 @@ class AccountTransactionRepository(
         Args:
             session (AsyncSession): Асинхронна сесія SQLAlchemy.
             account_id (int): ID рахунку користувача.
-            transaction_type (str): Тип транзакції (значення з `core.dicts.TransactionType`).
+            transaction_type (TransactionType): Тип транзакції (Enum `TransactionType`).
             skip (int): Кількість записів для пропуску.
             limit (int): Максимальна кількість записів для повернення.
 
@@ -112,11 +113,11 @@ class AccountTransactionRepository(
             Tuple[List[AccountTransaction], int]: Кортеж зі списком транзакций та їх загальною кількістю.
         """
         logger.debug(
-            f"Отримання транзакцій типу '{transaction_type}' для рахунку ID: {account_id}, skip: {skip}, limit: {limit}"
+            f"Отримання транзакцій типу '{transaction_type.value if isinstance(transaction_type, TransactionType) else transaction_type}' для рахунку ID: {account_id}, skip: {skip}, limit: {limit}"
         )
         filters_dict = {
             "account_id": account_id,
-            "transaction_type": transaction_type
+            "transaction_type": transaction_type # BaseRepository.get_multi має обробляти Enum
         }
         sort_by_field = "created_at" # Зазвичай транзакції сортують за датою
         sort_order_str = "desc"      # Новіші перші
@@ -154,6 +155,6 @@ if __name__ == "__main__":
     logger.info("\nСпецифічні методи:")
     logger.info(
         "  - get_transactions_for_account(account_id: int, skip: int = 0, limit: int = 100, order_by_desc_created_at: bool = True)")
-    logger.info("  - get_transactions_by_type(account_id: int, transaction_type: str, skip: int = 0, limit: int = 100)")
+    logger.info("  - get_transactions_by_type(account_id: int, transaction_type: TransactionType, skip: int = 0, limit: int = 100)") # Оновлено тип
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

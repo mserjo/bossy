@@ -10,23 +10,17 @@ Pydantic схеми для сутності "Призначення Завдан
 from datetime import datetime
 from typing import Optional
 
-from pydantic import Field, field_validator
+from pydantic import Field # field_validator видалено, оскільки більше не використовується
 
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, TimestampedSchemaMixin
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача
 from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.core.dicts import TaskAssignmentStatus # Імпортовано Enum
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
-# TODO: Визначити та імпортувати TaskAssignmentStatus Enum з core.dicts
-# from backend.app.src.core.dicts import TaskAssignmentStatus
-
-# Заглушка для TaskAssignmentStatus, поки він не визначений в core.dicts
-class TempTaskAssignmentStatus:  # TODO: Видалити, коли буде реальний Enum
-    ASSIGNED = "assigned"
-    ACCEPTED = "accepted"
-    DECLINED = "declined"
+# TaskAssignmentStatus Enum імпортовано вище.
 
 
 class TaskAssignmentBaseSchema(BaseSchema):
@@ -35,11 +29,9 @@ class TaskAssignmentBaseSchema(BaseSchema):
     """
     task_id: int = Field(description="Ідентифікатор завдання.")
     user_id: int = Field(description="Ідентифікатор користувача, якому призначено завдання.")
-    # TODO: Замінити str на TaskAssignmentStatus, коли Enum буде доступний.
-    #       Додати валідатор на основі Enum.
-    status: Optional[str] = Field(
+    status: Optional[TaskAssignmentStatus] = Field( # Змінено на TaskAssignmentStatus Enum
         None,
-        description=f"Статус призначення (наприклад, '{TempTaskAssignmentStatus.ASSIGNED}', '{TempTaskAssignmentStatus.ACCEPTED}')."
+        description="Статус призначення."
     )
 
     # model_config успадковується з BaseSchema (from_attributes=True)
@@ -51,10 +43,9 @@ class TaskAssignmentCreateSchema(BaseSchema):
     `task_id` зазвичай передається як параметр шляху.
     """
     user_id: int = Field(description="Ідентифікатор користувача, якому призначається завдання.")
-    # TODO: Замінити str на TaskAssignmentStatus. Додати валідатор.
-    status: Optional[str] = Field(
-        default=TempTaskAssignmentStatus.ASSIGNED,  # Статус за замовчуванням при створенні
-        description=f"Статус призначення. За замовчуванням: '{TempTaskAssignmentStatus.ASSIGNED}'."
+    status: Optional[TaskAssignmentStatus] = Field( # Змінено на TaskAssignmentStatus Enum
+        default=TaskAssignmentStatus.ASSIGNED,  # Статус за замовчуванням при створенні
+        description="Статус призначення."
     )
 
 
@@ -63,9 +54,8 @@ class TaskAssignmentUpdateSchema(BaseSchema):
     Схема для оновлення статусу призначення завдання.
     Дозволяє оновлювати лише поле `status`.
     """
-    # TODO: Замінити str на TaskAssignmentStatus. Додати валідатор.
-    status: str = Field(
-        description=f"Новий статус призначення (наприклад, '{TempTaskAssignmentStatus.ACCEPTED}', '{TempTaskAssignmentStatus.DECLINED}').")
+    status: TaskAssignmentStatus = Field( # Змінено на TaskAssignmentStatus Enum
+        description="Новий статус призначення.")
 
 
 class TaskAssignmentSchema(TaskAssignmentBaseSchema, TimestampedSchemaMixin):
@@ -87,22 +77,21 @@ if __name__ == "__main__":
     logger.info("--- Pydantic Схеми для Призначень Завдань (TaskAssignment) ---")
 
     logger.info("\nTaskAssignmentBaseSchema (приклад):")
-    base_assign_data = {"task_id": 1, "user_id": 101, "status": TempTaskAssignmentStatus.ACCEPTED}
+    base_assign_data = {"task_id": 1, "user_id": 101, "status": TaskAssignmentStatus.ACCEPTED} # Використовуємо Enum
     base_assign_instance = TaskAssignmentBaseSchema(**base_assign_data)
     logger.info(base_assign_instance.model_dump_json(indent=2))
 
     logger.info("\nTaskAssignmentCreateSchema (приклад для створення):")
-    create_assign_data = {"user_id": 102, "status": TempTaskAssignmentStatus.ASSIGNED}
+    create_assign_data = {"user_id": 102, "status": TaskAssignmentStatus.ASSIGNED} # Використовуємо Enum
     create_assign_instance = TaskAssignmentCreateSchema(**create_assign_data)
     logger.info(create_assign_instance.model_dump_json(indent=2))
-    # Приклад з помилкою (якщо б був валідатор на Enum)
-    # try:
-    #     TaskAssignmentCreateSchema(user_id=103, status="невірний_статус")
-    # except Exception as e:
-    #     logger.info(f"Помилка валідації TaskAssignmentCreateSchema (очікувано): {e}")
+    try:
+        TaskAssignmentCreateSchema(user_id=103, status="невірний_статус") # Pydantic валідує Enum
+    except Exception as e:
+        logger.info(f"Помилка валідації TaskAssignmentCreateSchema (очікувано): {e}")
 
     logger.info("\nTaskAssignmentUpdateSchema (приклад для оновлення):")
-    update_assign_data = {"status": TempTaskAssignmentStatus.DECLINED}
+    update_assign_data = {"status": TaskAssignmentStatus.DECLINED} # Використовуємо Enum
     update_assign_instance = TaskAssignmentUpdateSchema(**update_assign_data)
     logger.info(update_assign_instance.model_dump_json(indent=2))
 
@@ -110,7 +99,7 @@ if __name__ == "__main__":
     assignment_response_data = {
         "task_id": 1,
         "user_id": 101,
-        "status": TempTaskAssignmentStatus.ACCEPTED,
+        "status": TaskAssignmentStatus.ACCEPTED, # Використовуємо Enum
         "created_at": datetime.now(),
         "updated_at": datetime.now(),
         "user": {"id": 101, "name": "Призначений Користувач"}  # TODO i18n (UserPublicProfileSchema)
@@ -119,4 +108,4 @@ if __name__ == "__main__":
     logger.info(assignment_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних призначень завдань.")
-    logger.info("TODO: Інтегрувати Enum 'TaskAssignmentStatus' з core.dicts для поля 'status'.")
+    # logger.info("TODO: Інтегрувати Enum 'TaskAssignmentStatus' з core.dicts для поля 'status'.") # Вирішено

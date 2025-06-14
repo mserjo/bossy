@@ -68,9 +68,9 @@ class Level(BaseMainModel):
     # Зв'язок з UserLevel для отримання всіх користувачів, що досягли цього рівня (якщо потрібно)
     # user_levels: Mapped[List["UserLevel"]] = relationship(back_populates="level", lazy="selectin")
 
-    # _repr_fields успадковуються та збираються з BaseMainModel та його міксинів.
+    # _repr_fields успадковуються та збираються з BaseMainModel та його міксинів (id, name, state_id, group_id, created_at тощо).
     # Додаємо специфічні для Level поля.
-    _repr_fields = ["level_number", "required_points"]
+    _repr_fields = ("level_number", "required_points", "icon_url")
 
 
 if __name__ == "__main__":

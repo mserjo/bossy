@@ -24,12 +24,14 @@
 """
 
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Схеми для Стану Здоров'я Системи
 from backend.app.src.schemas.system.health import (
+    ServiceHealthStatusBaseSchema, # Додано, якщо потрібно експортувати базову
     ServiceHealthStatusSchema,
-    HealthCheckResponseSchema
+    OverallHealthStatusSchema # Змінено з HealthCheckResponseSchema
 )
 
 # Схеми для Системних Налаштувань
@@ -37,36 +39,37 @@ from backend.app.src.schemas.system.settings import (
     SystemSettingBaseSchema,
     SystemSettingCreateSchema,
     SystemSettingUpdateSchema,
-    SystemSettingResponseSchema
+    SystemSettingSchema # Змінено з SystemSettingResponseSchema
 )
 
 # Схеми для Моніторингу (Логи та Метрики)
 from backend.app.src.schemas.system.monitoring import (
     SystemLogBaseSchema,
     SystemLogCreateSchema,
-    SystemLogResponseSchema,
+    SystemLogSchema, # Змінено з SystemLogResponseSchema
     PerformanceMetricBaseSchema,
     PerformanceMetricCreateSchema,
-    PerformanceMetricResponseSchema
+    PerformanceMetricSchema # Змінено з PerformanceMetricResponseSchema
 )
 
 __all__ = [
     # Health Status schemas
+    "ServiceHealthStatusBaseSchema", # Додано
     "ServiceHealthStatusSchema",
-    "HealthCheckResponseSchema",
+    "OverallHealthStatusSchema", # Змінено
     # SystemSetting schemas
     "SystemSettingBaseSchema",
     "SystemSettingCreateSchema",
     "SystemSettingUpdateSchema",
-    "SystemSettingResponseSchema",
+    "SystemSettingSchema", # Змінено
     # SystemLog schemas
     "SystemLogBaseSchema",
     "SystemLogCreateSchema",
-    "SystemLogResponseSchema",
+    "SystemLogSchema", # Змінено
     # PerformanceMetric schemas
     "PerformanceMetricBaseSchema",
     "PerformanceMetricCreateSchema",
-    "PerformanceMetricResponseSchema",
+    "PerformanceMetricSchema", # Змінено
 ]
 
 logger.debug("Ініціалізація пакету схем Pydantic `system` завершена. Усі системні схеми експортовано.")

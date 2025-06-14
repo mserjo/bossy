@@ -59,9 +59,9 @@ class Badge(BaseMainModel):
     # Зв'язок з UserAchievement для отримання всіх користувачів, що отримали цей бейдж (якщо потрібно)
     # user_achievements: Mapped[List["UserAchievement"]] = relationship(back_populates="badge", lazy="selectin")
 
-    # _repr_fields успадковуються та збираються з BaseMainModel та його міксинів.
+    # _repr_fields успадковуються та збираються з BaseMainModel та його міксинів (id, name, state_id, group_id, created_at тощо).
     # Додаємо специфічні для Badge поля.
-    _repr_fields = ["icon_url"]  # 'name' та 'group_id' вже є в BaseMainModel або його міксинах
+    _repr_fields = ("icon_url",)
 
 
 if __name__ == "__main__":

@@ -16,50 +16,49 @@
 """
 
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    DictionaryBaseSchema,
+    DictionaryBaseResponseSchema as DictionaryResponseSchema, # Renamed and aliased
     DictionaryCreateSchema,
-    DictionaryUpdateSchema,
-    DictionaryResponseSchema
+    DictionaryUpdateSchema
+    # DictionaryBaseSchema is now DictionaryBaseResponseSchema
 )
 
 # Імпорт схем для конкретних довідників
-# Припускаємо, що кожен файл визначає XxxCreateSchema, XxxUpdateSchema, XxxResponseSchema
 from backend.app.src.schemas.dictionaries.statuses import (
     StatusCreateSchema, StatusUpdateSchema, StatusResponseSchema
 )
 from backend.app.src.schemas.dictionaries.user_roles import (
-    UserRoleCreateSchema, UserRoleUpdateSchema, UserRoleResponseSchema
+    UserRoleCreateSchema, UserRoleUpdateSchema, UserRoleResponseSchema # UserRoleSchema renamed to UserRoleResponseSchema
 )
 from backend.app.src.schemas.dictionaries.user_types import (
     UserTypeCreateSchema, UserTypeUpdateSchema, UserTypeResponseSchema
 )
 from backend.app.src.schemas.dictionaries.group_types import (
-    GroupTypeCreateSchema, GroupTypeUpdateSchema, GroupTypeResponseSchema
+    GroupTypeCreateSchema, GroupTypeUpdateSchema, GroupTypeResponseSchema # GroupTypeSchema renamed to GroupTypeResponseSchema
 )
 from backend.app.src.schemas.dictionaries.task_types import (
     TaskTypeCreateSchema, TaskTypeUpdateSchema, TaskTypeResponseSchema
 )
 from backend.app.src.schemas.dictionaries.bonus_types import (
-    BonusTypeCreateSchema, BonusTypeUpdateSchema, BonusTypeResponseSchema
+    BonusTypeCreateSchema, BonusTypeUpdateSchema, BonusTypeResponseSchema # BonusTypeSchema renamed to BonusTypeResponseSchema
 )
 from backend.app.src.schemas.dictionaries.calendars import (
     CalendarProviderCreateSchema, CalendarProviderUpdateSchema, CalendarProviderResponseSchema
 )
 from backend.app.src.schemas.dictionaries.messengers import (
-    MessengerPlatformCreateSchema, MessengerPlatformUpdateSchema, MessengerPlatformResponseSchema
+    MessengerPlatformCreateSchema, MessengerPlatformUpdateSchema, MessengerPlatformResponseSchema # MessengerPlatformSchema renamed to MessengerPlatformResponseSchema
 )
 
 
 __all__ = [
     # Базові схеми довідників
-    "DictionaryBaseSchema",
     "DictionaryCreateSchema",
     "DictionaryUpdateSchema",
-    "DictionaryResponseSchema",
+    "DictionaryResponseSchema", # This is the alias for DictionaryBaseResponseSchema
     # Схеми для Статусів
     "StatusCreateSchema",
     "StatusUpdateSchema",
@@ -67,7 +66,7 @@ __all__ = [
     # Схеми для Ролей Користувачів
     "UserRoleCreateSchema",
     "UserRoleUpdateSchema",
-    "UserRoleResponseSchema",
+    "UserRoleResponseSchema", # UserRoleSchema renamed
     # Схеми для Типів Користувачів
     "UserTypeCreateSchema",
     "UserTypeUpdateSchema",
@@ -75,7 +74,7 @@ __all__ = [
     # Схеми для Типів Груп
     "GroupTypeCreateSchema",
     "GroupTypeUpdateSchema",
-    "GroupTypeResponseSchema",
+    "GroupTypeResponseSchema", # GroupTypeSchema renamed
     # Схеми для Типів Завдань
     "TaskTypeCreateSchema",
     "TaskTypeUpdateSchema",
@@ -83,7 +82,7 @@ __all__ = [
     # Схеми для Типів Бонусів
     "BonusTypeCreateSchema",
     "BonusTypeUpdateSchema",
-    "BonusTypeResponseSchema",
+    "BonusTypeResponseSchema", # BonusTypeSchema renamed
     # Схеми для Провайдерів Календарів
     "CalendarProviderCreateSchema",
     "CalendarProviderUpdateSchema",
@@ -91,7 +90,7 @@ __all__ = [
     # Схеми для Платформ Месенджерів
     "MessengerPlatformCreateSchema",
     "MessengerPlatformUpdateSchema",
-    "MessengerPlatformResponseSchema",
+    "MessengerPlatformResponseSchema", # MessengerPlatformSchema renamed
 ]
 
 logger.debug("Ініціалізація пакету схем Pydantic `dictionaries`...")

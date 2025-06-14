@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    BaseDictionarySchema,
+    DictionaryBaseResponseSchema,  # Змінено на правильну назву базової схеми
     DictionaryCreateSchema,
     DictionaryUpdateSchema
 )
@@ -22,17 +22,17 @@ from backend.app.src.schemas.dictionaries.base_dict import (
 # from pydantic import Field # Може знадобитися, якщо додаватимуться специфічні поля з валідацією
 
 # Схема для представлення запису Системної Ролі Користувача (у відповідях API)
-class UserRoleSchema(BaseDictionarySchema):
+class UserRoleResponseSchema(DictionaryBaseResponseSchema):
     """
     Pydantic схема для представлення запису довідника "Системна Роль Користувача".
-    Успадковує всі поля від `BaseDictionarySchema`.
+    Успадковує всі поля від `DictionaryBaseResponseSchema`.
     """
     # Якщо для системних ролей потрібні специфічні додаткові поля у відповідях API,
     # наприклад, перелік дозволів за замовчуванням для цієї ролі,
     # їх можна визначити тут.
     # default_permissions: Optional[List[str]] = Field(None, description="Список кодів дозволів за замовчуванням.")
 
-    # model_config успадковується з BaseDictionarySchema
+    # model_config успадковується з DictionaryBaseResponseSchema
     pass
 
 
@@ -78,7 +78,7 @@ if __name__ == "__main__":
     user_role_data_from_db['updated_at'] = datetime.fromisoformat(
         user_role_data_from_db['updated_at'].replace('Z', '+00:00'))
 
-    user_role_schema_instance = UserRoleSchema(**user_role_data_from_db)
+    user_role_schema_instance = UserRoleResponseSchema(**user_role_data_from_db) # Renamed
     logger.info(user_role_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nUserRoleCreateSchema (приклад для створення):")

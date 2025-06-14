@@ -9,18 +9,18 @@
 
 from typing import List, Optional, Tuple, Any
 
-from sqlalchemy import select, func, join
+from sqlalchemy import select, func # join видалено, selectinload видалено
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload  # Для жадібного завантаження зв'язків, якщо потрібно
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделей та схем
 from backend.app.src.models.groups.group import Group
 from backend.app.src.models.groups.membership import GroupMembership  # Для join в get_groups_for_member
-# from backend.app.src.models.auth.user import User # Видалено, оскільки не використовується
 from backend.app.src.schemas.groups.group import GroupCreateSchema, GroupUpdateSchema
-from backend.app.src.config import logger # Використання спільного логера
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class GroupRepository(BaseRepository[Group, GroupCreateSchema, GroupUpdateSchema]):

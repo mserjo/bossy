@@ -113,9 +113,10 @@ class Group(
         back_populates="group", cascade="all, delete-orphan", lazy="selectin"
     )
 
-    # _repr_fields збираються з Base та міксинів.
+    # _repr_fields збираються з Base та міксинів (name, state_id, created_at, updated_at, deleted_at, is_deleted, notes).
+    # `id` автоматично обробляється Base.__repr__.
     # Додаємо специфічні для Group поля, які важливі для __repr__.
-    _repr_fields = ["owner_id", "group_type_id"]
+    _repr_fields = ("owner_id", "group_type_id")
 
 
 if __name__ == "__main__":

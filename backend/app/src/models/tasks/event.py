@@ -12,7 +12,7 @@ from datetime import datetime
 from sqlalchemy import String, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.src.models.base import BaseGroupAffiliatedMainModel
+from backend.app.src.models.base import BaseMainModel # Змінено на BaseMainModel
 # from backend.app.src.core.dicts import EventFrequency # Якщо події також мають повторюваність
 
 # Налаштування логера для цього модуля
@@ -20,15 +20,17 @@ logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
+    from backend.app.src.models.groups.group import Group # Додано для зв'язку group
     from backend.app.src.models.tasks.assignment import TaskAssignment
     from backend.app.src.models.tasks.completion import TaskCompletion
     # from backend.app.src.models.dictionaries.task_types import TaskType # Якщо використовується task_types для event_type
     # Або визначити нову таблицю та модель dict_event_types
 
 
-class Event(BaseGroupAffiliatedMainModel): # Успадковує id, name, description, state, notes, group_id, created_at, updated_at, deleted_at
+class Event(BaseMainModel): # Змінено на BaseMainModel
     """
     Представляє подію в межах групи (наприклад, зустріч, призначення, віха, свято).
+    Успадковує від BaseMainModel, що надає поля: id, name, description, state, group_id, notes, created_at, updated_at, deleted_at.
     Схоже на Завдання, але може мати інший акцент на полях, таких як час початку/закінчення та місцезнаходження.
     """
     __tablename__ = "events"
@@ -53,17 +55,28 @@ class Event(BaseGroupAffiliatedMainModel): # Успадковує id, name, desc
     assignments: Mapped[List["TaskAssignment"]] = relationship(back_populates="event", cascade="all, delete-orphan", lazy="selectin")
     completions: Mapped[List["TaskCompletion"]] = relationship(back_populates="event", cascade="all, delete-orphan", lazy="selectin")
 
-    created_by_user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, comment="Користувач, який створив подію")
+    created_by_user_id: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("users.id", name="fk_event_created_by_user_id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Користувач, який створив подію"
+    )
     created_by: Mapped[Optional["User"]] = relationship(foreign_keys=[created_by_user_id], lazy="selectin")
 
-    def __repr__(self) -> str:
-        # Представлення об'єкта для логування та відладки.
-        id_val = getattr(self, 'id', 'N/A')
-        group_id_val = getattr(self, 'group_id', 'N/A')
-        start_time_val = self.start_time.isoformat() if self.start_time else 'N/A'
-        return f"<Event(id={id_val}, name='{self.name}', group_id={group_id_val}, start_time='{start_time_val}')>"
+    # Зв'язок з групою (group_id успадковано від BaseMainModel через GroupAffiliationMixin)
+    group: Mapped[Optional["Group"]] = relationship(
+        foreign_keys=[BaseMainModel.group_id], # Використовуємо успадкований group_id
+        lazy="selectin"
+        # back_populates="events" # Потребуватиме додавання Mapped[List["Event"]] = relationship(back_populates="group") до моделі Group
+    )
+
+    # _repr_fields успадковуються та збираються з BaseMainModel (id, name, state_id, group_id, created_at тощо).
+    # Додаємо специфічні для Event поля.
+    _repr_fields = ("start_time", "location", "created_by_user_id")
+
 
 if __name__ == "__main__":
+    # from datetime import timezone, timedelta # Потрібно для __main__ прикладу, якщо він створює datetime
     if not logging.getLogger().hasHandlers():
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 

@@ -15,7 +15,7 @@ from typing import Optional, List, Any  # Any для тимчасових пол
 from pydantic import Field, EmailStr  # EmailStr може знадобитися для UserPublicProfileSchema, якщо email там
 
 # Абсолютний імпорт базових схем та міксинів
-from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
+from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin, SoftDeleteSchemaMixin
 # BaseMainSchema не імпортуємо напряму, якщо GroupBaseSchema визначає поля самостійно
 # або якщо поля BaseMainSchema не повністю співпадають з тим, що потрібно для GroupBaseSchema.
 # Поточний план для GroupBaseSchema визначає поля, схожі на BaseMainSchema, але без group_id.
@@ -99,10 +99,10 @@ class GroupUpdateSchema(GroupBaseSchema):
     owner_id: Optional[int] = Field(None, description="Новий ID власника групи.")
 
 
-class GroupSchema(GroupBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+class GroupSchema(GroupBaseSchema, IDSchemaMixin, TimestampedSchemaMixin, SoftDeleteSchemaMixin):
     """
     Схема для представлення даних групи у відповідях API.
-    Включає `id`, часові мітки та розширену інформацію про власника та тип групи.
+    Включає `id`, часові мітки, `deleted_at` та розширену інформацію про власника та тип групи.
     """
     # id, created_at, updated_at успадковані з міксинів.
     # name, description, group_type_code, state, notes успадковані з GroupBaseSchema.

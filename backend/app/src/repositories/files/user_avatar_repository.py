@@ -18,8 +18,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.files.avatar import UserAvatar
-from backend.app.src.schemas.files.avatar import UserAvatarCreateSchema, UserAvatarUpdateSchema  # UserAvatarUpdateSchema може бути простою
-from backend.app.src.config import logger # Використання спільного логера
+from backend.app.src.schemas.files.avatar import UserAvatarCreateSchema # UserAvatarUpdateSchema не визначено в schemas/files/avatar.py
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+from pydantic import BaseModel as PydanticBaseModel # Для UpdateSchemaType placeholder
+
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
+
+# Створюємо placeholder для UserAvatarUpdateSchema, оскільки він не визначений у файлі схем
+# і BaseRepository вимагає його. Аватари зазвичай не "оновлюються" таким чином,
+# а створюється новий запис, а старий деактивується, що обробляється в set_active_avatar.
+class UserAvatarUpdateSchema(PydanticBaseModel):
+    pass
 
 
 class UserAvatarRepository(BaseRepository[UserAvatar, UserAvatarCreateSchema, UserAvatarUpdateSchema]):

@@ -44,7 +44,7 @@ class UserAccountBaseSchema(BaseSchema):
     # TODO i18n: default value 'бали'
     currency: str = Field(
         default="бали",
-        max_length=50,  # Збільшено з 10 до 50 для гнучкості
+        max_length=10,  # Узгоджено з моделлю String(10)
         description="Валюта або одиниця виміру бонусів на рахунку (наприклад, 'бали', 'очки')."
     )
     # model_config успадковується з BaseSchema (from_attributes=True)
@@ -71,7 +71,7 @@ class UserAccountUpdateSchema(BaseSchema):
     # currency: Optional[str] = Field(None, max_length=50, description="Нова валюта рахунку.")
 
 
-class UserAccountSchema(UserAccountBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+class UserAccountResponseSchema(UserAccountBaseSchema, IDSchemaMixin, TimestampedSchemaMixin): # Renamed
     """
     Схема для представлення даних про рахунок користувача у відповідях API.
     """
@@ -84,7 +84,7 @@ class UserAccountSchema(UserAccountBaseSchema, IDSchemaMixin, TimestampedSchemaM
     group: Optional[GroupSchema] = Field(None, description="Коротка інформація про групу, до якої належить рахунок.")
 
 
-class UserAccountTransactionHistorySchema(UserAccountSchema):
+class UserAccountTransactionHistorySchema(UserAccountResponseSchema): # Renamed
     """
     Розширена схема для представлення рахунку користувача разом з історією транзакцій.
     """
@@ -133,12 +133,12 @@ if __name__ == "__main__":
         # "user": {"id": 1, "name": "Власник Рахунку"}, # Приклад UserPublicProfileSchema
         # "group": {"id": 10, "name": "Група Тестування"}  # Приклад GroupSchema (коротка версія)
     }
-    account_response_instance = UserAccountSchema(**account_response_data)
+    account_response_instance = UserAccountResponseSchema(**account_response_data) # Renamed
     logger.info(account_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nUserAccountTransactionHistorySchema (приклад відповіді API з транзакціями):")
     history_response_data = {
-        **account_response_data,  # Успадковує поля з UserAccountSchema
+        **account_response_data,  # Успадковує поля з UserAccountResponseSchema
         "transactions": [  # Приклад AccountTransactionSchema
             {"id": 1001, "transaction_type": "credit", "amount": Decimal("50.00"), "description": "Бонус за завдання",
              "created_at": datetime.now()},  # TODO i18n

@@ -29,9 +29,9 @@ DICT_NAME_MAX_LENGTH = 255
 DICT_CODE_MAX_LENGTH = 100
 
 
-class BaseDictionarySchema(BaseMainSchema):
+class DictionaryBaseResponseSchema(BaseMainSchema): # Renamed from BaseDictionarySchema
     """
-    Базова Pydantic схема для представлення запису довідника.
+    Базова Pydantic схема для представлення запису довідника у відповідях API.
 
     Успадковує всі поля від `BaseMainSchema` (id, name, description, state, notes,
     group_id, created_at, updated_at, deleted_at) та додає поле `code`.
@@ -114,10 +114,10 @@ if __name__ == "__main__":
     logger.info("--- Базові Схеми Pydantic для Довідників ---")
 
     logger.info("\nBaseDictionarySchema (приклад):")
-    # Для демонстрації BaseDictionarySchema потрібні всі поля з BaseMainSchema
+    # Для демонстрації DictionaryBaseResponseSchema потрібні всі поля з BaseMainSchema
     from datetime import datetime
     try:
-        base_dict_example = BaseDictionarySchema(
+        base_dict_example = DictionaryBaseResponseSchema( # Renamed
             id=1,
             name="Приклад Назви",
             code="EXAMPLE_CODE",

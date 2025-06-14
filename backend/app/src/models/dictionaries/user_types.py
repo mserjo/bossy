@@ -2,31 +2,32 @@
 # -*- coding: utf-8 -*-
 """Модель SQLAlchemy для довідника "Типи користувачів".
 
-Цей модуль визначає модель `UserTypeModel`, яка представляє записи в довіднику
+Цей модуль визначає модель `UserType`, яка представляє записи в довіднику
 системних типів користувачів. Ці типи можуть використовуватися для класифікації
 користувачів та надання їм різних наборів можливостей або обмежень на рівні системи
 (наприклад, "звичайний користувач", "адміністратор платформи", "бот").
 
-Модель успадковує `BaseDictionaryModel`, що надає їй стандартний набір полів,
+Модель успадковує `BaseDictionary`, що надає їй стандартний набір полів,
 включаючи `id`, `name` (для людиночитаної назви типу), `description` (для опису),
 `code` (унікальний текстовий код типу), а також часові мітки та інші поля.
 """
 
 # Абсолютний імпорт базової моделі для довідників
-from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Можливі додаткові імпорти, якщо будуть специфічні поля:
 # from sqlalchemy.orm import Mapped, mapped_column
 # from sqlalchemy import Boolean, String
 
 
-class UserTypeModel(BaseDictionaryModel):
+class UserType(BaseDictionary):
     """Модель SQLAlchemy для довідника "Типи користувачів".
 
     Представляє системні типи користувачів (наприклад, "REGULAR_USER", "ADMIN_USER", "BOT_USER").
-    Ці типи відрізняються від системних ролей (`UserRoleModel`), які можуть надавати
+    Ці типи відрізняються від системних ролей (`UserRole`), які можуть надавати
     більш гранулярні дозволи. Тип користувача може визначати загальну категорію
     або набір базових можливостей.
 
@@ -34,7 +35,7 @@ class UserTypeModel(BaseDictionaryModel):
         __tablename__ (str): Назва таблиці в базі даних: `user_types`.
         __table_args__ (dict): Додаткові параметри таблиці, включаючи коментар.
 
-    Успадковані атрибути з `BaseDictionaryModel`:
+    Успадковані атрибути з `BaseDictionary`:
         id (Mapped[uuid.UUID]): Унікальний ідентифікатор.
         name (Mapped[str]): Людиночитана назва типу користувача.
         description (Mapped[Optional[str]]): Опис типу користувача.
@@ -57,16 +58,16 @@ class UserTypeModel(BaseDictionaryModel):
     #     comment="Максимальна кількість проектів, яку може створити користувач цього типу."
     # )
 
-    # _repr_fields визначаються в BaseDictionaryModel та його батьківських класах.
+    # _repr_fields визначаються в BaseDictionary та його батьківських класах.
     # На цьому рівні немає додаткових полів для __repr__.
     _repr_fields: tuple[str, ...] = ()
 
 
 if __name__ == "__main__":
-    # Демонстраційний блок для моделі UserTypeModel.
-    logger.info("--- Модель Довідника: UserTypeModel ---")
-    logger.info("Назва таблиці: %s", UserTypeModel.__tablename__)
-    logger.info("Коментар до таблиці: %s", getattr(UserTypeModel, '__table_args__', ({},))[0].get('comment', ''))
+    # Демонстраційний блок для моделі UserType.
+    logger.info("--- Модель Довідника: UserType ---")
+    logger.info("Назва таблиці: %s", UserType.__tablename__)
+    logger.info("Коментар до таблиці: %s", getattr(UserType, '__table_args__', ({},))[0].get('comment', ''))
 
     logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = [
@@ -79,11 +80,10 @@ if __name__ == "__main__":
         logger.info("  - %s", field)
 
     # Приклад створення екземпляра (без взаємодії з БД)
-    import uuid
     from datetime import datetime, timezone
 
-    example_user_type = UserTypeModel(
-        id=uuid.uuid4(),
+    example_user_type = UserType(
+        id=1, # id тепер Integer
         name="Звичайний користувач", # TODO i18n: "Звичайний користувач"
         description="Стандартний тип користувача з базовим набором прав та можливостей в системі.", # TODO i18n
         code="REGULAR_USER",  # Може відповідати значенням з core.dicts.UserType Enum
@@ -92,8 +92,8 @@ if __name__ == "__main__":
     )
     example_user_type.created_at = datetime.now(timezone.utc) # Імітація
 
-    logger.info("\nПриклад екземпляра UserTypeModel (без сесії):\n  %s", example_user_type)
+    logger.info("\nПриклад екземпляра UserType (без сесії):\n  %s", example_user_type)
     # Очікуваний __repr__ (порядок може відрізнятися):
-    # <UserTypeModel(id=..., name='Звичайний користувач', code='REGULAR_USER', state_id=1, created_at=...)>
+    # <UserType(id=..., name='Звичайний користувач', code='REGULAR_USER', state_id=1, created_at=...)>
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

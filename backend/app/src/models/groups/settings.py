@@ -87,7 +87,9 @@ class GroupSetting(Base, TimestampedMixin):
     group: Mapped["Group"] = relationship(back_populates="settings", lazy="selectin")
 
     # Поля для __repr__
-    _repr_fields = ["id", "group_id", "currency_name"]
+    # `id` автоматично додається через Base.__repr__
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
+    _repr_fields = ("group_id", "currency_name")
 
 
 if __name__ == "__main__":

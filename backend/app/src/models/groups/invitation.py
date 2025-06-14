@@ -16,19 +16,12 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Абсолютний імпорт базових класів та Enum
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin
-from backend.app.src.core.dicts import GroupRole  # Для ролі за замовчуванням
+from backend.app.src.core.dicts import GroupRole, InvitationStatus  # Оновлені Enum
+from sqlalchemy import Enum as SQLEnum # Імпорт SQLEnum
 from backend.app.src.config.logging import get_logger # Імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
-# TODO: Визначити Enum InvitationStatus в core.dicts.py, наприклад:
-# class InvitationStatus(str, Enum):
-#     PENDING = "pending"  # Запрошення надіслано, очікує на відповідь
-#     ACCEPTED = "accepted" # Запрошення прийнято
-#     DECLINED = "declined" # Запрошення відхилено
-#     EXPIRED = "expired"  # Термін дії запрошення закінчився
-#     CANCELLED = "cancelled" # Запрошення скасовано відправником
-# Потім імпортувати: from backend.app.src.core.dicts import InvitationStatus
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
@@ -76,8 +69,8 @@ class GroupInvitation(Base, TimestampedMixin):
     invitation_code: Mapped[str] = mapped_column(
         String(50), unique=True, index=True, nullable=False, comment="Унікальний код запрошення"
     )
-    role_to_assign: Mapped[str] = mapped_column(
-        String(50), default=GroupRole.MEMBER.value, nullable=False, comment="Роль, що буде призначена при прийнятті"
+    role_to_assign: Mapped[GroupRole] = mapped_column(
+        SQLEnum(GroupRole), default=GroupRole.MEMBER, nullable=False, comment="Роль, що буде призначена при прийнятті"
     )
     expires_at: Mapped[datetime] = mapped_column(
         nullable=False, comment="Час закінчення терміну дії запрошення"
@@ -87,10 +80,8 @@ class GroupInvitation(Base, TimestampedMixin):
         nullable=True,  # Може бути NULL, якщо запрошення системне або автор видалений
         comment="ID користувача, який створив запрошення"
     )
-    # TODO: Замінити String на Enum InvitationStatus, коли він буде визначений в core.dicts.py
-    # status: Mapped[InvitationStatus] = mapped_column(SQLEnum(InvitationStatus), default=InvitationStatus.PENDING, nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(50), default="pending", nullable=False, index=True,
+    status: Mapped[InvitationStatus] = mapped_column(
+        SQLEnum(InvitationStatus), default=InvitationStatus.PENDING, nullable=False, index=True,
         comment="Статус запрошення (pending, accepted, expired тощо)"
     )
 
@@ -100,7 +91,9 @@ class GroupInvitation(Base, TimestampedMixin):
                                                         lazy="selectin")  # Немає back_populates, якщо User не має invitations_created
 
     # Поля для __repr__
-    _repr_fields = ["id", "group_id", "invitation_code", "status", "expires_at"]
+    # `id` автоматично додається через Base.__repr__
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
+    _repr_fields = ("group_id", "invitation_code", "status", "expires_at")
 
 
 if __name__ == "__main__":
@@ -128,10 +121,10 @@ if __name__ == "__main__":
         group_id=202,
         email="new.user@example.com",
         invitation_code="UNIQUECODE123",
-        role_to_assign=GroupRole.MEMBER.value,
+        role_to_assign=GroupRole.MEMBER, # Використання Enum
         expires_at=datetime.now(timezone.utc) + timedelta(days=7),
         created_by_user_id=101,
-        status="pending"  # TODO: Замінити на InvitationStatus.PENDING.value
+        status=InvitationStatus.PENDING  # Використання Enum
     )
     # Імітуємо часові мітки
     example_invitation.created_at = datetime.now(timezone.utc)
@@ -139,7 +132,6 @@ if __name__ == "__main__":
 
     logger.info(f"\nПриклад екземпляра GroupInvitation (без сесії):\n  {example_invitation}")
     # Очікуваний __repr__ (порядок може відрізнятися):
-    # <GroupInvitation(id=1, group_id=202, invitation_code='UNIQUECODE123', status='pending', expires_at=...)>
+    # <GroupInvitation(id=1, group_id=202, invitation_code='UNIQUECODE123', status=<InvitationStatus.PENDING: 'pending'>, expires_at=...)>
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
-    logger.info("TODO: Не забудьте визначити Enum 'InvitationStatus' в core.dicts.py та оновити поле 'status'.")

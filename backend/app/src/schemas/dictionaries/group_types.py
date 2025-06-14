@@ -13,7 +13,7 @@ logger = get_logger(__name__)
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    BaseDictionarySchema,
+    DictionaryBaseResponseSchema,  # Змінено на правильну назву базової схеми
     DictionaryCreateSchema,
     DictionaryUpdateSchema
 )
@@ -22,10 +22,10 @@ from backend.app.src.schemas.dictionaries.base_dict import (
 # from pydantic import Field
 
 # Схема для представлення запису Типу Групи (у відповідях API)
-class GroupTypeSchema(BaseDictionarySchema):
+class GroupTypeResponseSchema(DictionaryBaseResponseSchema):
     """
     Pydantic схема для представлення запису довідника "Тип Групи".
-    Успадковує всі поля від `BaseDictionarySchema`.
+    Успадковує всі поля від `DictionaryBaseResponseSchema`.
     """
     # Специфічні поля для GroupTypeSchema, якщо є, додаються тут.
     pass
@@ -72,7 +72,7 @@ if __name__ == "__main__":
     group_type_data_from_db['updated_at'] = datetime.fromisoformat(
         group_type_data_from_db['updated_at'].replace('Z', '+00:00'))
 
-    group_type_schema_instance = GroupTypeSchema(**group_type_data_from_db)
+    group_type_schema_instance = GroupTypeResponseSchema(**group_type_data_from_db) # Renamed
     logger.info(group_type_schema_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nGroupTypeCreateSchema (приклад для створення):")

@@ -4,20 +4,20 @@
 Pydantic схеми для Подій.
 """
 
-import logging
 from typing import Optional, List
-from datetime import datetime, timezone # timedelta for examples if needed
-
+from datetime import datetime, timezone, timedelta # timedelta for examples if needed
 from pydantic import Field
+
+# Абсолютний імпорт базових схем та Enum
+from backend.app.src.config.logging import get_logger # Імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 from backend.app.src.schemas.base import BaseSchema, BaseMainSchema # BaseMainSchema for response
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema
 from backend.app.src.schemas.tasks.assignment import TaskAssignmentSchema
 from backend.app.src.schemas.tasks.completion import TaskCompletionSchema
 # from backend.app.src.core.dicts import EventFrequency # Якщо події мають повторюваність
-
-# Налаштування логера для цього модуля
-logger = logging.getLogger(__name__)
 
 # --- Локально визначені базові інформаційні схеми для демонстрації ---
 # TODO: Замінити на імпорти з відповідних файлів схем, коли вони будуть повністю визначені.

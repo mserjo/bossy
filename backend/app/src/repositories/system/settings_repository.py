@@ -7,7 +7,7 @@
 наприклад, отримання налаштування за його унікальним ключем.
 """
 
-from typing import List, Optional, Tuple, Any
+from typing import List, Optional, Tuple, Any, Dict # Додано Dict
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,7 +17,9 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.system.settings import SystemSetting
 from backend.app.src.schemas.system.settings import SystemSettingCreateSchema, SystemSettingUpdateSchema
-from backend.app.src.config import logger  # Використання спільного логера
+from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class SystemSettingRepository(BaseRepository[SystemSetting, SystemSettingCreateSchema, SystemSettingUpdateSchema]):

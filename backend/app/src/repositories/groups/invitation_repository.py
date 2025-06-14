@@ -10,15 +10,16 @@ from typing import List, Optional, Tuple, Any
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.orm import selectinload # Для жадібного завантаження
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.groups.invitation import GroupInvitation
 from backend.app.src.schemas.groups.invitation import GroupInvitationCreateSchema, GroupInvitationUpdateSchema
-from backend.app.src.config import logger # Використання спільного логера
-# from datetime import datetime, timezone # Для TODO в get_by_email_and_group
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
+# from datetime import datetime, timezone # Видалено, оскільки не використовується
 
 
 class GroupInvitationRepository(

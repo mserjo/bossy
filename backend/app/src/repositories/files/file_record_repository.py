@@ -17,17 +17,18 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.files.file import FileRecord
 from backend.app.src.schemas.files.file import FileRecordCreateSchema
-from backend.app.src.config import logger # Використання спільного логера
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+from backend.app.src.core.dicts import FileType # Імпорт FileType Enum
 
-# from backend.app.src.core.dicts import FileType as FileTypeEnum # Для фільтрації за purpose
-# або from backend.app.src.models.files.file import FileTypeEnum, якщо він визначений у моделі
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Записи файлів зазвичай не оновлюються після створення (окрім, можливо, metadata або purpose).
 # Якщо потрібне оновлення, можна створити більш конкретну схему.
 class FileRecordUpdateSchema(PydanticBaseModel):
     # Наприклад, якщо дозволено оновлювати лише metadata або purpose:
     # metadata: Optional[Dict[str, Any]] = None
-    # purpose: Optional[str] = None # TODO: Використати FileTypeEnum.value
+    # purpose: Optional[FileType] = None # Якщо б оновлювали, то використовували б FileType
     pass
 
 
@@ -109,7 +110,7 @@ class FileRecordRepository(BaseRepository[FileRecord, FileRecordCreateSchema, Fi
     async def get_files_by_purpose(
             self,
             session: AsyncSession,
-            purpose: str,  # Очікується значення з FileTypeEnum
+            purpose: FileType,  # Змінено на FileType Enum
             skip: int = 0,
             limit: int = 100
     ) -> Tuple[List[FileRecord], int]:
@@ -118,17 +119,16 @@ class FileRecordRepository(BaseRepository[FileRecord, FileRecordCreateSchema, Fi
 
         Args:
             session (AsyncSession): Асинхронна сесія SQLAlchemy.
-            purpose (str): Призначення файлу.
-                           # TODO: [Enum Validation] Переконатися, що 'purpose' передається як Enum.value
-                           #       або валідується відповідно до `technical_task.txt` / `structure-claude-v2.md`.
-                           #       Розглянути використання FileTypeEnum з `backend.app.src.models.files.file`.
+            purpose (FileType): Призначення файлу (значення з Enum FileType).
             skip (int): Кількість записів для пропуску.
             limit (int): Максимальна кількість записів для повернення.
 
         Returns:
             Tuple[List[FileRecord], int]: Кортеж зі списком записів файлів та їх загальною кількістю.
         """
-        logger.debug(f"Отримання файлів за призначенням: {purpose}, skip: {skip}, limit: {limit}")
+        logger.debug(f"Отримання файлів за призначенням: {purpose.value if isinstance(purpose, FileType) else purpose}, skip: {skip}, limit: {limit}")
+        # Фільтр буде використовувати значення Enum, якщо модель очікує Enum, або .value, якщо модель очікує рядок/число.
+        # Модель FileRecord.purpose очікує FileType (SQLEnum), тому передаємо Enum напряму.
         filters_dict: Dict[str, Any] = {"purpose": purpose}
         sort_by_field = "created_at"
         sort_order_str = "desc" # Новіші файли першими
@@ -162,7 +162,6 @@ if __name__ == "__main__":
     logger.info("\nСпецифічні методи:") # type: ignore
     logger.info("  - get_by_file_path(session: AsyncSession, file_path: str)") # type: ignore
     logger.info("  - get_files_by_uploader(session: AsyncSession, uploader_user_id: int, skip: int = 0, limit: int = 100)") # type: ignore
-    logger.info("  - get_files_by_purpose(session: AsyncSession, purpose: str, skip: int = 0, limit: int = 100)") # type: ignore
+    logger.info("  - get_files_by_purpose(session: AsyncSession, purpose: FileType, skip: int = 0, limit: int = 100)") # type: ignore
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.") # type: ignore
-    logger.info("TODO: Інтегрувати Enum 'FileType' для аргументу `purpose` в get_files_by_purpose.") # type: ignore

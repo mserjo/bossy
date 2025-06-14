@@ -12,9 +12,9 @@ from backend.app.src.repositories.dictionaries.base_dict_repository import BaseD
 # Абсолютний імпорт моделі та схем для Типів Бонусів
 from backend.app.src.models.dictionaries.bonus_types import BonusType
 from backend.app.src.schemas.dictionaries.bonus_types import BonusTypeCreateSchema, BonusTypeUpdateSchema
-from backend.app.src.config import logging # Імпорт logging з конфігурації
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 # Отримання логера для цього модуля
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 
 class BonusTypeRepository(BaseDictionaryRepository[BonusType, BonusTypeCreateSchema, BonusTypeUpdateSchema]):

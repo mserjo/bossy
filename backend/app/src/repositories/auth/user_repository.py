@@ -19,9 +19,9 @@ from backend.app.src.models.auth.user import User
 from backend.app.src.schemas.auth.user import UserCreateSchema, UserUpdateSchema
 # Абсолютний імпорт функції хешування паролю
 from backend.app.src.config.security import get_password_hash
-from backend.app.src.config import logging # Імпорт logging з конфігурації
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 # Отримання логера для цього модуля
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class UserRepository(BaseRepository[User, UserCreateSchema, UserUpdateSchema]):
     """

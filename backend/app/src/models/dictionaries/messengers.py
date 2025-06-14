@@ -39,9 +39,9 @@ class MessengerPlatform(BaseDictionaryModel):
     # webhook_url_template: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, comment="Шаблон URL для вебхука (якщо застосовно)")
     # supports_buttons: Mapped[bool] = mapped_column(Boolean, default=False, comment="Чи підтримує платформа інтерактивні кнопки")
 
-    # _repr_fields успадковуються та збираються автоматично.
-    # Додавання специфічних полів до __repr__:
-    # _repr_fields = ["supports_buttons"]
+    # _repr_fields успадковуються та збираються автоматично з BaseDictionaryModel.
+    # Немає додаткових специфічних полів для __repr__ на цьому рівні.
+    _repr_fields: tuple[str, ...] = ()
 
 
 if __name__ == "__main__":

@@ -7,7 +7,7 @@
 за його унікальним кодом (`code`) або назвою (`name`).
 """
 
-from typing import Optional, Type, Any  # Any не використовується, але може бути корисним для майбутніх методів
+from typing import Optional, Type # Any видалено, оскільки не використовується
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,9 +15,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Абсолютний імпорт базового репозиторію
 # TypeVars (ModelType, CreateSchemaType, UpdateSchemaType) успадковуються з BaseRepository
 from backend.app.src.repositories.base import BaseRepository, ModelType, CreateSchemaType, UpdateSchemaType
-from backend.app.src.config import logging # Імпорт logging з конфігурації
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 # Отримання логера для цього модуля
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class BaseDictionaryRepository(BaseRepository[ModelType, CreateSchemaType, UpdateSchemaType]):
     """

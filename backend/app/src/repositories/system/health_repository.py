@@ -6,24 +6,22 @@
 та надає специфічні методи для роботи зі станами здоров'я різних сервісів.
 """
 
-from typing import List, Optional, Dict, Any # Tuple видалено, PydanticBaseModel видалено
+from typing import List, Optional, Dict, Any
 
-from sqlalchemy import select # func видалено
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
-from backend.app.src.config import logger  # Використання спільного логера
+from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.system.health import ServiceHealthStatus
 from backend.app.src.schemas.system.health import ServiceHealthStatusCreateSchema
+from backend.app.src.core.dicts import HealthStatusType # Імпортовано Enum
 
-
-# TODO: [Enum Integration] Імпортувати Enum HealthStatusType,
-#       ймовірно з `backend.app.src.core.enums` або аналогічного місця,
-#       згідно з `technical_task.txt` / `structure-claude-v2.md`.
-# from backend.app.src.core.dicts import HealthStatusType
 
 # Записи про стан здоров'я зазвичай створюються або оновлюються повністю,
 # тому UpdateSchema може бути такою ж, як CreateSchema, або простою заглушкою,
@@ -86,9 +84,9 @@ class ServiceHealthStatusRepository(
             List[ServiceHealthStatus]: Список записів про стан здоров'я нездорових сервісів.
         """
         logger.debug("Отримання списку нездорових сервісів")
-        # TODO: [Enum Validation] Замінити рядок "healthy" на значення з Enum HealthStatusType.HEALTHY.value
-        #       згідно з `technical_task.txt` / `core.enums`.
-        filters_dict: Dict[str, Any] = {"status__ne": "healthy"} # 'ne' для 'not equal'
+        # Модель ServiceHealthStatus.status використовує HealthStatusType (SQLEnum),
+        # тому передаємо Enum член напряму для порівняння.
+        filters_dict: Dict[str, Any] = {"status__ne": HealthStatusType.HEALTHY}
 
         sort_by_field = "updated_at"
         sort_order_str = "desc" # Можна сортувати за часом останньої перевірки або за назвою сервісу
@@ -109,7 +107,7 @@ class ServiceHealthStatusRepository(
             return []
 
     async def update_or_create_status(
-            self, session: AsyncSession, service_name: str, status: str, details: Optional[str] = None
+            self, session: AsyncSession, service_name: str, status: HealthStatusType, details: Optional[str] = None
     ) -> Optional[ServiceHealthStatus]:
         """
         Оновлює існуючий запис стану здоров'я сервісу або створює новий, якщо він не існує.
@@ -117,8 +115,7 @@ class ServiceHealthStatusRepository(
         Args:
             session (AsyncSession): Асинхронна сесія SQLAlchemy.
             service_name (str): Унікальна назва сервісу.
-            status (str): Новий статус сервісу.
-                          # TODO: [Enum Validation] Використовувати HealthStatusType Enum.value.
+            status (HealthStatusType): Новий статус сервісу (Enum).
             details (Optional[str]): Додаткові деталі про стан.
 
         Returns:
@@ -184,10 +181,10 @@ if __name__ == "__main__":
     logger.info("\nСпецифічні методи:")
     logger.info("  - get_by_service_name(service_name: str)")
     logger.info("  - get_unhealthy_services()")
-    logger.info("  - update_or_create_status(service_name: str, status: str, details: Optional[str])")
+    logger.info("  - update_or_create_status(service_name: str, status: HealthStatusType, details: Optional[str])") # Оновлено тип
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    logger.info("TODO: Інтегрувати Enum 'HealthStatusType' для аргументу `status` та у фільтрах.")
+    # logger.info("TODO: Інтегрувати Enum 'HealthStatusType' для аргументу `status` та у фільтрах.") # Вирішено
 
     # Приклад концептуального використання update_or_create_status
     # async def demo_health_repo():

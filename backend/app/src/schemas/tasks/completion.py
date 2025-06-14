@@ -11,13 +11,14 @@ Pydantic схеми для сутності "Виконання Завдання
 from datetime import datetime
 from typing import Optional
 
-from pydantic import Field, field_validator
+from pydantic import Field  # field_validator видалено, оскільки більше не використовується
 
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача та верифікатора
 from backend.app.src.core.dicts import TaskStatus  # Enum для статусів виконання
 from backend.app.src.config.logging import get_logger # Імпорт логера
+from datetime import timedelta # Переміщено timedelta сюди
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
@@ -34,22 +35,13 @@ class TaskCompletionBaseSchema(BaseSchema):
         default_factory=datetime.now,  # Встановлює поточний час, якщо не надано
         description="Фактичний час завершення завдання користувачем (або час подання на перевірку)."
     )
-    # TODO: Додати валідатор для status на основі TaskStatus Enum
-    status: str = Field(
-        default=TaskStatus.PENDING_REVIEW.value,
-        description=f"Статус виконання завдання. Допустимі значення: {', '.join([ts.value for ts in TaskStatus])}."
+    status: TaskStatus = Field( # Змінено на TaskStatus Enum
+        default=TaskStatus.PENDING_REVIEW, # Використовуємо Enum напряму
+        description="Статус виконання завдання."
     )
     notes: Optional[str] = Field(None, description="Нотатки користувача щодо виконання завдання.")
 
-    @field_validator('status')
-    @classmethod
-    def validate_status(cls, value: str) -> str:
-        """Перевіряє, чи надане значення статусу є допустимим членом Enum TaskStatus."""
-        allowed_statuses = {s.value for s in TaskStatus}
-        if value not in allowed_statuses:
-            # TODO i18n: Translatable error message
-            raise ValueError(f"Недопустимий статус '{value}'. Дозволені статуси: {', '.join(allowed_statuses)}")
-        return value
+    # Валідатор validate_status більше не потрібен, Pydantic обробляє Enum
 
     # model_config успадковується з BaseSchema (from_attributes=True)
 
@@ -74,22 +66,11 @@ class TaskCompletionUpdateSchema(
     verified_at: Optional[datetime] = Field(None, description="Час перевірки виконання адміністратором.")
     # verifier_id: Optional[int] = None # Встановлюється сервісом на основі поточного адміністратора
 
-    # TODO: Додати валідатор для status на основі TaskStatus Enum
-    status: Optional[str] = Field(None,
-                                  description=f"Новий статус виконання. Допустимі значення: {', '.join([ts.value for ts in TaskStatus])}.")
+    status: Optional[TaskStatus] = Field(None, # Змінено на TaskStatus Enum
+                                  description="Новий статус виконання.")
     notes: Optional[str] = Field(None, description="Додаткові нотатки (наприклад, від адміністратора при перевірці).")
 
-    @field_validator('status')
-    @classmethod
-    def validate_status_on_update(cls, value: Optional[str]) -> Optional[str]:
-        """Перевіряє статус при оновленні, якщо він наданий."""
-        if value is None:
-            return value
-        allowed_statuses = {s.value for s in TaskStatus}
-        if value not in allowed_statuses:
-            # TODO i18n: Translatable error message
-            raise ValueError(f"Недопустимий статус '{value}'. Дозволені статуси: {', '.join(allowed_statuses)}")
-        return value
+    # Валідатор validate_status_on_update більше не потрібен
 
 
 class TaskCompletionSchema(TaskCompletionBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
@@ -119,7 +100,7 @@ if __name__ == "__main__":
     logger.info("\nTaskCompletionCreateSchema (приклад для створення):")
     create_completion_data = {
         "completed_at": datetime.now(),
-        "status": TaskStatus.PENDING_REVIEW.value,
+        "status": TaskStatus.PENDING_REVIEW, # Використовуємо Enum
         "notes": "Завдання виконано, очікую на перевірку."  # TODO i18n
     }
     create_completion_instance = TaskCompletionCreateSchema(**create_completion_data)
@@ -128,7 +109,7 @@ if __name__ == "__main__":
     logger.info("\nTaskCompletionUpdateSchema (приклад для оновлення адміністратором):")
     update_completion_data = {
         "verified_at": datetime.now(),
-        "status": TaskStatus.COMPLETED.value,
+        "status": TaskStatus.COMPLETED, # Використовуємо Enum
         "notes": "Чудова робота!"  # TODO i18n
     }
     update_completion_instance = TaskCompletionUpdateSchema(**update_completion_data)
@@ -144,7 +125,7 @@ if __name__ == "__main__":
         "task_id": 10,
         "user_id": 101,
         "completed_at": datetime.now() - timedelta(hours=1),
-        "status": TaskStatus.COMPLETED.value,
+        "status": TaskStatus.COMPLETED, # Використовуємо Enum
         "notes": "Завдання виконано успішно.",  # TODO i18n
         "created_at": datetime.now() - timedelta(hours=2),  # Час подання
         "updated_at": datetime.now(),  # Час останнього оновлення (напр. верифікації)
@@ -157,7 +138,7 @@ if __name__ == "__main__":
 
     logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних виконань завдань.")
     logger.info(
-        f"Використовується TaskStatus Enum для поля 'status', наприклад: TaskStatus.REJECTED = '{TaskStatus.REJECTED.value}'")
+        f"Використовується TaskStatus Enum для поля 'status', наприклад: TaskStatus.REJECTED = '{TaskStatus.REJECTED}'") # .value не потрібно для Enum member
 
-# Потрібно для timedelta в __main__
-from datetime import timedelta
+# Потрібно для timedelta в __main__ - вже переміщено нагору
+# from datetime import timedelta

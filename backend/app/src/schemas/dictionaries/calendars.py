@@ -11,23 +11,24 @@
 
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone # timezone для прикладу в __main__
-import uuid # Для прикладу в __main__
+# import uuid # Видалено, оскільки id тепер int
 from pydantic import Field
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
     DictionaryCreateSchema,
-    DictionaryResponseSchema,
+    DictionaryBaseResponseSchema,  # Змінено на правильну назву базової схеми
     DictionaryUpdateSchema
 )
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
-class CalendarProviderResponseSchema(DictionaryResponseSchema):
+class CalendarProviderResponseSchema(DictionaryBaseResponseSchema):
     """Pydantic схема для представлення запису довідника "Провайдер Календаря" у відповідях API.
 
-    Успадковує всі поля від `DictionaryResponseSchema`.
+    Успадковує всі поля від `DictionaryBaseResponseSchema`.
     Додає специфічні поля для провайдерів календарів.
     """
     is_active: bool = Field(..., description="Статус активності провайдера.")
@@ -84,18 +85,18 @@ if __name__ == "__main__":
 
     logger.info("\nCalendarProviderResponseSchema (приклад для відповіді API):")
     cp_response_data = {
-        "id": uuid.uuid4(),
+        "id": 1, # id тепер int
         "name": "Google Calendar",  # TODO i18n: "Google Calendar"
         "code": "GOOGLE_CALENDAR",
         "description": "Інтеграція з сервісом Google Calendar.",  # TODO i18n
-        "icon": "fab fa-google",
-        "color": "#4285F4",
+        # "icon": "fab fa-google", # Видалено
+        # "color": "#4285F4",    # Видалено
         "is_active": True,
         "credentials_schema": {"type": "oauth2", "scopes": ["calendar.readonly"]},
         "sync_frequency_minutes": 60,
         "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
-        "is_deleted": False
+        "updated_at": datetime.now(timezone.utc)
+        # "is_deleted": False # Видалено
     }
     cp_response_instance = CalendarProviderResponseSchema(**cp_response_data)
     logger.info(cp_response_instance.model_dump_json(indent=2, exclude_none=True))

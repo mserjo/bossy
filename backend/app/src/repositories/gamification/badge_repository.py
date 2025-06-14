@@ -15,7 +15,9 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.gamification.badge import Badge
 from backend.app.src.schemas.gamification.badge import BadgeCreateSchema, BadgeUpdateSchema
-from backend.app.src.config import logger # Використання спільного логера
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class BadgeRepository(BaseRepository[Badge, BadgeCreateSchema, BadgeUpdateSchema]):
@@ -65,15 +67,10 @@ class BadgeRepository(BaseRepository[Badge, BadgeCreateSchema, BadgeUpdateSchema
         if active_only:
             # Модель Badge успадковує BaseMainModel, яке має поле 'state' через StateMixin.
             # Припускаємо, що активний стан позначається як "active".
-            # TODO: [Визначення Активного Стану] Уточнити значення для активного стану ("active", True, etc.)
-            #       згідно з `technical_task.txt` / моделлю даних.
-            if hasattr(self.model, "state"):
-                filters_dict["state"] = "active"
-            else:
-                logger.warning(
-                    f"Модель {self.model.__name__} не має поля 'state' для фільтрації активних бейджів. "
-                    "Фільтр active_only не буде застосовано."
-                )
+            # TODO: [Визначення Активного Стану] Уточнити значення для активного стану ("active" або Enum.value),
+            #       якщо модель буде використовувати Enum для поля 'state'.
+            filters_dict["state"] = "active"
+            # Попередній блок 'else' з hasattr був видалений, оскільки 'state' гарантовано існує.
 
         sort_by_field = "name"
         sort_order_str = "asc"

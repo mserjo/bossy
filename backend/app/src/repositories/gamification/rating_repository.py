@@ -11,11 +11,13 @@ from datetime import date  # Для фільтрації за period_end_date
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.orm import selectinload
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
-from backend.app.src.config import logger # Використання спільного логера
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+from backend.app.src.core.dicts import RatingType # Імпорт RatingType Enum
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.gamification.rating import UserGroupRating
 from backend.app.src.schemas.gamification.rating import (
@@ -46,7 +48,7 @@ class UserGroupRatingRepository(
             session: AsyncSession,
             user_id: int,
             group_id: int,
-            rating_type: Optional[str] = None,  # Очікується значення з RatingType Enum
+            rating_type: Optional[RatingType] = None,  # Змінено на RatingType Enum
             period_end_date: Optional[date] = None  # Для періодичних рейтингів
     ) -> Optional[UserGroupRating]:
         """
@@ -57,9 +59,7 @@ class UserGroupRatingRepository(
             session (AsyncSession): Асинхронна сесія SQLAlchemy.
             user_id (int): ID користувача.
             group_id (int): ID групи.
-            rating_type (Optional[str]): Тип рейтингу.
-                                         # TODO: [Enum Validation] Інтегрувати Enum 'RatingType'
-                                         #       згідно з `technical_task.txt` / `core.dicts`.
+            rating_type (Optional[RatingType]): Тип рейтингу (Enum).
             period_end_date (Optional[date]): Дата завершення періоду для рейтингу.
 
         Returns:
@@ -75,17 +75,14 @@ class UserGroupRatingRepository(
             self.model.group_id == group_id
         ]
         if rating_type is not None:
-            conditions.append(self.model.rating_type == rating_type)
+            conditions.append(self.model.rating_type == rating_type) # Порівняння з Enum членом
 
         if period_end_date is not None:
             conditions.append(self.model.period_end_date == period_end_date)
-        elif rating_type != "overall" and rating_type is not None:
-            # Якщо period_end_date не вказано, і тип рейтингу не 'overall',
-            # шукаємо запис, де period_end_date IS NULL (для поточних періодичних).
-            # Для 'overall' зазвичай period_end_date завжди NULL.
+        # Логіка для period_end_date IS NULL, якщо тип не 'overall' і дата не надана,
+        # або якщо тип 'overall'.
+        elif (rating_type is not None and rating_type != RatingType.OVERALL) or rating_type == RatingType.OVERALL:
             conditions.append(self.model.period_end_date.is_(None))
-        elif rating_type == "overall": # Для overall завжди шукаємо з period_end_date IS NULL
-             conditions.append(self.model.period_end_date.is_(None))
 
 
         stmt = select(self.model).where(*conditions)
@@ -103,7 +100,7 @@ class UserGroupRatingRepository(
             self,
             session: AsyncSession,
             group_id: int,
-            rating_type: Optional[str] = None,  # Очікується значення з RatingType Enum
+            rating_type: Optional[RatingType] = None,  # Змінено на RatingType Enum
             period_end_date: Optional[date] = None,
             limit: int = 10
     ) -> List[UserGroupRating]:
@@ -114,8 +111,7 @@ class UserGroupRatingRepository(
         Args:
             session (AsyncSession): Асинхронна сесія SQLAlchemy.
             group_id (int): ID групи.
-            rating_type (Optional[str]): Тип рейтингу.
-                                         # TODO: [Enum Validation] Інтегрувати Enum 'RatingType'.
+            rating_type (Optional[RatingType]): Тип рейтингу (Enum).
             period_end_date (Optional[date]): Дата завершення періоду.
             limit (int): Максимальна кількість записів для повернення (топ N).
 
@@ -129,14 +125,13 @@ class UserGroupRatingRepository(
         filters_dict: Dict[str, Any] = {"group_id": group_id}
 
         if rating_type is not None:
-            filters_dict["rating_type"] = rating_type
+            filters_dict["rating_type"] = rating_type # Передаємо Enum член напряму
 
         if period_end_date is not None:
             filters_dict["period_end_date"] = period_end_date
-        elif rating_type != "overall" and rating_type is not None:
-            filters_dict["period_end_date"] = None # Явна перевірка на NULL
-        elif rating_type == "overall":
-             filters_dict["period_end_date"] = None
+        # Логіка для period_end_date IS NULL для фільтра в get_multi
+        elif (rating_type is not None and rating_type != RatingType.OVERALL) or rating_type == RatingType.OVERALL:
+            filters_dict["period_end_date"] = None # Фільтр BaseRepository має обробити None як IS NULL
 
 
         sort_by_field = "rating_score"
@@ -162,7 +157,7 @@ class UserGroupRatingRepository(
                 exc_info=True
             )
             return []
-        return items
+        # return items # Цей рядок недосяжний
 
 
 if __name__ == "__main__":
@@ -179,4 +174,4 @@ if __name__ == "__main__":
     logger.info("  - get_top_ratings_for_group(group_id, rating_type, period_end_date, limit)")
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    logger.info("TODO: Інтегрувати Enum 'RatingType' з core.dicts для поля 'rating_type' та відповідної логіки фільтрації.")
+    # logger.info("TODO: Інтегрувати Enum 'RatingType' з core.dicts для поля 'rating_type' та відповідної логіки фільтрації.") # Вирішено

@@ -151,7 +151,7 @@ class StateMixin:
     # Це має відповідати реальній таблиці-довіднику статусів у вашій БД.
     @declared_attr
     def state_id(cls) -> Mapped[Optional[int]]:
-        """ID стану/статусу сутності (зовнішній ключ до таблиці статусів)."""
+        """ID стану/статусу сутності (зовнішній ключ до таблиці dict_statuses)."""
         # Використання %(table_name)s дозволяє Alembic автоматично підставляти
         # ім'я таблиці при генерації міграцій для ForeignKey.
         fk_name = f"fk_{cls.__tablename__}_state_id" # Використовуємо f-string, оскільки %(table_name)s тут не працює напряму
@@ -160,10 +160,10 @@ class StateMixin:
                                                   # але стандартна конвенція Alembic з %(table_name)s краща,
                                                   # якщо налаштована в env.py -> context.configure(naming_convention=...)
         return mapped_column(
-            ForeignKey("statuses.id", name=fk_name, use_alter=True), # Явне ім'я FK та use_alter
+            ForeignKey("dict_statuses.id", name=fk_name, use_alter=True), # Явне ім'я FK та use_alter, змінено на dict_statuses
             nullable=True, # Залежить від бізнес-логіки, чи може стан бути відсутнім
             index=True,
-            comment="ID стану/статусу сутності (FK до таблиці статусів)"
+            comment="ID стану/статусу сутності (FK до таблиці dict_statuses)"
         )
 
     # Примітка: Відповідний `relationship` до моделі статусів (наприклад, `StatusModel`)

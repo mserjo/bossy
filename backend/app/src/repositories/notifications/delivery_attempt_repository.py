@@ -10,7 +10,6 @@ from typing import List, Optional, Tuple, Any
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.orm import selectinload
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
@@ -19,12 +18,12 @@ from backend.app.src.models.notifications.delivery import NotificationDeliveryAt
 from backend.app.src.schemas.notifications.delivery import NotificationDeliveryAttemptCreateSchema
 # NotificationDeliveryAttemptUpdateSchema зазвичай не потрібна
 from pydantic import BaseModel as PydanticBaseModel  # Для "заглушки" UpdateSchema
-from backend.app.src.config import logger # Використання спільного логера
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType # Імпортовано Enums
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
-# TODO: [Enum Integration] Імпортувати Enums NotificationChannelType та DeliveryStatusType,
-#       ймовірно з `backend.app.src.core.enums` або аналогічного місця,
-#       згідно з `technical_task.txt` / `structure-claude-v2.md`.
-# from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType
+# Enums NotificationChannelType та DeliveryStatusType імпортовано вище.
 
 
 # Спроби доставки зазвичай не оновлюються, а створюються нові для кожної спроби.
@@ -102,7 +101,7 @@ class NotificationDeliveryAttemptRepository(
     async def get_failed_attempts_by_channel(
             self,
             session: AsyncSession,
-            channel: str,  # Очікується значення з NotificationChannelType Enum
+            channel: NotificationChannelType,  # Змінено на NotificationChannelType Enum
             skip: int = 0,
             limit: int = 100
     ) -> Tuple[List[NotificationDeliveryAttempt], int]:
@@ -111,9 +110,7 @@ class NotificationDeliveryAttemptRepository(
 
         Args:
             session (AsyncSession): Асинхронна сесія SQLAlchemy.
-            channel (str): Канал доставки.
-                           # TODO: [Enum Validation] Використовувати NotificationChannelType Enum.value
-                           #       згідно з `technical_task.txt` / `core.enums`.
+            channel (NotificationChannelType): Канал доставки (Enum).
             skip (int): Кількість записів для пропуску.
             limit (int): Максимальна кількість записів для повернення.
 
@@ -121,13 +118,11 @@ class NotificationDeliveryAttemptRepository(
             Tuple[List[NotificationDeliveryAttempt], int]: Кортеж зі списком невдалих спроб та їх загальною кількістю.
         """
         logger.debug(
-            f"Отримання невдалих спроб для каналу: {channel}, skip: {skip}, limit: {limit}"
+            f"Отримання невдалих спроб для каналу: {channel.value}, skip: {skip}, limit: {limit}"
         )
-        # TODO: [Enum Validation] Замінити рядок "failed" на значення з Enum DeliveryStatusType.FAILED.value
-        #       згідно з `technical_task.txt` / `core.enums`.
         filters_dict: Dict[str, Any] = {
-            "channel": channel,
-            "status": "failed"  # Потребує оновлення на Enum
+            "channel": channel, # Передаємо Enum член напряму
+            "status": DeliveryStatusType.FAILED # Використовуємо Enum член напряму
         }
         sort_by_field = "created_at"
         sort_order_str = "desc"
@@ -142,7 +137,7 @@ class NotificationDeliveryAttemptRepository(
                 sort_order=sort_order_str
             )
             total_count = await super().count(session=session, filters=filters_dict)
-            logger.debug(f"Знайдено {total_count} невдалих спроб для каналу: {channel}")
+            logger.debug(f"Знайдено {total_count} невдалих спроб для каналу: {channel.value if isinstance(channel, Enum) else channel}") # Log enum value
             return items, total_count
         except Exception as e:
             logger.error(
@@ -164,7 +159,6 @@ if __name__ == "__main__":
 
     logger.info("\nСпецифічні методи:")
     logger.info("  - get_attempts_for_notification(notification_id: int, skip: int = 0, limit: int = 100)")
-    logger.info("  - get_failed_attempts_by_channel(channel: str, skip: int = 0, limit: int = 100)")
+    logger.info("  - get_failed_attempts_by_channel(channel: NotificationChannelType, skip: int = 0, limit: int = 100)") # Оновлено тип
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    logger.info("TODO: Інтегрувати Enums 'NotificationChannelType' та 'DeliveryStatusType' з core.dicts для фільтрації.")

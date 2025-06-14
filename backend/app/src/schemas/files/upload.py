@@ -14,7 +14,7 @@ from pydantic import Field, AnyHttpUrl, field_validator
 
 # Абсолютний імпорт базової схеми та Enum
 from backend.app.src.schemas.base import BaseSchema
-from backend.app.src.core.dicts import FileType as FileTypeEnum # Enum для призначення файлу
+from backend.app.src.core.dicts import FileType # Змінено імпорт FileTypeEnum на FileType
 from backend.app.src.config.logging import get_logger  # Імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
@@ -24,9 +24,9 @@ MIME_TYPE_MAX_LENGTH_UPLOAD = 100 # Збігається з FileRecord
 PURPOSE_MAX_LENGTH_UPLOAD = 50    # Збігається з FileRecord
 
 
-class FileUploadInitiateRequestSchema(BaseSchema):
+class PresignedUrlRequestSchema(BaseSchema): # Renamed from FileUploadInitiateRequestSchema
     """
-    Схема для запиту на ініціацію завантаження файлу.
+    Схема для запиту на ініціацію завантаження файлу та отримання presigned URL.
     Клієнт надсилає метадані файлу, щоб отримати URL для завантаження.
     """
     file_name: str = Field(
@@ -48,25 +48,17 @@ class FileUploadInitiateRequestSchema(BaseSchema):
         # le=settings.MAX_FILE_SIZE_MB * 1024 * 1024,
         description="Розмір файлу в байтах."
     )
-    # TODO: Додати валідатор для purpose на основі Enum FileTypeEnum
-    purpose: str = Field(
+    # Валідатор для purpose на основі Enum FileType вже існує нижче.
+    purpose: FileType = Field( # Змінено на FileType
         ...,
-        max_length=PURPOSE_MAX_LENGTH_UPLOAD,
-        description=f"Призначення файлу (наприклад, '{FileTypeEnum.AVATAR.value}', '{FileTypeEnum.TASK_ATTACHMENT.value}'). Визначає подальшу обробку та зберігання."
+        # max_length більше не потрібен для Enum
+        description="Призначення файлу. Визначає подальшу обробку та зберігання."
     )
 
-    @field_validator('purpose')
-    @classmethod
-    def validate_purpose(cls, value: str) -> str:
-        """Перевіряє, чи надане значення призначення є допустимим членом Enum FileType."""
-        allowed_purposes = {ft.value for ft in FileTypeEnum}
-        if value not in allowed_purposes:
-            # TODO i18n: Translatable error message
-            raise ValueError(f"Недопустиме призначення файлу '{value}'. Дозволені: {', '.join(allowed_purposes)}")
-        return value
+    # Валідатор validate_purpose більше не потрібен, Pydantic v2 обробляє Enum автоматично
 
 
-class PresignedUploadURLResponse(BaseSchema):
+class PresignedUrlResponseSchema(BaseSchema): # Renamed from PresignedUploadURLResponse
     """
     Схема відповіді, що містить URL для прямого завантаження файлу (наприклад, presigned URL для S3)
     та ідентифікатор створеного запису файлу.
@@ -97,7 +89,7 @@ class FileUploadCompleteRequestSchema(BaseSchema):
     # Можна додати інші поля, такі як version_id для S3.
 
 
-class FileUploadResponse(BaseSchema):
+class FileUploadResponseSchema(BaseSchema): # Renamed from FileUploadResponse
     """
     Схема відповіді після успішного завершення всього процесу завантаження файлу.
     Містить фінальну інформацію про завантажений файл.
@@ -107,10 +99,11 @@ class FileUploadResponse(BaseSchema):
     url: AnyHttpUrl = Field(description="Фінальний URL для доступу до завантаженого файлу.")
     mime_type: str = Field(description="MIME-тип файлу.")
     file_size: int = Field(description="Розмір файлу в байтах.")
-    purpose: Optional[str] = Field(None, description="Призначення файлу.")
+    purpose: Optional[FileType] = Field(None, description="Призначення файлу.") # Змінено на FileType
 
-    class Config: # Використовуємо вкладений Config для Pydantic v2, а не model_config на рівні класу
-        populate_by_name = True # Дозволяє використовувати аліас fileRecordId
+    # model_config успадковується з BaseSchema, який вже має populate_by_name = True
+    # class Config:
+    #     populate_by_name = True
 
 
 if __name__ == "__main__":
@@ -122,23 +115,23 @@ if __name__ == "__main__":
         "file_name": "contract_final.docx", # TODO i18n example
         "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "file_size": 256000, # 250KB
-        "purpose": FileTypeEnum.GENERAL_DOCUMENT.value
+        "purpose": FileType.GENERAL_DOCUMENT.value # Змінено на FileType
     }
-    initiate_instance = FileUploadInitiateRequestSchema(**initiate_data)
+    initiate_instance = PresignedUrlRequestSchema(**initiate_data) # Renamed
     logger.info(initiate_instance.model_dump_json(indent=2))
     try:
-        FileUploadInitiateRequestSchema(file_name="test.txt", mime_type="text/plain", file_size=10, purpose="INVALID_PURPOSE")
+        PresignedUrlRequestSchema(file_name="test.txt", mime_type="text/plain", file_size=10, purpose="INVALID_PURPOSE") # Renamed
     except ValueError as e:
-        logger.info(f"Помилка валідації FileUploadInitiateRequestSchema (очікувано для purpose): {e}")
+        logger.info(f"Помилка валідації PresignedUrlRequestSchema (очікувано для purpose): {e}") # Renamed
 
 
-    logger.info("\nPresignedUploadURLResponse (приклад відповіді з URL для завантаження):")
+    logger.info("\nPresignedUrlResponseSchema (приклад відповіді з URL для завантаження):") # Renamed
     presigned_data = {
         "upload_url": "https://s3.example.com/bucket-name/user_xyz/contract_final.docx?AWSAccessKeyId=...",
         "fields": {"key": "user_xyz/contract_final.docx", "Content-Type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document"},
         "file_record_id": 101
     }
-    presigned_instance = PresignedUploadURLResponse(**presigned_data)
+    presigned_instance = PresignedUrlResponseSchema(**presigned_data) # Renamed
     logger.info(presigned_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nFileUploadCompleteRequestSchema (приклад запиту на підтвердження):")
@@ -157,12 +150,12 @@ if __name__ == "__main__":
         "url": "https://cdn.example.com/files/user_xyz/contract_final.docx_completed",
         "mime_type": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "file_size": 256000,
-        "purpose": FileTypeEnum.GENERAL_DOCUMENT.value
+        "purpose": FileType.GENERAL_DOCUMENT.value # Змінено на FileType
     }
     # Для демонстрації аліасу при створенні екземпляра
-    final_response_instance_alias = FileUploadResponse(fileRecordId=101, **{k:v for k,v in final_response_data.items() if k != 'file_id'})
+    final_response_instance_alias = FileUploadResponseSchema(fileRecordId=101, **{k:v for k,v in final_response_data.items() if k != 'file_id'}) # Renamed
     logger.info(final_response_instance_alias.model_dump_json(indent=2, by_alias=True, exclude_none=True)) # by_alias=True для використання аліасів при серіалізації
 
     logger.info("\nПримітка: Ці схеми описують кроки процесу завантаження файлів.")
-    logger.info("TODO: Додати валідацію 'purpose' на основі Enum FileTypeEnum в FileUploadInitiateRequestSchema.")
-    logger.info("TODO: Додати обмеження на 'file_size' в FileUploadInitiateRequestSchema згідно з налаштуваннями.")
+    logger.info("Валідатор для 'purpose' на основі Enum FileType в PresignedUrlRequestSchema вже існує.") # Updated TODO
+    logger.info("TODO: Додати обмеження на 'file_size' в PresignedUrlRequestSchema згідно з налаштуваннями.")

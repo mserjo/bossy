@@ -64,8 +64,9 @@ class RefreshToken(Base, TimestampedMixin):
     user: Mapped["User"] = relationship(back_populates="refresh_tokens", lazy="selectin")
 
     # Поля для __repr__
+    # `id` автоматично додається через Base.__repr__
     # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
-    _repr_fields = ["id", "user_id", "expires_at"]
+    _repr_fields = ("user_id", "expires_at")
 
 
 if __name__ == "__main__":

@@ -11,7 +11,6 @@ from typing import List, Optional, Tuple, Any
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.orm import selectinload
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
@@ -20,7 +19,9 @@ from backend.app.src.models.gamification.user_achievement import UserAchievement
 from backend.app.src.schemas.gamification.achievement import UserAchievementCreateSchema
 # UserAchievementUpdateSchema зазвичай не потрібна, досягнення не змінюються
 from pydantic import BaseModel as PydanticBaseModel  # Для UpdateSchemaType
-from backend.app.src.config import logger # Використання спільного логера
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 # Досягнення зазвичай не оновлюються, а видаляються та створюються заново, якщо потрібно коригування.

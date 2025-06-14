@@ -16,7 +16,8 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.config import logger # Новий імпорт логера
+from backend.app.src.config.logging import get_logger # Новий імпорт логера
+logger = get_logger(__name__)
 
 # Оскільки BonusRule модель успадковує NameDescriptionMixin, StateMixin, їх поля теж мають бути тут.
 
@@ -96,7 +97,7 @@ class BonusRuleUpdateSchema(BonusRuleBaseSchema):
     state: Optional[str] = Field(None, max_length=50)
 
 
-class BonusRuleSchema(BonusRuleBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+class BonusRuleResponseSchema(BonusRuleBaseSchema, IDSchemaMixin, TimestampedSchemaMixin): # Renamed
     """
     Схема для представлення даних про правило нарахування бонусів у відповідях API.
     Включає `id`, часові мітки та розширену інформацію про пов'язані об'єкти.
@@ -108,7 +109,7 @@ class BonusRuleSchema(BonusRuleBaseSchema, IDSchemaMixin, TimestampedSchemaMixin
     # TODO: Замінити Any на відповідні схеми.
     bonus_type: Optional[BonusTypeSchema] = Field(None, description="Об'єкт типу бонусу.")
     task: Optional[TaskSchema] = Field(None, description="Об'єкт пов'язаного завдання (коротка інформація).")
-    event_task: Optional[TaskSchema] = Field(None,
+    event: Optional[TaskSchema] = Field(None, # Renamed from event_task
                                              description="Об'єкт пов'язаної події (якщо event_id використовується окремо).")
 
     # Можна додати обчислювані або додатково завантажені поля, наприклад:
@@ -158,7 +159,7 @@ if __name__ == "__main__":
         # "bonus_type": {"id": 1, "name": "Нагорода", "code": "REWARD"}, # Приклад BonusTypeSchema
         # "task": {"id": 123, "name": "Завдання 'Титан'"} # Приклад TaskSchema (коротка версія)
     }
-    rule_response_instance = BonusRuleSchema(**rule_response_data)
+    rule_response_instance = BonusRuleResponseSchema(**rule_response_data) # Renamed
     logger.info(rule_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nПримітка: Схеми для пов'язаних об'єктів (BonusTypeSchema, TaskSchema) наразі є заповнювачами (Any).")

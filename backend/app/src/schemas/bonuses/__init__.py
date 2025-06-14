@@ -13,7 +13,8 @@
 """
 
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Схеми, пов'язані з Правилами Нарахування Бонусів
 from backend.app.src.schemas.bonuses.bonus_rule import (

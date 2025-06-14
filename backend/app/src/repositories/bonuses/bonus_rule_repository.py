@@ -18,9 +18,9 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.bonuses.bonus_rule import BonusRule
 from backend.app.src.schemas.bonuses.bonus_rule import BonusRuleCreateSchema, BonusRuleUpdateSchema
-from backend.app.src.config import logging # Імпорт logging з конфігурації
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 # Отримання логера для цього модуля
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 # from backend.app.src.core.dicts import SomeStateEnum # Якщо поле state використовує Enum
 
@@ -59,16 +59,13 @@ class BonusRuleRepository(BaseRepository[BonusRule, BonusRuleCreateSchema, Bonus
         filters_dict: Dict[str, Any] = {"task_id": task_id}
 
         if active_only:
-            # TODO: [Визначення Активного Стану] Уточнити значення для активного стану ("active", True, etc.)
-            #       згідно з `technical_task.txt` / моделлю даних.
-            if hasattr(self.model, "state"): # Припускаємо, що поле називається 'state'
-                filters_dict["state"] = "active" # Припускаємо, що активний стан це рядок "active"
-            elif hasattr(self.model, "is_active"): # Альтернативний варіант, якщо поле 'is_active' (Boolean)
-                 filters_dict["is_active"] = True
-            else:
-                logger.warning(
-                    f"Модель {self.model.__name__} не має стандартного поля 'state' або 'is_active' "
-                    f"для фільтрації активних правил. Повертаються всі правила для завдання {task_id}."
+            # Модель BonusRule успадковує StateMixin, який має поле 'state'.
+            # TODO: [Визначення Активного Стану] Уточнити значення для активного стану (наприклад, "active" або Enum.value).
+            #       Поточна реалізація StateMixin використовує Optional[str].
+            filters_dict["state"] = "active" # Припускаємо, що активний стан це рядок "active"
+            # видалено блок hasattr(self.model, "is_active") оскільки is_active не є стандартним полем моделі BonusRule
+            # Якщо поле стану буде іншим або використовувати Enum, це місце потребуватиме оновлення.
+            # Коментар про logger.warning видалено, оскільки else блок, де він був, видалено.
                 )
 
         try:
@@ -105,14 +102,9 @@ class BonusRuleRepository(BaseRepository[BonusRule, BonusRuleCreateSchema, Bonus
 
         if active_only:
             # TODO: [Визначення Активного Стану] Аналогічно до get_rules_for_task.
-            if hasattr(self.model, "state"):
-                filters_dict["state"] = "active"
-            elif hasattr(self.model, "is_active"):
-                filters_dict["is_active"] = True
-            else:
-                logger.warning(
-                    f"Модель {self.model.__name__} не має стандартного поля 'state' або 'is_active' "
-                    f"для фільтрації активних правил. Повертаються всі правила для події {event_task_id}."
+            filters_dict["state"] = "active" # Припускаємо, що активний стан це рядок "active"
+            # видалено блок hasattr(self.model, "is_active")
+            # Коментар про logger.warning видалено, оскільки else блок, де він був, видалено.
                 )
 
         try:

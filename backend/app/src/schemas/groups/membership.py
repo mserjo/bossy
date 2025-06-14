@@ -11,7 +11,7 @@ Pydantic схеми для сутності "Членство в Групі" (Gr
 from datetime import datetime
 from typing import Optional
 
-from pydantic import Field, field_validator  # field_validator для валідації ролі
+from pydantic import Field  # field_validator видалено, оскільки більше не використовується
 
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, TimestampedSchemaMixin
@@ -28,20 +28,12 @@ class GroupMembershipBaseSchema(BaseSchema):
     """
     user_id: int = Field(description="Ідентифікатор користувача.")
     group_id: int = Field(description="Ідентифікатор групи.")
-    role: str = Field(
-        default=GroupRole.MEMBER.value,
-        description=f"Роль користувача в групі. Допустимі значення: {', '.join([r.value for r in GroupRole])}."
+    role: GroupRole = Field( # Змінено на GroupRole Enum
+        default=GroupRole.MEMBER, # Використовуємо Enum напряму
+        description="Роль користувача в групі."
     )
 
-    @field_validator('role')
-    @classmethod
-    def validate_role(cls, value: str) -> str:
-        """Перевіряє, чи надане значення ролі є допустимим членом Enum GroupRole."""
-        allowed_roles = {r.value for r in GroupRole}
-        if value not in allowed_roles:
-            # TODO i18n: Translatable error message
-            raise ValueError(f"Недопустима роль '{value}'. Дозволені ролі: {', '.join(allowed_roles)}")
-        return value
+    # Валідатор validate_role більше не потрібен, Pydantic обробляє Enum
 
     # model_config успадковується з BaseSchema (from_attributes=True)
 
@@ -54,20 +46,12 @@ class GroupMembershipCreateSchema(
     `user_id` може бути в тілі запиту або визначатися інакше (наприклад, для запрошення).
     """
     user_id: int = Field(description="Ідентифікатор користувача, якого додають до групи.")
-    role: str = Field(
-        default=GroupRole.MEMBER.value,
-        description=f"Роль, що призначається користувачеві в групі. За замовчуванням: '{GroupRole.MEMBER.value}'. Допустимі значення: {', '.join([r.value for r in GroupRole])}."
+    role: GroupRole = Field( # Змінено на GroupRole Enum
+        default=GroupRole.MEMBER, # Використовуємо Enum напряму
+        description="Роль, що призначається користувачеві в групі."
     )
 
-    @field_validator('role')
-    @classmethod
-    def validate_role_on_create(cls, value: str) -> str:
-        """Перевіряє роль при створенні (аналогічно до базової перевірки)."""
-        allowed_roles = {r.value for r in GroupRole}
-        if value not in allowed_roles:
-            # TODO i18n: Translatable error message
-            raise ValueError(f"Недопустима роль '{value}'. Дозволені ролі: {', '.join(allowed_roles)}")
-        return value
+    # Валідатор validate_role_on_create більше не потрібен
 
 
 class GroupMembershipUpdateSchema(BaseSchema):
@@ -75,18 +59,10 @@ class GroupMembershipUpdateSchema(BaseSchema):
     Схема для оновлення ролі користувача в групі.
     Дозволяє оновлювати лише поле `role`.
     """
-    role: str = Field(
-        description=f"Нова роль користувача в групі. Допустимі значення: {', '.join([r.value for r in GroupRole])}.")
+    role: GroupRole = Field( # Змінено на GroupRole Enum
+        description="Нова роль користувача в групі.")
 
-    @field_validator('role')
-    @classmethod
-    def validate_role_on_update(cls, value: str) -> str:
-        """Перевіряє роль при оновленні."""
-        allowed_roles = {r.value for r in GroupRole}
-        if value not in allowed_roles:
-            # TODO i18n: Translatable error message
-            raise ValueError(f"Недопустима роль '{value}'. Дозволені ролі: {', '.join(allowed_roles)}")
-        return value
+    # Валідатор validate_role_on_update більше не потрібен
 
 
 class GroupMembershipSchema(GroupMembershipBaseSchema, TimestampedSchemaMixin):
@@ -107,21 +83,21 @@ if __name__ == "__main__":
     logger.info("--- Pydantic Схеми для Членства в Групах (GroupMembership) ---")
 
     logger.info("\nGroupMembershipBaseSchema (приклад):")
-    base_data = {"user_id": 1, "group_id": 10, "role": GroupRole.ADMIN.value}
+    base_data = {"user_id": 1, "group_id": 10, "role": GroupRole.ADMIN} # Використовуємо Enum
     base_instance = GroupMembershipBaseSchema(**base_data)
     logger.info(base_instance.model_dump_json(indent=2))
     try:
-        GroupMembershipBaseSchema(user_id=1, group_id=10, role="invalid_role")
+        GroupMembershipBaseSchema(user_id=1, group_id=10, role="invalid_role") # Pydantic валідує Enum
     except Exception as e:
         logger.info(f"Помилка валідації GroupMembershipBaseSchema (очікувано): {e}")
 
     logger.info("\nGroupMembershipCreateSchema (приклад для створення):")
-    create_data = {"user_id": 2, "role": GroupRole.MEMBER.value}
+    create_data = {"user_id": 2, "role": GroupRole.MEMBER} # Використовуємо Enum
     create_instance = GroupMembershipCreateSchema(**create_data)
     logger.info(create_instance.model_dump_json(indent=2))
 
     logger.info("\nGroupMembershipUpdateSchema (приклад для оновлення):")
-    update_data = {"role": GroupRole.ADMIN.value}
+    update_data = {"role": GroupRole.ADMIN} # Використовуємо Enum
     update_instance = GroupMembershipUpdateSchema(**update_data)
     logger.info(update_instance.model_dump_json(indent=2))
 
@@ -129,7 +105,7 @@ if __name__ == "__main__":
     membership_response_data = {
         "user_id": 1,
         "group_id": 10,
-        "role": GroupRole.ADMIN.value,
+        "role": GroupRole.ADMIN, # Використовуємо Enum
         "created_at": datetime.now(),
         "updated_at": datetime.now(),
         "user": {"id": 1, "name": "Адміністратор Групи"}  # TODO i18n (UserPublicProfileSchema)

@@ -14,26 +14,18 @@ from pydantic import Field
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin  # TimestampedSchemaMixin тут не потрібен, бо timestamp є власним полем
 from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.core.dicts import LogLevel # Імпортовано LogLevel Enum
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
-# TODO: Визначити та імпортувати Enum LogLevel з core.dicts
-# from backend.app.src.core.dicts import LogLevel as LogLevelEnum
+# LogLevel Enum імпортовано вище.
 # TODO: Замінити Any на UserPublicProfileSchema, коли вона буде доступна/рефакторена.
 # from backend.app.src.schemas.auth.user import UserPublicProfileSchema
 
 UserPublicProfileSchema = Any  # Тимчасовий заповнювач
 
 
-# Заглушка для LogLevel Enum
-class TempLogLevel:  # TODO: Видалити після імпорту Enum
-    INFO = "INFO"
-    ERROR = "ERROR"
-    WARNING = "WARNING"
-    DEBUG = "DEBUG"
-
-
-LOG_LEVEL_MAX_LENGTH = 50
+# LOG_LEVEL_MAX_LENGTH = 50 # Не потрібен для Enum
 LOG_MESSAGE_MAX_LENGTH_DISPLAY = 1000  # Для відображення, Text в моделі може бути довшим
 LOG_SOURCE_MAX_LENGTH = 255
 METRIC_NAME_MAX_LENGTH = 255
@@ -51,10 +43,8 @@ class SystemLogBaseSchema(BaseSchema):
         default_factory=datetime.now,  # Клієнт може надати, але сервер може перезаписати
         description="Час виникнення події логу."
     )
-    # TODO: Замінити str на LogLevelEnum та додати валідатор.
-    level: str = Field(
-        max_length=LOG_LEVEL_MAX_LENGTH,
-        description=f"Рівень логу (наприклад, '{TempLogLevel.INFO}', '{TempLogLevel.ERROR}')."
+    level: LogLevel = Field( # Змінено на LogLevel Enum
+        description="Рівень логу."
     )
     message: str = Field(description="Основне повідомлення логу.")
     source: Optional[str] = Field(
@@ -151,7 +141,7 @@ if __name__ == "__main__":
 
     logger.info("\nSystemLogCreateSchema (приклад для створення логу):")
     create_log_data = {
-        "level": TempLogLevel.INFO,  # TODO: Замінити на Enum.value
+        "level": LogLevel.INFO, # Використовуємо Enum
         "message": "Користувач user@example.com успішно оновив профіль.",  # TODO i18n
         "source": "user_profile_service",
         "user_id": 101,
@@ -165,7 +155,7 @@ if __name__ == "__main__":
     log_response_data = {
         "id": 1,
         "timestamp": datetime.now(),
-        "level": TempLogLevel.ERROR,  # TODO: Замінити на Enum.value
+        "level": LogLevel.ERROR, # Використовуємо Enum
         "message": "Не вдалося підключитися до зовнішнього сервісу 'X'.",  # TODO i18n
         "source": "integration_module",
         # "user": {"id": 101, "name": "Ініціатор Дії"} # Приклад UserPublicProfileSchema
@@ -195,5 +185,5 @@ if __name__ == "__main__":
     logger.info(metric_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних системного моніторингу.")
-    logger.info("TODO: Інтегрувати Enum 'LogLevel' з core.dicts для поля 'level' в SystemLog.")
+    # logger.info("TODO: Інтегрувати Enum 'LogLevel' з core.dicts для поля 'level' в SystemLog.") # Вирішено
     logger.info("TODO: Замінити Any на UserPublicProfileSchema в SystemLogSchema.")

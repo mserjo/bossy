@@ -19,9 +19,9 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.bonuses.account import UserAccount
 from backend.app.src.schemas.bonuses.account import UserAccountCreateSchema, UserAccountUpdateSchema
-from backend.app.src.config import logging # Імпорт logging з конфігурації
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 # Отримання логера для цього модуля
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 class UserAccountRepository(BaseRepository[UserAccount, UserAccountCreateSchema, UserAccountUpdateSchema]):
     """

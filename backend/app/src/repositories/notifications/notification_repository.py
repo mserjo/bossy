@@ -11,11 +11,12 @@ from datetime import datetime, timezone
 
 from sqlalchemy import select, func, update as sqlalchemy_update
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.orm import selectinload
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
-from backend.app.src.config import logger # Використання спільного логера
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.notifications.notification import Notification
@@ -23,9 +24,7 @@ from backend.app.src.schemas.notifications.notification import (
     NotificationCreateSchema,
     NotificationUpdateSchema  # Для позначки як прочитане
 )
-
-
-# from backend.app.src.core.dicts import NotificationType as NotificationTypeEnum # Для фільтрації
+from backend.app.src.core.dicts import NotificationType # Імпортовано Enum
 
 
 class NotificationRepository(BaseRepository[Notification, NotificationCreateSchema, NotificationUpdateSchema]):
@@ -49,7 +48,7 @@ class NotificationRepository(BaseRepository[Notification, NotificationCreateSche
             user_id: int,
             *,
             is_read: Optional[bool] = None,
-            notification_type: Optional[str] = None,  # Очікується значення з NotificationTypeEnum
+            notification_type: Optional[NotificationType] = None,  # Змінено на NotificationType Enum
             skip: int = 0,
             limit: int = 100
     ) -> Tuple[List[Notification], int]:
@@ -60,10 +59,7 @@ class NotificationRepository(BaseRepository[Notification, NotificationCreateSche
             session (AsyncSession): Асинхронна сесія SQLAlchemy.
             user_id (int): ID користувача.
             is_read (Optional[bool]): Фільтр за статусом прочитання.
-            notification_type (Optional[str]): Фільтр за типом сповіщення.
-                                               # TODO: [Enum Validation] Переконатися, що notification_type
-                                               #       передається як Enum.value або валідується згідно з
-                                               #       `technical_task.txt` / `core.enums`.
+            notification_type (Optional[NotificationType]): Фільтр за типом сповіщення (Enum).
             skip (int): Кількість записів для пропуску.
             limit (int): Максимальна кількість записів для повернення.
 
@@ -173,7 +169,7 @@ class NotificationRepository(BaseRepository[Notification, NotificationCreateSche
                 exc_info=True
             )
             return 0
-        return result.rowcount
+        # return result.rowcount # Цей рядок недосяжний
 
 
 if __name__ == "__main__":
@@ -191,4 +187,3 @@ if __name__ == "__main__":
     logger.info("  - mark_all_as_read_for_user(user_id)")
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    logger.info("TODO: Переконатися, що `notification_type` у `get_notifications_for_user` коректно обробляється з Enum.")

@@ -15,7 +15,9 @@ from sqlalchemy.orm import selectinload # Імпорт для "жадібног�
 from backend.app.src.models.tasks.event import Event
 from backend.app.src.schemas.tasks.event import EventCreateSchema, EventUpdateSchema
 from backend.app.src.repositories.base import BaseRepository
-from backend.app.src.config import logger # Використання спільного логера
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 class EventRepository(BaseRepository[Event, EventCreateSchema, EventUpdateSchema]):

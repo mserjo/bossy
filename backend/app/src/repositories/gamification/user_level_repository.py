@@ -9,9 +9,9 @@
 
 from typing import List, Optional, Tuple, Any
 
-from sqlalchemy import select, func, join
+from sqlalchemy import select, func # join видалено
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+# from sqlalchemy.orm import selectinload # selectinload видалено
 from pydantic import BaseModel as PydanticBaseModel  # Для UpdateSchemaType
 
 # Абсолютний імпорт базового репозиторію
@@ -20,7 +20,9 @@ from backend.app.src.repositories.base import BaseRepository
 from backend.app.src.models.gamification.user_level import UserLevel
 from backend.app.src.models.gamification.level import Level  # Для join в get_current_level_for_user_in_group
 from backend.app.src.schemas.gamification.user_level import UserLevelCreateSchema
-from backend.app.src.config import logger # Використання спільного логера
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 # Записи UserLevel зазвичай не оновлюються; створюється новий запис при досягненні нового рівня.

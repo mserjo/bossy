@@ -9,10 +9,10 @@
 """
 
 from typing import List, Optional, Tuple, Any, Sequence, Dict, TYPE_CHECKING # Added Sequence, Dict, TYPE_CHECKING
-import datetime  # For type hints
+from datetime import datetime # For type hints, removed 'import datetime as dt'
 from sqlalchemy.sql.expression import false, true  # For boolean comparisons
 
-from sqlalchemy import select, func, join, and_, or_, not_
+from sqlalchemy import select, func, and_, or_, not_ # join видалено
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -27,7 +27,9 @@ from backend.app.src.models.dictionaries.task_types import TaskType
 from backend.app.src.models.dictionaries.statuses import Status
 from backend.app.src.schemas.tasks.task import TaskCreateSchema, TaskUpdateSchema
 from backend.app.src.core.dicts import TaskStatus as TaskStatusEnum
-from backend.app.src.config import logger  # Використання спільного логера
+from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
+# Отримання логера для цього модуля
+logger = get_logger(__name__)
 
 
 # Необхідно імпортувати UserModel для type hints в selectinload, якщо він використовується.

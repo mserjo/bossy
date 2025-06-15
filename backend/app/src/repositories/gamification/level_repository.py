@@ -153,6 +153,41 @@ class LevelRepository(BaseRepository[Level, LevelCreateSchema, LevelUpdateSchema
             )
             return None
 
+    async def find_by_min_points_and_group(
+            self, session: AsyncSession, min_points: int, group_id: Optional[int] = None
+    ) -> Optional[Level]:
+        """
+        Знаходить рівень за точною кількістю required_points та групою (або глобальний).
+        Використовується для перевірки унікальності.
+
+        Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
+            min_points (int): Точна кількість балів для пошуку.
+            group_id (Optional[int]): ID групи або None для глобальних рівнів.
+
+        Returns:
+            Optional[Level]: Екземпляр моделі `Level`, якщо знайдено, інакше None.
+        """
+        logger.debug(
+            f"Пошук рівня за min_points: {min_points}, group_id: {'глобальний' if group_id is None else group_id}"
+        )
+        stmt = select(self.model).where(self.model.min_points_required == min_points)
+        if group_id is not None:
+            stmt = stmt.where(self.model.group_id == group_id)
+        else:
+            stmt = stmt.where(self.model.group_id.is_(None))
+
+        try:
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(
+                f"Помилка при пошуку рівня за min_points {min_points}, "
+                f"group_id {'глобальний' if group_id is None else group_id}: {e}",
+                exc_info=True
+            )
+            return None
+
 
 if __name__ == "__main__":
     # Демонстраційний блок для LevelRepository.
@@ -167,5 +202,6 @@ if __name__ == "__main__":
     logger.info("  - get_levels_by_group_id(group_id: Optional[int], skip: int = 0, limit: int = 100)")
     logger.info("  - get_level_by_number(group_id: Optional[int], level_number: int)")
     logger.info("  - get_level_by_points(group_id: Optional[int], points: int)")
+    logger.info("  - find_by_min_points_and_group(min_points: int, group_id: Optional[int] = None)")
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

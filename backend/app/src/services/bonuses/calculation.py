@@ -5,31 +5,31 @@
 Відповідає за обчислення бонусних балів на основі визначених правил
 та контексту подій, таких як виконання завдань.
 """
-from typing import List, Optional, Dict, Any, Tuple # Додано Tuple
-# UUID видалено, оскільки ID правила тепер int, і немає інших використань UUID
+from typing import List, Optional, Dict, Any, Tuple
 from decimal import Decimal
 from datetime import timedelta, datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func # Оновлено імпорт select
+from sqlalchemy import select, func
 
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.bonuses.bonus import BonusRule
+from backend.app.src.models.bonuses.bonus import BonusRule # Model name was Bonus in previous version, now BonusRule
 from backend.app.src.models.tasks.task import Task
 from backend.app.src.models.tasks.completion import TaskCompletion
 from backend.app.src.models.auth.user import User
 # from backend.app.src.models.groups.group import Group # Не використовується прямо
 
-from backend.app.src.schemas.bonuses.bonus_rule import BonusRuleResponse
-from backend.app.src.services.bonuses.bonus_rule import BonusRuleService
-from backend.app.src.config import logger  # Використання спільного логера з конфігу
+from backend.app.src.schemas.bonuses.bonus_rule import BonusRuleResponse # Schema name was BonusRule in previous version, now BonusRuleResponse
+from backend.app.src.services.bonuses.bonus_rule import BonusRuleService # Service name was BonusRule in previous version, now BonusRuleService
+from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
+logger = get_logger(__name__) # Ініціалізація логера
 # settings видалено, оскільки не використовується
-from backend.app.src.core.constants import TASK_COMPLETION_STATUS_APPROVED # Імпорт константи
+# from backend.app.src.core.constants import TASK_COMPLETION_STATUS_APPROVED # Видалено, будемо використовувати Enum
+from backend.app.src.core.dicts import TaskStatus # Імпорт TaskStatus Enum
 
-# TODO: [Constants/Enums] Константа COMPLETION_STATUS_APPROVED винесена до core.constants.
-#       ймовірно в `backend.app.src.core.enums` або `backend.app.src.core.constants`,
-#       згідно з `technical_task.txt` / `structure-claude-v2.md`.
-# COMPLETION_STATUS_APPROVED = "APPROVED"  # Видалено локальне визначення
+
+# TODO: [Constants/Enums] Константа COMPLETION_STATUS_APPROVED замінена на TaskStatus.COMPLETED.value.
+#       Перевірити, чи є в TaskStatus Enum більш відповідний член (наприклад, APPROVED).
 
 
 class BonusCalculationService(BaseService):
@@ -68,9 +68,10 @@ class BonusCalculationService(BaseService):
         """
         logger.info(f"Розрахунок бонусу за виконання завдання ID '{task.id}' користувачем ID '{user.id}'.")
 
-        if task_completion.status != TASK_COMPLETION_STATUS_APPROVED: # Використання імпортованої константи
+        # Припускаємо, що TaskStatus.COMPLETED є еквівалентом ухваленого завдання для нарахування бонусу
+        if task_completion.status != TaskStatus.COMPLETED:
             logger.info(
-                f"Завдання ID '{task.id}' не має статусу '{TASK_COMPLETION_STATUS_APPROVED}'. Бонус не нараховується.") # Використання імпортованої константи
+                f"Завдання ID '{task.id}' не має статусу '{TaskStatus.COMPLETED.value}'. Бонус не нараховується.")
             return None, None
 
         if not task.group_id:
@@ -138,7 +139,8 @@ class BonusCalculationService(BaseService):
         logger.debug(f"Перевірка умов для правила '{rule.name}' (ID: {rule.id}), тип умови: {rule.condition_type}")
 
         # Базова перевірка: завдання має бути ухвалене
-        if task_completion.status != TASK_COMPLETION_STATUS_APPROVED: # Використання імпортованої константи
+        # Припускаємо, що TaskStatus.COMPLETED є еквівалентом ухваленого завдання
+        if task_completion.status != TaskStatus.COMPLETED:
             return False  # Умова не виконана, якщо завдання не ухвалене
 
         condition_type = rule.condition_type
@@ -172,7 +174,7 @@ class BonusCalculationService(BaseService):
         elif condition_type == "USER_FIRST_TASK_COMPLETION":
             stmt = select(func.count(TaskCompletion.id)).where(
                 TaskCompletion.user_id == user.id,
-                TaskCompletion.status == TASK_COMPLETION_STATUS_APPROVED, # Використання імпортованої константи
+                TaskCompletion.status == TaskStatus.COMPLETED, # Використання Enum
                 TaskCompletion.id != task_completion.id  # Не рахувати поточне виконання
             )
             prior_completions_count = (await self.db_session.execute(stmt)).scalar_one()
@@ -187,7 +189,7 @@ class BonusCalculationService(BaseService):
             stmt = select(func.count(TaskCompletion.id)).where(
                 TaskCompletion.user_id == user.id,
                 TaskCompletion.task_id == task.id,
-                TaskCompletion.status == TASK_COMPLETION_STATUS_APPROVED, # Використання імпортованої константи
+                TaskCompletion.status == TaskStatus.COMPLETED, # Використання Enum
                 TaskCompletion.id != task_completion.id  # Не рахувати поточне виконання
             )
             prior_specific_completions_count = (await self.db_session.execute(stmt)).scalar_one()

@@ -6,12 +6,12 @@
 та коректне оновлення балансів рахунків користувачів.
 """
 from typing import List, Optional, Tuple
-# UUID видалено, оскільки всі ID, що були UUID, змінено на int, і related_entity_id обробляється як str
 from decimal import Decimal
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta # timedelta додано
+from enum import Enum # Додано для isinstance в логуванні
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select # Оновлено імпорт
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
@@ -19,16 +19,17 @@ from backend.app.src.services.base import BaseService
 from backend.app.src.models.bonuses.transaction import AccountTransaction
 from backend.app.src.models.bonuses.account import UserAccount
 from backend.app.src.models.auth.user import User
-# from backend.app.src.models.groups.group import Group # Видалено закоментований імпорт
+from backend.app.src.core.dicts import TransactionType # Імпорт TransactionType Enum
 
 from backend.app.src.schemas.bonuses.transaction import (
     AccountTransactionCreate,
     AccountTransactionResponse
 )
 from backend.app.src.schemas.bonuses.account import UserAccountResponse
-from backend.app.src.services.bonuses.account import UserAccountService # InsufficientFundsError імпортується з core.exceptions
-from backend.app.src.core.exceptions import InsufficientFundsError # Імпорт перенесеного винятку
-from backend.app.src.config import logger  # Використання спільного логера з конфігу
+from backend.app.src.services.bonuses.account import UserAccountService
+from backend.app.src.core.exceptions import InsufficientFundsError
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+logger = get_logger(__name__) # Ініціалізація логера
 from backend.app.src.config import settings
 
 
@@ -173,7 +174,7 @@ class AccountTransactionService(BaseService):
             limit: int = 100,
             start_date: Optional[datetime] = None,
             end_date: Optional[datetime] = None,
-            transaction_type: Optional[str] = None
+            transaction_type: Optional[TransactionType] = None # Змінено на TransactionType Enum
     ) -> List[AccountTransactionResponse]:
         """
         Перелічує транзакції для конкретного бонусного рахунку.
@@ -183,11 +184,11 @@ class AccountTransactionService(BaseService):
         :param limit: Максимальна кількість записів.
         :param start_date: Фільтр за початковою датою.
         :param end_date: Фільтр за кінцевою датою.
-        :param transaction_type: Фільтр за типом транзакції.
+        :param transaction_type: Фільтр за типом транзакції (Enum TransactionType).
         :return: Список Pydantic схем AccountTransactionResponse.
         """
         logger.debug(
-            f"Перелік транзакцій для рахунку ID: {user_account_id}, тип: {transaction_type}, "
+            f"Перелік транзакцій для рахунку ID: {user_account_id}, тип: {transaction_type.value if isinstance(transaction_type, Enum) else transaction_type}, "
             f"період: [{start_date}-{end_date}], пропустити={skip}, ліміт={limit}"
         )
 

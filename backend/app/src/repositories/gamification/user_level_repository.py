@@ -138,6 +138,105 @@ class UserLevelRepository(BaseRepository[UserLevel, UserLevelCreateSchema, UserL
             )
             return [], 0
 
+    async def list_by_level_and_group(
+            self,
+            session: AsyncSession,
+            level_id: int,
+            group_id: Optional[int] = None,
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[UserLevel], int]:
+        """
+        Отримує список користувачів (їх записи UserLevel) на вказаному рівні
+        в заданому контексті групи (або глобально).
+
+        Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
+            level_id (int): ID рівня.
+            group_id (Optional[int]): ID групи або None для глобального контексту.
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
+
+        Returns:
+            Tuple[List[UserLevel], int]: Кортеж зі списком UserLevel та їх загальною кількістю.
+        """
+        log_ctx_parts = [f"level_id {level_id}"]
+        if group_id is not None:
+            log_ctx_parts.append(f"group_id {group_id}")
+        else:
+            log_ctx_parts.append("глобальний контекст")
+        logger.debug(f"Отримання UserLevels для {', '.join(log_ctx_parts)}, skip: {skip}, limit: {limit}")
+
+        filters_dict: Dict[str, Any] = {"level_id": level_id}
+        if group_id is not None:
+            filters_dict["group_id"] = group_id
+        else:
+            filters_dict["group_id"] = None # Явна перевірка на NULL для глобальних
+
+        sort_by_field = "achieved_at" # або user_id
+        sort_order_str = "desc"
+
+        try:
+            items = await super().get_multi(
+                session=session,
+                skip=skip,
+                limit=limit,
+                filters=filters_dict,
+                sort_by=sort_by_field,
+                sort_order=sort_order_str
+            )
+            total_count = await super().count(session=session, filters=filters_dict)
+            return items, total_count
+        except Exception as e:
+            logger.error(
+                f"Помилка при отриманні UserLevels для {', '.join(log_ctx_parts)}: {e}",
+                exc_info=True
+            )
+            return [], 0
+
+    async def get_by_user_and_group(
+            self, session: AsyncSession, user_id: int, group_id: Optional[int] = None
+    ) -> Optional[UserLevel]:
+        """
+        Отримує запис UserLevel для користувача в заданому контексті групи (або глобально).
+        Припускається, що на user_id та group_id (якщо не None) існує унікальний запис,
+        або повертається перший знайдений (якщо логіка допускає декілька, хоча це не типово для "поточного" рівня).
+
+        Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
+            user_id (int): ID користувача.
+            group_id (Optional[int]): ID групи або None для глобального контексту.
+
+        Returns:
+            Optional[UserLevel]: Екземпляр UserLevel або None.
+        """
+        log_ctx_parts = [f"user_id {user_id}"]
+        if group_id is not None:
+            log_ctx_parts.append(f"group_id {group_id}")
+        else:
+            log_ctx_parts.append("глобальний контекст")
+        logger.debug(f"Отримання UserLevel для {', '.join(log_ctx_parts)}")
+
+        stmt = select(self.model).where(self.model.user_id == user_id)
+        if group_id is not None:
+            stmt = stmt.where(self.model.group_id == group_id)
+        else:
+            stmt = stmt.where(self.model.group_id.is_(None))
+
+        # Якщо очікується тільки один запис (наприклад, поточний рівень), scalar_one_or_none() підходить.
+        # Якщо може бути історія, і потрібен найновіший, потрібно додати order_by.
+        # Поточна логіка сервісу UserLevelService оновлює існуючий запис,
+        # тому тут очікується один або жодного.
+        try:
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(
+                f"Помилка при отриманні UserLevel для {', '.join(log_ctx_parts)}: {e}",
+                exc_info=True
+            )
+            return None
+
 
 if __name__ == "__main__":
     # Демонстраційний блок для UserLevelRepository.
@@ -151,5 +250,7 @@ if __name__ == "__main__":
     logger.info("\nСпецифічні методи:")
     logger.info("  - get_current_level_for_user_in_group(user_id: int, group_id: int) -> Optional[UserLevel]")
     logger.info("  - get_all_achieved_levels_for_user_in_group(user_id: int, group_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("  - list_by_level_and_group(level_id: int, group_id: Optional[int], skip: int = 0, limit: int = 100)")
+    logger.info("  - get_by_user_and_group(user_id: int, group_id: Optional[int]) -> Optional[UserLevel]")
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

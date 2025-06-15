@@ -1,26 +1,26 @@
 # backend/app/src/services/groups/settings.py
 # import logging # Замінено на централізований логер
-from typing import List, Optional, Dict, Any  # Dict, List не використовуються, можна прибрати
-from uuid import UUID
-from datetime import datetime, timezone  # Додано для updated_at
+from typing import Optional, Any # List, Dict, UUID видалено
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-# from sqlalchemy.orm import selectinload # Якщо налаштування мають зв'язані об'єкти для завантаження
+from sqlalchemy import select # sqlalchemy.future тепер select
+# from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 
 # Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.groups.settings import GroupSetting  # Модель SQLAlchemy GroupSetting
-from backend.app.src.models.groups.group import Group  # Для зв'язку налаштування з групою
-from backend.app.src.models.auth.user import User  # Для поля updated_by_user_id / created_by_user_id
-from backend.app.src.schemas.groups.settings import (  # Схеми Pydantic GroupSetting
-    GroupSettingCreate,  # Може не використовуватися напряму, якщо є upsert
+from backend.app.src.models.groups.settings import GroupSetting
+from backend.app.src.repositories.groups.settings_repository import GroupSettingRepository # Імпорт репозиторію
+from backend.app.src.models.groups.group import Group
+from backend.app.src.models.auth.user import User # Не використовується прямо, але може бути потрібне для аудиту в майбутньому
+from backend.app.src.schemas.groups.settings import (
+    GroupSettingCreate,
     GroupSettingUpdate,
     GroupSettingResponse
 )
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings as global_settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import logger
+from backend.app.src.config import settings as global_settings
 
 
 class GroupSettingService(BaseService):
@@ -33,112 +33,112 @@ class GroupSettingService(BaseService):
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
+        self.setting_repo = GroupSettingRepository() # Ініціалізація репозиторію
         logger.info("GroupSettingService ініціалізовано.")
 
-    async def get_settings_for_group(self, group_id: UUID) -> Optional[GroupSettingResponse]:
+    async def get_settings_for_group(self, group_id: int) -> Optional[GroupSettingResponse]: # Змінено UUID на int
         """
         Отримує налаштування для конкретної групи.
         Зазвичай група має один запис налаштувань.
-
-        :param group_id: ID групи.
-        :return: Pydantic схема GroupSettingResponse або None, якщо налаштування не знайдено.
         """
         logger.debug(f"Спроба отримання налаштувань для групи ID: {group_id}")
 
-        stmt = select(GroupSetting).where(GroupSetting.group_id == group_id)
-        # TODO: Додати selectinload, якщо GroupSetting має зв'язані сутності, які потрібно відображати.
-        # Наприклад: .options(selectinload(GroupSetting.default_role_for_member))
-
-        settings_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
+        settings_db = await self.setting_repo.get_by_group_id(session=self.db_session, group_id=group_id)
+        # TODO: selectinload для GroupSetting, якщо потрібно, має бути в репозиторії get_by_group_id або тут після отримання.
 
         if settings_db:
             logger.info(f"Налаштування для групи ID '{group_id}' знайдено.")
-            return GroupSettingResponse.model_validate(settings_db)  # Pydantic v2
+            return GroupSettingResponse.model_validate(settings_db)
         else:
             logger.info(f"Запис налаштувань для групи ID '{group_id}' не знайдено.")
-            # TODO: Розглянути політику створення налаштувань за замовчуванням, якщо їх не існує.
-            #  Можна викликати create_or_update_group_settings з порожнім GroupSettingUpdate,
-            #  щоб створити запис з системними значеннями за замовчуванням, визначеними в моделі GroupSetting.
+            # Тут можна реалізувати створення налаштувань за замовчуванням, якщо потрібно.
+            # Наприклад, викликати self.create_or_update_group_settings(group_id, GroupSettingUpdate(), current_user_id)
+            # щоб створити запис з default значеннями з моделі/схеми.
             return None
 
     async def create_or_update_group_settings(
             self,
-            group_id: UUID,
+            group_id: int, # Змінено UUID на int
             settings_data: GroupSettingUpdate,
-            # Використовуємо GroupSettingUpdate, оскільки дозволяє часткові оновлення
-            current_user_id: Optional[UUID] = None  # Опціонально: для журналу аудиту
+            current_user_id: Optional[int] = None # Змінено UUID на int
     ) -> GroupSettingResponse:
         """
         Створює налаштування групи, якщо вони не існують, або оновлює їх, якщо існують.
         Це операція типу "upsert", специфічна для запису налаштувань групи.
-
-        :param group_id: ID групи, чиї налаштування конфігуруються.
-        :param settings_data: Дані для налаштувань.
-        :param current_user_id: ID користувача, що виконує операцію (для аудиту).
-        :return: Pydantic схема GroupSettingResponse створених або оновлених налаштувань.
-        :raises ValueError: Якщо вказана група не існує. # i18n
         """
         log_actor = f"користувачем ID '{current_user_id}'" if current_user_id else "системою"
         logger.debug(f"Спроба створення/оновлення налаштувань для групи ID: {group_id} {log_actor}.")
 
-        group_db = await self.db_session.get(Group, group_id)
+        group_db = await self.db_session.get(Group, group_id) # Перевірка існування групи
         if not group_db:
-            msg = f"Групу з ID '{group_id}' не знайдено."  # i18n
+            msg = f"Групу з ID '{group_id}' не знайдено."
             logger.error(msg + " Неможливо створити/оновити налаштування.")
             raise ValueError(msg)
 
-        settings_db = (await self.db_session.execute(
-            select(GroupSetting).where(GroupSetting.group_id == group_id)
-        )).scalar_one_or_none()
+        settings_db = await self.setting_repo.get_by_group_id(session=self.db_session, group_id=group_id)
 
-        update_data_dict = settings_data.model_dump(exclude_unset=True)  # Pydantic v2
-        current_time = datetime.now(timezone.utc)
+        kwargs_for_repo: Dict[str, Any] = {}
+        if current_user_id is not None:
+            if hasattr(GroupSetting, 'updated_by_user_id'): # Модель GroupSetting може не мати цих полів
+                 kwargs_for_repo['updated_by_user_id'] = current_user_id
+            if not settings_db and hasattr(GroupSetting, 'created_by_user_id'):
+                 kwargs_for_repo['created_by_user_id'] = current_user_id
 
-        if settings_db:  # Оновлення існуючих налаштувань
+        if settings_db:
             logger.info(f"Знайдено існуючі налаштування для групи ID '{group_id}'. Оновлення.")
-            for field, value in update_data_dict.items():
-                if hasattr(settings_db, field):
-                    setattr(settings_db, field, value)
-                else:
-                    logger.warning(
-                        f"Поле '{field}' не знайдено в моделі GroupSetting під час оновлення для групи ID '{group_id}'.")
-
-            if hasattr(settings_db, 'updated_by_user_id') and current_user_id:
-                settings_db.updated_by_user_id = current_user_id
-            # `updated_at` має оновлюватися автоматично моделлю, або так:
-            if hasattr(settings_db, 'updated_at'):
-                settings_db.updated_at = current_time
-        else:  # Створення нового запису налаштувань
+            # updated_at оновлюється автоматично через TimestampedMixin в BaseRepository.update
+            settings_db = await self.setting_repo.update(
+                session=self.db_session, db_obj=settings_db, obj_in=settings_data, **kwargs_for_repo
+            )
+        else:
             logger.info(f"Існуючі налаштування для групи ID '{group_id}' не знайдено. Створення нового запису.")
-            # TODO: Застосувати системні значення за замовчуванням для полів, не наданих в settings_data,
-            #  якщо це визначено в `technical_task.txt` або логіці моделі GroupSetting.
-            create_data = update_data_dict.copy()
-            create_data['group_id'] = group_id  # Обов'язково встановлюємо group_id
+            # Переконуємося, що group_id є в даних для створення
+            create_data_dict = settings_data.model_dump(exclude_unset=True)
+            create_data_dict['group_id'] = group_id
 
-            if hasattr(GroupSetting, 'created_by_user_id') and current_user_id:
-                create_data['created_by_user_id'] = current_user_id
-            if hasattr(GroupSetting, 'updated_by_user_id') and current_user_id:
-                create_data['updated_by_user_id'] = current_user_id
-            # `created_at` та `updated_at` (при створенні) мають встановлюватися моделлю
+            # GroupSettingCreate може бути таким же як GroupSettingUpdate, або мати більше обов'язкових полів
+            # Для простоти, припускаємо, що GroupSettingCreate може приймати ті ж поля, що й GroupSettingUpdate + group_id
+            # Якщо GroupSettingCreate відрізняється, потрібно створити його екземпляр тут.
+            # Поточний BaseRepository.create приймає CreateSchemaType.
+            # Потрібно створити екземпляр GroupSettingCreateSchema.
 
-            settings_db = GroupSetting(**create_data)
-            self.db_session.add(settings_db)
+            # Створюємо екземпляр GroupSettingCreateSchema, якщо він визначений
+            # Якщо GroupSettingCreate не визначено або є плейсхолдером, це може викликати помилку.
+            # Припускаємо, що GroupSettingCreateSchema існує та приймає ці поля.
+            create_schema_instance = GroupSettingCreate(**create_data_dict)
+
+            settings_db = await self.setting_repo.create(
+                session=self.db_session, obj_in=create_schema_instance, **kwargs_for_repo
+            )
+
+        if not settings_db: # Якщо create або update повернули None (малоймовірно для BaseRepository)
+            msg = f"Не вдалося зберегти налаштування для групи ID '{group_id}'."
+            logger.error(msg)
+            raise RuntimeError(msg) # Або більш специфічний виняток
 
         try:
             await self.commit()
-            await self.db_session.refresh(settings_db)  # Оновлюємо для отримання будь-яких значень БД за замовчуванням
-        except IntegrityError as e:  # Наприклад, якщо group_id не унікальний (хоча логіка вище має це запобігти)
+            # Оновлюємо для отримання будь-яких значень БД за замовчуванням та зв'язків (якщо є)
+            # Якщо repo.create/update повертають об'єкт, який вже є в сесії, refresh може бути достатньо.
+            # Якщо потрібні зв'язки, які repo не завантажив, потрібен get_by_id з selectinload.
+            # Наразі GroupSetting не має зв'язків у _load_relations.
+            await self.db_session.refresh(settings_db)
+        except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності при збереженні налаштувань для групи ID '{group_id}': {e}",
                          exc_info=global_settings.DEBUG)
-            # i18n
             raise ValueError(f"Не вдалося зберегти налаштування для групи ID '{group_id}' через конфлікт даних.")
+        except Exception as e: # Обробка інших можливих помилок
+            await self.rollback()
+            logger.error(f"Неочікувана помилка при збереженні налаштувань для групи ID '{group_id}': {e}", exc_info=global_settings.DEBUG)
+            raise
+
 
         logger.info(f"Налаштування для групи ID '{group_id}' успішно збережено.")
-        return GroupSettingResponse.model_validate(settings_db)  # Pydantic v2
+        return GroupSettingResponse.model_validate(settings_db)
 
-    async def update_group_currency(self, group_id: UUID, currency_name: str,
-                                    current_user_id: Optional[UUID] = None) -> GroupSettingResponse:
+    async def update_group_currency(self, group_id: int, currency_name: str, # Змінено UUID на int
+                                    current_user_id: Optional[int] = None) -> GroupSettingResponse: # Змінено UUID на int
         """Оновлює тільки назву валюти для налаштувань групи."""
         log_actor = f"користувачем ID '{current_user_id}'" if current_user_id else "системою"
         logger.debug(f"Оновлення назви валюти для групи ID {group_id} на '{currency_name}' {log_actor}.")

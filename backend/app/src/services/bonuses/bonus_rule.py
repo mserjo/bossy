@@ -5,7 +5,7 @@
 Відповідає за створення, оновлення, видалення, отримання та пошук
 правил нарахування бонусів, враховуючи їх специфічність та умови застосування.
 """
-from typing import List, Optional, Dict # Any видалено, Dict використовується
+from typing import List, Optional, Dict, TYPE_CHECKING # Any видалено, Dict використовується, TYPE_CHECKING додано
 # UUID видалено, оскільки всі ID, що були UUID, змінено на int, і uuid4() тут не використовується
 from datetime import datetime, timezone
 
@@ -27,8 +27,12 @@ from backend.app.src.schemas.bonuses.bonus_rule import (
     BonusRuleUpdate,
     BonusRuleResponse
 )
-from backend.app.src.config import logger  # Використання спільного логера з конфігу
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+logger = get_logger(__name__) # Ініціалізація логера
 from backend.app.src.config import settings
+
+if TYPE_CHECKING: # Умовний імпорт для TYPE_CHECKING
+    pass
 
 
 class BonusRuleService(BaseService):
@@ -273,7 +277,9 @@ class BonusRuleService(BaseService):
 
         if task_type_id: conditions.append(BonusRule.task_type_id == task_type_id)
         if task_id: conditions.append(BonusRule.task_id == task_id)
-        if is_active is not None: conditions.append(BonusRule.is_active == is_active)
+        if is_active is not None:
+            # Припускаємо, що 'active' є рядковим представленням активного стану в полі 'state'
+            conditions.append(BonusRule.state == "active" if is_active else BonusRule.state != "active")
 
         if valid_on_date:
             # Правило активне, якщо valid_from <= valid_on_date AND (valid_until IS NULL OR valid_until >= valid_on_date)
@@ -319,7 +325,7 @@ class BonusRuleService(BaseService):
 
         # Базові умови: правило активне та валідне за датою
         base_conditions = [
-            BonusRule.is_active == True,
+            BonusRule.state == "active", # Припускаємо, що 'active' є рядковим представленням активного стану
             or_(BonusRule.valid_from.is_(None), BonusRule.valid_from <= current_time),
             or_(BonusRule.valid_until.is_(None), BonusRule.valid_until >= current_time)
         ]

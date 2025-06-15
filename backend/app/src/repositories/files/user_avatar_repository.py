@@ -10,7 +10,7 @@
 from typing import List, Optional, Tuple, Any
 from datetime import datetime, timezone
 
-from sqlalchemy import select, update as sqlalchemy_update
+from sqlalchemy import select, update as sqlalchemy_update, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 # from sqlalchemy.orm import selectinload
 
@@ -157,7 +157,94 @@ class UserAvatarRepository(BaseRepository[UserAvatar, UserAvatarCreateSchema, Us
                 exc_info=True
             )
             # TODO: Розглянути підняття специфічного виключення
-        return db_obj
+        return db_obj # Повертаємо db_obj, а не None, якщо все успішно
+
+    async def find_by_user_and_file(self, session: AsyncSession, user_id: int, file_record_id: int) -> Optional[UserAvatar]:
+        """
+        Знаходить запис UserAvatar за user_id та file_record_id.
+
+        Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
+            user_id (int): ID користувача.
+            file_record_id (int): ID запису файлу.
+
+        Returns:
+            Optional[UserAvatar]: Екземпляр моделі `UserAvatar`, якщо знайдено, інакше None.
+        """
+        logger.debug(f"Пошук UserAvatar для user_id: {user_id}, file_record_id: {file_record_id}")
+        stmt = select(self.model).where(
+            self.model.user_id == user_id,
+            self.model.file_record_id == file_record_id
+        )
+        try:
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(f"Помилка при пошуку UserAvatar для user_id {user_id}, file_record_id {file_record_id}: {e}", exc_info=True)
+            return None
+
+    async def list_by_user_id(self, session: AsyncSession, user_id: int, skip: int = 0, limit: int = 100) -> List[UserAvatar]:
+        """
+        Отримує список всіх записів UserAvatar для вказаного користувача.
+
+        Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
+            user_id (int): ID користувача.
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
+
+        Returns:
+            List[UserAvatar]: Список екземплярів моделі `UserAvatar`.
+        """
+        logger.debug(f"Отримання списку UserAvatar для user_id: {user_id}, skip: {skip}, limit: {limit}")
+        stmt = (
+            select(self.model)
+            .where(self.model.user_id == user_id)
+            .order_by(desc(self.model.is_active), desc(self.model.created_at)) # Спочатку активні, потім новіші
+            .offset(skip)
+            .limit(limit)
+        )
+        # TODO: Додати опціональне завантаження зв'язків (file_record, user), якщо потрібно для сервісу
+        # .options(selectinload(self.model.file_record), selectinload(self.model.user))
+        try:
+            result = await session.execute(stmt)
+            return list(result.scalars().all())
+        except Exception as e:
+            logger.error(f"Помилка при отриманні списку UserAvatar для user_id {user_id}: {e}", exc_info=True)
+            return []
+
+    async def deactivate_all_for_user(self, session: AsyncSession, user_id: int, updated_by_user_id: Optional[int] = None) -> int:
+        """
+        Деактивує всі активні аватари для вказаного користувача.
+
+        Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
+            user_id (int): ID користувача, чиї аватари потрібно деактивувати.
+            updated_by_user_id (Optional[int]): ID користувача, що виконує операцію (для аудиту, якщо поле є).
+
+        Returns:
+            int: Кількість деактивованих записів.
+        """
+        logger.debug(f"Деактивація всіх активних аватарів для user_id: {user_id}")
+        values_to_update: Dict[str, Any] = {"is_active": False, "updated_at": func.now()} # func.now() для оновлення на рівні БД
+
+        # Поле updated_by_user_id відсутнє в моделі UserAvatar, тому ця логіка не потрібна
+        # if updated_by_user_id and hasattr(self.model, "updated_by_user_id"):
+        #    values_to_update["updated_by_user_id"] = updated_by_user_id
+
+        stmt = (
+            sqlalchemy_update(self.model)
+            .where(self.model.user_id == user_id, self.model.is_active == True)
+            .values(**values_to_update)
+            .execution_options(synchronize_session=False) # Важливо для SQLAlchemy < 2.0, для 2.0 зазвичай 'fetch'
+        )
+        try:
+            result = await session.execute(stmt)
+            logger.info(f"Деактивовано {result.rowcount} аватар(ів) для user_id: {user_id}")
+            return result.rowcount
+        except Exception as e:
+            logger.error(f"Помилка при деактивації аватарів для user_id {user_id}: {e}", exc_info=True)
+            return 0
 
 
 if __name__ == "__main__":
@@ -173,6 +260,10 @@ if __name__ == "__main__":
     logger.info("\nСпецифічні методи:")
     logger.info("  - get_by_user_id(user_id: int) -> Optional[UserAvatar]")
     logger.info("  - get_active_avatar_for_user(user_id: int) -> Optional[UserAvatar]")
-    logger.info("  - set_active_avatar(user_id: int, file_record_id: int) -> UserAvatar")
+    logger.info("  - set_active_avatar(user_id: int, file_record_id: int) -> Optional[UserAvatar]") # Змінено повернення на Optional
+    logger.info("  - find_by_user_and_file(user_id: int, file_record_id: int) -> Optional[UserAvatar]")
+    logger.info("  - list_by_user_id(user_id: int, skip: int = 0, limit: int = 100) -> List[UserAvatar]")
+    logger.info("  - deactivate_all_for_user(user_id: int, updated_by_user_id: Optional[int] = None) -> int")
+
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

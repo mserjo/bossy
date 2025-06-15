@@ -55,7 +55,7 @@ class BaseCalendarIntegrationService(BaseService, ABC):
 
     service_name: str # Має бути визначено в підкласах, наприклад, "GOOGLE_CALENDAR"
 
-    def __init__(self, db_session: AsyncSession, user_id_for_context: Optional[UUID] = None):
+    def __init__(self, db_session: AsyncSession, user_id_for_context: Optional[int] = None): # Змінено UUID на int
         """
         Ініціалізує сервіс з сесією БД (для зберігання токенів/налаштувань через BaseService)
         та опціонально user_id, якщо операції специфічні для користувача.
@@ -68,7 +68,7 @@ class BaseCalendarIntegrationService(BaseService, ABC):
         logger.info(f"BaseCalendarIntegrationService (підклас: {self.__class__.__name__}) ініціалізовано для користувача: {self.user_id_for_context or 'N/A'}.")
 
     @abstractmethod
-    async def connect_account(self, auth_code: str, redirect_uri: str, user_id: UUID) -> Dict[str, Any]:
+    async def connect_account(self, auth_code: str, redirect_uri: str, user_id: int) -> Dict[str, Any]: # Змінено UUID на int
         """
         Підключає обліковий запис календаря користувача за допомогою коду авторизації (OAuth2).
         Повинен безпечно зберігати токени (наприклад, в БД, зашифровані).
@@ -83,7 +83,7 @@ class BaseCalendarIntegrationService(BaseService, ABC):
         raise NotImplementedError(f"Метод 'connect_account' не реалізовано для {self.__class__.__name__}")
 
     @abstractmethod
-    async def disconnect_account(self, user_id: UUID) -> bool:
+    async def disconnect_account(self, user_id: int) -> bool: # Змінено UUID на int
         """
         Відключає обліковий запис календаря користувача, відкликаючи токени.
         Повинен видаляти збережені токени.
@@ -96,7 +96,7 @@ class BaseCalendarIntegrationService(BaseService, ABC):
         raise NotImplementedError(f"Метод 'disconnect_account' не реалізовано для {self.__class__.__name__}")
 
     @abstractmethod
-    async def refresh_access_token_if_needed(self, user_id: UUID) -> bool:
+    async def refresh_access_token_if_needed(self, user_id: int) -> bool: # Змінено UUID на int
         """
         Перевіряє, чи не закінчився термін дії access-токену для користувача,
         і оновлює його за допомогою refresh-токену. Оновлює збережені токени.
@@ -109,7 +109,7 @@ class BaseCalendarIntegrationService(BaseService, ABC):
         raise NotImplementedError(f"Метод 'refresh_access_token_if_needed' не реалізовано для {self.__class__.__name__}")
 
     @abstractmethod
-    async def list_user_calendars(self, user_id: UUID) -> List[CalendarInfo]:
+    async def list_user_calendars(self, user_id: int) -> List[CalendarInfo]: # Змінено UUID на int
         """
         Перелічує всі календарі, доступні для підключеного облікового запису користувача.
 
@@ -122,7 +122,7 @@ class BaseCalendarIntegrationService(BaseService, ABC):
 
     @abstractmethod
     async def create_event(
-        self, user_id: UUID, calendar_id: str, event_data: CalendarEventData
+        self, user_id: int, calendar_id: str, event_data: CalendarEventData # Змінено UUID на int
     ) -> Optional[CalendarEventData]:
         """
         Створює нову подію в указаному календарі користувача.
@@ -138,7 +138,7 @@ class BaseCalendarIntegrationService(BaseService, ABC):
 
     @abstractmethod
     async def get_event(
-        self, user_id: UUID, calendar_id: str, event_id: str
+        self, user_id: int, calendar_id: str, event_id: str # Змінено UUID на int
     ) -> Optional[CalendarEventData]:
         """
         Отримує конкретну подію з календаря користувача.
@@ -154,7 +154,7 @@ class BaseCalendarIntegrationService(BaseService, ABC):
 
     @abstractmethod
     async def update_event(
-        self, user_id: UUID, calendar_id: str, event_id: str, event_data: CalendarEventData
+        self, user_id: int, calendar_id: str, event_id: str, event_data: CalendarEventData # Змінено UUID на int
     ) -> Optional[CalendarEventData]:
         """
         Оновлює існуючу подію в календарі користувача.
@@ -171,7 +171,7 @@ class BaseCalendarIntegrationService(BaseService, ABC):
 
     @abstractmethod
     async def delete_event(
-        self, user_id: UUID, calendar_id: str, event_id: str
+        self, user_id: int, calendar_id: str, event_id: str # Змінено UUID на int
     ) -> bool:
         """
         Видаляє подію з календаря користувача.
@@ -187,7 +187,7 @@ class BaseCalendarIntegrationService(BaseService, ABC):
 
     @abstractmethod
     async def list_events(
-        self, user_id: UUID, calendar_id: str, start_time: datetime, end_time: datetime,
+        self, user_id: int, calendar_id: str, start_time: datetime, end_time: datetime, # Змінено UUID на int
         query: Optional[str] = None
     ) -> List[CalendarEventData]:
         """

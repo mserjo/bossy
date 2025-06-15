@@ -1,34 +1,36 @@
 # backend/app/src/services/groups/membership.py
 # import logging # Замінено на централізований логер
 from typing import List, Optional
-from uuid import UUID
+# UUID видалено
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload  # , joinedload # joinedload не використовується
+from sqlalchemy import select, func # sqlalchemy.future тепер select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import func  # Для агрегації, наприклад, func.count
+# func вже імпортовано
 
 # Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.groups.membership import GroupMembership  # Модель SQLAlchemy GroupMembership
-from backend.app.src.models.groups.group import Group  # Для контексту групи
-from backend.app.src.models.auth.user import User  # Для контексту користувача
-from backend.app.src.models.dictionaries.user_roles import UserRole  # Для ролей в групі
+from backend.app.src.models.groups.membership import GroupMembership
+from backend.app.src.repositories.groups.membership_repository import GroupMembershipRepository # Імпорт репозиторію
+from backend.app.src.models.groups.group import Group
+from backend.app.src.models.auth.user import User
+from backend.app.src.models.dictionaries.user_roles import UserRole
+from backend.app.src.models.files.file import FileRecord # Для UserAvatar -> FileRecord в list_group_members
+from backend.app.src.models.files.avatar import UserAvatar # Для User -> UserAvatar в list_group_members
 
-from backend.app.src.schemas.groups.membership import (  # Схеми Pydantic
-    # GroupMembershipCreate, # Не використовується прямо, параметри передаються в метод
-    # GroupMembershipUpdate, # Не використовується прямо
+
+from backend.app.src.schemas.groups.membership import (
     GroupMembershipResponse,
-    GroupMemberResponse  # Схема, що може включати більше деталей про користувача
+    GroupMemberResponse,
+    GroupMembershipCreateSchema # Додано
 )
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import logger
+from backend.app.src.config import settings
 
-# TODO: Винести ADMIN_ROLE_CODE та USER_ROLE_CODE до спільного файлу констант або конфігурації.
 ADMIN_ROLE_CODE = "ADMIN"
-USER_ROLE_CODE = "USER"  # Приклад коду для звичайної ролі користувача
+USER_ROLE_CODE = "USER"
 
 
 class GroupMembershipService(BaseService):
@@ -39,15 +41,17 @@ class GroupMembershipService(BaseService):
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
+        self.membership_repo = GroupMembershipRepository() # Ініціалізація репозиторію
         logger.info("GroupMembershipService ініціалізовано.")
 
-    async def _get_membership_orm_with_relations(self, group_id: UUID, user_id: UUID) -> Optional[GroupMembership]:
+    async def _get_membership_orm_with_relations(self, group_id: int, user_id: int) -> Optional[GroupMembership]: # Змінено UUID на int
         """Внутрішній метод для отримання ORM моделі GroupMembership з завантаженими зв'язками."""
+        # Залишаємо прямий запит для гнучкого selectinload
         return (await self.db_session.execute(
             select(GroupMembership).options(
                 selectinload(GroupMembership.user).options(selectinload(User.user_type)),
-                selectinload(GroupMembership.group).options(selectinload(Group.group_type)),  # Група та її тип
-                selectinload(GroupMembership.role)  # Роль в групі
+                selectinload(GroupMembership.group).options(selectinload(Group.group_type)),
+                selectinload(GroupMembership.role)
             ).where(
                 GroupMembership.group_id == group_id,
                 GroupMembership.user_id == user_id
@@ -56,11 +60,11 @@ class GroupMembershipService(BaseService):
 
     async def add_member_to_group(
             self,
-            group_id: UUID,
-            user_id: UUID,
-            role_code: str,  # наприклад, "USER", "ADMIN"
-            added_by_user_id: Optional[UUID] = None,  # Для журналу аудиту
-            commit_session: bool = True  # Дозволяє контролювати коміт ззовні (напр. з InvitationService)
+            group_id: int, # Змінено UUID на int
+            user_id: int, # Змінено UUID на int
+            role_code: str,
+            added_by_user_id: Optional[int] = None, # Змінено UUID на int
+            commit_session: bool = True
     ) -> GroupMembershipResponse:
         """
         Додає користувача до групи з вказаною роллю.
@@ -179,17 +183,12 @@ class GroupMembershipService(BaseService):
 
         # Перевірка, чи користувач є останнім адміном
         if membership_db.role and membership_db.role.code == ADMIN_ROLE_CODE:
-            other_active_admins_count = (await self.db_session.execute(
-                select(func.count(GroupMembership.id)).join(UserRole).where(
-                    GroupMembership.group_id == group_id,
-                    GroupMembership.is_active == True,
-                    UserRole.code == ADMIN_ROLE_CODE,
-                    GroupMembership.user_id != user_id  # Виключаємо поточного користувача
-                )
-            )).scalar_one()
+            other_active_admins_count = await self.membership_repo.count_active_admins_in_group( # Використання репозиторію
+                session=self.db_session, group_id=group_id, exclude_user_id=user_id
+            )
 
             if other_active_admins_count == 0:
-                msg = "Неможливо видалити останнього адміністратора з групи. Спочатку призначте іншого адміністратора."  # i18n
+                msg = "Неможливо видалити останнього адміністратора з групи. Спочатку призначте іншого адміністратора."
                 logger.warning(f"Користувач ID '{user_id}' є останнім адміном в групі ID '{group_id}'. {msg}")
                 raise ValueError(msg)
 
@@ -205,8 +204,8 @@ class GroupMembershipService(BaseService):
         return True
 
     async def update_member_role(
-            self, group_id: UUID, user_id: UUID, new_role_code: str,
-            updated_by_user_id: Optional[UUID] = None, commit_session: bool = True
+            self, group_id: int, user_id: int, new_role_code: str, # Змінено UUID на int
+            updated_by_user_id: Optional[int] = None, commit_session: bool = True # Змінено UUID на int
     ) -> GroupMembershipResponse:
         """
         Оновлює роль користувача в групі.
@@ -242,61 +241,67 @@ class GroupMembershipService(BaseService):
 
         # Перевірка, чи не понижується останній адмін
         if membership_db.role and membership_db.role.code == ADMIN_ROLE_CODE and new_role_db.code != ADMIN_ROLE_CODE:
-            other_active_admins_count = (await self.db_session.execute(
-                select(func.count(GroupMembership.id)).join(UserRole).where(
-                    GroupMembership.group_id == group_id,
-                    GroupMembership.is_active == True,
-                    UserRole.code == ADMIN_ROLE_CODE,
-                    GroupMembership.user_id != user_id
-                )
-            )).scalar_one()
+            other_active_admins_count = await self.membership_repo.count_active_admins_in_group( # Використання репозиторію
+                session=self.db_session, group_id=group_id, exclude_user_id=user_id
+            )
             if other_active_admins_count == 0:
-                msg = "Неможливо змінити роль останнього адміністратора. Спочатку призначте іншого адміністратора."  # i18n
+                msg = "Неможливо змінити роль останнього адміністратора. Спочатку призначте іншого адміністратора."
                 logger.warning(f"Користувач ID '{user_id}' є останнім адміном в групі ID '{group_id}'. {msg}")
                 raise ValueError(msg)
 
         membership_db.user_role_id = new_role_db.id
         membership_db.updated_by_user_id = updated_by_user_id
         # `updated_at` оновлюється автоматично. Можна додати `role_updated_at`, якщо таке поле є.
-        if hasattr(membership_db, 'role_updated_at'):  # Припускаємо наявність такого поля для аудиту зміни ролі
+        if hasattr(membership_db, 'role_updated_at'):
             setattr(membership_db, 'role_updated_at', datetime.now(timezone.utc))
 
         self.db_session.add(membership_db)
         if commit_session:
             await self.commit()
-            await self.db_session.refresh(membership_db, attribute_names=['user', 'group', 'role'])
+            # Потрібно перезавантажити для відповіді зі зв'язками
+            refreshed_membership = await self._get_membership_orm_with_relations(group_id, user_id)
+            if not refreshed_membership: # Малоймовірно
+                raise RuntimeError("Не вдалося перезавантажити членство після оновлення ролі.")
+            membership_db = refreshed_membership
         else:
             await self.db_session.flush([membership_db])
+            # Потенційно потрібно refresh, якщо далі використовуються зв'язки до коміту
             await self.db_session.refresh(membership_db, attribute_names=['user', 'group', 'role'])
 
+
         logger.info(f"Роль для користувача ID '{user_id}' в групі ID '{group_id}' оновлено на '{new_role_db.name}'.")
-        return GroupMembershipResponse.model_validate(membership_db)  # Pydantic v2
+        return GroupMembershipResponse.model_validate(membership_db)
 
     async def list_group_members(
-            self, group_id: UUID, skip: int = 0, limit: int = 100, is_active: Optional[bool] = True
-    ) -> List[GroupMemberResponse]:  # Використовуємо GroupMemberResponse для потенційно розширеної інформації
+            self, group_id: int, skip: int = 0, limit: int = 100, is_active: Optional[bool] = True # Змінено UUID на int
+    ) -> List[GroupMemberResponse]:
         """Перелічує членів групи."""
         logger.debug(f"Перелік членів для групи ID: {group_id}, активні: {is_active}, пропустити={skip}, ліміт={limit}")
 
+        # Залишаємо прямий запит для гнучкого selectinload
         stmt = select(GroupMembership).options(
-            selectinload(GroupMembership.user).options(selectinload(User.user_type), selectinload(User.avatar).options(
-                selectinload(UserAvatar.file))),  # Додаємо аватар
+            selectinload(GroupMembership.user).options(
+                selectinload(User.user_type),
+                selectinload(User.avatar).options(selectinload(UserAvatar.file_record)) # Змінено на file_record
+            ),
             selectinload(GroupMembership.role)
-            # selectinload(GroupMembership.group) # Група вже відома з group_id
         ).where(GroupMembership.group_id == group_id)
 
         if is_active is not None:
             stmt = stmt.where(GroupMembership.is_active == is_active)
 
-        stmt = stmt.join(User, GroupMembership.user_id == User.id).order_by(User.username).offset(skip).limit(limit)
+        # Сортування за іменем користувача (username), якщо воно є в моделі User.
+        # Якщо User не має username, потрібно змінити на інше поле або видалити сортування.
+        # Припускаємо, що User.username існує.
+        stmt = stmt.join(User, GroupMembership.user_id == User.id).order_by(User.email).offset(skip).limit(limit) # Змінено на email для прикладу
 
-        memberships_db = (await self.db_session.execute(stmt)).scalars().unique().all()
+        memberships_db_list = (await self.db_session.execute(stmt)).scalars().unique().all()
 
-        response_list = [GroupMemberResponse.model_validate(m) for m in memberships_db]  # Pydantic v2
+        response_list = [GroupMemberResponse.model_validate(m) for m in memberships_db_list]
         logger.info(f"Отримано {len(response_list)} членів для групи ID '{group_id}'.")
         return response_list
 
-    async def get_membership_details(self, group_id: UUID, user_id: UUID) -> Optional[GroupMembershipResponse]:
+    async def get_membership_details(self, group_id: int, user_id: int) -> Optional[GroupMembershipResponse]: # Змінено UUID на int
         """Отримує деталі членства для конкретного користувача в групі."""
         logger.debug(f"Отримання деталей членства для користувача ID {user_id} в групі ID {group_id}")
 

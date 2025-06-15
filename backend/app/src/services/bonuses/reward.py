@@ -2,16 +2,19 @@
 """
 Сервіс для управління винагородами в бонусній системі.
 
+# backend/app/src/services/bonuses/reward.py
+"""
+Сервіс для управління винагородами в бонусній системі.
+
 Відповідає за створення, оновлення, видалення, отримання винагород
 та обробку процесу їх отримання користувачами за бонусні бали.
 """
-from typing import List, Optional # Dict видалено, оскільки не використовується в сигнатурах напряму
-# UUID видалено, оскільки всі ID, що були UUID, змінено на int, і uuid4() тут не використовується
+from typing import List, Optional # Dict, Any видалено
 from decimal import Decimal
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, and_, func # Оновлено імпорт select
+from sqlalchemy import select, or_, and_ # func видалено
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 
@@ -20,6 +23,7 @@ from backend.app.src.models.bonuses.reward import Reward
 from backend.app.src.models.bonuses.user_reward_redemption import UserRewardRedemption
 from backend.app.src.models.groups.group import Group
 from backend.app.src.models.auth.user import User
+from backend.app.src.core.dicts import TransactionType # Імпорт TransactionType Enum
 
 from backend.app.src.schemas.bonuses.reward import (
     RewardCreate,
@@ -30,7 +34,8 @@ from backend.app.src.schemas.bonuses.reward import (
 )
 # AccountTransactionCreate не використовується напряму цим сервісом
 from backend.app.src.services.bonuses.account import UserAccountService
-from backend.app.src.config import logger  # Використання спільного логера з конфігу
+from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
+logger = get_logger(__name__) # Ініціалізація логера
 from backend.app.src.config import settings
 from backend.app.src.core.exceptions import RewardUnavailableError, RedemptionConditionError # Імпорт перенесених винятків
 
@@ -207,9 +212,11 @@ class RewardService(BaseService):
         # Якщо group_id не вказано, за замовчуванням показує всі (і глобальні, і групові).
         # Щоб показувати тільки глобальні, якщо group_id is None, потрібен окремий прапорець/логіка.
 
-        if is_active is not None: conditions.append(Reward.is_active == is_active)
-        if min_stock is not None: conditions.append(Reward.stock_available >= min_stock)
-        if max_points_cost is not None: conditions.append(Reward.points_cost <= max_points_cost)
+        if is_active is not None:
+            # Припускаємо, що 'active' є рядковим представленням активного стану в полі 'state'
+            conditions.append(Reward.state == "active" if is_active else Reward.state != "active")
+        if min_stock is not None: conditions.append(Reward.stock_available >= min_stock) # type: ignore
+        if max_points_cost is not None: conditions.append(Reward.points_cost <= max_points_cost) # type: ignore
         if valid_on_date:
             conditions.append(and_(
                 or_(Reward.valid_from.is_(None), Reward.valid_from <= valid_on_date),
@@ -290,7 +297,7 @@ class RewardService(BaseService):
                 user_id=user_id,
                 group_id=account_to_use_group_id,  # Рахунок, з якого списуємо
                 amount=-total_cost,
-                transaction_type="REWARD_REDEMPTION",
+                transaction_type=TransactionType.REWARD_REDEMPTION, # Використання Enum
                 description=f"Отримано {quantity_to_redeem}x '{reward_db.name}'",  # i18n
                 related_entity_id=reward_id, # reward_id тепер int, adjust_account_balance очікує int
                 commit_session=False  # Важливо! Комміт буде в кінці redeem_reward

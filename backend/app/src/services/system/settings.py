@@ -1,25 +1,26 @@
 # backend/app/src/services/system/settings.py
+# backend/app/src/services/system/settings.py
 # import logging # Замінено на централізований логер
-import json  # Для десеріалізації JSON значень
-from typing import List, Optional, Any, Dict
-from uuid import UUID
-from datetime import datetime, timezone  # Додано timezone
+import json
+from typing import List, Optional, Any, Dict # UUID видалено
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-# from sqlalchemy.orm import selectinload # Якщо є зв'язки для завантаження
-from sqlalchemy.exc import IntegrityError  # Для обробки помилок унікальності
+from sqlalchemy import select # sqlalchemy.future тепер select
+from sqlalchemy.exc import IntegrityError
 
 # Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.system.settings import SystemSetting  # Модель SQLAlchemy
-from backend.app.src.schemas.system.settings import (  # Схеми Pydantic
+from backend.app.src.models.system.settings import SystemSetting
+from backend.app.src.repositories.system.settings_repository import SystemSettingRepository # Імпорт репозиторію
+from backend.app.src.schemas.system.settings import (
     SystemSettingCreate,
     SystemSettingUpdate,
     SystemSettingResponse,
 )
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings as global_settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.core.dicts import SettingValueType # Імпорт Enum
+from backend.app.src.config.logging import logger
+from backend.app.src.config import settings as global_settings
 
 
 class SystemSettingService(BaseService):
@@ -32,22 +33,19 @@ class SystemSettingService(BaseService):
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
+        self.setting_repo = SystemSettingRepository() # Ініціалізація репозиторію
         logger.info("SystemSettingService ініціалізовано.")
 
     async def get_setting_by_key(self, key: str) -> Optional[SystemSettingResponse]:
         """
         Отримує конкретне системне налаштування за його ключем.
-
-        :param key: Унікальний ключ системного налаштування.
-        :return: Pydantic схема SystemSettingResponse, якщо знайдено, інакше None.
         """
         logger.debug(f"Спроба отримання системного налаштування за ключем: {key}")
-        stmt = select(SystemSetting).where(SystemSetting.key == key)
-        setting_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
+        setting_db = await self.setting_repo.get_by_key(session=self.db_session, key=key)
 
         if setting_db:
             logger.info(f"Системне налаштування з ключем '{key}' знайдено.")
-            return SystemSettingResponse.model_validate(setting_db)  # Pydantic v2
+            return SystemSettingResponse.model_validate(setting_db)
 
         logger.info(f"Системне налаштування з ключем '{key}' не знайдено.")
         return None
@@ -55,156 +53,150 @@ class SystemSettingService(BaseService):
     async def get_all_settings(self, skip: int = 0, limit: int = 100) -> List[SystemSettingResponse]:
         """
         Отримує список всіх системних налаштувань з пагінацією.
-
-        :param skip: Кількість налаштувань для пропуску.
-        :param limit: Максимальна кількість налаштувань для повернення.
-        :return: Список Pydantic схем SystemSettingResponse.
         """
         logger.debug(f"Спроба отримання всіх системних налаштувань: skip={skip}, limit={limit}")
-        stmt = select(SystemSetting).order_by(SystemSetting.key).offset(skip).limit(limit)
-        settings_db = (await self.db_session.execute(stmt)).scalars().all()
+        settings_db_list, _ = await self.setting_repo.get_multi_with_total_count( # Використовуємо get_multi_with_total_count
+            session=self.db_session, skip=skip, limit=limit, sort_by="key"
+        )
+        # total_count тут не використовується, але метод get_multi_with_total_count його повертає
 
-        response_list = [SystemSettingResponse.model_validate(s) for s in settings_db]  # Pydantic v2
+        response_list = [SystemSettingResponse.model_validate(s) for s in settings_db_list]
         logger.info(f"Отримано {len(response_list)} системних налаштувань.")
         return response_list
 
     async def create_setting(self, setting_data: SystemSettingCreate,
-                             creator_id: Optional[UUID] = None) -> SystemSettingResponse:
+                             creator_id: Optional[int] = None) -> SystemSettingResponse: # Змінено UUID на int
         """
         Створює нове системне налаштування.
         Переконується, що налаштування з таким ключем ще не існує.
-
-        :param setting_data: Дані для нового системного налаштування.
-        :param creator_id: ID користувача, що створює налаштування (для аудиту).
-        :return: Pydantic схема створеного SystemSettingResponse.
-        :raises ValueError: Якщо налаштування з таким ключем вже існує. # i18n
         """
         logger.debug(f"Спроба створення нового системного налаштування з ключем: {setting_data.key}")
-        existing_setting = await self.get_setting_by_key(setting_data.key)
+        existing_setting = await self.setting_repo.get_by_key(session=self.db_session, key=setting_data.key)
         if existing_setting:
-            msg = f"Системне налаштування з ключем '{setting_data.key}' вже існує."  # i18n
+            msg = f"Системне налаштування з ключем '{setting_data.key}' вже існує."
             logger.warning(msg + " Створення скасовано.")
             raise ValueError(msg)
 
-        create_dict = setting_data.model_dump()  # Pydantic v2
-        # TODO: Додати created_by_user_id, updated_by_user_id, якщо вони є в моделі SystemSetting
-        # if creator_id and hasattr(SystemSetting, 'created_by_user_id'):
-        #     create_dict['created_by_user_id'] = creator_id
-        # if creator_id and hasattr(SystemSetting, 'updated_by_user_id'):
-        #     create_dict['updated_by_user_id'] = creator_id
+        # Модель SystemSetting не має created_by_user_id, updated_by_user_id
+        # kwargs_for_repo: Dict[str, Any] = {}
+        # if creator_id:
+        #     kwargs_for_repo['created_by_user_id'] = creator_id # Якщо б поле існувало
+        #     kwargs_for_repo['updated_by_user_id'] = creator_id # Якщо б поле існувало
 
-        new_setting_db = SystemSetting(**create_dict)
-        # `created_at`, `updated_at` мають встановлюватися автоматично моделлю
-
-        self.db_session.add(new_setting_db)
         try:
+            new_setting_db = await self.setting_repo.create(
+                session=self.db_session,
+                obj_in=setting_data
+                # **kwargs_for_repo
+            )
             await self.commit()
-            await self.db_session.refresh(new_setting_db)
-        except IntegrityError as e:  # На випадок паралельного створення
+            # await self.db_session.refresh(new_setting_db) # Не завжди потрібно після repo.create
+        except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності при створенні налаштування '{setting_data.key}': {e}",
                          exc_info=global_settings.DEBUG)
-            # i18n
             raise ValueError(f"Не вдалося створити налаштування '{setting_data.key}' через конфлікт даних.")
 
         logger.info(f"Системне налаштування '{new_setting_db.key}' ID: {new_setting_db.id} успішно створено.")
-        return SystemSettingResponse.model_validate(new_setting_db)  # Pydantic v2
+        return SystemSettingResponse.model_validate(new_setting_db)
 
-    async def update_setting(self, setting_id: UUID, setting_update_data: SystemSettingUpdate,
-                             updater_id: Optional[UUID] = None) -> Optional[SystemSettingResponse]:
+    async def update_setting(self, setting_id: int, setting_update_data: SystemSettingUpdate, # Змінено UUID на int
+                             updater_id: Optional[int] = None) -> Optional[SystemSettingResponse]: # Змінено UUID на int
         """
         Оновлює існуюче системне налаштування за його ID.
-
-        :param setting_id: ID системного налаштування для оновлення.
-        :param setting_update_data: Дані для оновлення.
-        :param updater_id: ID користувача, що оновлює налаштування (для аудиту).
-        :return: Pydantic схема оновленого SystemSettingResponse, або None, якщо не знайдено.
-        :raises ValueError: Якщо відбувається спроба оновити ключ на той, що вже існує для іншого налаштування. # i18n
         """
         logger.debug(f"Спроба оновлення системного налаштування з ID: {setting_id}")
 
-        setting_db = await self.db_session.get(SystemSetting, setting_id)
+        setting_db = await self.setting_repo.get(session=self.db_session, id=setting_id)
         if not setting_db:
             logger.warning(f"Системне налаштування з ID '{setting_id}' не знайдено для оновлення.")
             return None
 
-        update_data = setting_update_data.model_dump(exclude_unset=True)  # Pydantic v2
+        update_data_dict = setting_update_data.model_dump(exclude_unset=True)
 
-        if 'key' in update_data and update_data['key'] != setting_db.key:
-            existing_key_setting = await self.get_setting_by_key(update_data['key'])
+        if 'key' in update_data_dict and update_data_dict['key'] != setting_db.key:
+            existing_key_setting = await self.setting_repo.get_by_key(session=self.db_session, key=update_data_dict['key'])
             if existing_key_setting and existing_key_setting.id != setting_id:
-                msg = f"Інше системне налаштування з ключем '{update_data['key']}' вже існує."  # i18n
+                msg = f"Інше системне налаштування з ключем '{update_data_dict['key']}' вже існує."
                 logger.warning(
-                    f"Неможливо оновити ключ для ID '{setting_id}' на '{update_data['key']}', оскільки він використовується ID '{existing_key_setting.id}'. {msg}")
+                    f"Неможливо оновити ключ для ID '{setting_id}' на '{update_data_dict['key']}', оскільки він використовується ID '{existing_key_setting.id}'. {msg}")
                 raise ValueError(msg)
 
-        for field, value in update_data.items():
-            setattr(setting_db, field, value)
+        # Модель SystemSetting не має updated_by_user_id. updated_at оновлюється автоматично.
+        # kwargs_for_repo: Dict[str, Any] = {}
+        # if updater_id and hasattr(SystemSetting, 'updated_by_user_id'):
+        #    kwargs_for_repo['updated_by_user_id'] = updater_id
 
-        # TODO: Додати updated_by_user_id, якщо є в моделі
-        # if updater_id and hasattr(setting_db, 'updated_by_user_id'):
-        #    setting_db.updated_by_user_id = updater_id
-        if hasattr(setting_db, 'updated_at'):  # Модель має автоматично оновлювати це поле
-            setting_db.updated_at = datetime.now(timezone.utc)
-
-        self.db_session.add(setting_db)
         try:
+            updated_setting_db = await self.setting_repo.update(
+                session=self.db_session,
+                db_obj=setting_db,
+                obj_in=setting_update_data # Передаємо Pydantic схему
+                # **kwargs_for_repo
+            )
             await self.commit()
-            await self.db_session.refresh(setting_db)
-        except IntegrityError as e:  # На випадок паралельного оновлення, що спричиняє конфлікт
+            # await self.db_session.refresh(updated_setting_db) # Не завжди потрібно
+        except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності при оновленні налаштування ID '{setting_id}': {e}",
                          exc_info=global_settings.DEBUG)
-            # i18n
             raise ValueError(f"Не вдалося оновити налаштування '{setting_db.key}' через конфлікт даних.")
+        except Exception as e: # Обробка інших можливих помилок
+            await self.rollback()
+            logger.error(f"Неочікувана помилка при оновленні налаштування ID '{setting_id}': {e}", exc_info=global_settings.DEBUG)
+            raise
 
-        logger.info(f"Системне налаштування з ID '{setting_id}' (ключ: {setting_db.key}) успішно оновлено.")
-        return SystemSettingResponse.model_validate(setting_db)  # Pydantic v2
 
-    async def delete_setting(self, setting_id: UUID) -> bool:
+        logger.info(f"Системне налаштування з ID '{updated_setting_db.id}' (ключ: {updated_setting_db.key}) успішно оновлено.")
+        return SystemSettingResponse.model_validate(updated_setting_db)
+
+    async def delete_setting(self, setting_id: int) -> bool: # Змінено UUID на int
         """
         Видаляє системне налаштування за його ID.
-
-        :param setting_id: ID системного налаштування для видалення.
-        :return: True, якщо видалення успішне, False - якщо налаштування не знайдено.
         """
         logger.debug(f"Спроба видалення системного налаштування з ID: {setting_id}")
-        setting_db = await self.db_session.get(SystemSetting, setting_id)
+        setting_to_delete = await self.setting_repo.get(session=self.db_session, id=setting_id)
 
-        if not setting_db:
+        if not setting_to_delete:
             logger.warning(f"Системне налаштування з ID '{setting_id}' не знайдено для видалення.")
             return False
 
-        # TODO: Додати перевірку `is_editable_by_admin` або інші бізнес-правила перед видаленням, якщо потрібно.
-        # Наприклад, деякі системні налаштування можуть бути незмінними.
+        # TODO: Додати перевірку `is_editable_by_admin` або інші бізнес-правила
+        # if not setting_to_delete.is_editable:
+        #     raise ValueError(f"Налаштування '{setting_to_delete.key}' не може бути видалене.")
 
-        await self.db_session.delete(setting_db)
-        await self.commit()
-        logger.info(f"Системне налаштування з ID '{setting_id}' (ключ: {setting_db.key}) успішно видалено.")
-        return True
+        deleted_setting = await self.setting_repo.remove(session=self.db_session, id=setting_id)
+        if deleted_setting: # remove повертає видалений об'єкт або None
+            await self.commit()
+            logger.info(f"Системне налаштування з ID '{setting_id}' (ключ: {deleted_setting.key}) успішно видалено.")
+            return True
+        # Якщо remove повернув None, але get знайшов об'єкт, це дивно, але обробляємо як помилку
+        logger.error(f"Не вдалося видалити налаштування ID '{setting_id}' через репозиторій.")
+        return False
 
-    def _deserialize_setting_value(self, value_str: str, value_type: str) -> Any:
+
+    def _deserialize_setting_value(self, value_str: str, value_type: SettingValueType) -> Any: # value_type тепер Enum
         """Допоміжний метод для десеріалізації значення налаштування на основі його типу."""
-        logger.debug(f"Десеріалізація значення '{value_str}' як тип '{value_type}'")
+        logger.debug(f"Десеріалізація значення '{value_str}' як тип '{value_type.value}'")
         try:
-            if value_type == 'string':
+            if value_type == SettingValueType.STRING:
                 return value_str
-            elif value_type == 'integer':
+            elif value_type == SettingValueType.INTEGER:
                 return int(value_str)
-            elif value_type == 'float':  # Або Decimal, якщо використовується
+            elif value_type == SettingValueType.FLOAT:
                 return float(value_str)
-            elif value_type == 'boolean':
-                return value_str.lower() in ('true', '1', 'yes', 'on')
-            elif value_type == 'json':
+            elif value_type == SettingValueType.BOOLEAN:
+                return value_str.lower() in ('true', '1', 'yes', 'on', 't')
+            elif value_type == SettingValueType.JSON:
                 return json.loads(value_str)
-            # TODO: Додати інші типи, такі як 'date', 'datetime', 'list_str', 'list_int'
-            else:
-                logger.warning(f"Невідомий тип значення '{value_type}' для десеріалізації. Повернення як рядок.")
+            # TODO: Додати типи 'DATE', 'DATETIME', 'LIST_STR', 'LIST_INT'
+            else: # За замовчуванням або якщо тип невідомий
+                logger.warning(f"Невідомий або необроблений тип значення '{value_type.value}' для десеріалізації. Повернення як рядок.")
                 return value_str
         except Exception as e:
-            logger.error(f"Помилка десеріалізації значення '{value_str}' як '{value_type}': {e}",
+            logger.error(f"Помилка десеріалізації значення '{value_str}' як '{value_type.value}': {e}",
                          exc_info=global_settings.DEBUG)
-            return None  # Або кинути виняток, або повернути як є
+            return None # Або кинути виняток
 
     async def get_setting_value(self, key: str, default: Optional[Any] = None) -> Optional[Any]:
         """

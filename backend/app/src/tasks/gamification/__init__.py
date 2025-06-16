@@ -1,6 +1,5 @@
 # backend/app/src/tasks/gamification/__init__.py
 # -*- coding: utf-8 -*-
-# TODO: Перевірити наявність класів RecalculateUserLevelsTask, AwardBadgesTask, UpdateUserRatingsTask у відповідних файлах.
 """
 Підпакет для фонових завдань, пов'язаних з гейміфікацією.
 

@@ -20,9 +20,9 @@
 # На даний момент, відповідні класи завдань ще не створені в модулях,
 # тому імпорти будуть додані або розкоментовані, коли класи будуть реалізовані.
 
-from .email import SendEmailTask
-from .sms import SendSmsTask
-from .messenger import SendMessengerNotificationTask
+from backend.app.src.tasks.notifications.email import SendEmailTask
+from backend.app.src.tasks.notifications.sms import SendSmsTask
+from backend.app.src.tasks.notifications.messenger import SendMessengerNotificationTask
 
 __all__ = [
     'SendEmailTask',

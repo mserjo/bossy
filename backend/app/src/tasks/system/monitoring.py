@@ -190,26 +190,26 @@ class SystemMetricsCollectorTask(BaseTask):
             )
         return metrics
 
-# Приклад використання (можна видалити або закоментувати):
-# async def main():
-#     logging.basicConfig(
-#         level=logging.DEBUG, # DEBUG для перегляду детальних метрик
-#         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-#     )
-#     metrics_task = SystemMetricsCollectorTask()
-#     if metrics_task.initialization_failed:
-#         logger.error("Не вдалося ініціалізувати завдання збору метрик. Перевірте наявність psutil.")
-#         return
-#
-#     try:
-#         collected_metrics = await metrics_task.execute()
-#         # logger.info(f"Фінальні зібрані метрики в main: {collected_metrics}")
-#         if "error" in collected_metrics:
-#             logger.error(f"Під час збору метрик сталася помилка: {collected_metrics['error']}")
-#     except Exception as e:
-#         logger.error(f"Помилка при виконанні завдання metrics_task: {e}", exc_info=True)
-
-
-# if __name__ == "__main__":
-#     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-#     asyncio.run(main())
+# # Приклад використання (можна видалити або закоментувати):
+# # async def main():
+# #     logging.basicConfig(
+# #         level=logging.DEBUG, # DEBUG для перегляду детальних метрик
+# #         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# #     )
+# #     metrics_task = SystemMetricsCollectorTask()
+# #     if metrics_task.initialization_failed:
+# #         logger.error("Не вдалося ініціалізувати завдання збору метрик. Перевірте наявність psutil.")
+# #         return
+# #
+# #     try:
+# #         collected_metrics = await metrics_task.execute()
+# #         # logger.info(f"Фінальні зібрані метрики в main: {collected_metrics}")
+# #         if "error" in collected_metrics:
+# #             logger.error(f"Під час збору метрик сталася помилка: {collected_metrics['error']}")
+# #     except Exception as e:
+# #         logger.error(f"Помилка при виконанні завдання metrics_task: {e}", exc_info=True)
+# #
+# #
+# # if __name__ == "__main__":
+# #     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# #     asyncio.run(main())

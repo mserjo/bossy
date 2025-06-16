@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Ендпоінти для управління визначеннями Нагород та їх отримання користувачами.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
 from uuid import UUID  # ID тепер UUID
@@ -44,7 +46,9 @@ async def get_reward_service(session: AsyncSession = Depends(get_api_db_session)
 async def get_group_service_dep(session: AsyncSession = Depends(get_api_db_session)) -> GroupService:
     return GroupService(db_session=session)
 
-
+# ПРИМІТКА: Логіка перевірки прав доступу для створення нагороди (адміністратор групи
+# або суперюзер) потребує завершення, зокрема через реалізацію методу
+# `is_user_group_admin` в `GroupService` або використання спеціалізованих залежностей.
 @router.post(
     "/",
     response_model=RewardResponse,
@@ -138,10 +142,15 @@ async def read_available_rewards(
         results=[RewardResponse.model_validate(r) for r in rewards_orm]  # Pydantic v2
     )
 
-
+# ПРИМІТКА: Цей ендпоінт залежить від реалізації методу `list_available_rewards_paginated`
+# в `RewardService`, який має коректно фільтрувати нагороди за доступністю
+# для поточного користувача та групи. TODO щодо прав доступу також актуальний.
 # TODO: Створити залежність `check_reward_access_permission(reward_id: UUID, current_user: UserModel, ...)`
 #  яка перевіряє, чи може користувач бачити/редагувати цю нагороду (глобальна, або з його групи, або він адмін/СУ)
 
+# ПРИМІТКА: Доступ до конкретної нагороди має перевірятися. Поточна реалізація
+# покладається на метод `get_reward_by_id_for_user` в `RewardService`, який має
+# інкапсулювати цю логіку перевірки прав.
 @router.get(
     "/{reward_id}",
     response_model=RewardResponse,
@@ -171,7 +180,9 @@ async def read_reward_by_id(
                             detail=f"Нагороду з ID {reward_id} не знайдено або доступ заборонено.")
     return reward
 
-
+# ПРИМІТКА: Оновлення нагороди потребує ретельної перевірки прав (адміністратор групи
+# нагороди або суперюзер). Ця логіка має бути реалізована або в сервісі,
+# або через спеціалізовану залежність (див. TODO).
 @router.put(
     "/{reward_id}",
     response_model=RewardResponse,
@@ -237,7 +248,12 @@ async def delete_reward(
 
     return None
 
-
+# ПРИМІТКА: Видалення нагороди також потребує ретельної перевірки прав,
+# аналогічно до оновлення.
+# ПРИМІТКА: Отримання нагороди користувачем (`redeem_reward_endpoint`) є ключовою функцією.
+# Вона залежить від коректної реалізації `redeem_reward` в `RewardService`,
+# що включає перевірку балансу, доступності нагороди, списання балів та оновлення запасів.
+# Важливим є визначення `group_id_context`.
 @router.post(
     "/{reward_id}/redeem",
     response_model=UserRewardRedemptionResponse,  # Повертаємо запис про отримання нагороди

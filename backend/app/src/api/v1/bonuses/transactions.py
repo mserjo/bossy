@@ -6,6 +6,8 @@
 Включає отримання деталей конкретної транзакції та створення ручних транзакцій
 (зазвичай для адміністративних цілей, таких як корекція балансу).
 Історія транзакцій для користувача доступна через ендпоінти в `accounts.py`.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import Optional  # List, Generic, TypeVar, BaseModel не використовуються
 from uuid import UUID  # ID тепер UUID
@@ -43,6 +45,9 @@ async def get_user_account_service_dep(session: AsyncSession = Depends(get_api_d
 # TODO: Створити залежність `require_transaction_viewer(...)`, яка перевіряє,
 #  чи має поточний користувач право переглядати цю транзакцію (належить йому, або він адмін/СУ).
 
+# ПРИМІТКА: Реалізація прав доступу до перегляду транзакції (чи належить вона користувачу,
+# чи користувач є адміном/суперюзером) має бути уточнена в сервісі
+# `AccountTransactionService.get_transaction_by_id_for_user` або через спеціалізовану залежність.
 @router.get(
     "/{transaction_id}",
     response_model=AccountTransactionResponse,
@@ -78,7 +83,8 @@ async def get_transaction_details(
                             detail="Транзакцію не знайдено або доступ заборонено.")
     return transaction
 
-
+# ПРИМІТКА: Важливою є валідація `transaction_in.transaction_type` на відповідність
+# дозволеним типам для ручних операцій, як зазначено в TODO нижче.
 @router.post(
     "/manual",
     response_model=AccountTransactionResponse,  # Повертаємо створену транзакцію

@@ -252,48 +252,48 @@ class UpdateUserRatingsTask(BaseTask):
             "global_rating_details": global_rating_result
         }
 
-# Приклад використання (можна видалити або закоментувати):
-# async def main():
-#     logging.basicConfig(
-#         level=logging.INFO,
-#         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-#     )
-#     ratings_task = UpdateUserRatingsTask()
-#
-#     logger.info("--- Тест 1: Оновлення рейтингів для всіх груп (щомісячний) та глобального ---")
-#     result_all_monthly = await ratings_task.execute(calculate_global=True, rating_period="monthly")
-#     logger.info(f"Результат (всі групи, щомісячний + глобальний): {result_all_monthly['summary']}")
-#     # logger.debug(f"Деталі груп (зразок): {result_all_monthly['group_details_sample']}")
-#     # logger.debug(f"Деталі глобального: {result_all_monthly['global_rating_details']}")
-#
-#     logger.info("\n--- Тест 2: Оновлення для конкретної групи (group_alpha_kudos, загальний рейтинг) ---")
-#     result_specific_group = await ratings_task.execute(group_id="group_alpha_kudos", rating_period="overall")
-#     logger.info(f"Результат (група alpha, загальний): {result_specific_group['summary']}")
-#
-#     logger.info("\n--- Тест 3: Оновлення тільки глобального тижневого рейтингу ---")
-#     # Щоб не обробляти групи, передаємо group_id=None і process_all_groups_with_global=False (якщо б такий параметр був)
-#     # Або покладаємося на логіку, що _get_groups_for_rating_update(None) поверне порожній список, якщо ми не хочемо обробляти групи.
-#     # У поточній реалізації, якщо group_id is None, _get_groups_for_rating_update(None) викликається.
-#     # Для прикладу, припустимо, що ми хочемо тільки глобальний, і групи не будуть оброблені (наприклад, через порожній список від _get_groups_for_rating_update)
-#     # Для цього треба було б змінити _get_groups_for_rating_update, щоб він міг повернути [] при певних умовах,
-#     # або додати явний параметр в run, щоб пропустити групові оновлення.
-#     # Поки що, для простоти, execute викличе оновлення для всіх груп, а потім глобальний.
-#     # Для чисто "тільки глобальний" без груп, треба або передати group_id, який _get_groups поверне як [],
-#     # або додати параметр типу `skip_group_ratings=True`.
-#     # Припустимо, ми хочемо оновити глобальний і не чіпати групи взагалі:
-#     # Можна створити спеціальний випадок в _get_groups_for_rating_update, або додати прапорець в run.
-#     # Для чистоти прикладу, зробимо так, ніби ми передали спеціальний group_id, який не знайде груп:
-#     original_get_groups = ratings_task._get_groups_for_rating_update
-#     async def mock_get_groups_empty(group_id_param): # Мок для повернення порожнього списку груп
-#         if group_id_param is None: return []
-#         return await original_get_groups(group_id_param)
-#     ratings_task._get_groups_for_rating_update = mock_get_groups_empty
-#
-#     result_global_weekly = await ratings_task.execute(calculate_global=True, rating_period="weekly")
-#     logger.info(f"Результат (тільки глобальний, тижневий): {result_global_weekly['summary']}")
-#
-#     ratings_task._get_groups_for_rating_update = original_get_groups # Відновлення оригінального методу
-
-# if __name__ == "__main__":
-#     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-#     asyncio.run(main())
+# # Приклад використання (можна видалити або закоментувати):
+# # async def main():
+# #     logging.basicConfig(
+# #         level=logging.INFO,
+# #         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# #     )
+# #     ratings_task = UpdateUserRatingsTask()
+# #
+# #     logger.info("--- Тест 1: Оновлення рейтингів для всіх груп (щомісячний) та глобального ---")
+# #     result_all_monthly = await ratings_task.execute(calculate_global=True, rating_period="monthly")
+# #     logger.info(f"Результат (всі групи, щомісячний + глобальний): {result_all_monthly['summary']}")
+# #     # logger.debug(f"Деталі груп (зразок): {result_all_monthly['group_details_sample']}")
+# #     # logger.debug(f"Деталі глобального: {result_all_monthly['global_rating_details']}")
+# #
+# #     logger.info("\n--- Тест 2: Оновлення для конкретної групи (group_alpha_kudos, загальний рейтинг) ---")
+# #     result_specific_group = await ratings_task.execute(group_id="group_alpha_kudos", rating_period="overall")
+# #     logger.info(f"Результат (група alpha, загальний): {result_specific_group['summary']}")
+# #
+# #     logger.info("\n--- Тест 3: Оновлення тільки глобального тижневого рейтингу ---")
+# #     # Щоб не обробляти групи, передаємо group_id=None і process_all_groups_with_global=False (якщо б такий параметр був)
+# #     # Або покладаємося на логіку, що _get_groups_for_rating_update(None) поверне порожній список, якщо ми не хочемо обробляти групи.
+# #     # У поточній реалізації, якщо group_id is None, _get_groups_for_rating_update(None) викликається.
+# #     # Для прикладу, припустимо, що ми хочемо тільки глобальний, і групи не будуть оброблені (наприклад, через порожній список від _get_groups_for_rating_update)
+# #     # Для цього треба було б змінити _get_groups_for_rating_update, щоб він міг повернути [] при певних умовах,
+# #     # або додати явний параметр в run, щоб пропустити групові оновлення.
+# #     # Поки що, для простоти, execute викличе оновлення для всіх груп, а потім глобальний.
+# #     # Для чисто "тільки глобальний" без груп, треба або передати group_id, який _get_groups поверне як [],
+# #     # або додати параметр типу `skip_group_ratings=True`.
+# #     # Припустимо, ми хочемо оновити глобальний і не чіпати групи взагалі:
+# #     # Можна створити спеціальний випадок в _get_groups_for_rating_update, або додати прапорець в run.
+# #     # Для чистоти прикладу, зробимо так, ніби ми передали спеціальний group_id, який не знайде груп:
+# #     original_get_groups = ratings_task._get_groups_for_rating_update
+# #     async def mock_get_groups_empty(group_id_param): # Мок для повернення порожнього списку груп
+# #         if group_id_param is None: return []
+# #         return await original_get_groups(group_id_param)
+# #     ratings_task._get_groups_for_rating_update = mock_get_groups_empty
+# #
+# #     result_global_weekly = await ratings_task.execute(calculate_global=True, rating_period="weekly")
+# #     logger.info(f"Результат (тільки глобальний, тижневий): {result_global_weekly['summary']}")
+# #
+# #     ratings_task._get_groups_for_rating_update = original_get_groups # Відновлення оригінального методу
+# #
+# # if __name__ == "__main__":
+# #     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# #     asyncio.run(main())

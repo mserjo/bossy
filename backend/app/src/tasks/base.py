@@ -14,7 +14,7 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
-from typing import Any, Coroutine
+from typing import Any, Coroutine, Optional, Awaitable
 
 # Налаштування логера для цього модуля
 # Використовується стандартний logging, оскільки це базовий клас.
@@ -43,12 +43,12 @@ class BaseTask(ABC):
         execute(*args, **kwargs): Метод для запуску завдання з обробкою успіху/невдачі.
     """
 
-    def __init__(self, name: str = None):
+    def __init__(self, name: Optional[str] = None):
         """
         Ініціалізація базового завдання.
 
         Args:
-            name (str, optional): Ім'я завдання. Якщо не надано, використовується ім'я класу.
+            name (Optional[str], optional): Ім'я завдання. Якщо не надано, використовується ім'я класу.
         """
         self.name = name or self.__class__.__name__
         self.logger = logging.getLogger(f"task.{self.name}") # Специфічний логер для завдання
@@ -91,7 +91,7 @@ class BaseTask(ABC):
         """
         self.logger.error(f"Помилка під час виконання завдання '{self.name}': {exception}", exc_info=True)
 
-    async def execute(self, *args: Any, **kwargs: Any) -> Coroutine[Any, Any, Any]:
+    async def execute(self, *args: Any, **kwargs: Any) -> Awaitable[Optional[Any]]:
         """
         Запускає завдання з обробкою успіху та невдачі.
 
@@ -115,24 +115,3 @@ class BaseTask(ABC):
             # Тут можна додати логіку повторних спроб або специфічну обробку помилок
             # Залежно від вимог, можна повернути None або прокинути виняток далі
             return None
-
-# Приклад використання (можна видалити або закоментувати)
-# class MySampleTask(BaseTask):
-#     async def run(self, message: str) -> str:
-#         self.logger.info(f"MySampleTask отримав повідомлення: {message}")
-#         # Імітація якоїсь роботи
-#         await asyncio.sleep(1)
-#         if message == "error":
-#             raise ValueError("Тестова помилка в MySampleTask")
-#         return f"Повідомлення '{message}' оброблено"
-
-# async def main_example():
-#     task1 = MySampleTask(name="SampleTask.Success")
-#     await task1.execute("Привіт, світ!")
-
-#     task2 = MySampleTask(name="SampleTask.Failure")
-#     await task2.execute("error")
-
-# if __name__ == "__main__":
-#     logging.basicConfig(level=logging.INFO)
-#     asyncio.run(main_example())

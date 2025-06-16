@@ -211,43 +211,43 @@ class DatabaseBackupTask(BaseTask):
             )
         return results # Повертаємо результати в будь-якому випадку (успіх або частковий успіх перед винятком)
 
-# Приклад використання (можна видалити або закоментувати):
-# async def main():
-#     logging.basicConfig(
-#         level=logging.INFO,
-#         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-#     )
-#     # Переконайтесь, що змінні середовища (DB_*, BACKUP_DIR, PGPASSWORD) встановлені,
-#     # або змініть константи в коді.
-#     # Потрібен працюючий сервер PostgreSQL та встановлені утиліти pg_dump.
-#
-#     # Створення тестової директорії, якщо її немає
-#     if not os.path.exists(BACKUP_DIR):
-#         try:
-#             os.makedirs(BACKUP_DIR)
-#             logger.info(f"Створено тестову директорію для бекапів: {BACKUP_DIR}")
-#         except OSError as e:
-#             logger.error(f"Не вдалося створити тестову директорію {BACKUP_DIR}: {e}")
-#             return # Вихід, якщо директорію не створити
-#
-#     try:
-#         backup_task = DatabaseBackupTask()
-#         # Перевірка, чи ініціалізація пройшла успішно
-#         if backup_task.initialization_failed:
-#             logger.error("Ініціалізація завдання резервного копіювання не вдалася. Завдання не буде виконано.")
-#             return
-#
-#         await backup_task.execute(keep_last_n_backups=3)
-#     except RuntimeError as e:
-#         logger.error(f"Не вдалося виконати завдання резервного копіювання: {e}")
-#     except FileNotFoundError:
-#         logger.error("'pg_dump' не знайдено. Завдання не може бути виконано. Перевірте PATH та встановлення PostgreSQL client tools.")
-#     except Exception as e:
-#         logger.error(f"Загальна помилка під час виконання main прикладу: {e}", exc_info=True)
-
-# if __name__ == "__main__":
-#     # Приклад запуску:
-#     # PGPASSWORD="your_db_password" python backend/app/src/tasks/system/backup.py
-#     # Або експортуйте PGPASSWORD перед запуском.
-#     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-#     asyncio.run(main())
+# # Приклад використання (можна видалити або закоментувати):
+# # async def main():
+# #     logging.basicConfig(
+# #         level=logging.INFO,
+# #         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# #     )
+# #     # Переконайтесь, що змінні середовища (DB_*, BACKUP_DIR, PGPASSWORD) встановлені,
+# #     # або змініть константи в коді.
+# #     # Потрібен працюючий сервер PostgreSQL та встановлені утиліти pg_dump.
+# #
+# #     # Створення тестової директорії, якщо її немає
+# #     if not os.path.exists(BACKUP_DIR):
+# #         try:
+# #             os.makedirs(BACKUP_DIR)
+# #             logger.info(f"Створено тестову директорію для бекапів: {BACKUP_DIR}")
+# #         except OSError as e:
+# #             logger.error(f"Не вдалося створити тестову директорію {BACKUP_DIR}: {e}")
+# #             return # Вихід, якщо директорію не створити
+# #
+# #     try:
+# #         backup_task = DatabaseBackupTask()
+# #         # Перевірка, чи ініціалізація пройшла успішно
+# #         if backup_task.initialization_failed:
+# #             logger.error("Ініціалізація завдання резервного копіювання не вдалася. Завдання не буде виконано.")
+# #             return
+# #
+# #         await backup_task.execute(keep_last_n_backups=3)
+# #     except RuntimeError as e:
+# #         logger.error(f"Не вдалося виконати завдання резервного копіювання: {e}")
+# #     except FileNotFoundError:
+# #         logger.error("'pg_dump' не знайдено. Завдання не може бути виконано. Перевірте PATH та встановлення PostgreSQL client tools.")
+# #     except Exception as e:
+# #         logger.error(f"Загальна помилка під час виконання main прикладу: {e}", exc_info=True)
+# #
+# # if __name__ == "__main__":
+# #     # Приклад запуску:
+# #     # PGPASSWORD="your_db_password" python backend/app/src/tasks/system/backup.py
+# #     # Або експортуйте PGPASSWORD перед запуском.
+# #     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# #     asyncio.run(main())

@@ -1,6 +1,5 @@
 # backend/app/src/tasks/gamification/__init__.py
 # -*- coding: utf-8 -*-
-# TODO: Перевірити наявність класів RecalculateUserLevelsTask, AwardBadgesTask, UpdateUserRatingsTask у відповідних файлах.
 """
 Підпакет для фонових завдань, пов'язаних з гейміфікацією.
 
@@ -20,9 +19,6 @@
 
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-
-# На даний момент, відповідні класи завдань ще не створені в модулях,
-# тому імпорти будуть додані або розкоментовані, коли класи будуть реалізовані.
 
 from backend.app.src.tasks.gamification.levels import RecalculateUserLevelsTask
 from backend.app.src.tasks.gamification.badges import AwardBadgesTask

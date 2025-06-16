@@ -14,9 +14,12 @@
 - `monitoring_endpoints.py`: Ендпоінти для доступу до даних моніторингу.
 - `health_endpoints.py`: Ендпоінти для перевірки стану системи.
 - `init_data_endpoints.py`: Ендпоінт для ініціалізації початкових даних.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
-import logging
+# import logging # Видалено для використання централізованого логера
+from backend.app.src.config import logger # Централізований логер
 
 # Головний роутер для системних ендпоінтів v1 буде визначено в backend.app.src.api.v1.system.router
 # та імпортовано тут для можливого ре-експорту.
@@ -26,5 +29,5 @@ __all__ = [
     "system_router",
 ]
 
-logger = logging.getLogger(__name__)
-logger.info("Підпакет 'api.v1.system' ініціалізовано.")  # i18n: Log message, potentially for translation if logs are multilingual
+# logger = logging.getLogger(__name__) # Видалено
+logger.info("Підпакет 'api.v1.system' ініціалізовано та експортує 'system_router'.")

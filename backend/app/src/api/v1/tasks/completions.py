@@ -5,6 +5,8 @@
 
 Включає позначення завдань/подій як виконаних користувачами,
 а також їх ухвалення або відхилення адміністраторами.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
 from uuid import UUID  # ID тепер UUID
@@ -29,6 +31,7 @@ from backend.app.src.schemas.tasks.completion import (
 )
 from backend.app.src.core.pagination import PagedResponse, PageParams
 from backend.app.src.services.tasks.completion import TaskCompletionService
+from backend.app.src.core.constants import TASK_COMPLETION_STATUS_APPROVED, TASK_COMPLETION_STATUS_REJECTED # Імпорт статусів
 from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
 
@@ -54,6 +57,9 @@ async def get_task_completion_service(session: AsyncSession = Depends(get_api_db
     description="""Дозволяє користувачу позначити призначене йому завдання як виконане.
     Залежно від налаштувань типу завдання, може потребувати підтвердження адміністратором."""  # i18n
 )
+# ПРИМІТКА: Цей ендпоінт залежить від реалізації `mark_task_as_completed_by_user`
+# в `TaskCompletionService`, включаючи перевірку, чи призначено завдання
+# користувачеві та чи дозволено йому самостійно позначати виконання.
 async def mark_task_as_completed(
         task_id: UUID = Path(..., description="ID завдання, яке позначено як виконане"),  # i18n
         completion_data: TaskCompletionCreateRequest = Depends(TaskCompletionCreateRequest.as_form),
@@ -102,6 +108,10 @@ async def mark_task_as_completed(
     Доступно адміністраторам групи (якщо вказано `group_id`) або суперюзерам (для всіх груп).""",  # i18n
     dependencies=[Depends(get_current_active_user)]  # Базова перевірка, детальніша логіка в сервісі
 )
+# ПРИМІТКА: Важливою є реалізація коректної логіки фільтрації та прав доступу
+# в `list_completions_pending_approval_paginated` сервісу, щоб адміністратори
+# бачили тільки виконання в своїх групах, а суперюзери - всі.
+# Також, сервіс має коректно повертати загальну кількість для пагінації.
 async def list_completions_pending_approval(
         group_id: Optional[UUID] = Query(None,
                                          description="ID групи для фільтрації (адміни групи бачать тільки свою групу)"),
@@ -142,6 +152,9 @@ async def list_completions_pending_approval(
     description="Дозволяє адміністратору групи або суперюзеру підтвердити виконання завдання/події.",  # i18n
     # dependencies=[Depends(require_completion_reviewer)] # Використовувати залежність для прав
 )
+# ПРИМІТКА: Важливою є реалізація гранульованої перевірки прав доступу
+# (адміністратор групи завдання або суперюзер) замість тимчасової залежності
+# від `get_current_active_superuser`, як зазначено в TODO.
 async def approve_completion(
         completion_id: UUID = Path(..., description="ID виконання, яке підтверджується"),  # i18n
         admin_update_data: TaskCompletionAdminUpdateRequest,  # Опціонально, може містити коментар
@@ -156,7 +169,7 @@ async def approve_completion(
         # Передаємо admin_update_data, навіть якщо воно може бути порожнім (тільки зі статусом)
         approved_completion = await completion_service.update_task_completion_status(
             completion_id=completion_id,
-            admin_update_data=admin_update_data.model_copy(update={"status": COMPLETION_STATUS_APPROVED}),
+            admin_update_data=admin_update_data.model_copy(update={"status": TASK_COMPLETION_STATUS_APPROVED}), # Використання константи
             # Pydantic v2 model_copy
             admin_user_id=current_user.id
         )
@@ -182,6 +195,8 @@ async def approve_completion(
     # i18n
     # dependencies=[Depends(require_completion_reviewer)]
 )
+# ПРИМІТКА: Аналогічно до `approve_completion`, цей ендпоінт потребує ретельної
+# реалізації перевірки прав доступу. Коментар `admin_notes` при відхиленні є важливим.
 async def reject_completion(
         completion_id: UUID = Path(..., description="ID виконання, яке відхиляється"),  # i18n
         admin_update_data: TaskCompletionAdminUpdateRequest,  # Має містити admin_notes
@@ -201,7 +216,7 @@ async def reject_completion(
     try:
         rejected_completion = await completion_service.update_task_completion_status(
             completion_id=completion_id,
-            admin_update_data=admin_update_data.model_copy(update={"status": COMPLETION_STATUS_REJECTED}),
+            admin_update_data=admin_update_data.model_copy(update={"status": TASK_COMPLETION_STATUS_REJECTED}), # Використання константи
             # Pydantic v2
             admin_user_id=current_user.id
         )

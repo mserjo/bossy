@@ -5,14 +5,13 @@
 Надає функціонал для створення, отримання, оновлення балансу
 та перегляду бонусних рахунків, а також для запису транзакцій.
 """
-from typing import List, Optional, Tuple # Any видалено, Tuple використовується
-# UUID видалено, оскільки related_entity_id тепер int, і немає інших використань UUID
+from typing import List, Optional, Tuple # Any видалено, Tuple використовується, Dict не потрібен тут
 from decimal import Decimal  # Для точних розрахунків балансу
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select # Оновлено імпорт
-from sqlalchemy.orm import selectinload, noload
+from sqlalchemy.orm import selectinload # noload видалено
 from sqlalchemy.exc import IntegrityError
 
 from backend.app.src.services.base import BaseService
@@ -20,6 +19,7 @@ from backend.app.src.models.bonuses.account import UserAccount  # Модель S
 from backend.app.src.models.auth.user import User  # Для зв'язку рахунку з користувачем
 from backend.app.src.models.groups.group import Group  # Якщо рахунки для групи користувачів
 from backend.app.src.models.bonuses.transaction import AccountTransaction  # Модель для транзакцій
+from backend.app.src.core.dicts import TransactionType # Імпорт TransactionType Enum
 
 from backend.app.src.schemas.bonuses.account import (  # Pydantic Схеми
     UserAccountResponse,
@@ -27,7 +27,8 @@ from backend.app.src.schemas.bonuses.account import (  # Pydantic Схеми
     # UserAccountUpdate, # Для ручних коригувань адміністратором (не реалізовано в цьому сервісі)
 )
 from backend.app.src.schemas.bonuses.transaction import AccountTransactionResponse
-from backend.app.src.config import logger  # Використання спільного логера з конфігу
+from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
+logger = get_logger(__name__) # Ініціалізація логера
 from backend.app.src.config import settings  # Для доступу до конфігурацій
 from backend.app.src.core.exceptions import InsufficientFundsError # Імпорт перенесеного винятку
 
@@ -172,7 +173,7 @@ class UserAccountService(BaseService):
             self,
             user_id: int, # Змінено UUID на int
             amount: Decimal,
-            transaction_type: str,  # Наприклад, 'ENROLLMENT', 'MANUAL_ADJUSTMENT', 'REWARD_PAYOUT', 'WITHDRAWAL'
+            transaction_type: TransactionType,  # Змінено на TransactionType Enum
             description: Optional[str] = None,
             related_entity_id: Optional[int] = None,  # Змінено Optional[UUID] на Optional[int]
             group_id: Optional[int] = None,  # Змінено Optional[UUID] на Optional[int]
@@ -183,7 +184,7 @@ class UserAccountService(BaseService):
 
         :param user_id: ID користувача (int).
         :param amount: Сума для коригування (додатня для поповнення, від'ємна для списання).
-        :param transaction_type: Тип транзакції.
+        :param transaction_type: Тип транзакції (Enum TransactionType).
         :param description: Опис транзакції.
         :param related_entity_id: ID пов'язаної сутності (int).
         :param group_id: ID групи (int, None для глобального).

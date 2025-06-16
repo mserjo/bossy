@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.files.file import FileRecord
 from backend.app.src.models.auth.user import User
+from backend.app.src.repositories.files.file_record_repository import FileRecordRepository # Імпорт репозиторію
 # Group імпорт видалено, оскільки group_id не використовується в list_file_records
 
 from backend.app.src.schemas.files.file import (
@@ -40,6 +41,7 @@ class FileRecordService(BaseService): # type: ignore видалено
     def __init__(self, db_session: AsyncSession, file_upload_service: Optional[Any] = None):
         super().__init__(db_session)
         self.file_upload_service = file_upload_service
+        self.file_record_repo = FileRecordRepository() # Ініціалізація репозиторію
         logger.info("FileRecordService ініціалізовано.")
 
     async def get_file_record_by_id(self, file_id: int, load_relations: bool = True) -> Optional[FileRecordResponse]: # file_id: UUID -> int
@@ -96,39 +98,34 @@ class FileRecordService(BaseService): # type: ignore видалено
 
         effective_uploader_user_id = uploader_user_id or record_data.uploader_user_id
 
-        if effective_uploader_user_id and not await self.db_session.get(User, effective_uploader_user_id):
-            # i18n
-            raise ValueError(f"Користувача-завантажувача з ID '{effective_uploader_user_id}' не знайдено.")
-        # group_id перевірка видалена, оскільки поле відсутнє в моделі FileRecord
-        # if record_data.group_id and not await self.db_session.get(Group, record_data.group_id):
-        #     # i18n
-        #     raise ValueError(f"Групу з ID '{record_data.group_id}' не знайдено.")
+        if effective_uploader_user_id: # Перевірка існування uploader_user_id
+            user_exists = await self.db_session.get(User, effective_uploader_user_id)
+            if not user_exists:
+                raise ValueError(f"Користувача-завантажувача з ID '{effective_uploader_user_id}' не знайдено.")
 
-        # Перевірка унікальності storage_path
-        # TODO: Уточнити з ТЗ, чи storage_path має бути глобально унікальним, чи унікальним в межах uploader/group/entity. Поточна реалізація перевіряє глобальну унікальність.
-        stmt_path_check = select(FileRecord.id).where(FileRecord.storage_path == record_data.storage_path)
-        if (await self.db_session.execute(stmt_path_check)).scalar_one_or_none():
-            msg = f"Запис файлу зі шляхом зберігання '{record_data.storage_path}' вже існує."  # i18n
+        # Перевірка унікальності storage_path через репозиторій
+        existing_by_path = await self.file_record_repo.get_by_file_path(session=self.db_session, file_path=record_data.storage_path)
+        if existing_by_path:
+            msg = f"Запис файлу зі шляхом зберігання '{record_data.storage_path}' вже існує (ID: {existing_by_path.id})."
             logger.warning(msg)
             raise ValueError(msg)
 
-        # Створення запису FileRecord
-        # created_at, updated_at встановлюються автоматично моделлю/БД
-        new_record_db = FileRecord(
-            **record_data.model_dump(exclude_unset=True),  # Pydantic v2
-            uploader_user_id=effective_uploader_user_id  # Пріоритет параметра функції
-            # `created_at` та `updated_at` повинні встановлюватися автоматично моделлю
-        )
+        create_data_dict = record_data.model_dump(exclude_unset=True)
+        if effective_uploader_user_id is not None:
+            create_data_dict['uploader_user_id'] = effective_uploader_user_id
 
-        self.db_session.add(new_record_db)
+        final_create_data = FileRecordCreate(**create_data_dict)
+
         try:
-            await self.commit()
-            # Оновлюємо для завантаження зв'язків для відповіді
-            # Використовуємо get_file_record_by_id для консистентного завантаження зв'язків
+            new_record_db = await self.file_record_repo.create(
+                session=self.db_session,
+                obj_in=final_create_data
+            )
+            await self.commit() # Commit after successful repository operation
+
             created_record_response = await self.get_file_record_by_id(new_record_db.id, load_relations=True)
-            if not created_record_response:  # Малоймовірно, якщо коміт пройшов успішно
-                logger.error(f"Не вдалося отримати щойно створений запис файлу ID {new_record_db.id} після коміту.")
-                # i18n
+            if not created_record_response:
+                logger.error(f"Не вдалося отримати щойно створений запис файлу ID {new_record_db.id} після створення.")
                 raise RuntimeError("Помилка створення запису файлу: не вдалося отримати після збереження.")
 
             logger.info(f"Запис файлу '{new_record_db.file_name}' (ID: {new_record_db.id}) успішно створено.")
@@ -150,10 +147,12 @@ class FileRecordService(BaseService): # type: ignore видалено
             # current_user_id: Optional[int] = None # Змінено UUID на int
     ) -> Optional[FileRecordResponse]:
         """Оновлює метадані запису файлу (наприклад, ім'я, опис)."""
-        # logger.debug(f"Спроба оновлення метаданих для запису файлу ID: {file_id} користувачем ID: {current_user_id or 'System'}")
         logger.debug(f"Спроба оновлення метаданих для запису файлу ID: {file_id}")
 
-        record_db = await self.db_session.get(FileRecord, file_id)
+        # Залишаємо поточну логіку оновлення, оскільки вона включає restricted_fields
+        # і FileRecordUpdateSchema порожня.
+        # Якщо FileRecordUpdateSchema буде мати поля, можна перейти на self.file_record_repo.update().
+        record_db = await self.db_session.get(FileRecord, file_id) # Замість repo.get для прямого доступу до об'єкта сесії
         if not record_db:
             logger.warning(f"Запис файлу ID '{file_id}' не знайдено для оновлення метаданих.")
             return None
@@ -182,8 +181,9 @@ class FileRecordService(BaseService): # type: ignore видалено
 
         # if hasattr(record_db, 'updated_by_user_id') and current_user_id:
         #     record_db.updated_by_user_id = current_user_id
-        if hasattr(record_db, 'updated_at'):  # Модель повинна автоматично оновлювати updated_at
-            record_db.updated_at = datetime.now(timezone.utc)
+        # Поле updated_at оновлюється автоматично завдяки TimestampedMixin (onupdate=func.now())
+        # if hasattr(record_db, 'updated_at'):
+        #     record_db.updated_at = datetime.now(timezone.utc)
 
         self.db_session.add(record_db)
         try:
@@ -207,32 +207,36 @@ class FileRecordService(BaseService): # type: ignore видалено
         Видаляє запис файлу з бази даних.
         Опціонально може ініціювати видалення файлу зі сховища.
         """
-        # logger.debug(f"Користувач ID '{current_user_id or 'System'}' намагається видалити запис файлу ID: {file_id}. Видалення зі сховища: {delete_from_storage}")
         logger.debug(f"Спроба видалення запису файлу ID: {file_id}. Видалення зі сховища: {delete_from_storage}")
 
-        record_db = await self.db_session.get(FileRecord, file_id)
-        if not record_db:
+        record_db_orm = await self.file_record_repo.get(session=self.db_session, id=file_id)
+
+        if not record_db_orm:
             logger.warning(f"Запис файлу ID '{file_id}' не знайдено для видалення.")
             return False
 
-        storage_path_to_delete = getattr(record_db, 'storage_path', None)
+        storage_path_to_delete = getattr(record_db_orm, 'storage_path', None)
+        file_name_for_log = getattr(record_db_orm, 'file_name', 'N/A')
 
-        await self.db_session.delete(record_db)
         try:
+            deleted_record_orm = await self.file_record_repo.remove(session=self.db_session, id=file_id)
+            if not deleted_record_orm:
+                logger.warning(f"Запис файлу ID '{file_id}' не знайдено репозиторієм під час видалення.")
+                return False
+
             await self.commit()
-            # logger.info(f"Запис файлу ID '{file_id}' (Шлях: {storage_path_to_delete}) видалено з БД користувачем '{current_user_id or 'System'}'.")
+
             logger.info(f"Запис файлу ID '{file_id}' (Шлях: {storage_path_to_delete}) успішно видалено з БД.")
-        except IntegrityError as e:  # Якщо запис файлу використовується (наприклад, FK в User.avatar_id)
+        except IntegrityError as e:
             await self.rollback()
             logger.error(
                 f"Помилка цілісності при видаленні запису файлу ID '{file_id}': {e}. Можливо, він використовується.",
                 exc_info=settings.DEBUG)
-            # i18n
-            raise ValueError(f"Запис файлу '{record_db.file_name}' використовується і не може бути видалений.")
+            raise ValueError(f"Запис файлу '{file_name_for_log}' використовується і не може бути видалений.")
         except Exception as e:
             await self.rollback()
-            logger.error(f"Помилка коміту видалення запису файлу ID '{file_id}' з БД: {e}", exc_info=settings.DEBUG)
-            return False  # Помилка БД, не продовжуємо до видалення зі сховища
+            logger.error(f"Помилка видалення запису файлу ID '{file_id}' з БД: {e}", exc_info=settings.DEBUG)
+            return False
 
         if delete_from_storage and storage_path_to_delete:
             logger.info(f"Ініціювання видалення фактичного файлу зі сховища за шляхом: {storage_path_to_delete}")

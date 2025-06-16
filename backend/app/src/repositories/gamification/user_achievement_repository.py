@@ -162,6 +162,64 @@ class UserAchievementRepository(
             )
             return [], 0
 
+    async def get_achievements_for_badge(
+            self,
+            session: AsyncSession,
+            badge_id: int,
+            group_id: Optional[int] = None,
+            include_global: bool = True, # Similar logic to get_achievements_for_user
+            skip: int = 0,
+            limit: int = 100
+    ) -> Tuple[List[UserAchievement], int]:
+        """
+        Отримує список всіх досягнень (нагороджень) для вказаного бейджа з пагінацією.
+        Може фільтруватися за конкретною групою та/або включати глобальні нагородження.
+
+        Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
+            badge_id (int): ID бейджа.
+            group_id (Optional[int]): ID групи для фільтрації.
+            include_global (bool): Якщо True і group_id не вказано, включає глобальні нагородження.
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
+
+        Returns:
+            Tuple[List[UserAchievement], int]: Кортеж зі списком досягнень та їх загальною кількістю.
+        """
+        logger.debug(
+            f"Отримання досягнень для badge_id {badge_id}, group_id: {group_id}, "
+            f"include_global: {include_global}, skip: {skip}, limit: {limit}"
+        )
+        filters_dict: Dict[str, Any] = {"badge_id": badge_id}
+
+        if group_id is not None:
+            filters_dict["group_id"] = group_id
+        elif include_global:
+            filters_dict["group_id"] = None
+
+        sort_by_field = "created_at" # or 'achieved_at' if that's the alias for created_at
+        sort_order_str = "desc"
+
+        try:
+            items = await super().get_multi(
+                session=session,
+                skip=skip,
+                limit=limit,
+                filters=filters_dict,
+                sort_by=sort_by_field,
+                sort_order=sort_order_str
+                # options: Можна додати selectinload(self.model.user) etc. якщо потрібно
+            )
+            total_count = await super().count(session=session, filters=filters_dict)
+            logger.debug(f"Знайдено {total_count} досягнень для badge_id {badge_id} з заданими фільтрами.")
+            return items, total_count
+        except Exception as e:
+            logger.error(
+                f"Помилка при отриманні досягнень для badge_id {badge_id}: {e}",
+                exc_info=True
+            )
+            return [], 0
+
 
 if __name__ == "__main__":
     # Демонстраційний блок для UserAchievementRepository.
@@ -176,5 +234,7 @@ if __name__ == "__main__":
     logger.info("  - get_by_user_and_badge(user_id: int, badge_id: int, group_id: Optional[int] = None)")
     logger.info(
         "  - get_achievements_for_user(user_id: int, group_id: Optional[int] = None, include_global: bool = True, skip: int = 0, limit: int = 100)")
+    logger.info(
+        "  - get_achievements_for_badge(badge_id: int, group_id: Optional[int] = None, include_global: bool = True, skip: int = 0, limit: int = 100)")
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

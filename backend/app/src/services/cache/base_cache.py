@@ -3,7 +3,8 @@
 from abc import ABC, abstractmethod
 from typing import Optional, Any # Set видалено, оскільки використовується лише в коментарях
 
-from backend.app.src.config import logger # Використання спільного логера з конфігу
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+logger = get_logger(__name__) # Ініціалізація логера
 
 class BaseCacheService(ABC):
     """

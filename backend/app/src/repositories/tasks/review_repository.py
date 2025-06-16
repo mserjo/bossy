@@ -101,6 +101,38 @@ class TaskReviewRepository(BaseRepository[TaskReview, TaskReviewCreateSchema, Ta
             logger.error(f"Помилка при отриманні відгуків для task_id {task_id}: {e}", exc_info=True)
             return [], 0
 
+    async def list_by_reviewer(
+        self, session: AsyncSession, reviewer_user_id: int, skip: int = 0, limit: int = 100
+    ) -> Tuple[List[TaskReview], int]:
+        """
+        Отримує список всіх відгуків, залишених конкретним користувачем.
+
+        Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
+            reviewer_user_id (int): ID користувача (рецензента).
+            skip (int): Кількість записів для пропуску.
+            limit (int): Максимальна кількість записів для повернення.
+
+        Returns:
+            Tuple[List[TaskReview], int]: Кортеж зі списком відгуків та їх загальною кількістю.
+        """
+        logger.debug(f"Отримання відгуків рецензентом user_id: {reviewer_user_id}, skip: {skip}, limit: {limit}")
+        filters_dict: Dict[str, Any] = {"reviewer_user_id": reviewer_user_id}
+        sort_by_field = "created_at"
+        sort_order_str = "desc"
+
+        try:
+            items = await super().get_multi(
+                session=session, skip=skip, limit=limit, filters=filters_dict,
+                sort_by=sort_by_field, sort_order=sort_order_str
+            )
+            total_count = await super().count(session=session, filters=filters_dict)
+            logger.debug(f"Знайдено {total_count} відгуків рецензентом user_id: {reviewer_user_id}")
+            return items, total_count
+        except Exception as e:
+            logger.error(f"Помилка при отриманні відгуків рецензентом user_id {reviewer_user_id}: {e}", exc_info=True)
+            return [], 0
+
 
 if __name__ == "__main__":
     # Демонстраційний блок для TaskReviewRepository.
@@ -114,5 +146,6 @@ if __name__ == "__main__":
     logger.info("\nСпецифічні методи:")
     logger.info("  - get_by_task_and_user(task_id: int, user_id: int) -> Optional[TaskReview]")
     logger.info("  - get_reviews_for_task(task_id: int, skip: int = 0, limit: int = 100)")
+    logger.info("  - list_by_reviewer(reviewer_user_id: int, skip: int = 0, limit: int = 100)")
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

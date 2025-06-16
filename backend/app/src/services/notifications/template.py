@@ -3,20 +3,22 @@
 from typing import List, Optional, Dict, Any, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+from sqlalchemy import select # sqlalchemy.future тепер select
 
 # Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
-from backend.app.src.models.notifications.template import NotificationTemplate  # Модель SQLAlchemy
-from backend.app.src.schemas.notifications.template import (  # Схеми Pydantic
-    NotificationTemplateCreate,
+from backend.app.src.models.notifications.template import NotificationTemplate
+from backend.app.src.repositories.notifications.template_repository import NotificationTemplateRepository # Імпорт репозиторію
+from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт BaseCacheService
+from backend.app.src.schemas.notifications.template import (
+    NotificationTemplateCreate, # Ці імена використовуються в BaseDictionaryService Generic
     NotificationTemplateUpdate,
     NotificationTemplateResponse,
 )
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import logger
+from backend.app.src.config import settings
 
-# TODO: Додати jinja2 до залежностей проекту, якщо ще не додано (pip install Jinja2)
+# Jinja2 залежність
 try:
     from jinja2 import Environment, select_autoescape, StrictUndefined, TemplateSyntaxError, UndefinedError
 except ImportError:
@@ -39,24 +41,34 @@ except ImportError:
 
 
 class NotificationTemplateService(BaseDictionaryService[
-                                      NotificationTemplate, NotificationTemplateCreate, NotificationTemplateUpdate, NotificationTemplateResponse]):
+                                      NotificationTemplate, # Модель
+                                      NotificationTemplateRepository, # Репозиторій
+                                      NotificationTemplateCreate, # Схема створення
+                                      NotificationTemplateUpdate, # Схема оновлення
+                                      NotificationTemplateResponse  # Схема відповіді
+                                  ]):
     """
     Сервіс для управління елементами довідника "Шаблони Сповіщень".
-    Шаблони визначають структуру та стандартний вміст для різних типів сповіщень
-    (наприклад, email, SMS, push-сповіщення, текстові повідомлення в месенджерах).
-    Успадковує загальні CRUD-операції від BaseDictionaryService.
-
-    Очікується, що поле 'name' є унікальним людиночитаним ідентифікатором для шаблону
-    і використовується замість 'code' з BaseDictionaryService.
+    Успадковує CRUD-операції від BaseDictionaryService.
+    'code' з BaseDictionary буде використовуватися як унікальний програмний ідентифікатор шаблону.
+    'name' - людиночитана назва.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService): # Додано cache_service
         """
         Ініціалізує NotificationTemplateService.
 
         :param db_session: Асинхронна сесія бази даних SQLAlchemy.
+        :param cache_service: Екземпляр сервісу кешування.
         """
-        super().__init__(db_session, model=NotificationTemplate, response_schema=NotificationTemplateResponse)
+        self.template_repo = NotificationTemplateRepository() # Ініціалізація репозиторію
+        super().__init__( # Виклик оновленого конструктора BaseDictionaryService
+            db_session,
+            repository=self.template_repo,
+            cache_service=cache_service,
+            response_schema=NotificationTemplateResponse
+        )
+        # _model_name ініціалізується в BaseDictionaryService
         logger.info(f"NotificationTemplateService ініціалізовано для моделі: {self._model_name}")
         # Налаштування середовища Jinja2
         self.jinja_env = Environment(
@@ -87,43 +99,37 @@ class NotificationTemplateService(BaseDictionaryService[
         # TODO: Узгодити використання 'name' vs 'code' з BaseDictionaryService.
         #  Або NotificationTemplate повинен мати поле 'code', або BaseDictionaryService
         #  має бути більш гнучким щодо поля для унікального рядкового ідентифікатора.
-        #  Поки що, реалізуємо прямий запит за полем 'name'.
-
-        stmt = select(self.model).where(self.model.name == name)  # type: ignore
-        item_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
+        #  Якщо NotificationTemplate.name має бути унікальним ключем для пошуку (як code),
+        #  тоді цей метод може бути замінений або доповнений get_by_code з BaseDictionaryService,
+        #  якщо 'code' і 'name' - це одне й те саме поле або 'code' використовується як унікальний ключ.
+        #  Поточна реалізація репозиторію має get_by_name.
+        item_db = await self.template_repo.get_by_name(session=self.db_session, name=name)
 
         if item_db:
             logger.info(f"{self._model_name} з ім'ям '{name}' знайдено.")
-            return self.response_schema.model_validate(item_db)  # Pydantic v2
+            return self.response_schema.model_validate(item_db)
         logger.info(f"{self._model_name} з ім'ям '{name}' не знайдено.")
         return None
 
     async def list_templates_by_type(
             self,
-            template_type: str,  # Наприклад, 'EMAIL', 'SMS', 'PUSH'
+            template_type: NotificationChannelType, # Змінено str на NotificationChannelType Enum
             skip: int = 0,
             limit: int = 100
     ) -> List[NotificationTemplateResponse]:
         """
         Перелічує всі шаблони сповіщень вказаного типу.
-        Припускає, що модель NotificationTemplate має поле 'template_type'.
-
-        :param template_type: Тип шаблонів для фільтрації.
-        :param skip: Кількість записів для пропуску.
-        :param limit: Максимальна кількість записів.
-        :return: Список Pydantic схем NotificationTemplateResponse.
         """
-        logger.debug(f"Перелік шаблонів сповіщень типу: '{template_type}'")
-        if not hasattr(self.model, 'template_type'):
-            logger.warning(f"Модель {self._model_name} не має поля 'template_type'. Фільтрація за типом неможлива.")
-            return []
+        logger.debug(f"Перелік шаблонів сповіщень типу: '{template_type.value}'")
+        # Використовуємо метод репозиторію
+        templates_db_list, _ = await self.template_repo.list_by_template_type(
+            session=self.db_session,
+            template_type=template_type,
+            skip=skip,
+            limit=limit
+        )
 
-        stmt = select(self.model).where(self.model.template_type == template_type) \
-            .order_by(self.model.name).offset(skip).limit(limit)  # type: ignore
-
-        templates_db = (await self.db_session.execute(stmt)).scalars().all()
-
-        response_list = [self.response_schema.model_validate(t) for t in templates_db]  # Pydantic v2
+        response_list = [self.response_schema.model_validate(t) for t in templates_db_list]
         logger.info(f"Отримано {len(response_list)} шаблонів сповіщень типу '{template_type}'.")
         return response_list
 

@@ -48,14 +48,14 @@ class GoogleCalendarService(BaseCalendarIntegrationService):
     """
     service_name = GOOGLE_CALENDAR_SERVICE_NAME
 
-    def __init__(self, db_session: AsyncSession, user_id_for_context: Optional[UUID] = None):
+    def __init__(self, db_session: AsyncSession, user_id_for_context: Optional[int] = None): # Змінено UUID на int
         super().__init__(db_session, user_id_for_context)
         logger.info(f"GoogleCalendarService ініціалізовано для користувача: {self.user_id_for_context or 'N/A'}.")
         # self._mock_tokens_user_... - це тимчасове сховище для симуляції, буде замінено на БД
         if user_id_for_context and not hasattr(self, f"_mock_tokens_user_{user_id_for_context}"):
             setattr(self, f"_mock_tokens_user_{user_id_for_context}", None)
 
-    async def _get_user_tokens_from_db(self, user_id: UUID) -> Optional[Dict[str, Any]]:
+    async def _get_user_tokens_from_db(self, user_id: int) -> Optional[Dict[str, Any]]: # Змінено UUID на int
         """
         [ЗАГЛУШКА/TODO] Отримує токени користувача для Google Calendar з бази даних.
         Має взаємодіяти з моделлю UserIntegration або подібною.
@@ -80,7 +80,7 @@ class GoogleCalendarService(BaseCalendarIntegrationService):
             f"[ЗАГЛУШКА] _get_user_tokens_from_db: Не знайдено токенів для користувача {user_id}, сервіс {self.service_name}.")
         return None
 
-    async def _store_user_tokens_in_db(self, user_id: UUID, tokens: Dict[str, Any], account_identifier: str) -> bool:
+    async def _store_user_tokens_in_db(self, user_id: int, tokens: Dict[str, Any], account_identifier: str) -> bool: # Змінено UUID на int
         """
         [ЗАГЛУШКА/TODO] Зберігає або оновлює токени користувача для Google Calendar в базі даних.
         Має реалізувати логіку upsert для моделі UserIntegration.
@@ -116,7 +116,7 @@ class GoogleCalendarService(BaseCalendarIntegrationService):
         setattr(self, f"_mock_account_id_user_{user_id}", account_identifier)
         return True
 
-    async def _get_google_api_service(self, user_id: UUID) -> Optional[Any]:
+    async def _get_google_api_service(self, user_id: int) -> Optional[Any]: # Змінено UUID на int
         """
         [ЗАГЛУШКА/TODO] Створює та повертає автентифікований об'єкт сервісу Google Calendar API.
         Потребує реальної інтеграції з google-api-python-client.
@@ -172,7 +172,7 @@ class GoogleCalendarService(BaseCalendarIntegrationService):
 
         return MockGoogleApiService()
 
-    async def connect_account(self, user_id: UUID, auth_code: str, redirect_uri: str) -> Dict[str, Any]:
+    async def connect_account(self, user_id: int, auth_code: str, redirect_uri: str) -> Dict[str, Any]: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Підключає обліковий запис Google Calendar."""
         logger.info(
             f"GoogleCalendar: Користувач {user_id} підключається з auth_code (довжина: {len(auth_code)}) через {redirect_uri}.")
@@ -224,7 +224,7 @@ class GoogleCalendarService(BaseCalendarIntegrationService):
             # i18n
             return {"status": "error", "message": "Не вдалося зберегти токени (симуляція)."}
 
-    async def disconnect_account(self, user_id: UUID) -> bool:
+    async def disconnect_account(self, user_id: int) -> bool: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Відключає обліковий запис Google Calendar."""
         logger.info(f"GoogleCalendar: Користувач {user_id} відключає обліковий запис.")
         # TODO: Реалізувати відкликання токену з Google та видалення з БД.
@@ -238,7 +238,7 @@ class GoogleCalendarService(BaseCalendarIntegrationService):
         logger.info(f"[ЗАГЛУШКА] Google Calendar відключено для користувача {user_id}. Токени очищено (симуляція).")
         return True
 
-    async def refresh_access_token_if_needed(self, user_id: UUID) -> bool:
+    async def refresh_access_token_if_needed(self, user_id: int) -> bool: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Оновлює access-токен Google, якщо потрібно."""
         logger.debug(f"GoogleCalendar: Перевірка необхідності оновлення токену для користувача {user_id}.")
         user_tokens = await self._get_user_tokens_from_db(user_id)
@@ -272,7 +272,7 @@ class GoogleCalendarService(BaseCalendarIntegrationService):
         logger.info(f"[ЗАГЛУШКА] Access-токен Google оновлено для користувача {user_id}.")
         return True
 
-    async def list_user_calendars(self, user_id: UUID) -> List[CalendarInfo]:
+    async def list_user_calendars(self, user_id: int) -> List[CalendarInfo]: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Перелічує календарі користувача Google."""
         logger.info(f"GoogleCalendar: Перелік календарів для користувача {user_id}.")
         # TODO: Реалізувати виклик Google Calendar API для отримання списку календарів.
@@ -287,7 +287,7 @@ class GoogleCalendarService(BaseCalendarIntegrationService):
             CalendarInfo(id=f"work_cal_id_{uuid4()}", name="Робота", is_primary=False, can_edit=True)  # i18n
         ]
 
-    async def create_event(self, user_id: UUID, calendar_id: str, event_data: CalendarEventData) -> Optional[
+    async def create_event(self, user_id: int, calendar_id: str, event_data: CalendarEventData) -> Optional[ # Змінено UUID на int
         CalendarEventData]:
         """[ЗАГЛУШКА/TODO] Створює подію в Google Calendar."""
         logger.info(
@@ -302,7 +302,7 @@ class GoogleCalendarService(BaseCalendarIntegrationService):
         # Pydantic v2: model_dump()
         return CalendarEventData(id=f"mock_gcal_event_id_{uuid4()}", **event_data.model_dump())
 
-    async def get_event(self, user_id: UUID, calendar_id: str, event_id: str) -> Optional[CalendarEventData]:
+    async def get_event(self, user_id: int, calendar_id: str, event_id: str) -> Optional[CalendarEventData]: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Отримує подію з Google Calendar."""
         logger.info(
             f"[ЗАГЛУШКА] GoogleCalendar: Отримання події '{event_id}' для {user_id} в календарі '{calendar_id}'.")
@@ -315,8 +315,8 @@ class GoogleCalendarService(BaseCalendarIntegrationService):
             )
         raise NotImplementedError(f"Метод 'get_event' не реалізовано для {self.__class__.__name__}")
 
-    async def update_event(self, user_id: UUID, calendar_id: str, event_id: str, event_data: CalendarEventData) -> \
-    Optional[CalendarEventData]:
+    async def update_event(self, user_id: int, calendar_id: str, event_id: str, event_data: CalendarEventData) -> \
+    Optional[CalendarEventData]: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Оновлює подію в Google Calendar."""
         logger.info(
             f"[ЗАГЛУШКА] GoogleCalendar: Оновлення події '{event_id}' для {user_id} в '{calendar_id}' з назвою '{event_data.title}'.")
@@ -324,14 +324,14 @@ class GoogleCalendarService(BaseCalendarIntegrationService):
         # Pydantic v2: model_dump()
         return CalendarEventData(id=event_id, **event_data.model_dump())
 
-    async def delete_event(self, user_id: UUID, calendar_id: str, event_id: str) -> bool:
+    async def delete_event(self, user_id: int, calendar_id: str, event_id: str) -> bool: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Видаляє подію з Google Calendar."""
         logger.info(
             f"[ЗАГЛУШКА] GoogleCalendar: Видалення події '{event_id}' для {user_id} в календарі '{calendar_id}'.")
         # TODO: Реалізувати виклик Google Calendar API.
         return True  # Симуляція успішного видалення
 
-    async def list_events(self, user_id: UUID, calendar_id: str, start_time: datetime, end_time: datetime,
+    async def list_events(self, user_id: int, calendar_id: str, start_time: datetime, end_time: datetime, # Змінено UUID на int
                           query: Optional[str] = None) -> List[CalendarEventData]:
         """[ЗАГЛУШКА/TODO] Перелічує події з Google Calendar."""
         logger.info(

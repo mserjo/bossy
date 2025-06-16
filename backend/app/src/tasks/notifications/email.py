@@ -202,56 +202,56 @@ class SendEmailTask(BaseTask):
 
         return result
 
-# Приклад використання (можна видалити або закоментувати):
-# class EmailSendingFailedError(Exception): pass
-
-# async def main():
-#     logging.basicConfig(
-#         level=logging.DEBUG, # DEBUG для детальних логів SMTP
-#         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-#     )
+# # Приклад використання (можна видалити або закоментувати):
+# # class EmailSendingFailedError(Exception): pass
 #
-#     # Для тестування: запустіть локальний SMTP сервер:
-#     # python -m smtpd -c DebuggingServer -n localhost:1025
-#     # І переконайтеся, що константи SMTP_* встановлені відповідно:
-#     # SMTP_SERVER = "localhost"
-#     # SMTP_PORT = 1025
-#     # SMTP_USERNAME = ""
-#     # SMTP_PASSWORD = ""
-#     # SMTP_SENDER_EMAIL = "testsender@kudos.example.com"
-#     # SMTP_USE_TLS = False
-#     # SMTP_USE_SSL = False
-#
-#     email_task = SendEmailTask()
-#
-#     # Тест 1: Успішна відправка
-#     logger.info("Тест 1: Спроба успішної відправки...")
-#     result_test_1 = await email_task.execute(
-#         recipient_email="recipient1@example.com",
-#         subject="Тестовий лист 1 (HTML + Text)",
-#         text_body="Це простий текстовий лист, відправлений через SendEmailTask.",
-#         html_body="<h1>Привіт!</h1><p>Це <b>HTML</b> лист, відправлений через <code>SendEmailTask</code>.</p>",
-#         sender_name="Kudos Система"
-#     )
-#     logger.info(f"Результат тесту 1: {result_test_1}")
-#
-#     # Тест 2: Лист без тіла
-#     logger.info("\nТест 2: Спроба відправки листа без тіла...")
-#     result_test_2 = await email_task.execute(
-#         recipient_email="recipient2@example.com",
-#         subject="Тестовий лист 2 (Без тіла)"
-#     )
-#     logger.info(f"Результат тесту 2: {result_test_2}")
-
-#     # Тест 3: Лист тільки з текстовим тілом
-#     logger.info("\nТест 3: Спроба відправки листа тільки з текстом...")
-#     result_test_3 = await email_task.execute(
-#         recipient_email="recipient3@example.com",
-#         subject="Тестовий лист 3 (Тільки текст)",
-#         text_body="Це лист, що містить лише текстову версію."
-#     )
-#     logger.info(f"Результат тесту 3: {result_test_3}")
-
-# if __name__ == "__main__":
-#     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-#     asyncio.run(main())
+# # async def main():
+# #     logging.basicConfig(
+# #         level=logging.DEBUG, # DEBUG для детальних логів SMTP
+# #         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# #     )
+# #
+# #     # Для тестування: запустіть локальний SMTP сервер:
+# #     # python -m smtpd -c DebuggingServer -n localhost:1025
+# #     # І переконайтеся, що константи SMTP_* встановлені відповідно:
+# #     # SMTP_SERVER = "localhost"
+# #     # SMTP_PORT = 1025
+# #     # SMTP_USERNAME = ""
+# #     # SMTP_PASSWORD = ""
+# #     # SMTP_SENDER_EMAIL = "testsender@kudos.example.com"
+# #     # SMTP_USE_TLS = False
+# #     # SMTP_USE_SSL = False
+# #
+# #     email_task = SendEmailTask()
+# #
+# #     # Тест 1: Успішна відправка
+# #     logger.info("Тест 1: Спроба успішної відправки...")
+# #     result_test_1 = await email_task.execute(
+# #         recipient_email="recipient1@example.com",
+# #         subject="Тестовий лист 1 (HTML + Text)",
+# #         text_body="Це простий текстовий лист, відправлений через SendEmailTask.",
+# #         html_body="<h1>Привіт!</h1><p>Це <b>HTML</b> лист, відправлений через <code>SendEmailTask</code>.</p>",
+# #         sender_name="Kudos Система"
+# #     )
+# #     logger.info(f"Результат тесту 1: {result_test_1}")
+# #
+# #     # Тест 2: Лист без тіла
+# #     logger.info("\nТест 2: Спроба відправки листа без тіла...")
+# #     result_test_2 = await email_task.execute(
+# #         recipient_email="recipient2@example.com",
+# #         subject="Тестовий лист 2 (Без тіла)"
+# #     )
+# #     logger.info(f"Результат тесту 2: {result_test_2}")
+# #
+# #     # Тест 3: Лист тільки з текстовим тілом
+# #     logger.info("\nТест 3: Спроба відправки листа тільки з текстом...")
+# #     result_test_3 = await email_task.execute(
+# #         recipient_email="recipient3@example.com",
+# #         subject="Тестовий лист 3 (Тільки текст)",
+# #         text_body="Це лист, що містить лише текстову версію."
+# #     )
+# #     logger.info(f"Результат тесту 3: {result_test_3}")
+# #
+# # if __name__ == "__main__":
+# #     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# #     asyncio.run(main())

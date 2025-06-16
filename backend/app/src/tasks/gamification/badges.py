@@ -327,69 +327,69 @@ class AwardBadgesTask(BaseTask):
              return {"status": "error_invalid_parameters", "error": error_msg}
 
 
-# Приклад використання (можна видалити або закоментувати):
-# async def main():
-#     logging.basicConfig(
-#         level=logging.DEBUG, # DEBUG для детального логування
-#         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-#     )
-#     badge_task = AwardBadgesTask()
-#
-#     logger.info("--- Тест 1: Видача бейджа за подією 'level_up' (користувач test_user_lvl_up) ---")
-#     result_levelup = await badge_task.execute(
-#         user_id="test_user_lvl_up",
-#         event_type="level_up",
-#         event_data={"new_level": 5, "old_level": 4} # new_level=5 має видати power_player_lvl5_stub
-#     )
-#     logger.info(f"Результат (level_up): {result_levelup}")
-#
-#     logger.info("\n--- Тест 2: Видача бейджа за подією 'task_completed' (перше завдання для test_user_first_task) ---")
-#     result_task_first = await badge_task.execute(
-#         user_id="test_user_first_task",
-#         event_type="task_completed",
-#         event_data={"task_id": "task_abc", "user_total_completed_tasks": 1} # має видати first_task_completed_stub
-#     )
-#     logger.info(f"Результат (task_completed, first): {result_task_first}")
-#
-#     logger.info("\n--- Тест 3: Подія 'task_completed' (не перше завдання для test_user_lvl_up) ---")
-#     result_task_not_first = await badge_task.execute(
-#         user_id="test_user_lvl_up", # Цей користувач вже отримав power_player_lvl5_stub
-#         event_type="task_completed",
-#         event_data={"task_id": "task_def", "user_total_completed_tasks": 10} # не має видати first_task_completed_stub
-#     )
-#     logger.info(f"Результат (task_completed, not first): {result_task_not_first}")
-#
-#     logger.info("\n--- Тест 4: Періодична перевірка для всіх (заглушка) ---")
-#     result_periodic = await badge_task.execute()
-#     logger.info(f"Результат (періодична перевірка): {result_periodic}")
-#
-#     logger.info("\n--- Тест 5: Користувач 'user_has_all_badges' (імітація, що він вже має бейджі) ---")
-#     result_has_all = await badge_task.execute(
-#         user_id="user_has_all_badges",
-#         event_type="level_up",
-#         event_data={"new_level": 5} # Навіть якщо підходить під умову, бейдж не має видатися
-#     )
-#     logger.info(f"Результат (user_has_all_badges): {result_has_all}")
-#
-#     logger.info("\n--- Тест 6: Перевірка конкретного бейджа (якого ще немає) ---")
-#     result_specific_new = await badge_task.execute(
-#         user_id="test_user_specific_badge",
-#         specific_badge_id_to_check="streak_5_days_stub" # Цей бейдж видається тільки в періодичній заглушці іншому юзеру
-#     ) # Очікуємо, що він буде виданий, бо _check_and_award_badge не має складної логіки перевірки умов для заглушки
-#     logger.info(f"Результат (specific_badge_new): {result_specific_new}")
-#
-#     logger.info("\n--- Тест 7: Перевірка конкретного бейджа (який вже 'є' у user_has_all_badges) ---")
-#     result_specific_exists = await badge_task.execute(
-#         user_id="user_has_all_badges",
-#         specific_badge_id_to_check="power_player_lvl5_stub"
-#     )
-#     logger.info(f"Результат (specific_badge_exists): {result_specific_exists}")
-#
-#     logger.info("\n--- Тест 8: Виклик з user_id, але без event_type (має пропуститися згідно логіки заглушки) ---")
-#     result_user_no_event = await badge_task.execute(user_id="test_user_no_event")
-#     logger.info(f"Результат (user_id, no event_type): {result_user_no_event}")
-
-
-# if __name__ == "__main__":
-#     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-#     asyncio.run(main())
+# # Приклад використання (можна видалити або закоментувати):
+# # async def main():
+# #     logging.basicConfig(
+# #         level=logging.DEBUG, # DEBUG для детального логування
+# #         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# #     )
+# #     badge_task = AwardBadgesTask()
+# #
+# #     logger.info("--- Тест 1: Видача бейджа за подією 'level_up' (користувач test_user_lvl_up) ---")
+# #     result_levelup = await badge_task.execute(
+# #         user_id="test_user_lvl_up",
+# #         event_type="level_up",
+# #         event_data={"new_level": 5, "old_level": 4} # new_level=5 має видати power_player_lvl5_stub
+# #     )
+# #     logger.info(f"Результат (level_up): {result_levelup}")
+# #
+# #     logger.info("\n--- Тест 2: Видача бейджа за подією 'task_completed' (перше завдання для test_user_first_task) ---")
+# #     result_task_first = await badge_task.execute(
+# #         user_id="test_user_first_task",
+# #         event_type="task_completed",
+# #         event_data={"task_id": "task_abc", "user_total_completed_tasks": 1} # має видати first_task_completed_stub
+# #     )
+# #     logger.info(f"Результат (task_completed, first): {result_task_first}")
+# #
+# #     logger.info("\n--- Тест 3: Подія 'task_completed' (не перше завдання для test_user_lvl_up) ---")
+# #     result_task_not_first = await badge_task.execute(
+# #         user_id="test_user_lvl_up", # Цей користувач вже отримав power_player_lvl5_stub
+# #         event_type="task_completed",
+# #         event_data={"task_id": "task_def", "user_total_completed_tasks": 10} # не має видати first_task_completed_stub
+# #     )
+# #     logger.info(f"Результат (task_completed, not first): {result_task_not_first}")
+# #
+# #     logger.info("\n--- Тест 4: Періодична перевірка для всіх (заглушка) ---")
+# #     result_periodic = await badge_task.execute()
+# #     logger.info(f"Результат (періодична перевірка): {result_periodic}")
+# #
+# #     logger.info("\n--- Тест 5: Користувач 'user_has_all_badges' (імітація, що він вже має бейджі) ---")
+# #     result_has_all = await badge_task.execute(
+# #         user_id="user_has_all_badges",
+# #         event_type="level_up",
+# #         event_data={"new_level": 5} # Навіть якщо підходить під умову, бейдж не має видатися
+# #     )
+# #     logger.info(f"Результат (user_has_all_badges): {result_has_all}")
+# #
+# #     logger.info("\n--- Тест 6: Перевірка конкретного бейджа (якого ще немає) ---")
+# #     result_specific_new = await badge_task.execute(
+# #         user_id="test_user_specific_badge",
+# #         specific_badge_id_to_check="streak_5_days_stub" # Цей бейдж видається тільки в періодичній заглушці іншому юзеру
+# #     ) # Очікуємо, що він буде виданий, бо _check_and_award_badge не має складної логіки перевірки умов для заглушки
+# #     logger.info(f"Результат (specific_badge_new): {result_specific_new}")
+# #
+# #     logger.info("\n--- Тест 7: Перевірка конкретного бейджа (який вже 'є' у user_has_all_badges) ---")
+# #     result_specific_exists = await badge_task.execute(
+# #         user_id="user_has_all_badges",
+# #         specific_badge_id_to_check="power_player_lvl5_stub"
+# #     )
+# #     logger.info(f"Результат (specific_badge_exists): {result_specific_exists}")
+# #
+# #     logger.info("\n--- Тест 8: Виклик з user_id, але без event_type (має пропуститися згідно логіки заглушки) ---")
+# #     result_user_no_event = await badge_task.execute(user_id="test_user_no_event")
+# #     logger.info(f"Результат (user_id, no event_type): {result_user_no_event}")
+# #
+# #
+# # if __name__ == "__main__":
+# #     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# #     asyncio.run(main())

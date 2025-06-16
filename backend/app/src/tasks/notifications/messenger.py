@@ -215,88 +215,88 @@ class SendMessengerNotificationTask(BaseTask):
 
         return result
 
-# Приклад використання (можна видалити або закоментувати):
-# async def main():
-#     logging.basicConfig(
-#         level=logging.INFO,
-#         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-#     )
-#     messenger_task = SendMessengerNotificationTask()
-#
-#     # --- Telegram Example ---
-#     # Для реального тестування Telegram:
-#     # 1. Замініть "your_telegram_bot_token_placeholder" на ваш реальний токен бота.
-#     # 2. Замініть "YOUR_TELEGRAM_CHAT_ID" на реальний chat_id користувача або групи.
-#     #    Chat ID можна отримати, наприклад, відправивши боту команду /start і перевіривши логи,
-#     #    або через інших ботів, як @userinfobot.
-#     # 3. Розкоментуйте блок реальної інтеграції в _send_telegram_message та імпорт httpx.
-#
-#     telegram_chat_id_example = "123456789" # Замініть на реальний chat_id
-#     # Перевірка, чи токен змінено з плейсхолдера
-#     is_telegram_configured = MESSENGER_PLATFORMS_CONFIG["telegram"]["token"] != "your_telegram_bot_token_placeholder"
-#
-#     if is_telegram_configured and telegram_chat_id_example != "123456789":
-#         logger.info(f"Тестування Telegram з реальним токеном (chat_id: {telegram_chat_id_example})...")
-#         result_telegram = await messenger_task.execute(
-#             target_identifier=telegram_chat_id_example,
-#             message_text="<b>Привіт з Kudos!</b>\nЦе тестове повідомлення в <i>Telegram</i>, відправлене через <code>SendMessengerNotificationTask</code>.",
-#             platform="telegram"
-#             # kwargs можна передавати додаткові параметри, наприклад, parse_mode="HTML" (вже враховано в заглушці)
-#         )
-#         logger.info(f"Результат відправки в Telegram: {result_telegram}")
-#     else:
-#         logger.warning("Тест Telegram пропущено: токен не змінено з плейсхолдера або chat_id не встановлено. Використовується заглушка.")
-#         # Запуск із заглушкою
-#         result_telegram_stub = await messenger_task.execute(target_identifier="stub_chat_id", message_text="Тест Telegram (заглушка)", platform="telegram")
-#         logger.info(f"Результат відправки в Telegram (заглушка): {result_telegram_stub}")
-#
-#
-#     # --- Viber Example (заглушка) ---
-#     logger.info("\nТестування Viber (заглушка)...")
-#     result_viber = await messenger_task.execute(
-#         target_identifier="viber_user_id_example", # ID користувача Viber
-#         message_text="Тестове повідомлення для Viber від Kudos.",
-#         platform="Viber" # Перевірка нечутливості до регістру
-#     )
-#     logger.info(f"Результат відправки в Viber (заглушка): {result_viber}")
-#
-#     # --- Slack Example (заглушка) ---
-#     logger.info("\nТестування Slack (заглушка)...")
-#     result_slack = await messenger_task.execute(
-#         target_identifier="#general_channel_or_user_id",
-#         message_text="Hello from Kudos! This is a test message to Slack.",
-#         platform="slack"
-#     )
-#     logger.info(f"Результат відправки в Slack (заглушка): {result_slack}")
-#
-#     # --- Teams Example (заглушка) ---
-#     logger.info("\nТестування Teams (заглушка)...")
-#     result_teams = await messenger_task.execute(
-#         target_identifier="teams_webhook_url_example_or_chat_id",
-#         message_text="Kudos Update: Test message to Microsoft Teams.",
-#         platform="teams"
-#     )
-#     logger.info(f"Результат відправки в Teams (заглушка): {result_teams}")
-#
-#     # --- Непідтримувана платформа ---
-#     logger.info("\nТестування непідтримуваної платформи...")
-#     result_unknown = await messenger_task.execute(
-#         target_identifier="some_id",
-#         message_text="Тест для невідомої платформи.",
-#         platform="unknown_messenger_network"
-#     )
-#     logger.info(f"Результат відправки на невідому платформу: {result_unknown}")
-#
-#     # --- Некоректні вхідні дані ---
-#     logger.info("\nТестування з некоректними вхідними даними...")
-#     result_bad_input = await messenger_task.execute(
-#         target_identifier="",
-#         message_text="Some message",
-#         platform="telegram"
-#     )
-#     logger.info(f"Результат з порожнім target_identifier: {result_bad_input}")
-
-
-# if __name__ == "__main__":
-#     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-#     asyncio.run(main())
+# # Приклад використання (можна видалити або закоментувати):
+# # async def main():
+# #     logging.basicConfig(
+# #         level=logging.INFO,
+# #         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# #     )
+# #     messenger_task = SendMessengerNotificationTask()
+# #
+# #     # --- Telegram Example ---
+# #     # Для реального тестування Telegram:
+# #     # 1. Замініть "your_telegram_bot_token_placeholder" на ваш реальний токен бота.
+# #     # 2. Замініть "YOUR_TELEGRAM_CHAT_ID" на реальний chat_id користувача або групи.
+# #     #    Chat ID можна отримати, наприклад, відправивши боту команду /start і перевіривши логи,
+# #     #    або через інших ботів, як @userinfobot.
+# #     # 3. Розкоментуйте блок реальної інтеграції в _send_telegram_message та імпорт httpx.
+# #
+# #     telegram_chat_id_example = "123456789" # Замініть на реальний chat_id
+# #     # Перевірка, чи токен змінено з плейсхолдера
+# #     is_telegram_configured = MESSENGER_PLATFORMS_CONFIG["telegram"]["token"] != "your_telegram_bot_token_placeholder"
+# #
+# #     if is_telegram_configured and telegram_chat_id_example != "123456789":
+# #         logger.info(f"Тестування Telegram з реальним токеном (chat_id: {telegram_chat_id_example})...")
+# #         result_telegram = await messenger_task.execute(
+# #             target_identifier=telegram_chat_id_example,
+# #             message_text="<b>Привіт з Kudos!</b>\nЦе тестове повідомлення в <i>Telegram</i>, відправлене через <code>SendMessengerNotificationTask</code>.",
+# #             platform="telegram"
+# #             # kwargs можна передавати додаткові параметри, наприклад, parse_mode="HTML" (вже враховано в заглушці)
+# #         )
+# #         logger.info(f"Результат відправки в Telegram: {result_telegram}")
+# #     else:
+# #         logger.warning("Тест Telegram пропущено: токен не змінено з плейсхолдера або chat_id не встановлено. Використовується заглушка.")
+# #         # Запуск із заглушкою
+# #         result_telegram_stub = await messenger_task.execute(target_identifier="stub_chat_id", message_text="Тест Telegram (заглушка)", platform="telegram")
+# #         logger.info(f"Результат відправки в Telegram (заглушка): {result_telegram_stub}")
+# #
+# #
+# #     # --- Viber Example (заглушка) ---
+# #     logger.info("\nТестування Viber (заглушка)...")
+# #     result_viber = await messenger_task.execute(
+# #         target_identifier="viber_user_id_example", # ID користувача Viber
+# #         message_text="Тестове повідомлення для Viber від Kudos.",
+# #         platform="Viber" # Перевірка нечутливості до регістру
+# #     )
+# #     logger.info(f"Результат відправки в Viber (заглушка): {result_viber}")
+# #
+# #     # --- Slack Example (заглушка) ---
+# #     logger.info("\nТестування Slack (заглушка)...")
+# #     result_slack = await messenger_task.execute(
+# #         target_identifier="#general_channel_or_user_id",
+# #         message_text="Hello from Kudos! This is a test message to Slack.",
+# #         platform="slack"
+# #     )
+# #     logger.info(f"Результат відправки в Slack (заглушка): {result_slack}")
+# #
+# #     # --- Teams Example (заглушка) ---
+# #     logger.info("\nТестування Teams (заглушка)...")
+# #     result_teams = await messenger_task.execute(
+# #         target_identifier="teams_webhook_url_example_or_chat_id",
+# #         message_text="Kudos Update: Test message to Microsoft Teams.",
+# #         platform="teams"
+# #     )
+# #     logger.info(f"Результат відправки в Teams (заглушка): {result_teams}")
+# #
+# #     # --- Непідтримувана платформа ---
+# #     logger.info("\nТестування непідтримуваної платформи...")
+# #     result_unknown = await messenger_task.execute(
+# #         target_identifier="some_id",
+# #         message_text="Тест для невідомої платформи.",
+# #         platform="unknown_messenger_network"
+# #     )
+# #     logger.info(f"Результат відправки на невідому платформу: {result_unknown}")
+# #
+# #     # --- Некоректні вхідні дані ---
+# #     logger.info("\nТестування з некоректними вхідними даними...")
+# #     result_bad_input = await messenger_task.execute(
+# #         target_identifier="",
+# #         message_text="Some message",
+# #         platform="telegram"
+# #     )
+# #     logger.info(f"Результат з порожнім target_identifier: {result_bad_input}")
+# #
+# #
+# # if __name__ == "__main__":
+# #     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# #     asyncio.run(main())

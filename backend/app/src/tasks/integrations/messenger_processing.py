@@ -272,54 +272,54 @@ class ProcessIncomingMessageTask(BaseTask):
             self.logger.error(f"Критична помилка під час обробки повідомлення від '{platform}': {e}", exc_info=True)
             return {"status": "error_critical_processing", "platform": platform, "error": str(e)}
 
-# Приклад використання (можна видалити або закоментувати):
-# async def main():
-#     logging.basicConfig(
-#         level=logging.INFO,
-#         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-#     )
-#     processing_task = ProcessIncomingMessageTask()
-#
-#     # --- Приклад Telegram Update (спрощена структура) ---
-#     logger.info("Тестування обробки Telegram команди (заглушка)...")
-#     telegram_payload = {
-#         "update_id": 123456789,
-#         "message": {
-#             "message_id": 101,
-#             "from": {"id": 987654321, "is_bot": False, "first_name": "Test", "last_name": "User", "username": "testuser"},
-#             "chat": {"id": 987654321, "first_name": "Test", "last_name": "User", "username": "testuser", "type": "private"},
-#             "date": 1678886400, # Unix timestamp
-#             "text": "/my_command arg1 arg2"
-#         }
-#     }
-#     result_telegram = await processing_task.execute(platform="telegram", payload=telegram_payload)
-#     logger.info(f"Результат обробки Telegram: {result_telegram}")
-#
-#     # --- Приклад Viber Event (дуже спрощена структура) ---
-#     logger.info("\nТестування обробки Viber події (заглушка)...")
-#     viber_payload = {
-#         "event": "message", "timestamp": 1678886500, "message_token": "some_token",
-#         "sender": {"id": "viber_user_id_abc", "name": "Viber User", "language": "uk", "country": "UA"},
-#         "message": {"type": "text", "text": "Hello from Viber", "tracking_data": "some_tracking_data"}
-#     }
-#     result_viber = await processing_task.execute(platform="Viber", payload=viber_payload) # Перевірка регістру
-#     logger.info(f"Результат обробки Viber: {result_viber}")
-#
-#     # --- Приклад Slack Interaction (дуже спрощена структура) ---
-#     logger.info("\nТестування обробки Slack інтеракції (заглушка)...")
-#     slack_payload = {
-#         "type": "slash_command", "command": "/kudos_slack", "text": "give @anotheruser 5 points for helping",
-#         "user_id": "UXXXXXXXX", "channel_id": "CXXXXXXXX", "response_url": "https://hooks.slack.com/commands/..."
-#     }
-#     result_slack = await processing_task.execute(platform="slack", payload=slack_payload)
-#     logger.info(f"Результат обробки Slack: {result_slack}")
-#
-#     # --- Непідтримувана платформа ---
-#     logger.info("\nТестування непідтримуваної платформи...")
-#     unknown_payload = {"data": "some_data"}
-#     result_unknown = await processing_task.execute(platform="UnknownMessenger", payload=unknown_payload)
-#     logger.info(f"Результат обробки невідомої платформи: {result_unknown}")
-
-# if __name__ == "__main__":
-#     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-#     asyncio.run(main())
+# # Приклад використання (можна видалити або закоментувати):
+# # async def main():
+# #     logging.basicConfig(
+# #         level=logging.INFO,
+# #         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# #     )
+# #     processing_task = ProcessIncomingMessageTask()
+# #
+# #     # --- Приклад Telegram Update (спрощена структура) ---
+# #     logger.info("Тестування обробки Telegram команди (заглушка)...")
+# #     telegram_payload = {
+# #         "update_id": 123456789,
+# #         "message": {
+# #             "message_id": 101,
+# #             "from": {"id": 987654321, "is_bot": False, "first_name": "Test", "last_name": "User", "username": "testuser"},
+# #             "chat": {"id": 987654321, "first_name": "Test", "last_name": "User", "username": "testuser", "type": "private"},
+# #             "date": 1678886400, # Unix timestamp
+# #             "text": "/my_command arg1 arg2"
+# #         }
+# #     }
+# #     result_telegram = await processing_task.execute(platform="telegram", payload=telegram_payload)
+# #     logger.info(f"Результат обробки Telegram: {result_telegram}")
+# #
+# #     # --- Приклад Viber Event (дуже спрощена структура) ---
+# #     logger.info("\nТестування обробки Viber події (заглушка)...")
+# #     viber_payload = {
+# #         "event": "message", "timestamp": 1678886500, "message_token": "some_token",
+# #         "sender": {"id": "viber_user_id_abc", "name": "Viber User", "language": "uk", "country": "UA"},
+# #         "message": {"type": "text", "text": "Hello from Viber", "tracking_data": "some_tracking_data"}
+# #     }
+# #     result_viber = await processing_task.execute(platform="Viber", payload=viber_payload) # Перевірка регістру
+# #     logger.info(f"Результат обробки Viber: {result_viber}")
+# #
+# #     # --- Приклад Slack Interaction (дуже спрощена структура) ---
+# #     logger.info("\nТестування обробки Slack інтеракції (заглушка)...")
+# #     slack_payload = {
+# #         "type": "slash_command", "command": "/kudos_slack", "text": "give @anotheruser 5 points for helping",
+# #         "user_id": "UXXXXXXXX", "channel_id": "CXXXXXXXX", "response_url": "https://hooks.slack.com/commands/..."
+# #     }
+# #     result_slack = await processing_task.execute(platform="slack", payload=slack_payload)
+# #     logger.info(f"Результат обробки Slack: {result_slack}")
+# #
+# #     # --- Непідтримувана платформа ---
+# #     logger.info("\nТестування непідтримуваної платформи...")
+# #     unknown_payload = {"data": "some_data"}
+# #     result_unknown = await processing_task.execute(platform="UnknownMessenger", payload=unknown_payload)
+# #     logger.info(f"Результат обробки невідомої платформи: {result_unknown}")
+# #
+# # if __name__ == "__main__":
+# #     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# #     asyncio.run(main())

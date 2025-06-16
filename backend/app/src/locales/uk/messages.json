@@ -1,0 +1,9 @@
+{
+  "common.greeting": "Привіт!",
+  "common.thank_you": "Дякуємо!",
+  "error.general": "Сталася неочікувана помилка. Будь ласка, спробуйте пізніше.",
+  "error.not_found": "Запитаний ресурс не знайдено.",
+  "success.general": "Операцію успішно завершено.",
+  "success.created": "Ресурс успішно створено.",
+  "validation.field_required": "Це поле є обов'язковим."
+}

@@ -23,14 +23,13 @@ from apscheduler.jobstores.memory import MemoryJobStore
 from apscheduler.executors.asyncio import AsyncIOExecutor
 from pytz import utc
 
-# from app.src.config.settings import settings # Потенційно для налаштувань часової зони, тощо
 from app.src.tasks.system.cleanup import CleanupTask
 from app.src.tasks.system.backup import DatabaseBackupTask
 from app.src.tasks.system.monitoring import SystemMetricsCollectorTask
-# from app.src.tasks.notifications.email import SendEmailTask
-# from app.src.tasks.notifications.sms import SendSmsTask
-# from app.src.tasks.notifications.messenger import SendMessengerNotificationTask
-# from app.src.tasks.integrations.calendar import SyncCalendarTask
+# from app.src.tasks.notifications.email import SendEmailTask # Example: Keep commented, event-driven mostly
+# from app.src.tasks.notifications.sms import SendSmsTask # Example: Keep commented, event-driven mostly
+# from app.src.tasks.notifications.messenger import SendMessengerNotificationTask # Example: Keep commented, event-driven mostly
+from app.src.tasks.integrations.calendar import SyncCalendarTask # To be scheduled
 # ProcessIncomingMessageTask зазвичай не додається в планувальник, а викликається вебхуками
 from app.src.tasks.gamification.levels import RecalculateUserLevelsTask
 from app.src.tasks.gamification.badges import AwardBadgesTask
@@ -38,9 +37,6 @@ from app.src.tasks.gamification.ratings import UpdateUserRatingsTask
 
 # Налаштування логера для цього модуля
 logger = logging.getLogger(__name__)
-
-# Словник для зберігання посилань на екземпляри завдань, якщо це потрібно
-# registered_tasks: Dict[str, Any] = {} # Наприклад, для перевикористання екземплярів
 
 # Конфігурація JobStore та Executor для APScheduler
 # JobStore зберігає завдання (тут в пам'яті, для продакшену може бути БД)
@@ -80,13 +76,6 @@ def add_scheduled_task(func: Callable, trigger: str, **trigger_args: Any) -> Non
     except Exception as e:
         logger.error(f"Помилка додавання завдання '{getattr(func, '__name__', str(func))}' до планувальника: {e}", exc_info=True)
 
-# async def example_task_function():
-#     """Приклад простої функції, яку можна запускати за розкладом."""
-#     logger.info("Приклад запланованого завдання виконано!")
-#     # Тут може бути логіка вашого завдання, наприклад:
-#     # cleanup_task_instance = CleanupTask()
-#     # await cleanup_task_instance.execute()
-
 
 def initialize_scheduled_tasks():
     """
@@ -107,7 +96,6 @@ def initialize_scheduled_tasks():
         id="system_cleanup_task", # Важливо давати ID для можливості управління завданням
         replace_existing=True     # Замінити, якщо завдання з таким ID вже існує
     )
-    # registered_tasks["cleanup_task"] = cleanup_task # Якщо потрібно зберігати екземпляр
 
     # Завдання для резервного копіювання бази даних (щодня о 03:30)
     # Переконайтеся, що pg_dump налаштований та доступний, і є права на запис в директорію бекапів.
@@ -122,7 +110,6 @@ def initialize_scheduled_tasks():
         id="database_backup_task",
         replace_existing=True
     )
-    # registered_tasks["db_backup_task"] = db_backup_task
 
     # Завдання для збору системних метрик (кожні 15 хвилин)
     # Переконайтеся, що бібліотека psutil встановлена.
@@ -134,10 +121,6 @@ def initialize_scheduled_tasks():
         id="system_metrics_collector_task",
         replace_existing=True
     )
-    # registered_tasks["system_metrics_task"] = system_metrics_task
-
-    # Приклад додавання завдання, яке виконується щодня о 3:00 ночі (інший приклад, якщо потрібно)
-    # add_scheduled_task(some_other_function, 'cron', hour=3, minute=0)
 
     # Додайте сюди інші ваші заплановані завдання
     # Наприклад, для синхронізації, відправки сповіщень, оновлення рейтингів тощо.
@@ -205,25 +188,28 @@ def initialize_scheduled_tasks():
     # )
     # --- Кінець прикладів для завдань сповіщень ---
 
-    # --- Приклади для завдань інтеграцій (деякі можуть бути за розкладом, інші - на вимогу) ---
-    # logger.info("Ініціалізація завдань інтеграцій (приклади, закоментовано)...")
+    logger.info("Ініціалізація завдань інтеграцій...")
 
     # Приклад: періодична синхронізація календарів для активних користувачів
     # Ця логіка потребуватиме отримання списку користувачів з активними інтеграціями.
     # Тут показано лише концептуальний виклик для одного користувача/провайдера.
-    # sync_google_calendar_task_instance = SyncCalendarTask(name="UserGoogleCalendarSync")
-    # add_scheduled_task(
-    #     sync_google_calendar_task_instance.execute, # Викликаємо execute, який потім викличе run
-    #     trigger='interval',
-    #     hours=1, # Наприклад, кожну годину
-    #     kwargs={
-    #         "user_id": "some_user_id_placeholder", # ID користувача, для якого синхронізувати
-    #         "calendar_provider": "google"
-    #         # Додаткові kwargs можуть включати time_min, time_max, specific_calendar_ids тощо.
-    #     },
-    #     id="sync_google_calendar_for_user_some_user_id_placeholder", # ID має бути унікальним
-    #     replace_existing=True
-    # )
+    # Важливо: user_id та calendar_provider мають бути реальними або мати механізм отримання.
+    # Для прикладу, це завдання може бути заплановане для кожного активного користувача
+    # з підключеним календарем, або мати внутрішню логіку для перебору користувачів.
+    # Тут планується загальний таск, який, можливо, сам перебирає користувачів.
+    sync_calendar_task_instance = SyncCalendarTask(name="AllUserCalendarSync")
+    add_scheduled_task(
+        sync_calendar_task_instance.execute, # Викликаємо execute, який потім викличе run
+        trigger='interval',
+        hours=1, # Наприклад, кожну годину
+        kwargs={ # Ці kwargs будуть передані в SyncCalendarTask.run
+            # "user_id": "all_active_users_with_calendar", # Спеціальний маркер або логіка всередині таска
+            "calendar_provider": "all_available" # Або конкретний, якщо таск для одного провайдера
+            # Додаткові kwargs можуть включати time_min, time_max, specific_calendar_ids тощо.
+        },
+        id="sync_all_calendars_hourly", # ID має бути унікальним
+        replace_existing=True
+    )
 
     # Примітка: ProcessIncomingMessageTask зазвичай не запускається за розкладом,
     # а викликається напряму вебхуком або іншим обробником подій, передаючи payload.
@@ -245,7 +231,6 @@ def initialize_scheduled_tasks():
         replace_existing=True
         # Можна передати kwargs, якщо потрібно, наприклад, user_id=None для всіх
     )
-    # registered_tasks["recalculate_levels_task"] = recalculate_levels_task
 
     # Завдання для періодичної перевірки та видачі бейджів (наприклад, кожні 6 годин)
     # Цей таск також може викликатися подіями, але періодичний запуск може ловити умови,
@@ -258,7 +243,6 @@ def initialize_scheduled_tasks():
         id="periodic_badge_awards_task",
         replace_existing=True
     )
-    # registered_tasks["award_badges_periodic_task"] = award_badges_periodic_task
 
     # Завдання для оновлення рейтингів користувачів (наприклад, щодня о 01:00)
     # Можна запускати для всіх груп та глобальний рейтинг.
@@ -273,7 +257,6 @@ def initialize_scheduled_tasks():
         id="update_user_ratings_daily_task", # Унікальний ID для щоденного завдання
         replace_existing=True
     )
-    # registered_tasks["update_ratings_task"] = update_ratings_task
 
     # Можна додати ще одне завдання для оновлення рейтингів, наприклад, щотижневе/щомісячне
     # update_ratings_weekly_task = UpdateUserRatingsTask(name="WeeklyRatingsUpdate")

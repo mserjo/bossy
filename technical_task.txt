@@ -5,7 +5,7 @@
 Запасні варіанти: Bossy/BonGru/GruBon/Incentive/Laudis/Virtus (або запропонуй свій варіант, можливо на латині).
 
 Основні технології (можеш додати ще необхідні бібліотеки та технології):
-backend: Python 3.13, pytest, FastAPI, PostgreSQL, Pydantic v2, SQLAlchemy v2, alembic
+backend: Python 3.13, pytest, FastAPI, PostgreSQL v17, Pydantic v2, SQLAlchemy v2, alembic
 frontend: Flutter, flutter_test
 
 Вимоги до системи:

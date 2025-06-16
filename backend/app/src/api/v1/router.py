@@ -10,6 +10,8 @@
 з відповідним префіксом та тегами для документації OpenAPI.
 
 `v1_api_router` потім підключається до кореневого маршрутизатора додатка.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
 from fastapi import APIRouter
@@ -40,29 +42,29 @@ def _(text: str) -> str:
     return text
 
 # Створення головного маршрутизатора для API v1
-v1_api_router = APIRouter()
+v1_router = APIRouter() # Змінено v1_api_router на v1_router
 
 # --- Підключення під-маршрутизаторів ---
 # Кожен роутер підключається з унікальним префіксом, що відповідає його функціоналу.
 # Теги використовуються для групування ендпоінтів в документації OpenAPI (Swagger).
 
 ROUTERS_CONFIG = [
-    {"router": system_router, "prefix": "/system", "tags": ["V1 System"], "name": "system"},
-    {"router": auth_router, "prefix": "/auth", "tags": ["V1 Auth"], "name": "auth"},
-    {"router": users_router, "prefix": "/users", "tags": ["V1 Users"], "name": "users"},
-    {"router": dictionaries_router, "prefix": "/dictionaries", "tags": ["V1 Dictionaries"], "name": "dictionaries"},
-    {"router": groups_router, "prefix": "/groups", "tags": ["V1 Groups"], "name": "groups"},
-    {"router": tasks_router, "prefix": "/tasks", "tags": ["V1 Tasks & Events"], "name": "tasks"},
-    {"router": bonuses_router, "prefix": "/bonuses", "tags": ["V1 Bonuses & Rewards"], "name": "bonuses"},
-    {"router": gamification_router, "prefix": "/gamification", "tags": ["V1 Gamification"], "name": "gamification"},
-    {"router": notifications_router, "prefix": "/notifications", "tags": ["V1 Notifications"], "name": "notifications"},
-    {"router": files_router, "prefix": "/files", "tags": ["V1 Files"], "name": "files"},
-    {"router": integrations_router, "prefix": "/integrations", "tags": ["V1 Integrations"], "name": "integrations"},
+    {"router": system_router, "prefix": "/system", "tags": ["V1 Система"], "name": "system"},
+    {"router": auth_router, "prefix": "/auth", "tags": ["V1 Автентифікація"], "name": "auth"},
+    {"router": users_router, "prefix": "/users", "tags": ["V1 Користувачі"], "name": "users"},
+    {"router": dictionaries_router, "prefix": "/dictionaries", "tags": ["V1 Довідники"], "name": "dictionaries"},
+    {"router": groups_router, "prefix": "/groups", "tags": ["V1 Групи"], "name": "groups"},
+    {"router": tasks_router, "prefix": "/tasks", "tags": ["V1 Завдання та Події"], "name": "tasks"},
+    {"router": bonuses_router, "prefix": "/bonuses", "tags": ["V1 Бонуси та Винагороди"], "name": "bonuses"},
+    {"router": gamification_router, "prefix": "/gamification", "tags": ["V1 Гейміфікація"], "name": "gamification"},
+    {"router": notifications_router, "prefix": "/notifications", "tags": ["V1 Сповіщення"], "name": "notifications"},
+    {"router": files_router, "prefix": "/files", "tags": ["V1 Файли"], "name": "files"},
+    {"router": integrations_router, "prefix": "/integrations", "tags": ["V1 Інтеграції"], "name": "integrations"},
 ]
 
 for config in ROUTERS_CONFIG:
     try:
-        v1_api_router.include_router(config["router"], prefix=config["prefix"], tags=config["tags"])
+        v1_router.include_router(config["router"], prefix=config["prefix"], tags=config["tags"]) # Змінено v1_api_router на v1_router
         # i18n: Log message - Router connected successfully
         logger.info(_("Маршрутизатор v1.{name} успішно підключено з префіксом '{prefix}'.").format(name=config['name'], prefix=config['prefix']))
     except Exception as e:
@@ -76,27 +78,27 @@ for config in ROUTERS_CONFIG:
         )
 
 # --- Базовий ендпоінт для перевірки доступності API v1 ---
-@v1_api_router.get(
+@v1_router.get( # Змінено v1_api_router на v1_router
     "/ping",
-    summary="Перевірка доступності API v1", # i18n
-    description="Простий ендпоінт для перевірки, чи головний маршрутизатор API v1 (`v1_api_router`) активний та відповідає.", # i18n
-    tags=["V1 Health Check"] # i18n
+    summary="Перевірка доступності API v1",
+    description="Простий ендпоінт для перевірки, чи головний маршрутизатор API v1 (`v1_router`) активний та відповідає.",
+    tags=["V1 Перевірка стану"] # Оновлено тег
 )
 async def ping_v1_api():
     """
     Ендпоінт "ping" для API v1.
     Використовується для моніторингу доступності сервісу.
     """
-    logger.debug("API v1: /ping ендпоінт викликано.") # i18n
+    logger.debug("API v1: /ping ендпоінт викликано.")
     return {
-        "status": "API v1 is alive!", # i18n_key_example: api.v1.alive_status
-        "message": "Pong from v1 API!" # i18n_key_example: api.v1.pong_message
+        "status": "API v1 активний!", # Оновлено повідомлення
+        "message": "Pong від API v1!"  # Оновлено повідомлення
     }
 
 # i18n: Log message - V1 API router configured
-logger.info(_("Головний маршрутизатор API v1 (`v1_api_router`) налаштовано та агреговано всі під-маршрутизатори."))
+logger.info(_("Головний маршрутизатор API v1 (`v1_router`) налаштовано та агреговано всі під-маршрутизатори.")) # Змінено v1_api_router на v1_router
 
 # Змінна, що експортується для підключення до основного FastAPI додатку
 # (зазвичай в backend/app/main.py або backend/app/src/api/router.py)
-# Наприклад: app.include_router(v1_api_router, prefix="/api/v1")
-# __all__ = ["v1_api_router"] # Не є строго необхідним для прямого імпорту
+# Наприклад: app.include_router(v1_router, prefix="/api/v1")
+# __all__ = ["v1_api_router"] # Видалено, оскільки v1_api_router перейменовано і __all__ тут не критичний

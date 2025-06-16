@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Ендпоінти для управління профілем поточного користувача.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 # import logging # Замінено на централізований логер
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -38,7 +40,10 @@ async def read_current_user_profile(  # Перейменовано для уни
     # Pydantic v2 .model_validate() використовується неявно FastAPI при поверненні ORM моделі з response_model
     return current_user
 
-
+# ПРИМІТКА: Функціональність оновлення профілю залежить від реалізації методу `update_user`
+# в `UserService`, включаючи логіку валідації (наприклад, унікальність username/email,
+# якщо вони змінюються) та визначення полів, які користувач може самостійно оновлювати
+# (див. TODO нижче).
 @router.put(
     "/me",
     response_model=UserResponse,

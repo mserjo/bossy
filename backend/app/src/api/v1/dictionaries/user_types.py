@@ -6,8 +6,10 @@
 Дозволяє створювати, отримувати, оновлювати та видаляти типи користувачів.
 Доступ до операцій створення, оновлення та видалення обмежений для суперкористувачів.
 Перегляд списку та окремих елементів доступний автентифікованим користувачам.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-from typing import List  # Any не використовується, можна прибрати
+from typing import List # Any вже було видалено, або не було
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -36,7 +38,8 @@ async def get_user_type_service(session: AsyncSession = Depends(get_api_db_sessi
     """
     return UserTypeService(db_session=session)  # Використовуємо db_session напряму
 
-
+# ПРИМІТКА: Реалізація полів `created_by_user_id`/`updated_by_user_id` (якщо вони є в моделі)
+# залежить від можливостей базового сервісу `BaseDictionaryService`.
 @router.post(
     "/",
     response_model=UserTypeResponse,
@@ -92,7 +95,8 @@ async def get_user_type(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип користувача не знайдено.")
     return db_item
 
-
+# ПРИМІТКА: Коректна пагінація залежить від реалізації методу `count_all()`
+# в `UserTypeService` (успадкованого від `BaseDictionaryService`).
 @router.get(
     "/",
     response_model=PagedResponse[UserTypeResponse],
@@ -140,6 +144,10 @@ async def update_user_type(
     Доступно тільки суперкористувачам.
     TODO: Додати перевірку, чи не змінюються системні типи (наприклад, SUPERUSER_TYPE), якщо це заборонено.
     """
+# ПРИМІТКА: Важливо реалізувати перевірку, щоб запобігти небажаним змінам
+# системних типів користувачів, як зазначено в TODO.
+# Також, ПРИМІТКА: Реалізація полів `created_by_user_id`/`updated_by_user_id` (якщо вони є в моделі)
+# залежить від можливостей базового сервісу `BaseDictionaryService`.
     logger.info(f"Спроба оновлення типу користувача ID '{user_type_id}' користувачем ID '{current_user.id}'.")
     try:
         # TODO: Перевірити, чи модель UserType має updated_by_user_id і чи BaseDictionaryService це обробляє.
@@ -175,6 +183,8 @@ async def delete_user_type(
     Доступно тільки суперкористувачам.
     TODO: Додати перевірку, чи не видаляються системні типи (наприклад, SUPERUSER_TYPE), якщо це заборонено.
     """
+# ПРИМІТКА: Необхідно реалізувати перевірку, щоб уникнути видалення
+# критично важливих системних типів користувачів, як зазначено в TODO.
     logger.info(f"Спроба видалення типу користувача ID '{user_type_id}' користувачем ID '{current_user.id}'.")
     try:
         deleted = await service.delete(item_id=user_type_id)

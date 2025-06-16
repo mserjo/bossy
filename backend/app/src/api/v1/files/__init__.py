@@ -10,13 +10,15 @@
 
 Загальний префікс для всіх цих шляхів (наприклад, `/files`) буде встановлено
 при підключенні `files_router` до роутера версії API (`v1_router`).
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from fastapi import APIRouter
 
-# Повні шляхи імпорту (відносно поточного пакету)
-from .uploads import router as uploads_router
-from .avatars import router as avatars_router
-from .files import router as general_files_router # Роутер для загальних операцій з файлами (напр., /<file_id>)
+# Оновлені повні шляхи імпорту для під-роутерів
+from backend.app.src.api.v1.files.uploads import router as uploads_router
+from backend.app.src.api.v1.files.avatars import router as avatars_router
+from backend.app.src.api.v1.files.files import router as general_files_router
 
 from backend.app.src.config.logging import logger # Централізований логер
 

@@ -15,16 +15,19 @@
 
 Головний роутер `v1_router` експортується для підключення до загального `api_router`
 в `app.src.api.router`.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
-import logging
+# import logging # Видалено для використання централізованого логера
+from backend.app.src.config import logger # Централізований логер
 
 # Головний роутер для v1 API буде визначено в .router та імпортовано тут для можливого ре-експорту.
-from .router import v1_router
+from backend.app.src.api.v1.router import v1_router # Оновлено на повний шлях
 
 __all__ = [
     "v1_router",
 ]
 
-logger = logging.getLogger(__name__)
-logger.info("Пакет 'api.v1' ініціалізовано.")
+# logger = logging.getLogger(__name__) # Видалено
+logger.info("Пакет 'api.v1' ініціалізовано та експортує 'v1_router'.")

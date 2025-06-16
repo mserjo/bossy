@@ -5,6 +5,8 @@
 
 Включає перегляд списку членів, додавання нових членів, оновлення їх ролей,
 видалення членів з групи, а також вихід користувача з групи.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional  # Generic, TypeVar не використовуються, Any, Dict теж
 from uuid import UUID  # ID тепер UUID
@@ -90,6 +92,9 @@ async def list_group_members(
     description="Дозволяє адміністратору групи або суперюзеру додати користувача до групи з вказаною роллю.",  # i18n
     dependencies=[Depends(check_group_edit_permission)]  # Перевірка прав адміна групи/суперюзера
 )
+# ПРИМІТКА: Перевірка прав (адміністратор групи або суперюзер) виконується
+# залежністю `check_group_edit_permission`. Сервіс `add_member_to_group`
+# відповідає за логіку додавання та валідацію.
 async def add_group_member(
         group_id: UUID = Path(..., description="ID групи"),  # i18n
         member_in: GroupMembershipCreateBody,  # Схема з user_id та role_code
@@ -128,6 +133,9 @@ async def add_group_member(
     description="Дозволяє адміністратору групи або суперюзеру змінити роль існуючого члена групи.",  # i18n
     dependencies=[Depends(check_group_edit_permission)]
 )
+# ПРИМІТКА: Оновлення ролі члена групи вимагає прав адміністратора групи або суперюзера,
+# що перевіряється `check_group_edit_permission`. Сервіс `update_member_role`
+# має обробляти логіку, наприклад, неможливість зміни ролі останнього адміністратора.
 async def update_group_member_role(
         group_id: UUID = Path(..., description="ID групи"),  # i18n
         user_id_to_update: UUID = Path(..., description="ID користувача, чию роль змінюють"),  # i18n
@@ -170,6 +178,9 @@ async def update_group_member_role(
     description="Дозволяє адміністратору групи або суперюзеру видалити (деактивувати) користувача з групи."  # i18n
     # Обмеження (наприклад, не можна видалити єдиного адміністратора) обробляються в сервісі.
 )
+# ПРИМІТКА: Видалення члена з групи (деактивація членства) потребує прав адміністратора
+# або суперюзера. Сервіс `remove_member_from_group` має враховувати сценарії,
+# такі як видалення останнього адміністратора.
 async def remove_group_member(
         group_id: UUID = Path(..., description="ID групи"),  # i18n
         user_id_to_remove: UUID = Path(..., description="ID користувача, якого видаляють"),  # i18n
@@ -212,6 +223,9 @@ async def remove_group_member(
     description="Дозволяє аутентифікованому користувачу покинути групу, членом якої він є."  # i18n
     # Обмеження (адміністратор не може покинути групу, якщо він єдиний адмін) обробляються в сервісі.
 )
+# ПРИМІТКА: Вихід користувача з групи (`user_leave_group`) має обробляти важливі
+# сценарії в сервісному шарі, наприклад, неможливість для останнього адміністратора
+# покинути групу без призначення нового.
 async def leave_group(
         group_id: UUID = Path(..., description="ID групи, яку користувач покидає"),  # i18n
         current_user: UserModel = Depends(get_current_active_user),  # Будь-який активний користувач

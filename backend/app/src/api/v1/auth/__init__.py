@@ -6,15 +6,17 @@
 Цей модуль імпортує окремі роутери для логіну, реєстрації, управління токенами,
 паролями та профілем користувача, та об'єднує їх в один `auth_router`.
 Префікси для під-роутерів (наприклад, `/token`, `/password`, `/profile`) встановлюються тут.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from fastapi import APIRouter
 
-# Повні шляхи імпорту (відносно поточного пакету)
-from .login import router as login_router
-from .register import router as register_router
-from .token import router as token_router
-from .password import router as password_router
-from .profile import router as profile_router
+# Повні шляхи імпорту
+from backend.app.src.api.v1.auth.login import router as login_router
+from backend.app.src.api.v1.auth.register import router as register_router
+from backend.app.src.api.v1.auth.token import router as token_router
+from backend.app.src.api.v1.auth.password import router as password_router
+from backend.app.src.api.v1.auth.profile import router as profile_router
 
 from backend.app.src.config.logging import logger # Централізований логер
 

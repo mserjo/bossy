@@ -9,12 +9,14 @@
 
 Загальний префікс для всіх цих шляхів (наприклад, `/integrations`) буде встановлено
 при підключенні `integrations_router` до роутера версії API (`v1_router`).
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from fastapi import APIRouter
 
-# Повні шляхи імпорту (відносно поточного пакету)
-from .calendars import router as calendars_router
-from .messengers import router as messengers_router
+# Оновлені повні шляхи імпорту для під-роутерів
+from backend.app.src.api.v1.integrations.calendars import router as calendars_router
+from backend.app.src.api.v1.integrations.messengers import router as messengers_router
 
 from backend.app.src.config.logging import logger # Централізований логер
 

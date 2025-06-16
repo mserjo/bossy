@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Ендпоінти для управління паролями користувачів: зміна, запит на скидання, встановлення нового.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 # import logging # Замінено на централізований логер
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
@@ -27,7 +29,9 @@ from backend.app.src.config import settings as global_settings  # Для FRONTEN
 
 router = APIRouter()
 
-
+# ПРИМІТКА: Цей ендпоінт залежить від реалізації методу `change_password`
+# в `PasswordService`, який має перевіряти поточний пароль користувача
+# та оновлювати його на новий.
 @router.post(
     "/change",  # Префікс /password буде додано в auth/__init__.py
     response_model=MessageResponse,
@@ -63,7 +67,9 @@ async def change_password_endpoint(  # Перейменовано, щоб уни
     # i18n
     return MessageResponse(message="Пароль успішно змінено.")
 
-
+# ПРИМІТКА: Цей ендпоінт залежить від реалізації `create_password_reset_token` в `PasswordService`
+# та майбутньої інтеграції з `NotificationService` для надсилання email (див. TODO).
+# Також важливою є коректна конфігурація `FRONTEND_URL` в налаштуваннях.
 @router.post(
     "/forgot",  # Префікс /password
     response_model=MessageResponse,
@@ -93,7 +99,7 @@ async def forgot_password_endpoint(  # Перейменовано
         reset_token = await password_service.create_password_reset_token(user_id=user.id)
 
         # TODO: Переконатися, що FRONTEND_PASSWORD_RESET_URL налаштовано в settings.py
-        frontend_reset_url = f"{global_settings.FRONTEND_URL}/reset-password?token={reset_token}"
+        frontend_reset_url = f"{global_settings.FRONTEND_URL}/reset-password?token={reset_token}" # Шлях `/reset-password` визначається логікою фронтенд-додатку.
 
         logger.info(
             f"Токен скидання паролю для {user.email}: {reset_token}. Посилання: {frontend_reset_url}")  # Тільки для розробки!
@@ -118,7 +124,9 @@ async def forgot_password_endpoint(  # Перейменовано
         message="Якщо ваша пошта зареєстрована та активна, ви отримаєте лист з інструкціями для відновлення паролю."
     )
 
-
+# ПРИМІТКА: Цей ендпоінт залежить від реалізації методу `reset_password_with_token_flow`
+# в `PasswordService`, який має валідувати токен, оновлювати пароль користувача
+# та інвалідувати використаний токен.
 @router.post(
     "/reset",  # Префікс /password
     response_model=MessageResponse,

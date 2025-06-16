@@ -5,6 +5,8 @@
 
 Дозволяє отримувати метадані файлів та видаляти файли разом із їх записами
 (зазвичай адміністративні дії або для власників файлів з обмеженнями).
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
 from uuid import UUID  # ID тепер UUID
@@ -37,6 +39,10 @@ async def get_file_record_service(session: AsyncSession = Depends(get_api_db_ses
 # async def require_file_record_viewer(file_id: UUID = Path(...), current_user: UserModel = Depends(get_current_active_user), ...): ...
 # async def require_file_record_editor(file_id: UUID = Path(...), current_user: UserModel = Depends(get_current_active_user), ...): ...
 
+# ПРИМІТКА: Реалізація прав доступу до перегляду метаданих файлу
+# (чи належить файл користувачу, чи користувач має відповідні права через групу/роль)
+# має бути забезпечена методом сервісу `get_file_record_by_id_for_user`
+# або спеціалізованою залежністю, як зазначено в TODO.
 @router.get(
     "/{file_id}",
     response_model=FileRecordResponse,
@@ -72,7 +78,10 @@ async def get_file_record_details(
                             detail="Запис файлу не знайдено або доступ заборонено.")
     return file_record  # Сервіс вже повертає Pydantic схему
 
-
+# ПРИМІТКА: Видалення файлу є критичною операцією. Логіка перевірки прав
+# (власник, адміністратор групи, суперюзер) та безпечного видалення файлу зі сховища
+# має бути ретельно реалізована в `FileRecordService.delete_file_record_with_permission_check`,
+# як зазначено в TODO.
 @router.delete(
     "/{file_id}",
     status_code=status.HTTP_204_NO_CONTENT,
@@ -116,7 +125,9 @@ async def delete_file_record_and_file(
 
     return None  # HTTP 204 No Content
 
-
+# ПРИМІТКА: Цей адмін-ендпоінт для отримання списку всіх файлів залежить від
+# реалізації методу `list_all_file_records_paginated` в `FileRecordService`,
+# включаючи підтримку фільтрів та коректний підрахунок загальної кількості записів.
 @router.get(
     "/",
     response_model=PagedResponse[FileRecordResponse],

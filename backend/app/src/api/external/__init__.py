@@ -7,14 +7,16 @@
 від зовнішніх платформ, таких як календарні сервіси (Google Calendar, Outlook Calendar)
 або месенджери (Telegram, Slack, Viber, Teams), коли вони надсилають події
 (наприклад, оновлення події в календарі, нове повідомлення для бота).
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
 from fastapi import APIRouter
 
-# Повні шляхи імпорту (відносно поточного пакету)
-from .webhook import router as generic_webhook_router
-from .calendar import router as calendar_webhooks_router
-from .messenger import router as messenger_webhooks_router
+# Повні шляхи імпорту
+from backend.app.src.api.external.webhook import router as generic_webhook_router
+from backend.app.src.api.external.calendar import router as calendar_webhooks_router
+from backend.app.src.api.external.messenger import router as messenger_webhooks_router
 
 from backend.app.src.config import logger # Стандартизований імпорт логера
 

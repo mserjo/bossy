@@ -12,18 +12,18 @@ from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column  # relationship тут не потрібен, якщо немає зворотніх зв'язків
 
 # Абсолютний імпорт базової моделі для довідників
-from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 from backend.app.src.config.logging import get_logger # Імпорт логера
 from backend.app.src.core.dicts import NotificationChannelType # Імпорт Enum
 from sqlalchemy import Enum as SQLEnum # Імпорт SQLEnum
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
-class NotificationTemplate(BaseDictionaryModel):
+class NotificationTemplate(BaseDictionary):
     """
     Модель Шаблону Сповіщення.
 
-    Успадковує `BaseDictionaryModel` (id, code, name, description, state, etc.).
+    Успадковує `BaseDictionary` (id, code, name, description, state, etc.).
     Поле `code` - унікальний код шаблону (наприклад, "new_task_assigned_email").
     Поле `name` - людиночитана назва шаблону (наприклад, "Email: Нове завдання призначено").
     Поле `description` - детальний опис призначення шаблону.
@@ -48,7 +48,7 @@ class NotificationTemplate(BaseDictionaryModel):
         SQLEnum(NotificationChannelType), nullable=False, index=True, comment="Тип/канал шаблону (наприклад, email, sms, in_app)"
     )
 
-    # _repr_fields успадковуються та збираються з BaseDictionaryModel (id, name, code, state_id тощо).
+    # _repr_fields успадковуються та збираються з BaseDictionary (id, name, code, state_id тощо).
     # Додаємо специфічні для NotificationTemplate поля.
     _repr_fields = ("template_type",)
 

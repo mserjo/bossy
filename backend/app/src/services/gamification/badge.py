@@ -5,13 +5,15 @@ from datetime import datetime, timezone  # Додано для updated_at
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select # sqlalchemy.future видалено
-from sqlalchemy.orm import selectinload  # Додано для завантаження зв'язків
+from sqlalchemy.orm import selectinload, or_  # Додано для завантаження зв'язків та or_
+from sqlalchemy.exc import IntegrityError # Додано для обробки помилок
 
 # Повні шляхи імпорту
-from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService # BaseDictionaryService -> BaseService (помилка в оригіналі, має бути BaseDictionaryService)
+from backend.app.src.services.base import BaseService # Змінено на BaseService
 from backend.app.src.models.gamification.badge import Badge  # Модель SQLAlchemy Badge
 from backend.app.src.repositories.gamification.badge_repository import BadgeRepository # Імпорт репозиторію
-from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
+# BaseCacheService не потрібен, якщо сервіс не використовує BaseDictionaryService
+# from backend.app.src.services.cache.base_cache import BaseCacheService
 from backend.app.src.models.auth.user import User  # Для зв'язків created_by_user, updated_by_user
 from backend.app.src.models.files.file import FileRecord  # Для зв'язку icon_file
 from backend.app.src.models.groups.group import Group  # Для зв'язку group
@@ -24,33 +26,27 @@ from backend.app.src.config import logger  # Стандартизований і
 from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 
 
-class BadgeService(BaseDictionaryService[Badge, BadgeRepository, BadgeCreate, BadgeUpdate, BadgeResponse]): # Додано BadgeRepository до Generic
+class BadgeService(BaseService): # Змінено успадкування на BaseService
     """
     Сервіс для управління визначеннями Значків (Бейджів).
     Бейджі - це нагороди, які користувачі можуть заробити, визначені критеріями,
     назвою, описом та іконкою.
-    Успадковує та розширює CRUD-операції від BaseDictionaryService.
     Унікальність поля `name` перевіряється в межах групи (якщо `group_id` вказано) або глобально.
     """
 
-    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService):
+    def __init__(self, db_session: AsyncSession): # Видалено cache_service
         """
         Ініціалізує сервіс BadgeService.
 
         :param db_session: Асинхронна сесія бази даних SQLAlchemy.
-        :param cache_service: Екземпляр сервісу кешування.
         """
-        badge_repo = BadgeRepository(model=Badge)
-        super().__init__(
-            db_session,
-            repository=badge_repo,
-            cache_service=cache_service,
-            response_schema=BadgeResponse
-        )
-        # _model_name ініціалізується в BaseDictionaryService з repository.model.__name__
+        super().__init__(db_session) # Передаємо тільки db_session
+        self.badge_repo = BadgeRepository() # Ініціалізуємо репозиторій
+        self.response_schema = BadgeResponse # Зберігаємо схему відповіді для використання
+        self._model_name = Badge.__name__ # Встановлюємо ім'я моделі вручну
         logger.info(f"BadgeService ініціалізовано для моделі: {self._model_name}")
 
-    async def _load_relations(self, query: select) -> select:
+    async def _load_relations(self, query: select) -> select: # select з sqlalchemy
         """Допоміжний метод для додавання selectinload для зв'язків Badge."""
         return query.options(
             selectinload(Badge.icon_file),
@@ -172,26 +168,34 @@ class BadgeService(BaseDictionaryService[Badge, BadgeRepository, BadgeCreate, Ba
         logger.debug(f"Спроба створення нового {self._model_name} (Бейдж) з ім'ям: '{data.name}'")
         await self._check_name_uniqueness(data.name, data.group_id)
 
-        # Перевірка існування icon_file_id, якщо надано
         if data.icon_file_id and not await self.db_session.get(FileRecord, data.icon_file_id):
-            # i18n
             raise ValueError(f"Файл іконки з ID '{data.icon_file_id}' не знайдено.")
 
-        new_item_db = self.model(
-            **data.model_dump(),
-            created_by_user_id=created_by_user_id,
-            updated_by_user_id=created_by_user_id  # При створенні
-        )
-        self.db_session.add(new_item_db)
+        # Створюємо словник даних для kwargs, щоб передати created_by_user_id та updated_by_user_id
+        # Хоча модель Badge їх не має, BaseRepository.create може їх прийняти, якщо вони є в **kwargs
+        # Але краще передавати їх явно, якщо модель їх підтримує.
+        # Поточна модель Badge успадковує BaseMainModel, яка має created_by_user_id, updated_by_user_id.
+
+        badge_data_for_repo = data.model_dump()
+        # created_by_user_id та updated_by_user_id будуть встановлені через kwargs в repo.create,
+        # якщо модель їх підтримує і BaseRepository.create це обробляє.
+        # Або, якщо модель має ці поля, їх можна додати в BadgeCreate схему.
+        # Поки що припускаємо, що BaseRepository.create може прийняти їх як kwargs.
+
         try:
+            new_item_db = await self.badge_repo.create(
+                session=self.db_session,
+                obj_in=data, # Передаємо Pydantic схему
+                created_by_user_id=created_by_user_id,
+                updated_by_user_id=created_by_user_id
+            )
             await self.commit()
-            # Завантажуємо зв'язки для повної відповіді
-            refreshed_item = await self.get_by_id(new_item_db.id)
-            if not refreshed_item: raise RuntimeError("Не вдалося отримати створений бейдж.")  # Малоймовірно
+            refreshed_item = await self.get_by_id(new_item_db.id) # Використовуємо get_by_id сервісу для завантаження зв'язків
+            if not refreshed_item: raise RuntimeError("Не вдалося отримати створений бейдж.")
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності '{data.name}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося створити {self._model_name}: конфлікт даних.")  # i18n
+            raise ValueError(f"Не вдалося створити {self._model_name}: конфлікт даних.")
 
         logger.info(f"{self._model_name} '{refreshed_item.name}' ID: {refreshed_item.id} успішно створено.")
         return refreshed_item
@@ -205,48 +209,47 @@ class BadgeService(BaseDictionaryService[Badge, BadgeRepository, BadgeCreate, Ba
         """
         logger.debug(f"Спроба оновлення {self._model_name} (Бейдж) з ID: {item_id}")
 
-        item_db = (await self.db_session.execute(
-            select(self.model).where(self.model.id == item_id)
-        )).scalar_one_or_none()
+        item_db = await self.badge_repo.get(session=self.db_session, id=item_id) # Використовуємо репозиторій
 
         if not item_db:
             logger.warning(f"{self._model_name} з ID '{item_id}' не знайдено для оновлення.")
             return None
 
-        update_data = data.model_dump(exclude_unset=True)
+        update_data_dict = data.model_dump(exclude_unset=True)
 
-        # Перевірка унікальності імені, якщо воно змінюється або змінюється група
-        new_name = update_data.get('name', item_db.name)
-        new_group_id = update_data.get('group_id', item_db.group_id)  # Важливо враховувати зміну group_id на None
-        if 'group_id' not in update_data and item_db.group_id is not None:  # Якщо group_id не вказано в update, але є в БД
-            new_group_id = item_db.group_id
+        new_name = update_data_dict.get('name', item_db.name)
+        # Обробка group_id: якщо 'group_id' є в update_data_dict, використовуємо його значення,
+        # інакше залишаємо поточне значення item_db.group_id.
+        # Це важливо, бо Pydantic model_dump(exclude_unset=True) не включатиме group_id, якщо він не був наданий в data.
+        new_group_id = update_data_dict.get('group_id') if 'group_id' in update_data_dict else item_db.group_id
 
-        if ('name' in update_data and new_name != item_db.name) or \
-                ('group_id' in update_data and new_group_id != item_db.group_id):
+
+        if ('name' in update_data_dict and new_name != item_db.name) or \
+           ('group_id' in update_data_dict and new_group_id != item_db.group_id):
             await self._check_name_uniqueness(new_name, new_group_id, item_id_to_exclude=item_id)
 
-        # Перевірка існування icon_file_id, якщо надано і змінено
-        if 'icon_file_id' in update_data and update_data['icon_file_id'] is not None \
-                and update_data['icon_file_id'] != item_db.icon_file_id:
-            if not await self.db_session.get(FileRecord, update_data['icon_file_id']):
-                # i18n
-                raise ValueError(f"Файл іконки з ID '{update_data['icon_file_id']}' не знайдено.")
+        if 'icon_file_id' in update_data_dict and update_data_dict['icon_file_id'] is not None \
+                and update_data_dict['icon_file_id'] != item_db.icon_file_id:
+            if not await self.db_session.get(FileRecord, update_data_dict['icon_file_id']):
+                raise ValueError(f"Файл іконки з ID '{update_data_dict['icon_file_id']}' не знайдено.")
 
-        for field, value in update_data.items():
-            setattr(item_db, field, value)
-
-        item_db.updated_by_user_id = updated_by_user_id
-        item_db.updated_at = datetime.now(timezone.utc)
-
-        self.db_session.add(item_db)
+        # BaseRepository.update очікує obj_in як Pydantic схему або dict.
+        # Передаємо data (BadgeUpdate schema), а updated_by_user_id як kwarg.
         try:
+            updated_item_db = await self.badge_repo.update(
+                session=self.db_session,
+                db_obj=item_db,
+                obj_in=data, # Передаємо оригінальну Pydantic схему BadgeUpdate
+                updated_by_user_id=updated_by_user_id
+                # updated_at оновлюється автоматично через TimestampedMixin в BaseRepository.update
+            )
             await self.commit()
-            refreshed_item = await self.get_by_id(item_db.id)  # Отримуємо з усіма зв'язками
-            if not refreshed_item: raise RuntimeError("Не вдалося отримати оновлений бейдж.")  # Малоймовірно
+            refreshed_item = await self.get_by_id(updated_item_db.id)
+            if not refreshed_item: raise RuntimeError("Не вдалося отримати оновлений бейдж.")
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності ID '{item_id}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося оновити {self._model_name}: конфлікт даних.")  # i18n
+            raise ValueError(f"Не вдалося оновити {self._model_name}: конфлікт даних.")
 
         logger.info(f"{self._model_name} '{refreshed_item.name}' ID: {refreshed_item.id} успішно оновлено.")
         return refreshed_item

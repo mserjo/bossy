@@ -6,7 +6,8 @@
 та управлінням користувачами, токенами, сесіями та паролями.
 """
 
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+logger = get_logger(__name__) # Ініціалізація логера
 
 # Явний імпорт сервісів для кращої читабельності та статичного аналізу
 from backend.app.src.services.auth.user import UserService

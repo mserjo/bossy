@@ -3,7 +3,8 @@
 Сервіс для управління сесіями користувачів.
 
 Надає функціонал для створення, отримання, валідації та інвалідації
-користувацьких сесій, а також для очищення прострочених сесій.
+користувацьких сесій (використовуючи модель UserSession та схему UserSessionResponse),
+а також для очищення прострочених сесій.
 """
 from typing import List, Optional # Type видалено
 from uuid import UUID, uuid4
@@ -19,7 +20,8 @@ from backend.app.src.models.auth.session import UserSession  # Модель SQLA
 from backend.app.src.models.auth.user import User  # Модель SQLAlchemy для користувача
 from backend.app.src.schemas.auth.session import UserSessionResponse, UserSessionCreate # Імпорт актуальних схем
 
-from backend.app.src.config import logger  # Використання спільного логера з конфігу
+from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
+logger = get_logger(__name__) # Ініціалізація логера
 from backend.app.src.config import settings  # Для доступу до конфігурацій, наприклад DEFAULT_SESSION_DURATION_DAYS
 
 # Тривалість сесії за замовчуванням береться з налаштувань.
@@ -128,7 +130,7 @@ class UserSessionService(BaseService):
         Якщо надано user_id, переконується, що сесія належить цьому користувачеві.
 
         :param session_token: Токен сесії (UUID) для інвалідації.
-        :param user_id: ID користувача (int), якщо надано, перевірити, чи сесія належить цьому користувачеві.
+        :param user_id: Опціональний ID користувача (int), для перевірки належності сесії.
         :return: True, якщо сесію знайдено та інвалідовано, інакше False.
         """
         logger.debug(f"Спроба інвалідації токена сесії (UUID): {session_token} для користувача ID: {user_id or 'будь-який'}")

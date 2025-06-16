@@ -1,11 +1,12 @@
 # backend/app/src/services/tasks/scheduler.py
+# backend/app/src/services/tasks/scheduler.py
 # import logging # Замінено на централізований логер
 from typing import List, Optional
-from uuid import UUID
+# UUID видалено
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+from sqlalchemy import select, or_ # sqlalchemy.future тепер select, or_ додано
 from sqlalchemy.orm import selectinload
 
 # Повні шляхи імпорту
@@ -43,12 +44,10 @@ class TaskSchedulingService(BaseService):
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        # Щоб уникнути циркулярних залежностей на рівні модуля, залежні сервіси
-        # можуть бути інстанційовані локально в методах або передані при ініціалізації,
-        # якщо керуються через DI контейнер. Поки що, деякі виклики сервісів будуть концептуальними заглушками.
+        # self.task_repo = TaskRepository() # Ініціалізація репозиторію (якщо використовується)
         logger.info("TaskSchedulingService ініціалізовано.")
 
-    async def process_recurring_tasks(self) -> List[UUID]:
+    async def process_recurring_tasks(self) -> List[int]: # Змінено List[UUID] на List[int]
         """
         Визначає шаблони повторюваних завдань, для яких настав час створення нового екземпляра,
         та створює ці нові екземпляри.
@@ -58,20 +57,25 @@ class TaskSchedulingService(BaseService):
         """
         logger.info("Обробка повторюваних завдань...")
         now = datetime.now(timezone.utc)
-        newly_created_task_ids: List[UUID] = []
+        newly_created_task_ids: List[int] = [] # Змінено List[UUID] на List[int]
 
         # Запит передбачає, що модель Task має: is_recurring_template, is_active, recurrence_end_date
+        # TODO: Замінити на TaskRepository.get_recurring_task_templates_due()
         stmt = select(Task).where(
             Task.is_recurring_template == True,
-            Task.is_active == True,  # Обробляємо тільки активні шаблони
-            (Task.recurrence_end_date.is_(None) | (Task.recurrence_end_date > now))  # type: ignore
+            Task.is_active == True,
+            (Task.recurrence_end_date.is_(None) | (Task.recurrence_end_date >= now.date())) # Порівняння дат
         ).options(
             selectinload(Task.group),
             selectinload(Task.task_type),
-            selectinload(Task.status),  # Для отримання status_id за замовчуванням для нового екземпляра
-            selectinload(Task.created_by_user)  # Для отримання оригінального творця
-            # TODO: Завантажити default_assignees, якщо вони зберігаються з шаблоном
+            selectinload(Task.status),
+            selectinload(Task.created_by_user)
         )
+        # Додамо перевірку next_occurrence_at, якщо воно є в моделі і використовується
+        if hasattr(Task, 'next_occurrence_at'):
+             stmt = stmt.where(Task.next_occurrence_at <= now)
+
+
         recurring_templates_db = (await self.db_session.execute(stmt)).scalars().all()
 
         for template in recurring_templates_db:
@@ -80,14 +84,12 @@ class TaskSchedulingService(BaseService):
                     logger.info(
                         f"Створення нового екземпляра для шаблону повторюваного завдання ID: {template.id} ('{template.title}')")
 
-                    # TODO: Реалізувати надійний розрахунок наступної дати виконання, враховуючи recurrence_pattern.
                     new_due_date = await self._calculate_next_due_date(template, now)
-                    if not new_due_date:  # Якщо не вдалося розрахувати (напр. непідтримуваний патерн)
+                    if not new_due_date:
                         logger.warning(
                             f"Не вдалося розрахувати наступну дату виконання для шаблону ID {template.id}. Пропуск.")
                         continue
 
-                    # Використовуємо статус шаблону, якщо він дійсний, інакше статус "OPEN"
                     status_id_to_set = template.status_id
                     if not status_id_to_set or not await self.db_session.get(Status, status_id_to_set):
                         open_status = (await self.db_session.execute(
@@ -99,63 +101,58 @@ class TaskSchedulingService(BaseService):
                             continue
                         status_id_to_set = open_status.id
 
-                    # TODO: Розглянути використання TaskService.create_task для створення, якщо вдасться уникнути циркулярності.
-                    #  Це забезпечить узгодженість логіки створення завдань.
                     new_instance_data = {
                         "title": template.title, "description": template.description,
                         "group_id": template.group_id, "task_type_id": template.task_type_id,
                         "status_id": status_id_to_set, "due_date": new_due_date,
                         "points_reward": template.points_reward,
                         "penalty_points_on_missed": template.penalty_points_on_missed,
-                        "is_recurring_template": False,  # Це екземпляр
-                        "parent_task_id": template.id,  # Посилання на шаблон завдання
-                        "created_by_user_id": template.created_by_user_id,  # Або ID системного користувача
-                        "updated_by_user_id": template.created_by_user_id,  # Або ID системного користувача
-                        "is_active": True,  # Нові екземпляри активні за замовчуванням
+                        "is_recurring_template": False,
+                        "parent_task_id": template.id,
+                        "created_by_user_id": template.created_by_user_id,
+                        "updated_by_user_id": template.created_by_user_id,
+                        "is_active": True,
                         "is_mandatory": template.is_mandatory,
                         "execution_type": template.execution_type,
-                        # TODO: Скопіювати інші релевантні поля з шаблону, якщо потрібно.
+                        # `next_occurrence_at` для екземпляра не встановлюється або None
                     }
-                    # Видаляємо None значення, щоб не перезаписувати значення за замовчуванням в моделі
                     new_instance_data_cleaned = {k: v for k, v in new_instance_data.items() if v is not None}
 
                     new_instance_model = Task(**new_instance_data_cleaned)
                     self.db_session.add(new_instance_model)
-                    await self.db_session.flush()  # Отримуємо ID для логування та можливих призначень
-                    newly_created_task_ids.append(new_instance_model.id)
-                    logger.info(
-                        f"Створено новий екземпляр завдання ID: {new_instance_model.id} для шаблону ID: {template.id}")
+                    await self.db_session.flush()
+                    if new_instance_model.id is not None: # Перевірка, що ID встановлено
+                        newly_created_task_ids.append(new_instance_model.id)
+                        logger.info(
+                            f"Створено новий екземпляр завдання ID: {new_instance_model.id} для шаблону ID: {template.id}")
+                    else: # Малоймовірно, якщо flush пройшов без помилок
+                        logger.error(f"Не вдалося отримати ID для нового екземпляра завдання з шаблону ID: {template.id}")
+                        continue # Пропуск цього екземпляра
 
-                    template.last_instance_created_at = now  # Оновлюємо час створення останнього екземпляра
-                    self.db_session.add(template)
 
-                    # TODO: Якщо шаблон мав призначення за замовчуванням, призначити їх новому екземпляру.
-                    # from backend.app.src.services.tasks.assignment import TaskAssignmentService # Локальний імпорт
-                    # assignment_service = TaskAssignmentService(self.db_session)
-                    # # ... логіка копіювання призначень ...
+                    # Оновлення next_occurrence_at для шаблону
+                    # Ця логіка має бути більш надійною і використовувати той же _calculate_next_due_date
+                    # або спеціальний метод для оновлення шаблону.
+                    # Поки що, спрощена логіка або TODO.
+                    # template.last_instance_created_at = now
+                    # template.next_occurrence_at = await self._calculate_next_due_date(template, new_due_date or now) # Розрахунок наступного разу від нової дати
+                    # self.db_session.add(template)
+                    # TODO: Правильно оновити next_occurrence_at для template
 
                 except Exception as e:
                     logger.error(f"Помилка обробки шаблону повторюваного завдання ID {template.id}: {e}",
                                  exc_info=global_settings.DEBUG)
-                    # Важливо: не робимо тут rollback всієї транзакції, помилка одного шаблону не має зупиняти інші.
-                    # Якщо _initialize_dictionary та _initialize_system_users робили flush замість commit,
-                    # то тут можна було б зробити rollback для конкретного шаблону, але це складно.
-                    # Поточна логіка з commit після кожної категорії в run_full_initialization є компромісом.
-                    # Якщо тут виникає помилка, то зміни для цього шаблону не будуть закомічені, якщо commit в кінці.
-                    # Якщо sub-методи комітять, то тут rollback не вплине на попередні успішні коміти.
-                    # Для обробки повторюваних завдань, краще мати один коміт в кінці.
-                    # Поки що, припускаємо, що помилка тут не має валити всю пачку.
-                    pass  # Продовжуємо з наступним шаблоном
+                    pass
 
         if newly_created_task_ids:
             try:
-                await self.commit()  # Один коміт для всіх успішно створених екземплярів та оновлень шаблонів
+                await self.commit()
                 logger.info(
                     f"Успішно оброблено повторювані завдання. Створено {len(newly_created_task_ids)} нових екземплярів.")
             except Exception as e:
                 logger.error(f"Помилка коміту екземплярів повторюваних завдань: {e}", exc_info=global_settings.DEBUG)
                 await self.rollback()
-                newly_created_task_ids.clear()  # Очищаємо список, оскільки коміт не вдався
+                newly_created_task_ids.clear()
         else:
             logger.info("Немає нових екземплярів повторюваних завдань для створення цього разу.")
 

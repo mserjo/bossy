@@ -19,14 +19,16 @@ from backend.app.src.models.auth.user import User
 from backend.app.src.models.dictionaries.user_roles import UserRole
 from backend.app.src.models.dictionaries.user_types import UserType
 from backend.app.src.schemas.auth.user import (
-    UserCreate,
-    UserUpdate,
+    UserCreate, # UserCreateSchema було перейменовано на UserCreate в schemas.auth.user, це коректно
+    UserUpdate, # UserUpdateSchema було перейменовано на UserUpdate в schemas.auth.user, це коректно
     UserResponse,
     UserResponseWithRoles,
 )
 from backend.app.src.core.security import get_password_hash
-from backend.app.src.config import logger # Використання спільного логера з конфігу
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+logger = get_logger(__name__) # Ініціалізація логера
 from backend.app.src.config import settings  # Для доступу до DEBUG тощо
+from backend.app.src.core.dicts import UserState # Імпорт UserState для фільтрації
 
 if TYPE_CHECKING: # Умовний імпорт для TYPE_CHECKING
     pass

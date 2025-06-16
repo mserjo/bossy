@@ -16,6 +16,7 @@ from sqlalchemy.exc import IntegrityError
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.files.avatar import UserAvatar
 from backend.app.src.models.files.file import FileRecord
+from backend.app.src.repositories.files.user_avatar_repository import UserAvatarRepository # Імпорт репозиторію
 from backend.app.src.models.auth.user import User
 
 from backend.app.src.schemas.files.avatar import UserAvatarResponse
@@ -33,6 +34,7 @@ class UserAvatarService(BaseService): # type: ignore видалено
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
+        self.user_avatar_repo = UserAvatarRepository() # Ініціалізація репозиторію
         logger.info("UserAvatarService ініціалізовано.")
 
     async def _get_user_avatar_link_by_id_orm(self, user_avatar_id: int) -> Optional[UserAvatar]: # user_avatar_id: UUID -> int
@@ -71,110 +73,83 @@ class UserAvatarService(BaseService): # type: ignore видалено
         logger.debug(
             f"Користувач ID '{actor_user_id}' намагається встановити аватар для користувача ID '{user_id}' використовуючи файл ID '{file_id}'.")
 
-        user = await self.db_session.get(User, user_id)
+        user = await self.db_session.get(User, user_id) # Перевірка залишається в сервісі
         if not user:
-            # i18n
             raise ValueError(f"Користувача з ID '{user_id}' не знайдено.")
 
-        file_record = await self.db_session.get(FileRecord, file_id)
+        file_record = await self.db_session.get(FileRecord, file_id) # Перевірка залишається в сервісі
         if not file_record:
-            # i18n
             raise ValueError(f"Запис файлу з ID '{file_id}' не знайдено.")
 
         if not file_record.mime_type or not file_record.mime_type.startswith("image/"):
             logger.warning(
                 f"Файл ID '{file_id}' (MIME: {file_record.mime_type}) не є зображенням. Неможливо встановити як аватар.")
-            # i18n
             raise ValueError(f"Файл '{file_record.file_name}' не є дійсним зображенням для аватара.")
 
-        # Атомарна деактивація існуючих активних аватарів для цього користувача
-        # Логіка updated_by_user_id видалена, оскільки поле відсутнє в моделі UserAvatar
-        update_values: Dict[str, Any] = {"is_active": False, "updated_at": datetime.now(timezone.utc)}
-        # if hasattr(UserAvatar, 'updated_by_user_id'):
-        #     update_values["updated_by_user_id"] = actor_user_id
-
-        stmt_deactivate = UserAvatar.__table__.update().where(
-            UserAvatar.user_id == user_id,
-            UserAvatar.is_active == True
-        ).values(**update_values)
-        await self.db_session.execute(stmt_deactivate)
-
-        # Перевірка, чи існує вже зв'язок цього користувача з цим файлом
-        stmt_existing_link = select(UserAvatar).where(
-            UserAvatar.user_id == user_id,
-            UserAvatar.file_id == file_id
-        )
-        avatar_link_db = (await self.db_session.execute(stmt_existing_link)).scalar_one_or_none()
-
-        current_time = datetime.now(timezone.utc)
-        if avatar_link_db:  # Якщо зв'язок існує, активуємо його
-            logger.info(
-                f"Повторна активація існуючого зв'язку аватара між користувачем ID '{user_id}' та файлом ID '{file_id}'.")
-            avatar_link_db.is_active = True
-            avatar_link_db.updated_at = current_time
-            # Логіка updated_by_user_id видалена
-            # if hasattr(UserAvatar, 'updated_by_user_id'):
-            #     avatar_link_db.updated_by_user_id = actor_user_id
-        else:  # Створюємо новий зв'язок
-            logger.info(f"Створення нового зв'язку аватара для користувача ID '{user_id}' з файлом ID '{file_id}'.")
-            # Логіка created_by_user_id та updated_by_user_id видалена
-            create_data: Dict[str, Any] = { # Dict та Any тут ще потрібні
-                "user_id": user_id,
-                "file_id": file_id,
-                "is_active": True,
-            }
-            # if hasattr(UserAvatar, 'created_by_user_id'):
-            #     create_data['created_by_user_id'] = actor_user_id
-            # if hasattr(UserAvatar, 'updated_by_user_id'):
-            #     create_data['updated_by_user_id'] = actor_user_id
-
-            avatar_link_db = UserAvatar(**create_data)
-            self.db_session.add(avatar_link_db)
-
         try:
-            await self.commit()  # Зберігаємо деактивацію старих та активацію/створення нового зв'язку
+            # Делегуємо основну логіку репозиторію
+            # updated_by_user_id для deactivate_all_for_user та potentially для create/update в set_active_avatar
+            # наразі не передається, оскільки модель UserAvatar не має цих полів.
+            # Якщо б вони були, то actor_user_id передавався б у repo.set_active_avatar.
+            avatar_link_db = await self.user_avatar_repo.set_active_avatar(
+                session=self.db_session,
+                user_id=user_id,
+                file_record_id=file_id
+                # updated_by_user_id=actor_user_id # Якщо б поле було в моделі
+            )
+
+            if not avatar_link_db: # Якщо репозиторій повернув None (помилка всередині репо)
+                 logger.error(f"Не вдалося встановити аватар для користувача ID {user_id} через помилку в репозиторії.")
+                 raise RuntimeError("Помилка встановлення аватара на рівні репозиторію.")
+
+            await self.commit() # Коміт операцій, виконаних репозиторієм
+
             # Отримуємо оновлений/створений запис з усіма зв'язками для відповіді
+            # _get_user_avatar_link_by_id_orm використовує прямий запит для selectinload
             refreshed_avatar_link_db = await self._get_user_avatar_link_by_id_orm(avatar_link_db.id)
-            if not refreshed_avatar_link_db:  # Малоймовірно
+            if not refreshed_avatar_link_db:
                 logger.error(f"Не вдалося отримати зв'язок аватара ID {avatar_link_db.id} після коміту.")
-                # i18n
                 raise RuntimeError("Помилка встановлення аватара: не вдалося отримати запис після збереження.")
 
-        except IntegrityError as e:
+        except IntegrityError as e: # Ця помилка може прийти з repo.set_active_avatar
             await self.rollback()
             logger.error(f"Помилка цілісності при встановленні аватара для ID '{user_id}': {e}",
                          exc_info=settings.DEBUG)
-            # i18n
             raise ValueError(f"Не вдалося встановити аватар через конфлікт даних: {e}")
+        except Exception as e: # Інші можливі винятки
+            await self.rollback()
+            logger.error(f"Неочікувана помилка при встановленні аватара для ID '{user_id}': {e}", exc_info=settings.DEBUG)
+            raise
 
         logger.info(
             f"Аватар (Файл ID: '{file_id}') успішно встановлено як активний для користувача ID '{user_id}'. ID Зв'язку: {refreshed_avatar_link_db.id}")
-        return UserAvatarResponse.model_validate(refreshed_avatar_link_db)  # Pydantic v2
+        return UserAvatarResponse.model_validate(refreshed_avatar_link_db)
 
     async def get_active_user_avatar(self, user_id: int) -> Optional[UserAvatarResponse]: # user_id: UUID -> int
         """Отримує активний аватар для вказаного користувача."""
         logger.debug(f"Спроба отримання активного аватара для користувача ID: {user_id}")
 
-        stmt = select(UserAvatar).options(
-            selectinload(UserAvatar.user).options(selectinload(User.user_type)),  # Завантажуємо тип користувача
-            selectinload(UserAvatar.file).options(
-                selectinload(FileRecord.uploader_user).options(selectinload(User.user_type)),  # Тип завантажувача
-                selectinload(FileRecord.group)  # Група файлу, якщо є
-            )
-        ).where(
-            UserAvatar.user_id == user_id,
-            UserAvatar.is_active == True
-        )
-        active_avatar_db = (await self.db_session.execute(stmt)).scalar_one_or_none()
+        # Використовуємо репозиторій, але потім _get_user_avatar_link_by_id_orm для завантаження зв'язків
+        # Це можна оптимізувати, якщо репозиторій буде підтримувати завантаження зв'язків.
+        active_avatar_link_orm = await self.user_avatar_repo.get_active_avatar_for_user(session=self.db_session, user_id=user_id)
 
-        if active_avatar_db:
-            if not active_avatar_db.file:  # Перевірка цілісності даних
-                logger.error(
-                    f"Активний зв'язок аватара ID '{active_avatar_db.id}' для користувача '{user_id}' не має пов'язаного запису файлу. Неузгодженість даних.")
-                return None  # Або кинути виняток про пошкоджені дані
-            logger.info(
-                f"Активний аватар знайдено для користувача ID '{user_id}' (Файл ID: {active_avatar_db.file_id}).")
-            return UserAvatarResponse.model_validate(active_avatar_db)  # Pydantic v2
+        if active_avatar_link_orm:
+            # Перезавантажуємо з потрібними зв'язками через _get_user_avatar_link_by_id_orm
+            # Це не дуже ефективно, краще б репозиторій одразу завантажував все необхідне.
+            # Наразі залишаємо так для збереження логіки завантаження зв'язків.
+            # В ідеалі: `get_active_avatar_for_user` в репозиторії має параметр `load_relations=True`.
+            detailed_avatar_link_orm = await self._get_user_avatar_link_by_id_orm(active_avatar_link_orm.id)
+
+            if detailed_avatar_link_orm and detailed_avatar_link_orm.file:
+                 logger.info(
+                    f"Активний аватар знайдено для користувача ID '{user_id}' (Файл ID: {detailed_avatar_link_orm.file_id}).")
+                 return UserAvatarResponse.model_validate(detailed_avatar_link_orm)
+            elif detailed_avatar_link_orm and not detailed_avatar_link_orm.file:
+                 logger.error(
+                    f"Активний зв'язок аватара ID '{detailed_avatar_link_orm.id}' для користувача '{user_id}' не має пов'язаного запису файлу. Неузгодженість даних.")
+                 return None
+            # Якщо detailed_avatar_link_orm is None, хоча active_avatar_link_orm був знайдений - це дивно.
+            logger.warning(f"Не вдалося перезавантажити активний аватар ID {active_avatar_link_orm.id} зі зв'язками.")
 
         logger.info(f"Активний аватар для користувача ID '{user_id}' не знайдено.")
         return None
@@ -183,19 +158,24 @@ class UserAvatarService(BaseService): # type: ignore видалено
         """Перелічує всі аватари (активні та неактивні) для вказаного користувача."""
         logger.debug(f"Перелік всіх аватарів для користувача ID: {user_id}, пропустити={skip}, ліміт={limit}")
 
-        stmt = select(UserAvatar).options(
-            selectinload(UserAvatar.user).options(selectinload(User.user_type)),
-            selectinload(UserAvatar.file).options(
-                selectinload(FileRecord.uploader_user).options(selectinload(User.user_type)),
-                selectinload(FileRecord.group)
-            )
-        ).where(UserAvatar.user_id == user_id) \
+        # Використовуємо репозиторій
+        # Знову ж таки, завантаження зв'язків - це питання.
+        # list_by_user_id в репозиторії не має selectinload за замовчуванням.
+        # Для збереження поведінки, залишимо поки прямий запит.
+        stmt = select(UserAvatar).where(UserAvatar.user_id == user_id) \
+            .options(
+                selectinload(UserAvatar.user).selectinload(User.user_type),
+                selectinload(UserAvatar.file).options(
+                    selectinload(FileRecord.uploader_user).selectinload(User.user_type),
+                    # selectinload(FileRecord.group) # FileRecord не має прямого зв'язку group
+                )
+            ) \
             .order_by(UserAvatar.is_active.desc(), UserAvatar.created_at.desc()) \
             .offset(skip).limit(limit)
 
-        avatars_db = (await self.db_session.execute(stmt)).scalars().all()
+        avatars_db_list = (await self.db_session.execute(stmt)).scalars().all()
 
-        response_list = [UserAvatarResponse.model_validate(ua) for ua in avatars_db]  # Pydantic v2
+        response_list = [UserAvatarResponse.model_validate(ua) for ua in avatars_db_list]
         logger.info(f"Отримано {len(response_list)} записів аватарів для користувача ID '{user_id}'.")
         return response_list
 
@@ -204,34 +184,33 @@ class UserAvatarService(BaseService): # type: ignore видалено
         Деактивує конкретний зв'язок аватара користувача.
         Користувач може деактивувати тільки власний аватар, якщо не має адмінських прав.
         """
-        # TODO: [Authorization] Розширити логіку авторизації: адміністратор (перевіряючи права `current_user_id`) повинен мати можливість деактивувати чужий аватар.
         logger.debug(f"Користувач ID '{current_user_id}' намагається деактивувати зв'язок аватара ID: {user_avatar_id}")
 
-        user_avatar_db = await self.db_session.get(UserAvatar, user_avatar_id)
+        user_avatar_db = await self.user_avatar_repo.get(session=self.db_session, id=user_avatar_id)
         if not user_avatar_db:
             logger.warning(f"Зв'язок аватара UserAvatar ID '{user_avatar_id}' не знайдено.")
             return False
 
-        # Перевірка авторизації: користувач може деактивувати тільки свій зв'язок аватара
-        # Більш детальна логіка авторизації (адмін/суперюзер) має бути тут, як зазначено в TODO вище.
-        if user_avatar_db.user_id != current_user_id:
+        # TODO: [Authorization] Розширити логіку авторизації: адміністратор (перевіряючи права `current_user_id`) повинен мати можливість деактивувати чужий аватар.
+        if user_avatar_db.user_id != current_user_id: # Перевірка авторизації залишається в сервісі
             logger.error(
                 f"Користувач ID '{current_user_id}' не авторизований для деактивації зв'язку аватара ID '{user_avatar_id}', що належить користувачу ID '{user_avatar_db.user_id}'.")
-            # i18n
             raise PermissionError("Ви не маєте дозволу на деактивацію цього аватара.")
 
         if not user_avatar_db.is_active:
             logger.info(f"Зв'язок аватара UserAvatar ID '{user_avatar_id}' вже неактивний.")
-            return True  # Вже в бажаному стані
+            return True
 
+        # Оновлюємо поле напряму і зберігаємо через репозиторій update
+        # Або репозиторій може мати спеціальний метод deactivate(id)
+        # Наразі UserAvatarUpdateSchema порожня, тому repo.update не підходить без її зміни.
+        # Залишаємо пряме оновлення поля та коміт через сервіс.
         user_avatar_db.is_active = False
-        user_avatar_db.updated_at = datetime.now(timezone.utc)
-        # Логіка updated_by_user_id видалена
-        # if hasattr(user_avatar_db, 'updated_by_user_id'):
-        #     user_avatar_db.updated_by_user_id = current_user_id
+        # updated_at оновлюється автоматично через TimestampedMixin
 
-        self.db_session.add(user_avatar_db)
-        await self.commit()
+        self.db_session.add(user_avatar_db) # Додаємо змінений об'єкт до сесії
+        await self.commit() # Комітимо зміни
+
         logger.info(
             f"Зв'язок аватара UserAvatar ID '{user_avatar_id}' для користувача ID '{user_avatar_db.user_id}' деактивовано.")
         return True

@@ -153,6 +153,48 @@ class GroupMembershipRepository(
             logger.error(f"Помилка при отриманні ID груп для user_id {user_id}: {e}", exc_info=True)
             return []
 
+    async def count_active_admins_in_group(
+            self, session: AsyncSession, group_id: int, exclude_user_id: Optional[int] = None
+    ) -> int:
+        """
+        Підраховує кількість активних адміністраторів у групі, опціонально виключаючи одного користувача.
+
+        Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
+            group_id (int): ID групи.
+            exclude_user_id (Optional[int]): ID користувача, якого потрібно виключити з підрахунку.
+
+        Returns:
+            int: Кількість активних адміністраторів.
+        """
+        from backend.app.src.models.dictionaries.user_roles import UserRole # Локальний імпорт для уникнення циклічності на рівні модуля
+        from backend.app.src.services.groups.group import ADMIN_ROLE_CODE # Використання константи
+
+        logger.debug(f"Підрахунок активних адмінів для group_id {group_id}, виключаючи user_id {exclude_user_id}")
+
+        stmt = (
+            select(func.count(self.model.user_id))
+            .join(UserRole, self.model.role_id == UserRole.id) # Припускаємо, що поле в GroupMembership називається role_id
+            .where(
+                self.model.group_id == group_id,
+                self.model.is_active == True,
+                UserRole.code == ADMIN_ROLE_CODE
+            )
+        )
+        if exclude_user_id is not None:
+            stmt = stmt.where(self.model.user_id != exclude_user_id)
+
+        try:
+            result = await session.execute(stmt)
+            count = result.scalar_one_or_none() or 0
+            return count
+        except Exception as e:
+            logger.error(
+                f"Помилка при підрахунку активних адмінів для group_id {group_id}: {e}",
+                exc_info=True
+            )
+            return 0
+
 
 if __name__ == "__main__":
     # Демонстраційний блок для GroupMembershipRepository.
@@ -168,5 +210,6 @@ if __name__ == "__main__":
     logger.info("  - get_members_of_group(group_id: int, skip: int = 0, limit: int = 100)")
     logger.info("  - get_user_group_memberships(user_id: int, skip: int = 0, limit: int = 100)")
     logger.info("  - get_user_group_ids(user_id: int)")
+    logger.info("  - count_active_admins_in_group(group_id: int, exclude_user_id: Optional[int] = None)")
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

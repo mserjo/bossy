@@ -127,7 +127,7 @@ class FileUploadService(BaseService): # type: ignore видалено
 
         temp_dir_for_upload = self.temp_upload_dir / str(upload_id)
         try:
-            temp_dir_for_upload.mkdir(parents=True, exist_ok=True)
+            await aiofiles.os.makedirs(temp_dir_for_upload, exist_ok=True) # Замінено на async mkdir
         except Exception as e:
             logger.error(f"Не вдалося створити тимчасову директорію {temp_dir_for_upload} для ID {upload_id}: {e}",
                          exc_info=True)
@@ -187,14 +187,14 @@ class FileUploadService(BaseService): # type: ignore видалено
         # Генерація унікального підкаталогу для постійного зберігання
         permanent_file_subdir_name = str(uuid4())  # Унікальний підкаталог
         permanent_file_target_dir = self.permanent_storage_dir / permanent_file_subdir_name
-        permanent_file_target_dir.mkdir(parents=True, exist_ok=True)
+        await aiofiles.os.makedirs(permanent_file_target_dir, exist_ok=True) # Замінено на async mkdir
         permanent_file_path = permanent_file_target_dir / safe_original_filename
 
         temp_parent_dir_to_clean = self.temp_upload_dir / str(upload_id)
 
         try:
-            # Використовуємо shutil.move, оскільки він краще працює між різними файловими системами (якщо temp на іншому розділі)
-            shutil.move(str(temp_file_path), str(permanent_file_path))
+            # Використовуємо aiofiles.os.rename для асинхронного переміщення
+            await aiofiles.os.rename(str(temp_file_path), str(permanent_file_path))
             logger.info(f"Файл переміщено з '{temp_file_path}' до постійного сховища: '{permanent_file_path}'.")
         except Exception as e:
             logger.error(f"Не вдалося перемістити файл з тимчасового до постійного сховища для ID '{upload_id}': {e}",
@@ -202,9 +202,9 @@ class FileUploadService(BaseService): # type: ignore видалено
             # i18n
             raise ValueError("Не вдалося завершити збереження файлу.")
         finally:  # Очищення тимчасової директорії для цього завантаження
-            if temp_parent_dir_to_clean.exists():
+            if await aiofiles.os.path.exists(temp_parent_dir_to_clean): # Замінено на async exists
                 try:
-                    shutil.rmtree(temp_parent_dir_to_clean)
+                    await self._async_rmtree(temp_parent_dir_to_clean) # Замінено на async rmtree
                     logger.debug(f"Тимчасову директорію {temp_parent_dir_to_clean} очищено.")
                 except Exception as e_rm:
                     logger.error(f"Не вдалося очистити тимчасову директорію {temp_parent_dir_to_clean}: {e_rm}")
@@ -256,6 +256,25 @@ class FileUploadService(BaseService): # type: ignore видалено
             file_record=created_file_record_response
         )
 
+    async def _async_rmtree(self, directory: Path):
+        """Асинхронно видаляє директорію та весь її вміст."""
+        logger.debug(f"Асинхронне видалення директорії: {directory}")
+        try:
+            # Спочатку видаляємо всі файли та піддиректорії
+            for item_name in await aiofiles.os.listdir(directory):
+                item_path = directory / item_name
+                if await aiofiles.os.path.isdir(item_path):
+                    await self._async_rmtree(item_path) # Рекурсивний виклик для піддиректорій
+                else:
+                    await aiofiles.os.remove(item_path) # Видалення файлу
+            # Після того, як директорія порожня, видаляємо саму директорію
+            await aiofiles.os.rmdir(directory)
+            logger.debug(f"Директорію {directory} успішно видалено.")
+        except Exception as e:
+            logger.error(f"Помилка під час асинхронного видалення директорії {directory}: {e}", exc_info=True)
+            # Залежно від стратегії, можна або проковтнути помилку, або підняти її вище
+            # raise # Якщо потрібно повідомити про помилку вище
+
     async def delete_actual_file(self, storage_path: str) -> bool:
         """Видаляє фактичний файл зі сховища."""
         logger.info(f"Спроба видалення фактичного файлу зі сховища: '{storage_path}'")
@@ -274,11 +293,8 @@ class FileUploadService(BaseService): # type: ignore видалено
             return False
 
         try:
-            if abs_file_path.is_file():
-                # Використовуємо aiofiles для асинхронного видалення, якщо це критично,
-                # але os.remove зазвичай швидкий. Для простоти поки os.remove.
-                # TODO: Розглянути `await aiofiles.os.remove(abs_file_path)` якщо є блокування.
-                os.remove(abs_file_path)
+            if await aiofiles.os.path.isfile(abs_file_path): # Замінено на async версію
+                await aiofiles.os.remove(abs_file_path) # Замінено на async версію
                 logger.info(f"Локальний файл '{abs_file_path}' успішно видалено.")
 
                 # Спроба видалити батьківську директорію (UUID_SUBDIR), якщо вона порожня
@@ -286,9 +302,10 @@ class FileUploadService(BaseService): # type: ignore видалено
                 # Переконуємося, що батьківська директорія знаходиться в permanent_storage_dir і не є самою permanent_storage_dir
                 if parent_dir != self.permanent_storage_dir and str(parent_dir).startswith(
                         str(self.permanent_storage_dir.resolve())):
-                    if not any(parent_dir.iterdir()):  # Перевірка, чи директорія порожня
+                    # Перевірка, чи директорія порожня (aiofiles.os.listdir може бути використано)
+                    if not await aiofiles.os.listdir(parent_dir):
                         try:
-                            parent_dir.rmdir()
+                            await aiofiles.os.rmdir(parent_dir) # Замінено на async версію
                             logger.info(f"Порожню батьківську директорію '{parent_dir}' видалено.")
                         except OSError as e_rmdir:  # Може бути помилка, якщо директорія не порожня (race condition)
                             logger.warning(

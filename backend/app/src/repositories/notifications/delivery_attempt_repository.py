@@ -146,6 +146,63 @@ class NotificationDeliveryAttemptRepository(
             )
             return [], 0
 
+    async def list_retryable_attempts(
+        self,
+        session: AsyncSession,
+        max_attempts: int,
+        age_threshold: datetime, # Поріг часу (created_at >= age_threshold)
+        with_relations: bool = False, # Для завантаження зв'язків Notification -> User
+        skip: int = 0,
+        limit: int = 100
+    ) -> Tuple[List[NotificationDeliveryAttempt], int]:
+        """
+        Отримує список спроб доставки, які можна повторити.
+        Фільтрує за статусом, кількістю спроб та віком запису.
+        """
+        logger.debug(
+            f"Отримання спроб для повтору: max_attempts < {max_attempts}, created_at >= {age_threshold}, "
+            f"skip: {skip}, limit: {limit}, with_relations: {with_relations}"
+        )
+
+        conditions = [
+            self.model.status.in_([DeliveryStatusType.FAILED, DeliveryStatusType.RETRY_SCHEDULED]),
+            self.model.attempt_count < max_attempts,
+            self.model.created_at >= age_threshold
+        ]
+
+        stmt = select(self.model).where(*conditions).order_by(self.model.created_at.asc()) # Обробляємо старіші спочатку
+
+        if with_relations:
+            from backend.app.src.models.notifications.notification import Notification # Локальний імпорт
+            from backend.app.src.models.auth.user import User # Локальний імпорт
+            stmt = stmt.options(
+                selectinload(self.model.notification).options(
+                    selectinload(Notification.user).options(selectinload(User.user_type))
+                )
+            )
+
+        # Для підрахунку загальної кількості перед пагінацією
+        count_stmt = select(func.count(self.model.id)).where(*conditions)
+
+        # Застосування пагінації
+        stmt = stmt.offset(skip).limit(limit)
+
+        try:
+            total_count_result = await session.execute(count_stmt)
+            total_count = total_count_result.scalar_one_or_none() or 0
+
+            items_result = await session.execute(stmt)
+            items = list(items_result.scalars().all()) # unique() не потрібен, якщо with_relations правильно використовує options
+
+            logger.debug(f"Знайдено {total_count} спроб для повтору, повернуто {len(items)}.")
+            return items, total_count
+        except Exception as e:
+            logger.error(
+                f"Помилка при отриманні спроб для повтору: {e}",
+                exc_info=True
+            )
+            return [], 0
+
 
 if __name__ == "__main__":
     # Демонстраційний блок для NotificationDeliveryAttemptRepository.
@@ -159,6 +216,7 @@ if __name__ == "__main__":
 
     logger.info("\nСпецифічні методи:")
     logger.info("  - get_attempts_for_notification(notification_id: int, skip: int = 0, limit: int = 100)")
-    logger.info("  - get_failed_attempts_by_channel(channel: NotificationChannelType, skip: int = 0, limit: int = 100)") # Оновлено тип
+    logger.info("  - get_failed_attempts_by_channel(channel: NotificationChannelType, skip: int = 0, limit: int = 100)")
+    logger.info("  - list_retryable_attempts(max_attempts: int, age_threshold: datetime, with_relations: bool = False, skip: int = 0, limit: int = 100)")
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

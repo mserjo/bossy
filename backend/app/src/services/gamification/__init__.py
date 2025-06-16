@@ -13,14 +13,14 @@ from backend.app.src.services.gamification.level import LevelService
 from backend.app.src.services.gamification.user_level import UserLevelService
 from backend.app.src.services.gamification.badge import BadgeService
 from backend.app.src.services.gamification.achievement import UserAchievementService
-from backend.app.src.services.gamification.rating import RatingService # Відповідно до списку файлів завдання
+from backend.app.src.services.gamification.rating import UserRatingService # Змінено на UserRatingService
 
 __all__ = [
     "LevelService",
     "UserLevelService",
     "BadgeService",
     "UserAchievementService",
-    "RatingService", # Відповідно до списку файлів завдання
+    "UserRatingService", # Змінено на UserRatingService
 ]
 
 logger.info(f"Сервіси гейміфікації експортують: {__all__}")

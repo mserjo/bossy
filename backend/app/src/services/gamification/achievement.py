@@ -19,6 +19,7 @@ from sqlalchemy.exc import IntegrityError
 
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.gamification.achievement import UserAchievement
+from backend.app.src.repositories.gamification.user_achievement_repository import UserAchievementRepository # Імпорт репозиторію
 from backend.app.src.models.gamification.badge import Badge
 from backend.app.src.models.auth.user import User
 from backend.app.src.models.groups.group import Group
@@ -41,6 +42,7 @@ class UserAchievementService(BaseService): # type: ignore видалено
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
+        self.user_achievement_repo = UserAchievementRepository() # Ініціалізація репозиторію
         logger.info("UserAchievementService ініціалізовано.")
 
     async def _get_orm_user_achievement_by_id(self, achievement_id: int) -> Optional[UserAchievement]: # achievement_id: UUID -> int
@@ -100,41 +102,42 @@ class UserAchievementService(BaseService): # type: ignore видалено
                     raise ValueError(f"Групу з ID '{achievement_data.group_id}' не знайдено.")  # i18n
 
             if not badge.is_repeatable:
-                existing_achievement_stmt = select(UserAchievement.id).where(
-                    UserAchievement.user_id == user_id,
-                    UserAchievement.badge_id == badge_id
+                # Використовуємо репозиторій для перевірки існуючого досягнення
+                existing_achievement = await self.user_achievement_repo.get_by_user_and_badge(
+                    session=self.db_session,
+                    user_id=user_id,
+                    badge_id=badge_id,
+                    group_id=achievement_data.group_id
                 )
-                if achievement_data.group_id:
-                    existing_achievement_stmt = existing_achievement_stmt.where(
-                        UserAchievement.group_id == achievement_data.group_id)
-                else:
-                    existing_achievement_stmt = existing_achievement_stmt.where(UserAchievement.group_id.is_(None))
-
-                existing_result = await self.db_session.execute(existing_achievement_stmt)
-                if existing_result.scalar_one_or_none():
-                    msg = f"Бейдж '{badge.name}' (ID: {badge_id}) вже було надано цьому користувачеві в даному контексті і він не є повторюваним."  # i18n
+                if existing_achievement:
+                    msg = f"Бейдж '{badge.name}' (ID: {badge_id}) вже було надано цьому користувачеві в даному контексті і він не є повторюваним."
                     logger.warning(msg)
                     raise ValueError(msg)
 
-            new_achievement_data = achievement_data.model_dump()
-            new_achievement_data.update({
-                "user_id": user_id,
-                "badge_id": badge_id,
-                "awarded_by_user_id": awarded_by_user_id
-            })
-            new_achievement_db = UserAchievement(**new_achievement_data)
-            self.db_session.add(new_achievement_db)
-            await self.db_session.flush() # Щоб отримати ID
-            await self.db_session.refresh(new_achievement_db)
+            # Дані для створення UserAchievementCreateSchema, який приймає UserAchievementRepository.create
+            # awarded_at встановлюється автоматично через TimestampedMixin
+            create_schema_data = UserAchievementCreate(
+                user_id=user_id,
+                badge_id=badge_id,
+                group_id=achievement_data.group_id,
+                achieved_at=achievement_data.achieved_at or datetime.now(timezone.utc), # Забезпечуємо achieved_at
+                context_data=achievement_data.context_data,
+                awarded_by_user_id=awarded_by_user_id
+            )
 
+            new_achievement_db = await self.user_achievement_repo.create(
+                session=self.db_session,
+                obj_in=create_schema_data
+            )
+            # Попередній flush та refresh не потрібні, оскільки create з BaseRepository повертає ORM об'єкт
 
-        # Окремий блок try/except для коміту, щоб відкат не вплинув на вже отриманий new_achievement_db.id
+        # Коміт після виходу з блоку with session.begin() (якщо він був) або тут
         try:
             await self.commit()
-        except IntegrityError as e: # Ця помилка мала б бути перехоплена раніше, якщо UniqueConstraint спрацював до flush
+        except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності при нагородженні ({log_ctx}): {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося нагородити досягненням через конфлікт даних: {e}") # i18n
+            raise ValueError(f"Не вдалося нагородити досягненням через конфлікт даних: {e}")
         except Exception as e:
             await self.rollback()
             logger.error(f"Неочікувана помилка при коміті нагородження ({log_ctx}): {e}", exc_info=settings.DEBUG)
@@ -158,6 +161,8 @@ class UserAchievementService(BaseService): # type: ignore видалено
         """
         logger.debug(f"Спроба отримання запису досягнення за ID: {achievement_id}")
         try:
+            # Використовуємо _get_orm_user_achievement_by_id для завантаження зв'язків,
+            # оскільки repo.get() може не завантажувати їх так, як потрібно для UserAchievementResponse.
             achievement_db = await self._get_orm_user_achievement_by_id(achievement_id)
             if achievement_db:
                 logger.info(f"Запис досягнення з ID '{achievement_id}' знайдено.")
@@ -171,44 +176,49 @@ class UserAchievementService(BaseService): # type: ignore видалено
 
     async def list_achievements_for_user(
             self,
-            # session: AsyncSession, # Видалено параметр session
-            user_id: int, # UUID -> int
-            group_id: Optional[int] = None, # Optional[UUID] -> Optional[int]
-            filter_global_only: bool = False,
+            user_id: int,
+            group_id: Optional[int] = None,
+            filter_global_only: bool = False, # Цей параметр буде оброблено в repo
             skip: int = 0,
             limit: int = 100
     ) -> List[UserAchievementResponse]:
         """
         Перелічує досягнення для вказаного користувача.
         Може фільтрувати за групою або показувати тільки глобальні досягнення.
-        :param user_id: ID користувача (int).
-        :param group_id: ID групи (Optional[int]).
         """
         log_ctx_parts = [f"користувач ID '{user_id}'"]
         if group_id: log_ctx_parts.append(f"група ID '{group_id}'")
-        if filter_global_only and not group_id: log_ctx_parts.append("тільки глобальні")
+        # filter_global_only використовується в repo.get_achievements_for_user
+        # якщо group_id is None
+        if filter_global_only and group_id is None: log_ctx_parts.append("тільки глобальні")
         log_ctx = ", ".join(log_ctx_parts)
         logger.debug(f"Перелік досягнень для {log_ctx}, пропустити={skip}, ліміт={limit}")
 
         try:
-            stmt = select(UserAchievement).options(
-                selectinload(UserAchievement.user).options(noload("*")),
-                selectinload(UserAchievement.badge),
-                selectinload(UserAchievement.group),
-                selectinload(UserAchievement.awarded_by).options(noload("*"))
-            ).where(UserAchievement.user_id == user_id)
+            # Використовуємо метод репозиторію
+            # Репозиторій повертає Tuple[List[UserAchievement], int], нам потрібен тільки список.
+            # TODO: Розглянути, чи потрібне завантаження зв'язків тут.
+            # Якщо UserAchievementResponse потребує зв'язків, які не завантажуються в repo.get_achievements_for_user,
+            # то потрібен буде цикл з _get_orm_user_achievement_by_id або розширення репо.
+            # Наразі припускаємо, що моделі мають selectinload в своїх визначеннях зв'язків.
+            achievements_db_list, _ = await self.user_achievement_repo.get_achievements_for_user(
+                session=self.db_session,
+                user_id=user_id,
+                group_id=group_id,
+                include_global=filter_global_only if group_id is None else False, # Логіка include_global для репо
+                skip=skip,
+                limit=limit
+            )
 
-            if group_id is not None:
-                stmt = stmt.where(UserAchievement.group_id == group_id)
-            elif filter_global_only:
-                stmt = stmt.where(UserAchievement.group_id.is_(None))
+            # Якщо UserAchievementResponse потребує більш глибоких зв'язків, ніж ті, що завантажує репозиторій:
+            # response_list = []
+            # for ach_base in achievements_db_list:
+            #     detailed_ach = await self._get_orm_user_achievement_by_id(ach_base.id)
+            #     if detailed_ach:
+            #         response_list.append(UserAchievementResponse.model_validate(detailed_ach))
+            # Або, якщо зв'язки в моделі налаштовані на selectinload:
+            response_list = [UserAchievementResponse.model_validate(ach) for ach in achievements_db_list]
 
-            stmt = stmt.order_by(UserAchievement.achieved_at.desc()).offset(skip).limit(limit)
-
-            achievements_db_result = await self.db_session.execute(stmt) # Використання self.db_session
-            achievements_db = list(achievements_db_result.scalars().unique().all())
-
-            response_list = [UserAchievementResponse.model_validate(ach) for ach in achievements_db]
             logger.info(f"Отримано {len(response_list)} досягнень для {log_ctx}.")
             return response_list
         except Exception as e:
@@ -217,44 +227,37 @@ class UserAchievementService(BaseService): # type: ignore видалено
 
     async def list_users_for_badge(
             self,
-            # session: AsyncSession, # Видалено параметр session
-            badge_id: int, # UUID -> int
-            group_id: Optional[int] = None, # Optional[UUID] -> Optional[int]
-            filter_global_only: bool = False,
+            badge_id: int,
+            group_id: Optional[int] = None,
+            filter_global_only: bool = False, # Параметр для repo
             skip: int = 0,
             limit: int = 100
     ) -> List[UserAchievementResponse]:
         """
         Перелічує користувачів (через їхні записи UserAchievement), які отримали вказаний бейдж.
         Може фільтрувати за групою або показувати тільки глобальні нагородження цим бейджем.
-        :param badge_id: ID бейджа (int).
-        :param group_id: ID групи (Optional[int]).
         """
         log_ctx_parts = [f"бейдж ID '{badge_id}'"]
         if group_id: log_ctx_parts.append(f"група ID '{group_id}'")
-        if filter_global_only and not group_id: log_ctx_parts.append("тільки глобальні")
+        if filter_global_only and group_id is None: log_ctx_parts.append("тільки глобальні")
         log_ctx = ", ".join(log_ctx_parts)
         logger.debug(f"Перелік користувачів, що здобули {log_ctx}, пропустити={skip}, ліміт={limit}")
 
         try:
-            stmt = select(UserAchievement).options(
-                selectinload(UserAchievement.user).options(selectinload(User.user_type)),
-                selectinload(UserAchievement.badge),
-                selectinload(UserAchievement.group),
-                selectinload(UserAchievement.awarded_by).options(noload("*"))
-            ).where(UserAchievement.badge_id == badge_id)
+            # Використовуємо новий метод репозиторію
+            # TODO: Аналогічно до list_achievements_for_user, питання завантаження зв'язків.
+            achievements_db_list, _ = await self.user_achievement_repo.get_achievements_for_badge(
+                session=self.db_session,
+                badge_id=badge_id,
+                group_id=group_id,
+                include_global=filter_global_only if group_id is None else False,
+                skip=skip,
+                limit=limit
+            )
 
-            if group_id is not None:
-                stmt = stmt.where(UserAchievement.group_id == group_id)
-            elif filter_global_only:
-                stmt = stmt.where(UserAchievement.group_id.is_(None))
+            # Припускаємо, що UserAchievementResponse обробляє ORM об'єкти і їх зв'язки (lazy/selectin loaded)
+            response_list = [UserAchievementResponse.model_validate(ach) for ach in achievements_db_list]
 
-            stmt = stmt.order_by(UserAchievement.achieved_at.desc()).offset(skip).limit(limit)
-
-            achievements_db_result = await self.db_session.execute(stmt) # Використання self.db_session
-            achievements_db = list(achievements_db_result.scalars().unique().all())
-
-            response_list = [UserAchievementResponse.model_validate(ach) for ach in achievements_db]
             logger.info(f"Отримано {len(response_list)} записів нагороджень для {log_ctx}.")
             return response_list
         except Exception as e:

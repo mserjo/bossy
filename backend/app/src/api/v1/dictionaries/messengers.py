@@ -6,8 +6,10 @@
 Дозволяє створювати, отримувати, оновлювати та видаляти платформи месенджерів.
 Доступ до операцій створення, оновлення та видалення обмежений для суперкористувачів.
 Перегляд списку та окремих елементів доступний автентифікованим користувачам.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-from typing import List  # Any не використовується, можна прибрати
+from typing import List # Any вже було видалено, або не було
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -38,7 +40,8 @@ async def get_messenger_platform_service(
     """
     return MessengerPlatformService(db_session=session)  # Використовуємо db_session напряму
 
-
+# ПРИМІТКА: Реалізація полів `created_by_user_id`/`updated_by_user_id` (якщо вони є в моделі)
+# залежить від можливостей базового сервісу `BaseDictionaryService`.
 @router.post(
     "/",
     response_model=MessengerPlatformResponse,
@@ -95,7 +98,8 @@ async def get_messenger_platform(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Платформу месенджера не знайдено.")
     return db_item
 
-
+# ПРИМІТКА: Коректна пагінація залежить від реалізації методу `count_all()`
+# в `MessengerPlatformService` (успадкованого від `BaseDictionaryService`).
 @router.get(
     "/",
     response_model=PagedResponse[MessengerPlatformResponse],
@@ -126,6 +130,8 @@ async def get_all_messenger_platforms(
     )
 
 
+# ПРИМІТКА: Реалізація полів `created_by_user_id`/`updated_by_user_id` (якщо вони є в моделі)
+# залежить від можливостей базового сервісу `BaseDictionaryService`.
 @router.put(
     "/{messenger_platform_id}",
     response_model=MessengerPlatformResponse,

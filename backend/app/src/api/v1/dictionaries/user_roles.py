@@ -6,8 +6,10 @@
 Дозволяє створювати, отримувати, оновлювати та видаляти ролі користувачів.
 Доступ до операцій створення, оновлення та видалення обмежений для суперкористувачів.
 Перегляд списку та окремих елементів доступний автентифікованим користувачам.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-from typing import List  # Any не використовується, можна прибрати
+from typing import List # Any вже було видалено, або не було
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -36,7 +38,8 @@ async def get_user_role_service(session: AsyncSession = Depends(get_api_db_sessi
     """
     return UserRoleService(db_session=session)  # Використовуємо db_session напряму
 
-
+# ПРИМІТКА: Реалізація полів `created_by_user_id`/`updated_by_user_id` (якщо вони є в моделі)
+# залежить від можливостей базового сервісу `BaseDictionaryService`.
 @router.post(
     "/",
     response_model=UserRoleResponse,
@@ -92,7 +95,8 @@ async def get_user_role(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Роль користувача не знайдено.")
     return db_item
 
-
+# ПРИМІТКА: Коректна пагінація залежить від реалізації методу `count_all()`
+# в `UserRoleService` (успадкованого від `BaseDictionaryService`).
 @router.get(
     "/",
     response_model=PagedResponse[UserRoleResponse],
@@ -140,6 +144,8 @@ async def update_user_role(
     Доступно тільки суперкористувачам.
     TODO: Додати перевірку, чи не змінюються системні ролі (наприклад, SUPERUSER), якщо це заборонено.
     """
+# ПРИМІТКА: Важливо реалізувати перевірку, щоб запобігти небажаним змінам
+# системних ролей, як зазначено в TODO.
     logger.info(f"Спроба оновлення ролі користувача ID '{user_role_id}' користувачем ID '{current_user.id}'.")
     try:
         # TODO: Перевірити, чи модель UserRole має updated_by_user_id і чи BaseDictionaryService це обробляє.
@@ -175,6 +181,8 @@ async def delete_user_role(
     Доступно тільки суперкористувачам.
     TODO: Додати перевірку, чи не видаляються системні ролі (наприклад, SUPERUSER, ADMIN, USER), якщо це заборонено.
     """
+# ПРИМІТКА: Необхідно реалізувати перевірку, щоб уникнути видалення
+# критично важливих системних ролей, як зазначено в TODO.
     logger.info(f"Спроба видалення ролі користувача ID '{user_role_id}' користувачем ID '{current_user.id}'.")
     try:
         deleted = await service.delete(item_id=user_role_id)

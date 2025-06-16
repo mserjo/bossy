@@ -6,6 +6,8 @@
 Бейджі є типом нагород, які користувачі можуть заробити. Цей модуль
 дозволяє адміністраторам та суперкористувачам створювати, переглядати,
 оновлювати та видаляти визначення цих бейджів.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
 from uuid import UUID  # ID тепер UUID
@@ -47,7 +49,9 @@ async def get_badge_service(session: AsyncSession = Depends(get_api_db_session))
 async def get_group_service_dep(session: AsyncSession = Depends(get_api_db_session)) -> GroupService:
     return GroupService(db_session=session)
 
-
+# ПРИМІТКА: Ключовим моментом є реалізація надійної перевірки прав доступу
+# (адміністратор групи або суперюзер), як зазначено в TODO.
+# Також, сервіс `create` має обробляти `created_by_user_id`.
 @router.post(
     "/",
     response_model=BadgeResponse,
@@ -143,10 +147,15 @@ async def read_badge_definitions(
         results=[BadgeResponse.model_validate(b) for b in badges_orm]  # Pydantic v2
     )
 
-
+# ПРИМІТКА: Доступність бейджів для користувача має визначатися логікою
+# в `BadgeService.list_badges_paginated`, враховуючи членство в групах та
+# налаштування самих бейджів, як вказано в TODO.
 # TODO: Створити залежність `check_badge_access_permission(badge_id: UUID, current_user: UserModel, ...)`
 #  яка перевіряє, чи може користувач бачити/редагувати цей бейдж.
 
+# ПРИМІТКА: Логіка перевірки доступу до конкретного бейджа (глобальний, груповий,
+# чи є користувач членом групи) має бути інкапсульована в методі
+# `BadgeService.get_by_id_for_user` або спеціальній залежності.
 @router.get(
     "/{badge_id}",  # Змінено з badge_def_id на badge_id для узгодженості
     response_model=BadgeResponse,
@@ -177,7 +186,9 @@ async def read_badge_definition_by_id(
                             detail=f"Визначення бейджа з ID {badge_id} не знайдено або доступ заборонено.")
     return badge
 
-
+# ПРИМІТКА: Оновлення визначення бейджа вимагає ретельної перевірки прав
+# (адміністратор групи бейджа або суперюзер). Ця логіка має бути реалізована
+# або в сервісі, або через спеціалізовану залежність (див. TODO).
 @router.put(
     "/{badge_id}",
     response_model=BadgeResponse,
@@ -249,5 +260,7 @@ async def delete_badge_definition(
 
     return None
 
-
+# ПРИМІТКА: Видалення визначення бейджа також потребує ретельної перевірки прав,
+# аналогічно до оновлення, та перевірки, чи не використовується бейдж
+# в активних досягненнях.
 logger.info(f"Роутер для визначень бейджів (`{router.prefix}`) визначено.")

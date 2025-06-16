@@ -5,6 +5,8 @@
 
 - Визначення рівнів (CRUD): Доступно адміністраторам/суперкористувачам.
 - Рівні користувачів (перегляд): Користувачі бачать свій рівень, адміни/СУ - рівні інших.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
 from uuid import UUID  # ID тепер UUID
@@ -14,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Повні шляхи імпорту
 from backend.app.src.api.dependencies import (
     get_api_db_session, get_current_active_user,
-    get_current_active_superuser, paginator
+    get_current_active_superuser, paginator, get_group_membership_service # Додано get_group_membership_service
 )
 # TODO: Створити/використати гранульовані залежності для прав доступу
 from backend.app.src.api.v1.groups.groups import check_group_edit_permission, check_group_view_permission  # Тимчасово
@@ -27,6 +29,7 @@ from backend.app.src.core.pagination import PagedResponse, PageParams
 from backend.app.src.services.gamification.level import LevelService
 from backend.app.src.services.gamification.user_level import UserLevelService
 from backend.app.src.services.groups.group import GroupService  # Для перевірки групи при створенні/фільтрації
+from backend.app.src.services.groups.membership import GroupMembershipService # Додано для типізації
 from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
 
@@ -54,7 +57,9 @@ async def get_group_service_dep(session: AsyncSession = Depends(get_api_db_sessi
 # --- Ендпоінти для управління визначеннями рівнів (Level Definitions) ---
 definitions_router = APIRouter()
 
-
+# ПРИМІТКА: Створення визначення рівня потребує ретельної перевірки прав доступу
+# (адміністратор групи або суперюзер). Логіка створення також залежить від
+# можливостей `LevelService` та `BaseDictionaryService` (наприклад, `created_by_user_id`).
 @definitions_router.post(
     "/",
     response_model=LevelResponse,
@@ -68,7 +73,7 @@ async def create_level_definition(
         current_user: UserModel = Depends(get_current_active_user),
         level_service: LevelService = Depends(get_level_service),
         # group_service: GroupService = Depends(get_group_service_dep) # Для перевірки прав на групу
-        membership_service: GroupMembershipService = Depends(get_membership_service_dep)  # З groups.membership
+        membership_service: GroupMembershipService = Depends(get_group_membership_service)  # Оновлено залежність
 ):
     """
     Створює нове визначення рівня.
@@ -114,6 +119,9 @@ async def create_level_definition(
     Доступно всім автентифікованим користувачам. Фільтрується за групою (`group_id`),
     показуючи глобальні рівні та рівні вказаної групи."""  # i18n
 )
+# ПРИМІТКА: Фільтрація та пагінація визначень рівнів залежать від реалізації
+# `LevelService.list_levels_paginated`, включаючи обробку прав доступу
+# та коректний підрахунок загальної кількості елементів.
 async def read_level_definitions(
         group_id: Optional[UUID] = Query(None, description="ID групи для фільтрації (показує рівні групи + глобальні)"),
         # i18n
@@ -143,11 +151,14 @@ async def read_level_definitions(
     )
 
 
+# ПРИМІТКА: Ця залежність перевіряє права доступу до конкретного визначення рівня.
+# Логіка враховує суперкористувача, належність до групи (якщо рівень груповий)
+# та доступність глобальних рівнів.
 async def check_level_def_access_permission(  # Залежність для перевірки прав на конкретне визначення рівня
         level_id: UUID = Path(..., description="ID визначення рівня"),  # i18n
         current_user: UserModel = Depends(get_current_active_user),
         level_service: LevelService = Depends(get_level_service),
-        membership_service: GroupMembershipService = Depends(get_membership_service_dep)
+        membership_service: GroupMembershipService = Depends(get_group_membership_service) # Оновлено залежність
 ) -> LevelResponse:
     level = await level_service.get_by_id(item_id=level_id)
     if not level:
@@ -180,11 +191,14 @@ async def read_level_definition_by_id(
     return retrieved_level
 
 
+# ПРИМІТКА: Ця залежність перевіряє права на редагування/видалення визначення рівня.
+# Вона гарантує, що тільки адміністратори відповідної групи або суперкористувачі
+# можуть вносити зміни або видаляти рівні.
 async def check_level_def_edit_permission(
         level_id: UUID = Path(..., description="ID визначення рівня"),  # i18n
         current_user: UserModel = Depends(get_current_active_user),
         level_service: LevelService = Depends(get_level_service),
-        membership_service: GroupMembershipService = Depends(get_membership_service_dep)
+        membership_service: GroupMembershipService = Depends(get_group_membership_service) # Оновлено залежність
 ) -> LevelResponse:
     level = await level_service.get_by_id(item_id=level_id)
     if not level:
@@ -244,6 +258,9 @@ async def update_level_definition(
     description="Дозволяє адміністратору групи або суперюзеру видалити визначення рівня.",  # i18n
     dependencies=[Depends(check_level_def_edit_permission)]
 )
+# ПРИМІТКА: Видалення визначення рівня є критичною операцією. Необхідно забезпечити,
+# щоб сервіс `LevelService.delete` перевіряв, чи не використовується рівень
+# в активних `UserLevel` записах або інших залежностях, як зазначено в TODO.
 async def delete_level_definition(
         level_id: UUID,  # Змінено з level_def_id
         current_user: UserModel = Depends(get_current_active_user),  # Для логування
@@ -273,6 +290,9 @@ user_levels_router = APIRouter()
     summary="Отримання поточних рівнів користувача",  # i18n
     description="Повертає інформацію про поточні рівні аутентифікованого користувача (глобальний та в групах)."  # i18n
 )
+# ПРИМІТКА: Повна реалізація отримання всіх рівнів користувача (глобального та групових)
+# залежить від доопрацювання логіки в `UserLevelService` та отримання списку груп користувача,
+# як зазначено в TODO.
 async def get_my_user_levels(  # Перейменовано
         group_id: Optional[UUID] = Query(None,
                                          description="ID групи для фільтрації (показати рівень тільки для цієї групи або глобальний, якщо не вказано)"),
@@ -312,6 +332,9 @@ async def get_my_user_levels(  # Перейменовано
     # i18n
     dependencies=[Depends(get_current_active_superuser)]  # TODO: Розширити права для адмінів груп
 )
+# ПРИМІТКА: Цей ендпоінт для адміністраторів потребує ретельної перевірки прав доступу
+# (не тільки суперюзер, але й адміністратор групи, якщо запитується рівень в контексті групи).
+# Також залежить від повноти реалізації отримання всіх рівнів в `UserLevelService`.
 async def get_user_levels_by_id_admin(  # Перейменовано
         user_id_target: UUID = Path(..., description="ID користувача"),  # i18n
         group_id: Optional[UUID] = Query(None, description="ID групи для фільтрації"),  # i18n

@@ -6,9 +6,12 @@
 Включає підключення облікових записів користувачів до зовнішніх календарних платформ
 (наприклад, Google Calendar, Outlook Calendar) через OAuth2, відключення,
 а також управління конфігураціями інтеграцій на рівні користувача та групи.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional, Dict, Any  # Generic, TypeVar, BaseModel не потрібні
 from uuid import UUID
+from datetime import datetime, timezone, timedelta # Додано для заглушки відповіді
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, \
     Request as FastAPIRequest  # Query, Path, FastAPIRequest
 from fastapi.responses import RedirectResponse  # Для OAuth2 потоку
@@ -76,6 +79,10 @@ async def list_available_calendar_providers(
     summary="Перегляд активних інтеграцій з календарями користувача",  # i18n
     description="Повертає список поточних активних інтеграцій з календарями для аутентифікованого користувача."  # i18n
 )
+# ПРИМІТКА: Цей ендпоінт наразі повертає мок-дані. Повноцінна реалізація
+# вимагає створення та інтеграції сервісу для управління обліковими
+# даними інтеграцій користувачів (наприклад, UserIntegrationCredentialService),
+# як зазначено в TODO.
 async def get_user_calendar_connections(
         current_user: UserModel = Depends(get_current_active_user),
         # TODO: Потрібен сервіс для отримання UserIntegration записів (або подібних)
@@ -108,6 +115,10 @@ async def get_user_calendar_connections(
     description="Перенаправляє користувача на сторінку авторизації провайдера календаря для надання доступу.",  # i18n
     status_code=status.HTTP_307_TEMPORARY_REDIRECT
 )
+# ПРИМІТКА: Реалізація цього OAuth2 потоку є складною та вимагає коректної
+# взаємодії з відповідними сервісами календарів (`GoogleCalendarService`,
+# `OutlookCalendarService`) для генерації URL авторизації, обробки `state`
+# та `redirect_uri`, як зазначено в TODO. Поточна реалізація містить заглушки.
 async def initiate_calendar_connection(
         provider_code: str = Path(...,
                                   description="Код провайдера календаря (наприклад, 'GOOGLE_CALENDAR', 'OUTLOOK_CALENDAR')"),
@@ -163,6 +174,10 @@ async def initiate_calendar_connection(
     description="Приймає код авторизації від провайдера, обмінює його на токени та зберігає їх.",  # i18n
     response_model=UserCalendarConnectionResponse  # Або просте повідомлення про успіх/помилку
 )
+# ПРИМІТКА: Реалізація цього OAuth2 потоку є складною та вимагає коректної
+# взаємодії з відповідними сервісами календарів (`GoogleCalendarService`,
+# `OutlookCalendarService`) для генерації URL авторизації, обробки `state`
+# та `redirect_uri`, як зазначено в TODO. Поточна реалізація містить заглушки.
 async def handle_calendar_callback(
         provider_code: str = Path(..., description="Код провайдера календаря"),  # i18n
         code: Optional[str] = Query(None, description="Код авторизації від провайдера"),  # i18n

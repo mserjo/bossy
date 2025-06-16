@@ -6,8 +6,10 @@
 Дозволяє створювати, отримувати, оновлювати та видаляти постачальників календарів.
 Доступ до операцій створення, оновлення та видалення обмежений для суперкористувачів.
 Перегляд списку та окремих елементів доступний автентифікованим користувачам.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-from typing import List  # Any не використовується, можна прибрати
+from typing import List # Any видалено, оскільки не використовується
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -37,7 +39,8 @@ async def get_calendar_provider_service(session: AsyncSession = Depends(get_api_
     """
     return CalendarProviderService(db_session=session)  # Використовуємо db_session напряму
 
-
+# ПРИМІТКА: Реалізація полів `created_by_user_id`/`updated_by_user_id` (якщо вони є в моделі)
+# залежить від можливостей базового сервісу `BaseDictionaryService`.
 @router.post(
     "/",
     response_model=CalendarProviderResponse,
@@ -94,7 +97,8 @@ async def get_calendar_provider(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Постачальника календарів не знайдено.")
     return db_item
 
-
+# ПРИМІТКА: Коректна пагінація залежить від реалізації методу `count_all()`
+# в `CalendarProviderService` (успадкованого від `BaseDictionaryService`).
 @router.get(
     "/",
     response_model=PagedResponse[CalendarProviderResponse],
@@ -125,6 +129,8 @@ async def get_all_calendar_providers(
     )
 
 
+# ПРИМІТКА: Реалізація полів `created_by_user_id`/`updated_by_user_id` (якщо вони є в моделі)
+# залежить від можливостей базового сервісу `BaseDictionaryService`.
 @router.put(
     "/{calendar_provider_id}",
     response_model=CalendarProviderResponse,

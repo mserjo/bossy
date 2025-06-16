@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Модуль для визначення загальних залежностей (dependencies) для API ендпоінтів FastAPI.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
 # import logging # Замінено на централізований логер
@@ -24,6 +26,7 @@ from backend.app.src.services import (  # Імпортуємо реальні с
 from backend.app.src.models.auth.user import User  # Модель SQLAlchemy для користувача
 from backend.app.src.schemas.auth.token import TokenPayload  # Схема Pydantic для payload токена
 from backend.app.src.models.dictionaries.user_roles import UserRole  # Для перевірки ролі в групі
+from backend.app.src.core.constants import ADMIN_ROLE_CODE # Код ролі адміністратора
 
 # Імпорти для кешу та сервісів довідників
 from backend.app.src.services.cache.base_cache import BaseCacheService
@@ -34,7 +37,7 @@ from backend.app.src.services.dictionaries import (
     TaskTypeService, BonusTypeService, CalendarProviderService, MessengerPlatformService
 )
 
-ADMIN_ROLE_CODE = "ADMIN" # TODO: Перенести до core.constants або відповідного Enum
+# ADMIN_ROLE_CODE = "ADMIN" # TODO: Перенесено до core.constants
 
 # --- Залежність для сесії бази даних ---
 async def get_api_db_session() -> AsyncGenerator[AsyncSession, None]:
@@ -84,13 +87,14 @@ async def get_current_user_payload(
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Не вдалося валідувати облікові дані",  # i18n
+        detail="Не вдалося валідувати облікові дані",
         headers={"WWW-Authenticate": "Bearer"},
     )
     payload_dict = await token_service.validate_access_token(token=token)
     if not payload_dict or payload_dict.get("sub") is None:
         logger.warning(f"Невалідний токен або відсутній 'sub'. Токен: {token[:15]}...")
-        raise credentials_exception
+        # i18n
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Невалідний токен або відсутній 'sub'.")
 
     # TODO: Переконатися, що TokenPayload схема відповідає вмісту payload_dict
     #  і обробляє можливі помилки валідації Pydantic.
@@ -98,7 +102,8 @@ async def get_current_user_payload(
         token_payload = TokenPayload(**payload_dict)
     except Exception as e:  # Наприклад, pydantic.ValidationError
         logger.warning(f"Помилка валідації TokenPayload: {e}. Payload: {payload_dict}")
-        raise credentials_exception
+        # i18n
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Некоректний формат токена.")
 
     logger.debug(f"Payload токена успішно отримано для sub: {token_payload.sub}")
     return token_payload
@@ -113,7 +118,6 @@ async def get_current_user(
     """
     if not payload.sub:
         logger.warning("Відсутній 'sub' (user_id) в payload токена.")
-        # i18n
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Некоректний формат токена.")
 
     try:
@@ -122,14 +126,13 @@ async def get_current_user(
         logger.warning(f"Не вдалося конвертувати 'sub' з токена ('{payload.sub}') в int.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Некоректний формат ідентифікатора користувача в токені.", # i18n
+            detail="Некоректний формат ідентифікатора користувача в токені.",
             headers={"WWW-Authenticate": "Bearer"},
         )
     # Використання захищеного методу, який повертає ORM модель, або get_user_by_id, якщо він повертає модель
     user = await user_service._get_user_model_by_id(user_id=user_id_from_token)
     if user is None:
         logger.warning(f"Користувача з id '{user_id_from_token}' (з токена) не знайдено в БД.")
-        # i18n
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Користувача, пов'язаного з токеном, не знайдено.",
@@ -148,7 +151,6 @@ async def get_current_active_user(
     """
     if not current_user.is_active:
         logger.warning(f"Спроба доступу неактивним користувачем '{current_user.username}' (id: {current_user.id}).")
-        # i18n
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Обліковий запис користувача неактивний.")
     logger.debug(f"Користувач '{current_user.username}' активний.")
     return current_user
@@ -165,7 +167,6 @@ async def get_current_active_superuser(
         logger.warning(
             f"Користувач '{current_user.username}' (id: {current_user.id}) не є суперюзером. Доступ заборонено."
         )
-        # i18n
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Недостатньо прав: потрібні права суперкористувача."
@@ -204,15 +205,13 @@ async def get_current_active_group_admin(
     if not membership or not membership.is_active or not membership.role:
         logger.warning(
             f"Користувач '{current_user.username}' не є активним членом або не має ролі в групі ID '{group_id}'.")
-        # i18n
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="Ви не є активним членом цієї групи або не маєте призначеної ролі.")
 
-    if membership.role.code != ADMIN_ROLE_CODE:  # Припускаємо, що ADMIN_ROLE_CODE це "ADMIN"
+    if membership.role.code != ADMIN_ROLE_CODE:  # Використовуємо імпортовану константу
         logger.warning(
             f"Користувач '{current_user.username}' (ID: {current_user.id}) не є адміністратором групи ID '{group_id}' (роль: {membership.role.code}). Доступ заборонено."
         )
-        # i18n
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Недостатньо прав: потрібні права адміністратора цієї групи."
@@ -276,7 +275,6 @@ async def get_cache_service() -> BaseCacheService:
 
     if _cache_service_instance is None: # Якщо ініціалізація все ще не вдалася
         logger.error("Не вдалося створити жоден екземпляр CacheService!")
-        # i18n
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Сервіс кешування недоступний.")
 
     return _cache_service_instance

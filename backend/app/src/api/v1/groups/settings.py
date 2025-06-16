@@ -5,6 +5,8 @@
 
 Дозволяє адміністраторам групи або суперкористувачам переглядати та оновлювати
 налаштування, специфічні для групи (наприклад, назва валюти бонусів).
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Path
@@ -34,7 +36,10 @@ async def get_group_setting_service(session: AsyncSession = Depends(get_api_db_s
     """Залежність FastAPI для отримання екземпляра GroupSettingService."""
     return GroupSettingService(db_session=session)
 
-
+# ПРИМІТКА: Доступ до перегляду налаштувань групи обмежений адміністраторами
+# групи або суперюзерами через залежність `check_group_edit_permission`.
+# Поведінка при відсутності налаштувань (створення за замовчуванням)
+# залежить від реалізації сервісу, як зазначено в TODO.
 @router.get(
     "/",  # Відповідає /{group_id}/settings/
     response_model=GroupSettingResponse,
@@ -71,7 +76,9 @@ async def get_group_settings(
         )
     return group_settings
 
-
+# ПРИМІТКА: Оновлення налаштувань використовує логіку "створити або оновити" (upsert)
+# через метод `create_or_update_group_settings` в сервісі. Права доступу
+# контролюються залежністю `check_group_edit_permission`.
 @router.put(
     "/",  # Відповідає /{group_id}/settings/
     response_model=GroupSettingResponse,

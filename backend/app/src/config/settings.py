@@ -165,6 +165,12 @@ class Settings(BaseSettings):
     JWT_ISSUER: str = "your.domain.com"  # TODO: Замінити на реальний домен видавця
     JWT_AUDIENCE: str = "your.domain.com" # TODO: Замінити на реальну аудиторію
 
+    # --- Налаштування для Refresh Token Cookie ---
+    REFRESH_TOKEN_COOKIE_KEY: str = "refreshToken" # Ключ (назва) cookie для refresh token
+    REFRESH_TOKEN_COOKIE_SECURE: bool = True      # Чи встановлювати Secure прапорець для cookie (True для HTTPS)
+    REFRESH_TOKEN_COOKIE_SAMESITE: str = "lax"    # SameSite атрибут для cookie ('lax', 'strict', 'none')
+    # REFRESH_TOKEN_EXPIRE_SECONDS вже є (неявно через REFRESH_TOKEN_EXPIRE_DAYS)
+
     # --- Налаштування CORS (Cross-Origin Resource Sharing) ---
     # Дозволяє запити з вказаних джерел.
     # Для розробки можна використовувати `["*"]` (будь-яке джерело), але це небезпечно для продакшену.
@@ -276,9 +282,12 @@ if __name__ == "__main__":
             display_value = f"{value.scheme}://******@{value.host}:{value.port or ''}/{value.path}"
         elif is_sensitive and isinstance(value, str):
             display_value = f"{value[:2]}******{value[-2:]}" if len(value) > 4 else "******"
-        elif is_sensitive and value is not None:
+        elif is_sensitive and value is not None: # Catches non-string sensitive values
             display_value = "******"
-        else:
+        elif key in ("REFRESH_TOKEN_COOKIE_KEY", "REFRESH_TOKEN_COOKIE_SECURE", "REFRESH_TOKEN_COOKIE_SAMESITE"):
+            # Ці поля не є чутливими, відображаємо їх як є
+            display_value = value
+        else: # Default for non-sensitive or already handled sensitive values
             display_value = value
 
         logger.info("%s: %s", key, display_value)

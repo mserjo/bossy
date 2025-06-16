@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Ендпоінти для CRUD операцій над сутністю "Група".
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional  # Generic, TypeVar, Any, Dict не використовуються
 from uuid import UUID  # ID тепер UUID
@@ -28,6 +30,7 @@ from backend.app.src.schemas.groups.group import (
 from backend.app.src.core.pagination import PagedResponse, PageParams  # Використовуємо з core.pagination
 from backend.app.src.services.groups.group import GroupService
 from backend.app.src.services.groups.membership import GroupMembershipService  # Для перевірки прав
+from backend.app.src.core.constants import ADMIN_ROLE_CODE # Для перевірки ролі адміна
 from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
 
@@ -92,6 +95,10 @@ async def create_group(
     Звичайний користувач бачить групи, до яких він належить.
     TODO: Додати фільтри (публічні/приватні, за назвою, типом тощо)."""  # i18n
 )
+# ПРИМІТКА: Реалізація цього ендпоінта потребує значного доопрацювання в сервісному шарі
+# (`GroupService`) для коректного отримання списку груп для суперюзера,
+# правильної пагінації (повернення total_count), та реалізації фільтрів,
+# як зазначено в TODO. Поточна реалізація є частковою/заглушкою.
 async def read_groups(
         page_params: PageParams = Depends(paginator),
         current_user: UserModel = Depends(get_current_active_user),  # Потрібен для визначення контексту
@@ -155,7 +162,9 @@ async def check_group_view_permission(  # Залежність для перев
                             detail="Ви не є членом цієї групи або доступ обмежено.")
     return  # Доступ дозволено
 
-
+# ПРИМІТКА: Ця залежність (`check_group_view_permission`) є ключовою для контролю доступу
+# до інформації про групу. Вона має коректно обробляти випадки суперкористувача
+# та активного членства в групі.
 @router.get(
     "/{group_id}",
     response_model=GroupDetailedResponse,  # Завжди повертаємо деталі, якщо є доступ
@@ -183,6 +192,9 @@ async def read_group_by_id(
     return group_details
 
 
+# ПРИМІТКА: Ця залежність (`check_group_edit_permission`) контролює доступ до операцій
+# редагування та видалення групи. Важливою є перевірка ролі адміністратора групи
+# (з використанням `ADMIN_ROLE_CODE`) або прав суперкористувача.
 async def check_group_edit_permission(  # Залежність для перевірки прав на редагування/видалення групи
         group_id: UUID = Path(..., description="ID групи для перевірки"),  # i18n
         current_user: UserModel = Depends(get_current_active_user),

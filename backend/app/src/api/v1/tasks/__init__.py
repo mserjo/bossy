@@ -12,15 +12,17 @@
 
 Загальний префікс для всіх цих шляхів (наприклад, `/tasks`) буде встановлено
 при підключенні `tasks_router` до роутера версії API (`v1_router`).
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from fastapi import APIRouter
 
-# Повні шляхи імпорту (відносно поточного пакету)
-from .tasks import router as crud_tasks_router
-from .events import router as events_router
-from .assignments import router as task_assignments_router
-from .completions import router as task_completions_router
-from .reviews import router as task_reviews_router
+# Оновлені повні шляхи імпорту для під-роутерів
+from backend.app.src.api.v1.tasks.tasks import router as crud_tasks_router
+from backend.app.src.api.v1.tasks.events import router as events_router
+from backend.app.src.api.v1.tasks.assignments import router as task_assignments_router
+from backend.app.src.api.v1.tasks.completions import router as task_completions_router
+from backend.app.src.api.v1.tasks.reviews import router as task_reviews_router
 
 from backend.app.src.config.logging import logger # Централізований логер
 

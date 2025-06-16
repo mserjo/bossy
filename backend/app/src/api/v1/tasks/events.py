@@ -3,6 +3,8 @@
 """
 Ендпоінти для CRUD операцій над сутністю "Подія".
 Події є схожими на завдання, але зазвичай представляють заплановані заходи.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional
 from uuid import UUID  # ID тепер UUID
@@ -14,7 +16,7 @@ from backend.app.src.api.dependencies import (
     get_api_db_session, get_current_active_user,
     # TODO: Використати або створити залежності для перевірки прав доступу до подій/груп,
     # аналогічні тим, що можуть бути для завдань (наприклад, check_event_view_permission)
-    paginator
+    paginator, get_group_membership_service # Додано get_group_membership_service
 )
 from backend.app.src.api.v1.groups.groups import check_group_edit_permission, check_group_view_permission  # Тимчасово
 from backend.app.src.models.auth.user import User as UserModel
@@ -24,6 +26,7 @@ from backend.app.src.schemas.tasks.event import (
 from backend.app.src.core.pagination import PagedResponse, PageParams  # Використовуємо з core.pagination
 from backend.app.src.services.tasks.event import EventService
 from backend.app.src.services.groups.membership import GroupMembershipService  # Для перевірки членства
+from backend.app.src.core.constants import ADMIN_ROLE_CODE # Для перевірки ролі адміна
 from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
 
@@ -37,16 +40,19 @@ async def get_event_service(session: AsyncSession = Depends(get_api_db_session))
 
 
 # Залежність для GroupMembershipService (для перевірки прав)
-async def get_membership_service_dep(session: AsyncSession = Depends(get_api_db_session)) -> GroupMembershipService:
-    return GroupMembershipService(db_session=session)
+# async def get_membership_service_dep(session: AsyncSession = Depends(get_api_db_session)) -> GroupMembershipService:
+#     return GroupMembershipService(db_session=session)
+# Використовуємо get_group_membership_service з dependencies
 
 
+# ПРИМІТКА: Ця залежність перевіряє права на редагування події. Важливою є логіка
+# перевірки адміністратора групи (`ADMIN_ROLE_CODE`) або суперюзера.
 # Допоміжна функція-залежність для перевірки прав редагування події
 async def event_edit_permission_dependency(
         event_id: UUID = Path(..., description="ID Події"),  # i18n
         current_user: UserModel = Depends(get_current_active_user),
         event_service: EventService = Depends(get_event_service),
-        membership_service: GroupMembershipService = Depends(get_membership_service_dep)
+        membership_service: GroupMembershipService = Depends(get_group_membership_service) # Оновлено залежність
 ) -> UserModel:
     event_orm = await event_service.get_event_orm_by_id(event_id)  # Потрібен метод, що повертає ORM модель
     if not event_orm:
@@ -55,19 +61,21 @@ async def event_edit_permission_dependency(
         return current_user
 
     membership = await membership_service.get_membership_details(group_id=event_orm.group_id, user_id=current_user.id)
-    if not membership or not membership.is_active or membership.role.code != "ADMIN":  # ADMIN_ROLE_CODE
+    if not membership or not membership.is_active or membership.role.code != ADMIN_ROLE_CODE: # Використання ADMIN_ROLE_CODE
         # i18n
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="Недостатньо прав для редагування цієї події.")
     return current_user
 
 
+# ПРИМІТКА: Ця залежність перевіряє права на перегляд події, гарантуючи,
+# що користувач є членом групи події або суперюзером.
 # Допоміжна функція-залежність для перевірки прав перегляду події
 async def event_view_permission_dependency(
         event_id: UUID = Path(..., description="ID Події"),  # i18n
         current_user: UserModel = Depends(get_current_active_user),
         event_service: EventService = Depends(get_event_service),
-        membership_service: GroupMembershipService = Depends(get_membership_service_dep)
+        membership_service: GroupMembershipService = Depends(get_group_membership_service) # Оновлено залежність
 ) -> UserModel:
     event_orm = await event_service.get_event_orm_by_id(event_id)
     if not event_orm:
@@ -89,12 +97,15 @@ async def event_view_permission_dependency(
     summary="Створення нової події",  # i18n
     description="Дозволяє адміністратору групи або суперюзеру створити нову подію в межах групи."  # i18n
 )
+# ПРИМІТКА: Перевірка прав на створення події (адміністратор групи або суперюзер)
+# наразі реалізована всередині ендпоінта. В майбутньому її варто винести
+# в окрему, більш гранульовану залежність, як зазначено в TODO.
 async def create_event(
         event_in: EventCreate,  # group_id має бути в EventCreate
         # TODO: Використати залежність, що перевіряє права адміна на event_in.group_id
         current_user: UserModel = Depends(get_current_active_user),  # Тимчасово, потрібна перевірка адміна групи
         event_service: EventService = Depends(get_event_service),
-        membership_service: GroupMembershipService = Depends(get_membership_service_dep)  # Для перевірки прав
+        membership_service: GroupMembershipService = Depends(get_group_membership_service)  # Оновлено залежність
 ) -> EventDetailedResponse:
     """
     Створює нову подію.
@@ -106,7 +117,7 @@ async def create_event(
     if not current_user.is_superuser:
         membership = await membership_service.get_membership_details(group_id=event_in.group_id,
                                                                      user_id=current_user.id)
-        if not membership or not membership.is_active or membership.role.code != "ADMIN":  # ADMIN_ROLE_CODE
+        if not membership or not membership.is_active or membership.role.code != ADMIN_ROLE_CODE: # Використання ADMIN_ROLE_CODE
             # i18n
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                                 detail="Ви не є адміністратором вказаної групи для створення події.")
@@ -135,6 +146,9 @@ async def create_event(
     Фільтрується за `group_id`, якщо надано (користувач має бути членом групи або суперюзером).
     Якщо `group_id` не надано, суперюзер бачить усі події, звичайний користувач - події з усіх своїх груп."""  # i18n
 )
+# ПРИМІТКА: Фільтрація подій за групою та правами доступу, а також пагінація,
+# залежать від коректної реалізації методу `list_events_paginated` в `EventService`.
+# TODO щодо розширених фільтрів також важливий.
 async def read_events(
         group_id: Optional[UUID] = Query(None, description="ID групи для фільтрації подій"),  # i18n
         page_params: PageParams = Depends(paginator),

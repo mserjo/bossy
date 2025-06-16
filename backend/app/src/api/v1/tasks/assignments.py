@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Ендпоінти для управління призначеннями завдань (та потенційно подій) користувачам.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні тут, якщо імпортуються з core
 from uuid import UUID  # ID тепер UUID
@@ -51,7 +53,10 @@ async def get_task_service_dep(session: AsyncSession = Depends(get_api_db_sessio
 async def get_event_service_dep(session: AsyncSession = Depends(get_api_db_session)) -> EventService:
     return EventService(db_session=session)
 
-
+# ПРИМІТКА: Ця залежність призначена для перевірки прав на редагування призначень
+# до завдання. Поточна реалізація є неповною і потребує доопрацювання
+# логіки перевірки прав адміністратора групи завдання або суперюзера,
+# як зазначено в TODO.
 # Допоміжна залежність для перевірки прав на редагування призначень до завдання
 async def task_assignment_edit_dependency(
         task_id: UUID = Path(..., description="ID Завдання"),  # i18n
@@ -86,6 +91,8 @@ async def task_assignment_edit_dependency(
     summary="Призначення завдання користувачеві (Адмін)",  # i18n
     description="Дозволяє адміністратору групи завдання або суперюзеру призначити завдання користувачеві."  # i18n
 )
+# ПРИМІТКА: Безпека цього ендпоінта залежить від коректної реалізації
+# залежності `task_assignment_edit_dependency` для перевірки прав.
 async def assign_task_to_user_endpoint(  # Перейменовано
         task_id: UUID = Path(..., description="ID завдання для призначення"),  # i18n
         assignment_in: TaskAssignmentCreateBody,  # Тіло запиту з user_id
@@ -123,6 +130,10 @@ async def assign_task_to_user_endpoint(  # Перейменовано
     # i18n
     # TODO: Додати залежність для перевірки прав перегляду (член групи завдання або суперюзер)
 )
+# ПРИМІТКА: Для цього ендпоінта необхідно реалізувати залежність, що перевіряє
+# права поточного користувача на перегляд призначень для завдання (наприклад,
+# чи є він членом групи, до якої належить завдання, або суперюзером).
+# Також, сервіс має коректно обробляти пагінацію.
 async def list_assignments_for_task_endpoint(  # Перейменовано
         task_id: UUID = Path(..., description="ID завдання"),  # i18n
         page_params: PageParams = Depends(paginator),
@@ -157,6 +168,9 @@ async def list_assignments_for_task_endpoint(  # Перейменовано
     description="""Повертає список завдань та подій, призначених вказаному користувачу.
     Доступно самому користувачу для своїх призначень, або суперюзеру для будь-якого користувача."""  # i18n
 )
+# ПРИМІТКА: Цей ендпоінт дозволяє користувачу переглядати власні призначення
+# або суперюзеру переглядати призначення будь-кого. Важливою є коректна
+# реалізація пагінації в сервісному шарі.
 async def list_assignments_for_user_endpoint(  # Перейменовано
         user_id_target: UUID = Path(..., description="ID користувача, чиї призначення переглядаються"),  # i18n
         page_params: PageParams = Depends(paginator),
@@ -192,6 +206,8 @@ async def list_assignments_for_user_endpoint(  # Перейменовано
     description="Дозволяє адміністратору групи завдання або суперюзеру скасувати призначення завдання користувачеві."
     # i18n
 )
+# ПРИМІТКА: Скасування призначення завдання, як і його створення, залежить від
+# коректної реалізації перевірки прав через `task_assignment_edit_dependency`.
 async def unassign_task_from_user_endpoint(  # Перейменовано
         task_id: UUID = Path(..., description="ID завдання"),  # i18n
         user_id_to_unassign: UUID = Path(..., description="ID користувача, якого потрібно відкріпити"),  # i18n

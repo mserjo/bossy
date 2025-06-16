@@ -17,9 +17,6 @@
     З .monitoring імпортується SystemMetricsCollectorTask.
 """
 
-# На даний момент, відповідні класи завдань ще не створені в модулях,
-# тому імпорти будуть додані або розкоментовані, коли класи будуть реалізовані.
-
 from backend.app.src.tasks.system.cleanup import CleanupTask
 from backend.app.src.tasks.system.backup import DatabaseBackupTask
 from backend.app.src.tasks.system.monitoring import SystemMetricsCollectorTask

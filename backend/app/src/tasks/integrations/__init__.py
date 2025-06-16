@@ -15,9 +15,6 @@
     З .messenger_processing імпортується ProcessIncomingMessageTask.
 """
 
-# На даний момент, відповідні класи завдань ще не створені в модулях,
-# тому імпорти будуть додані або розкоментовані, коли класи будуть реалізовані.
-
 from backend.app.src.tasks.integrations.calendar import SyncCalendarTask
 from backend.app.src.tasks.integrations.messenger_processing import ProcessIncomingMessageTask
 

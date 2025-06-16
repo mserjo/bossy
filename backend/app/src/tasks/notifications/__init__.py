@@ -17,9 +17,6 @@
     З .messenger імпортується SendMessengerNotificationTask.
 """
 
-# На даний момент, відповідні класи завдань ще не створені в модулях,
-# тому імпорти будуть додані або розкоментовані, коли класи будуть реалізовані.
-
 from backend.app.src.tasks.notifications.email import SendEmailTask
 from backend.app.src.tasks.notifications.sms import SendSmsTask
 from backend.app.src.tasks.notifications.messenger import SendMessengerNotificationTask

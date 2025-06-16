@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Ендпоінти для автентифікації: вхід, оновлення токена, вихід.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 # import logging # Замінено на централізований логер
 from typing import Annotated  # Для FastAPI.Depends з Python 3.9+
@@ -31,10 +33,12 @@ from fastapi import Response as FastAPIResponse # для HTTP_204_NO_CONTENT
 
 router = APIRouter()
 
-# TODO: Перемістити ці константи в `settings` або в `TokenService`
-REFRESH_TOKEN_COOKIE_KEY = "refreshToken"
+# REFRESH_TOKEN_COOKIE_KEY тепер береться з global_settings
 
 
+# ПРИМІТКА: Успішне виконання цієї функції залежить від коректної реалізації
+# методів authenticate_user в UserService та create_access_token/create_refresh_token в TokenService,
+# як зазначено в TODO нижче.
 @router.post(
     "/token",  # Стандартний шлях для отримання токенів за логіном/паролем
     response_model=TokenResponse,
@@ -89,7 +93,7 @@ async def login_for_access_token(
 
     # Встановлення refresh_token в httpOnly cookie
     response.set_cookie(
-        key=REFRESH_TOKEN_COOKIE_KEY,
+        key=global_settings.REFRESH_TOKEN_COOKIE_KEY, # Використання global_settings
         value=refresh_token_str,
         httponly=True,
         secure=global_settings.REFRESH_TOKEN_COOKIE_SECURE,  # True для HTTPS
@@ -105,7 +109,9 @@ async def login_for_access_token(
         token_type="bearer"
     )
 
-
+# ПРИМІТКА: Ця функція-залежність є критичною для безпеки оновлення токена та виходу.
+# Її реалізація має суворо відповідати логіці TokenService.process_refresh_token,
+# включаючи валідацію JTI, перевірку відкликання та терміну дії токена.
 async def get_user_from_valid_refresh_token_cookie(  # Залежність для /refresh та /logout
         request: Request,
         token_service: TokenService = Depends(get_token_service)
@@ -116,7 +122,7 @@ async def get_user_from_valid_refresh_token_cookie(  # Залежність дл
     та повертає асоційованого користувача (ORM модель).
     TokenService.process_refresh_token також має відкликати використаний токен (для ротації).
     """
-    refresh_token_str = request.cookies.get(REFRESH_TOKEN_COOKIE_KEY)
+    refresh_token_str = request.cookies.get(global_settings.REFRESH_TOKEN_COOKIE_KEY) # Використання global_settings
     if not refresh_token_str:
         logger.warning("Спроба оновлення/виходу без refresh token cookie.")
         # i18n
@@ -132,7 +138,8 @@ async def get_user_from_valid_refresh_token_cookie(  # Залежність дл
                             detail="Недійсний або прострочений refresh token.")
     return user
 
-
+# ПРИМІТКА: Ротація refresh токенів, реалізована тут, є важливою для безпеки.
+# TokenService має коректно обробляти створення нового та відкликання старого refresh токена.
 @router.post(
     "/refresh",
     response_model=TokenResponse,
@@ -161,7 +168,7 @@ async def refresh_access_token(
     new_refresh_token_str = await token_service.create_refresh_token(user_id=current_user.id)
 
     response.set_cookie(
-        key=REFRESH_TOKEN_COOKIE_KEY,
+        key=global_settings.REFRESH_TOKEN_COOKIE_KEY, # Використання global_settings
         value=new_refresh_token_str,
         httponly=True,
         secure=global_settings.REFRESH_TOKEN_COOKIE_SECURE,
@@ -180,10 +187,11 @@ async def refresh_access_token(
 @router.post(
     "/logout",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Вихід користувача",  # i18n
+    summary="Вихід користувача",
     description="Здійснює вихід користувача, інвалідуючи поточний refresh token (видаляючи його з БД та cookie)."
-    # i18n
 )
+# ПРИМІТКА: Логіка виходу залежить від коректного відкликання refresh токена в TokenService
+# та видалення відповідного cookie.
 async def logout(
         response: Response,
         request: Request,  # Потрібен для отримання cookie, якщо залежність не передає сам токен
@@ -200,12 +208,12 @@ async def logout(
     Виконує вихід користувача.
     Інвалідує refresh token, що був переданий в httpOnly cookie.
     """
-    refresh_token_str = request.cookies.get(REFRESH_TOKEN_COOKIE_KEY)
+    refresh_token_str = request.cookies.get(global_settings.REFRESH_TOKEN_COOKIE_KEY) # Використання global_settings
     if not refresh_token_str:
         logger.info("Спроба виходу без refresh token cookie. Жодних дій на сервері.")
         # Все одно видаляємо cookie, якщо він якось залишився у клієнта
         response.delete_cookie(
-            key=REFRESH_TOKEN_COOKIE_KEY,
+            key=global_settings.REFRESH_TOKEN_COOKIE_KEY, # Використання global_settings
             secure=global_settings.REFRESH_TOKEN_COOKIE_SECURE,
             samesite=global_settings.REFRESH_TOKEN_COOKIE_SAMESITE,
             path=f"{global_settings.API_V1_STR}/auth"
@@ -226,12 +234,12 @@ async def logout(
 
     # Видаляємо cookie з відповіді
     response.delete_cookie(
-        key=REFRESH_TOKEN_COOKIE_KEY,
+        key=global_settings.REFRESH_TOKEN_COOKIE_KEY, # Використання global_settings
         secure=global_settings.REFRESH_TOKEN_COOKIE_SECURE,
         samesite=global_settings.REFRESH_TOKEN_COOKIE_SAMESITE,
         path=f"{global_settings.API_V1_STR}/auth"
     )
-    logger.info(f"Cookie '{REFRESH_TOKEN_COOKIE_KEY}' видалено для сесії виходу.")
+    logger.info(f"Cookie '{global_settings.REFRESH_TOKEN_COOKIE_KEY}' видалено для сесії виходу.") # Використання global_settings
     return FastAPIResponse(status_code=status.HTTP_204_NO_CONTENT)
 
 

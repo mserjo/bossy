@@ -6,6 +6,8 @@ API ендпоінти для моніторингу системи.
 Надає доступ до даних моніторингу, таких як системні логи
 (SystemLog) та метрики продуктивності (PerformanceMetric).
 Доступ до цих ендпоінтів зазвичай обмежений суперкористувачами.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 import json  # Для розбору JSON рядка для тегів
 from typing import List, Optional, Dict, Any
@@ -36,6 +38,9 @@ router = APIRouter()
 # --- Ендпоінти ---
 # TODO: Уточнити, які саме дані моніторингу є критично важливими (наприклад, логи Celery, довжина черг, стан БД).
 
+# ПРИМІТКА: Цей ендпоінт залежить від реалізації методу `get_system_logs`
+# в `SystemMonitoringService`, включаючи підтримку фільтрів та пагінації.
+# Важливою є також обробка помилок, що можуть виникнути в сервісі.
 @router.get(
     "/logs",
     response_model=List[SystemLogResponseSchema],
@@ -75,6 +80,10 @@ async def list_system_logs(
     description="Дозволяє суперкористувачам переглядати зібрані метрики продуктивності системи.",  # i18n
     dependencies=[Depends(get_current_active_superuser)]
 )
+# ПРИМІТКА: Обробка фільтра `tags_json` виконується вручну з парсингом JSON.
+# Розглянути можливість інтеграції цього в Pydantic схему фільтрів,
+# якщо FastAPI підтримує такий тип даних для query параметрів.
+# Також важлива надійна обробка помилок від сервісу.
 async def list_performance_metrics(
         # Використовуємо Depends для фільтрів метрик так само, як для логів
         filters: PerformanceMetricQueryFiltersSchema = Depends(),

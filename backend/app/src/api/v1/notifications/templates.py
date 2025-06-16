@@ -5,6 +5,8 @@
 
 Дозволяє суперкористувачам створювати, отримувати, оновлювати та видаляти
 шаблони, які використовуються для генерації сповіщень різних типів.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
 from uuid import UUID  # ID тепер UUID
@@ -37,7 +39,8 @@ async def get_notification_template_service(
     """Залежність FastAPI для отримання екземпляра NotificationTemplateService."""
     return NotificationTemplateService(db_session=session)
 
-
+# ПРИМІТКА: Реалізація полів `created_by_user_id`/`updated_by_user_id` (якщо вони є в моделі)
+# залежить від можливостей базового сервісу `BaseDictionaryService`.
 @router.post(
     "/",
     response_model=NotificationTemplateResponse,
@@ -78,6 +81,11 @@ async def create_notification_template(
     summary="Отримання списку шаблонів сповіщень",  # i18n
     description="Повертає список усіх шаблонів сповіщень з пагінацією. Доступно суперкористувачам."  # i18n
 )
+# ПРИМІТКА: Коректна фільтрація за `template_type` та відповідна пагінація
+# залежать від реалізації спеціалізованих методів у `NotificationTemplateService`
+# (наприклад, `list_templates_by_type` та `count_by_type`), як зазначено в TODO.
+# Поточна реалізація фільтрації та підрахунку для фільтрованих результатів є заглушкою.
+# Також, загальна пагінація залежить від методу `count_all()` в базовому сервісі.
 async def read_notification_templates(
         template_type: Optional[str] = Query(None,
                                              description="Фільтр за типом шаблону (наприклад, 'EMAIL', 'IN_APP')"),
@@ -146,6 +154,8 @@ async def read_notification_template_by_id(
     summary="Оновлення шаблону сповіщення",  # i18n
     description="Дозволяє суперкористувачу оновити існуючий шаблон сповіщення.",  # i18n
 )
+# ПРИМІТКА: Реалізація полів `created_by_user_id`/`updated_by_user_id` (якщо вони є в моделі)
+# залежить від можливостей базового сервісу `BaseDictionaryService`.
 async def update_notification_template(
         template_id: UUID,  # ID тепер UUID
         template_in: NotificationTemplateUpdate,

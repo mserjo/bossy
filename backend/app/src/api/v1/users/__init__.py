@@ -7,11 +7,13 @@
 та експортує його як `users_router`. Цей `users_router` призначений для
 адміністративних дій над користувачами, таких як перегляд списку всіх користувачів,
 створення, оновлення та видалення користувачів суперкористувачем.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from fastapi import APIRouter
 
-# Повні шляхи імпорту (відносно поточного пакету)
-from .users import router as crud_users_router # Роутер з CRUD операціями для користувачів
+# Оновлений повний шлях імпорту для під-роутера
+from backend.app.src.api.v1.users.users import router as crud_users_router # Роутер з CRUD операціями для користувачів
 
 from backend.app.src.config.logging import logger # Централізований логер
 

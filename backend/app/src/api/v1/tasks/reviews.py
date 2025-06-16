@@ -6,6 +6,8 @@
 Дозволяє користувачам створювати/оновлювати відгуки на завдання,
 переглядати відгуки для завдання, а також видаляти власні відгуки
 (або адміністраторам/суперюзерам видаляти будь-які відгуки).
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
 from uuid import UUID  # ID тепер UUID
@@ -19,7 +21,7 @@ from backend.app.src.api.dependencies import (
     #  `require_task_interaction_for_review(task_id: UUID = Path(...))` (чи користувач може залишити відгук)
     #  `require_review_owner_or_admin(review_id: UUID = Path(...))` (для редагування/видалення)
     get_current_active_superuser,  # Тимчасово для деяких адмінських дій
-    paginator
+    paginator, get_group_membership_service # Додано get_group_membership_service
 )
 from backend.app.src.api.v1.groups.groups import check_group_view_permission  # Для перегляду відгуків в контексті групи
 from backend.app.src.services.tasks.task import TaskService  # Для отримання завдання, до якого належить відгук
@@ -51,6 +53,10 @@ async def get_task_service_dep(session: AsyncSession = Depends(get_api_db_sessio
     return TaskService(db_session=session)
 
 
+# ПРИМІТКА: Залежність `review_access_dependency` та її використання в `list_reviews_for_task_endpoint`
+# (через `Depends().dependency`) є складними для розуміння та підтримки.
+# Рекомендується рефакторинг цієї логіки в більш стандартні FastAPI залежності
+# або перенесення логіки перевірки прав доступу до сервісного шару.
 # Допоміжна залежність для перевірки прав на перегляд/редагування відгуків завдання
 async def review_access_dependency(
         task_id: UUID = Path(..., description="ID Завдання, до якого належать відгуки"),  # i18n
@@ -83,6 +89,10 @@ async def review_access_dependency(
     description="""Дозволяє користувачу залишити або оновити свій відгук (оцінка, коментар) на завдання.
     Зазвичай один користувач може залишити один відгук на завдання (або на виконання)."""  # i18n
 )
+# ПРИМІТКА: Цей ендпоінт для створення/оновлення відгуку має важливу логіку "upsert",
+# яка має бути реалізована в `TaskReviewService.create_task_review`.
+# Також, необхідна залежність для перевірки, чи може користувач взагалі залишати відгук
+# на це завдання (наприклад, чи він є членом групи або виконавцем).
 async def create_or_update_task_review(
         task_id: UUID = Path(..., description="ID завдання, для якого залишається відгук"),  # i18n
         review_in: TaskReviewCreate,  # Схема для створення/оновлення
@@ -132,12 +142,18 @@ async def create_or_update_task_review(
     # i18n
     # dependencies=[Depends(task_view_permission_dependency)] # TODO: Адаптувати або створити залежність
 )
+# ПРИМІТКА: Перевірка доступу до перегляду відгуків завдання наразі реалізована
+# через прямий виклик `check_group_view_permission` та `Depends().dependency`,
+# що є складним. Рекомендується рефакторинг в окрему залежність.
+# Також, пагінація залежить від коректної реалізації в сервісі.
 async def list_reviews_for_task_endpoint(  # Перейменовано
         task_id: UUID = Path(..., description="ID завдання"),  # i18n
         page_params: PageParams = Depends(paginator),
         current_user: UserModel = Depends(get_current_active_user),  # Для перевірки доступу до завдання
         review_service: TaskReviewService = Depends(get_task_review_service),
-        task_service: TaskService = Depends(get_task_service_dep)  # Для отримання групи завдання
+        task_service: TaskService = Depends(get_task_service_dep),  # Для отримання групи завдання
+        # Замінюємо get_membership_service_dep на get_group_membership_service
+        group_membership_service_instance: GroupMembershipService = Depends(get_group_membership_service)
 ):
     """Отримує список відгуків для конкретного завдання."""
     # Перевірка доступу до завдання (чи є користувач членом групи завдання)
@@ -148,9 +164,9 @@ async def list_reviews_for_task_endpoint(  # Перейменовано
     # Використовуємо залежність check_group_view_permission з groups.py, передаючи group_id завдання
     # Це приклад, як можна було б зробити. Краще мати спеціалізовану залежність.
     try:
+        # Передаємо інстанс сервісу напряму, а не через Depends().dependency
         await check_group_view_permission(group_id=task_orm.group_id, current_user=current_user,
-                                          membership_service=Depends(
-                                              get_membership_service_dep).dependency)  # type: ignore
+                                          membership_service=group_membership_service_instance)
     except HTTPException as e:
         if e.status_code == status.HTTP_403_FORBIDDEN:
             # i18n
@@ -180,6 +196,9 @@ async def list_reviews_for_task_endpoint(  # Перейменовано
     description="Повертає деталі конкретного відгуку. Доступно автору, адміну групи завдання або суперюзеру.",  # i18n
     # TODO: Додати залежність для перевірки прав доступу до конкретного відгуку
 )
+# ПРИМІТКА: Перевірка прав доступу до конкретного відгуку (автор, адмін групи,
+# суперюзер) має бути реалізована в `TaskReviewService.get_review_by_id`
+# або через спеціалізовану FastAPI залежність.
 async def get_task_review_by_id_endpoint(  # Перейменовано
         review_id: UUID = Path(..., description="ID відгуку"),  # i18n
         # current_user: UserModel = Depends(get_current_active_user), # Для перевірки прав
@@ -204,6 +223,9 @@ async def get_task_review_by_id_endpoint(  # Перейменовано
     description="Дозволяє автору відгуку оновити свій відгук.",  # i18n
     # TODO: Додати залежність, що перевіряє, чи є current_user автором відгуку.
 )
+# ПРИМІТКА: Оновлення відгуку має бути дозволено тільки автору.
+# Ця перевірка має бути реалізована в `TaskReviewService.update_task_review`
+# або через спеціалізовану FastAPI залежність.
 async def update_task_review(
         review_id: UUID = Path(..., description="ID відгуку для оновлення"),  # i18n
         review_in: TaskReviewUpdate,  # Схема для оновлення (зазвичай rating, comment)
@@ -243,6 +265,9 @@ async def update_task_review(
     description="Дозволяє автору відгуку, адміністратору групи або суперюзеру видалити відгук.",  # i18n
     # TODO: Додати залежність, що перевіряє права (автор, адмін групи завдання, суперюзер).
 )
+# ПРИМІТКА: Видалення відгуку має бути дозволено автору, адміністратору групи
+# завдання або суперюзеру. Ця логіка перевірки прав має бути реалізована
+# в `TaskReviewService.delete_task_review` або через спеціалізовану залежність.
 async def delete_task_review_endpoint(  # Перейменовано
         review_id: UUID = Path(..., description="ID відгуку, який видаляється"),  # i18n
         current_user: UserModel = Depends(get_current_active_user),  # Для перевірки прав

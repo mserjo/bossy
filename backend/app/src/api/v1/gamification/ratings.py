@@ -5,6 +5,8 @@
 
 Рейтинги зазвичай розраховуються на основі накопичених бонусних балів
 в межах групи та за певний період (наприклад, "за весь час", "поточний місяць").
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import Optional  # List, Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
 from uuid import UUID  # ID тепер UUID
@@ -14,7 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession  # Не використовує
 # Повні шляхи імпорту
 from backend.app.src.api.dependencies import (
     get_api_db_session, get_current_active_user,
-    paginator  # paginator може не використовуватися, якщо лідерборд має власний ліміт
+    paginator,  # paginator може не використовуватися, якщо лідерборд має власний ліміт
+    get_group_membership_service # Додано get_group_membership_service
 )
 # TODO: Використати залежність для перевірки членства в групі або прав суперюзера
 from backend.app.src.api.v1.groups.groups import check_group_view_permission
@@ -26,6 +29,7 @@ from backend.app.src.schemas.gamification.rating import (
 )
 from backend.app.src.core.pagination import PageParams  # PagedResponse тут може не знадобитися
 from backend.app.src.services.gamification.rating import UserRatingService
+from backend.app.src.services.groups.membership import GroupMembershipService # Додано для типізації
 from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
 
@@ -40,7 +44,8 @@ async def get_user_rating_service(session: AsyncSession = Depends(get_api_db_ses
     """Залежність FastAPI для отримання екземпляра UserRatingService."""
     return UserRatingService(db_session=session)
 
-
+# ПРИМІТКА: Перевірка прав доступу до групи виконується через залежність `check_group_view_permission`.
+# Основна логіка формування лідерборду покладається на `UserRatingService`.
 @router.get(
     "/group/{group_id}/leaderboard",  # Змінено шлях для ясності
     response_model=GroupLeaderboardResponse,  # Повертає весь об'єкт лідерборду
@@ -96,6 +101,8 @@ async def get_group_ratings_leaderboard(
     description="""Повертає інформацію про рейтинг поточного користувача
     (наприклад, бали, позиція в загальному рейтингу групи) у вказаній групі."""  # i18n
 )
+# ПРИМІТКА: Важливою є перевірка активного членства користувача в групі перед
+# запитом його рейтингу в цій групі.
 async def get_my_rating_in_group(
         group_id: UUID = Path(..., description="ID групи"),  # i18n
         period_identifier: Optional[str] = Query(None,
@@ -103,7 +110,7 @@ async def get_my_rating_in_group(
         # i18n
         current_user: UserModel = Depends(get_current_active_user),
         rating_service: UserRatingService = Depends(get_user_rating_service),
-        membership_service: GroupMembershipService = Depends(get_membership_service_dep)  # З groups.membership
+        membership_service: GroupMembershipService = Depends(get_group_membership_service)  # Оновлено залежність
 ) -> Optional[UserGroupRatingResponse]:
     """
     Отримує рейтингову інформацію поточного користувача для конкретної групи.

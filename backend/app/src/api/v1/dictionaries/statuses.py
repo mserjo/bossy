@@ -6,8 +6,10 @@
 Дозволяє створювати, отримувати, оновлювати та видаляти статуси.
 Доступ до операцій створення, оновлення та видалення обмежений для суперкористувачів.
 Перегляд списку та окремих елементів доступний автентифікованим користувачам.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-from typing import List  # Any не використовується, можна прибрати
+from typing import List # Any вже було видалено, або не було
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query  # Додано Query для фільтрації
@@ -36,7 +38,8 @@ async def get_status_service(session: AsyncSession = Depends(get_api_db_session)
     """
     return StatusService(db_session=session)  # Використовуємо db_session напряму
 
-
+# ПРИМІТКА: Реалізація полів `created_by_user_id`/`updated_by_user_id` (якщо вони є в моделі)
+# залежить від можливостей базового сервісу `BaseDictionaryService`.
 @router.post(
     "/",
     response_model=StatusResponse,
@@ -93,7 +96,10 @@ async def get_status(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Статус не знайдено.")
     return db_item
 
-
+# ПРИМІТКА: Коректна фільтрація за `entity_type` та відповідна пагінація
+# залежать від реалізації спеціалізованих методів у `StatusService`
+# (наприклад, `list_statuses_by_entity_type` та `count_by_entity_type`),
+# як зазначено в TODO. Поточна реалізація фільтрації є заглушкою.
 @router.get(
     "/",
     response_model=PagedResponse[StatusResponse],
@@ -151,6 +157,8 @@ async def get_all_statuses(
     )
 
 
+# ПРИМІТКА: Реалізація полів `created_by_user_id`/`updated_by_user_id` (якщо вони є в моделі)
+# залежить від можливостей базового сервісу `BaseDictionaryService`.
 @router.put(
     "/{status_id}",
     response_model=StatusResponse,

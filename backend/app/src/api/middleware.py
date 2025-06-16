@@ -6,13 +6,15 @@
 Middleware в FastAPI дозволяє обробляти кожен запит до того, як він досягне
 конкретного ендпоінта, та кожну відповідь перед тим, як її буде повернуто клієнту.
 Це місце для логіки, яка має застосовуватися глобально до API або його частини.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
 import time
-import logging # Додано імпорт стандартного logging
+# import logging # Видалено, оскільки використовується налаштований logger
 from typing import Callable, Awaitable
 
-from fastapi import Request, Response # HTTPException, status видалено
+from fastapi import Request, Response
 # ASGIApp імпорт видалено
 
 # Повні шляхи імпорту
@@ -54,13 +56,17 @@ async def add_process_time_header_middleware(
     response.headers["X-Process-Time"] = f"{process_time:.4f} сек"
 
     # Логування може бути більш детальним, включаючи статус відповіді
-    # Використовуємо settings.DEBUG для визначення рівня деталізації логування
-    log_level = logging.DEBUG if settings.DEBUG else logging.INFO
-    logger.log(
-        log_level,
+    # Використовуємо settings.DEBUG для визначення рівня деталізації логування.
+    # Рівень логування для `logger` (кастомного) визначається його власною конфігурацією.
+    # Замість `logger.log(log_level, ...)` будемо використовувати `logger.debug` або `logger.info`.
+    log_message = (
         f"Запит {request.method} {request.url.path} - Статус {response.status_code} - "
         f"Оброблено за {process_time:.4f} сек."
     )
+    if settings.DEBUG:
+        logger.debug(log_message)
+    else:
+        logger.info(log_message) # Або logger.debug, якщо бажано менше логів у production за замовчуванням
 
     return response
 

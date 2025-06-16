@@ -3,6 +3,8 @@
 """
 Ендпоінти, пов'язані з управлінням та валідацією токенів.
 Наприклад, перевірка валідності існуючого токена доступу.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 # import logging # Замінено на централізований логер
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -22,7 +24,9 @@ from backend.app.src.config import \
 
 router = APIRouter()
 
-
+# ПРИМІТКА: Функціональність цього ендпоінта залежить від методу `validate_access_token`
+# в `TokenService`. Рішення щодо необхідності додаткової перевірки користувача
+# (див. TODO нижче) вплине на кінцеву логіку.
 @router.post(
     "/verify",  # Префікс /token буде додано в auth/__init__.py -> /auth/token/verify
     response_model=TokenVerifyResponse,

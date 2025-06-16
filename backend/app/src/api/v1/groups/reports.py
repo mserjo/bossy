@@ -5,9 +5,12 @@
 
 На даний момент ці ендпоінти є переважно концептуальними (заглушками).
 Логіка генерації звітів буде реалізована в відповідних сервісах.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-from typing import Any, Dict, Optional # Optional не використовується, можна прибрати
+from typing import Any, Dict # Optional видалено, оскільки не використовується
 from uuid import UUID # ID тепер UUID
+from datetime import datetime, timezone, timedelta # Додано для заглушки відповіді
 from fastapi import APIRouter, Depends, HTTPException, status, Path
 from sqlalchemy.ext.asyncio import AsyncSession # Не використовується прямо, якщо сесія в сервісі
 
@@ -30,6 +33,10 @@ router = APIRouter(
 # async def get_group_report_service(session: AsyncSession = Depends(get_api_db_session)) -> GroupReportService:
 #     return GroupReportService(db_session=session)
 
+# ПРИМІТКА: Цей ендпоінт наразі є заглушкою. Для повноцінної реалізації
+# необхідно створити відповідний сервіс (`GroupReportService`), схему відповіді
+# (`GroupActivityReportResponse`) та реалізувати логіку генерації звіту,
+# як зазначено в TODO.
 @router.get(
     "/activity", # Шлях відносно префіксу /{group_id}/reports -> /{group_id}/reports/activity
     response_model=Dict[str, Any], # TODO: Замінити на GroupActivityReportResponse, коли схема буде визначена

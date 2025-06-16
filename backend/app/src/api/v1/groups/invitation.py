@@ -5,6 +5,8 @@
 
 Включає створення, перегляд, відкликання запрошень (для адміністраторів групи)
 та прийняття/відхилення запрошень (для користувачів).
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional  # Generic, TypeVar, Any, Dict не використовуються
 from uuid import UUID  # ID тепер UUID
@@ -46,7 +48,9 @@ async def get_group_invitation_service(session: AsyncSession = Depends(get_api_d
 # встановленим при включенні цього group_specific_admin_actions_router до основного router нижче.
 group_specific_admin_actions_router = APIRouter()
 
-
+# ПРИМІТКА: Важливою є реалізація коректної перевірки прав доступу
+# (адміністратор групи або суперюзер), як зазначено в TODO. Також, сервіс
+# має валідувати `role_code_to_assign`.
 @group_specific_admin_actions_router.post(
     "/",  # Відносно /{group_id}/invitations
     response_model=GroupInvitationResponse,
@@ -101,6 +105,9 @@ async def create_group_invitation(
     description="Повертає список активних (pending) запрошень для вказаної групи. Доступно адміністраторам групи або суперюзерам."
     # i18n
 )
+# ПРИМІТКА: Коректна пагінація залежить від реалізації відповідних методів
+# в `GroupInvitationService` для отримання загальної кількості запрошень,
+# як зазначено в TODO.
 async def list_group_invitations(
         group_id: UUID = Path(..., description="ID групи для перегляду запрошень"),  # i18n
         page_params: PageParams = Depends(paginator),
@@ -136,6 +143,8 @@ async def list_group_invitations(
     summary="Відкликання запрошення (Адмін)",  # i18n
     description="Дозволяє адміністратору групи або суперюзеру відкликати (видалити) запрошення."  # i18n
 )
+# ПРИМІТКА: Сервіс `revoke_invitation` має перевіряти, чи запрошення дійсно
+# належить вказаній групі, щоб уникнути помилкового відкликання.
 async def revoke_group_invitation(
         group_id: UUID = Path(..., description="ID групи, до якої належить запрошення"),  # i18n
         invitation_id: UUID = Path(..., description="ID запрошення, яке відкликається"),  # i18n
@@ -181,6 +190,9 @@ user_actions_router = APIRouter()
     summary="Список моїх активних запрошень",  # i18n
     description="Повертає список активних запрошень для поточного аутентифікованого користувача."  # i18n
 )
+# ПРИМІТКА: Реалізація цього ендпоінта залежить від методу
+# `list_pending_invitations_for_user` в `GroupInvitationService`,
+# який має ефективно вибирати запрошення за ID або email користувача.
 async def list_my_pending_invitations(
         current_user: UserModel = Depends(get_current_active_user),
         invitation_service: GroupInvitationService = Depends(get_group_invitation_service)

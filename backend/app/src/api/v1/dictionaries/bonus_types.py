@@ -6,6 +6,8 @@
 Дозволяє створювати, отримувати, оновлювати та видаляти типи бонусів.
 Доступ до операцій створення, оновлення та видалення обмежений для суперкористувачів.
 Перегляд списку та окремих елементів доступний автентифікованим користувачам.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List
 from uuid import UUID
@@ -36,7 +38,9 @@ async def get_bonus_type_service(session: AsyncSession = Depends(get_api_db_sess
     """
     return BonusTypeService(db_session=session)  # Використовуємо db_session напряму
 
-
+# ПРИМІТКА: Реалізація поля `created_by_user_id` (якщо воно є в моделі BonusType)
+# залежить від можливостей базового сервісу `BaseDictionaryService` або має бути
+# реалізована тут явно.
 @router.post(
     "/",
     response_model=BonusTypeResponse,
@@ -98,7 +102,9 @@ async def get_bonus_type(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Тип бонусу не знайдено.")
     return db_bonus_type
 
-
+# ПРИМІТКА: Коректна пагінація залежить від реалізації методу `count_all()`
+# в `BonusTypeService` (успадкованого від `BaseDictionaryService`), як зазначено в TODO.
+# Також, можливість сортування залежить від реалізації в методі `get_all`.
 @router.get(
     "/",
     response_model=PagedResponse[BonusTypeResponse],

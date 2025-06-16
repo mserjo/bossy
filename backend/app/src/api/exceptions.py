@@ -6,6 +6,8 @@
 FastAPI дозволяє визначати кастомні обробники для різних типів винятків.
 Це дозволяє стандартизувати формат відповідей про помилки,
 додавати додаткову інформацію для логування або клієнта.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
 # import logging # Замінено на централізований логер
@@ -35,7 +37,7 @@ async def custom_request_validation_exception_handler(
     """
     error_details = []
     for error in exc.errors():
-        location_str = ".".join(str(loc) for loc in error.get("loc", ("unknown",)))  # unknown - i18n
+        location_str = ".".join(str(loc) for loc in error.get("loc", ("невідомо",))) # Замінено "unknown" на "невідомо"
         location_str = location_str.replace(".[", "[").replace("body.", "")  # Спрощення шляху
 
         error_details.append({

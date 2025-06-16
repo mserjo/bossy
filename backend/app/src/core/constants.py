@@ -10,6 +10,8 @@
 повинні знаходитися в модулі `backend.app.src.config.settings`.
 Цей файл призначений для констант, які є незмінними для всіх середовищ
 або визначають поведінку програми за замовчуванням.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 import logging # Для демонстраційного блоку if __name__ == "__main__"
 
@@ -70,6 +72,9 @@ TASK_COMPLETION_STATUS_REJECTED = "REJECTED"
 # Значення може читатися з конфігурації середовища або бути жорстко заданим.
 FEATURE_ADVANCED_ANALYTICS_ENABLED: bool = False # Приклад: розширена аналітика вимкнена за замовчуванням.
 
+# --- Константи ролей ---
+ADMIN_ROLE_CODE: str = "ADMIN"  # Код ролі адміністратора системи або групи
+
 # Коментар щодо констант, які НЕ повинні бути тут:
 # Важливо пам'ятати, що константи, які залежать від середовища розгортання
 # (наприклад, URL-адреси зовнішніх сервісів, секретні ключі, API-ключі),
@@ -96,6 +101,7 @@ if __name__ == "__main__":
     logger.info("Префікс ключа кешу для деталей користувача: %s", CACHE_KEY_PREFIX_USER_DETAILS)
     logger.info("Ім'я файлу стандартного аватара: %s", DEFAULT_AVATAR_FILENAME)
     logger.info("Прапорець функції розширеної аналітики: %s", FEATURE_ADVANCED_ANALYTICS_ENABLED)
+    logger.info("Код ролі адміністратора: %s", ADMIN_ROLE_CODE)
     logger.info("Назва групи за замовчуванням: %s (TODO i18n: '%s')", DEFAULT_GROUP_NAME, DEFAULT_GROUP_NAME)
 
     logger.info("\n--- Константи статусів завершення завдань ---")

@@ -5,8 +5,10 @@
 
 Включає ініціалізацію завантаження, передачу даних файлу (можливо, частинами)
 та завершення завантаження зі створенням запису про файл.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-from typing import Optional, Dict, Any  # List не використовується
+from typing import Optional, Dict, Any # List видалено, оскільки не використовується
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Path, Body
 from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо, якщо сесія в сервісі
@@ -72,7 +74,10 @@ async def initiate_file_upload(
         # i18n
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Внутрішня помилка сервера.")
 
-
+# ПРИМІТКА: Критично важливо реалізувати перевірку (див. TODO нижче),
+# що поточний користувач (`current_user`) є тим самим користувачем,
+# який ініціював сесію завантаження з `upload_id`, для запобігання
+# несанкціонованому дозавантаженню даних в чужу сесію.
 @router.post(
     "/data/{upload_id}",
     response_model=FileDataUploadResponse,  # Спеціальна відповідь для завантаження даних
@@ -123,7 +128,10 @@ async def upload_file_data_chunk(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                             detail="Внутрішня помилка сервера при обробці файлу.")
 
-
+# ПРИМІТКА: Критично важливо реалізувати перевірку (див. TODO нижче),
+# що поточний користувач (`current_user`) є тим самим користувачем,
+# який ініціював сесію завантаження з `upload_id`, для запобігання
+# несанкціонованому завершенню чужої сесії завантаження.
 @router.post(
     "/complete/{upload_id}",
     response_model=FileUploadResponse,  # Містить FileRecordResponse та повідомлення

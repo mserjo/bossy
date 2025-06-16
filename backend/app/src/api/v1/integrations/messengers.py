@@ -6,9 +6,12 @@
 Дозволяє користувачам налаштовувати отримання сповіщень через месенджери,
 пов'язуючи свій обліковий запис з ID на відповідній платформі (наприклад, Telegram Chat ID).
 Також може включати налаштування для груп (наприклад, куди надсилати групові сповіщення).
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional, Dict, Any  # Generic, TypeVar, BaseModel не потрібні
 from uuid import UUID
+from datetime import datetime, timezone # Додано для заглушки відповіді
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -38,6 +41,9 @@ router = APIRouter()
 
 
 # --- Залежності для сервісів ---
+# ПРИМІТКА: Цей сервіс (`UserIntegrationCredentialService`) є ключовим для роботи
+# інтеграцій з месенджерами та наразі не реалізований. Поточна залежність
+# повертає None, що робить залежні ендпоінти нефункціональними.
 async def get_user_integration_credential_service(
         session: AsyncSession = Depends(get_api_db_session)) -> UserIntegrationCredentialService:
     """Залежність FastAPI для UserIntegrationCredentialService."""
@@ -77,6 +83,8 @@ async def list_available_messenger_platforms(
     description="""Дозволяє користувачу пов'язати свій обліковий запис системи з акаунтом месенджера
     (наприклад, надати свій Telegram Chat ID після взаємодії з ботом)."""  # i18n
 )
+# ПРИМІТКА: Цей ендпоінт наразі є заглушкою через відсутність
+# `UserIntegrationCredentialService`. Потребує повної реалізації.
 async def connect_user_messenger(  # Перейменовано з configure_user_messenger_integration
         connection_in: UserMessengerConnectionCreate,  # Включає platform_code та platform_user_id
         current_user: UserModel = Depends(get_current_active_user),
@@ -126,6 +134,8 @@ async def connect_user_messenger(  # Перейменовано з configure_use
     summary="Перегляд підключених месенджерів користувача",  # i18n
     description="Повертає список поточних підключень до месенджерів для аутентифікованого користувача."  # i18n
 )
+# ПРИМІТКА: Цей ендпоінт наразі повертає мок-дані через відсутність
+# `UserIntegrationCredentialService`. Потребує повної реалізації.
 async def get_user_messenger_connections(  # Перейменовано
         current_user: UserModel = Depends(get_current_active_user),
         # user_integration_service: UserIntegrationCredentialService = Depends(get_user_integration_credential_service) # Розкоментувати
@@ -152,6 +162,8 @@ async def get_user_messenger_connections(  # Перейменовано
     summary="Видалення підключення до месенджера користувача",  # i18n
     description="Дозволяє користувачу видалити своє підключення до вказаної платформи месенджера."  # i18n
 )
+# ПРИМІТКА: Цей ендпоінт також є заглушкою через відсутність
+# `UserIntegrationCredentialService` для реального видалення даних підключення.
 async def delete_user_messenger_connection(  # Перейменовано
         platform_code: str = Path(..., description="Код платформи месенджера для відключення (напр., 'TELEGRAM')"),
         # i18n

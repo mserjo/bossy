@@ -3,6 +3,8 @@
 """
 Ендпоінти для перегляду досягнень користувачів (нагороджених значків-бейджів).
 Також може включати функціонал для ручного нагородження (адміністраторами).
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional # Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
 from uuid import UUID # ID тепер UUID
@@ -34,7 +36,9 @@ async def get_user_achievement_service(session: AsyncSession = Depends(get_api_d
     """Залежність FastAPI для отримання екземпляра UserAchievementService."""
     return UserAchievementService(db_session=session)
 
-
+# ПРИМІТКА: Цей ендпоінт залежить від реалізації `list_achievements_for_user_paginated`
+# в `UserAchievementService`, включаючи коректну фільтрацію за `group_id` та
+# підрахунок загальної кількості для пагінації.
 @router.get(
     "/me",
     response_model=PagedResponse[UserAchievementResponse],
@@ -67,6 +71,10 @@ async def list_my_achievements(
         results=[UserAchievementResponse.model_validate(ach) for ach in achievements_orm] # Pydantic v2
     )
 
+# ПРИМІТКА: Важливою є реалізація гранульованої перевірки прав доступу
+# (наприклад, чи є поточний користувач адміністратором групи, до якої належить
+# цільовий користувач), як зазначено в TODO. Поточна залежність від
+# `get_current_active_superuser` може бути недостатньою для всіх сценаріїв.
 @router.get(
     "/user/{user_id_target}", # target_user_id перейменовано на user_id_target для уникнення конфлікту
     response_model=PagedResponse[UserAchievementResponse],
@@ -102,6 +110,9 @@ async def list_user_achievements_admin( # Перейменовано
         results=[UserAchievementResponse.model_validate(ach) for ach in achievements_orm] # Pydantic v2
     )
 
+# ПРИМІТКА: Доступ до деталей конкретного досягнення має перевірятися.
+# Поточна реалізація покладається на метод `get_user_achievement_by_id_for_user`
+# в `UserAchievementService`, який має інкапсулювати цю логіку перевірки прав.
 @router.get(
     "/{achievement_id}",
     response_model=UserAchievementResponse,

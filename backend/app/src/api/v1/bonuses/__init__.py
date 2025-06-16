@@ -11,14 +11,16 @@
 
 Загальний префікс для всіх цих шляхів (наприклад, `/bonuses`) буде встановлено
 при підключенні `bonuses_router` до роутера версії API (`v1_router`).
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from fastapi import APIRouter
 
-# Повні шляхи імпорту (відносно поточного пакету)
-from .bonus_rules import router as bonus_rules_router
-from .accounts import router as accounts_router
-from .transactions import router as transactions_router
-from .rewards import router as rewards_router
+# Повні шляхи імпорту
+from backend.app.src.api.v1.bonuses.bonus_rules import router as bonus_rules_router
+from backend.app.src.api.v1.bonuses.accounts import router as accounts_router
+from backend.app.src.api.v1.bonuses.transactions import router as transactions_router
+from backend.app.src.api.v1.bonuses.rewards import router as rewards_router
 
 from backend.app.src.config.logging import logger # Централізований логер
 

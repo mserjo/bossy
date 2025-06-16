@@ -7,15 +7,17 @@
 налаштувань груп, управління членством, запрошеннями та звітами.
 Загальний префікс для всіх цих шляхів (наприклад, `/groups`) буде встановлено
 при підключенні `groups_router` до роутера версії API (`v1_router`).
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from fastapi import APIRouter
 
-# Повні шляхи імпорту (відносно поточного пакету)
-from .groups import router as crud_groups_router
-from .settings import router as group_settings_router
-from .membership import router as group_membership_router
-from .invitation import router as group_invitation_router
-from .reports import router as group_reports_router
+# Оновлені повні шляхи імпорту для під-роутерів
+from backend.app.src.api.v1.groups.groups import router as crud_groups_router
+from backend.app.src.api.v1.groups.settings import router as group_settings_router
+from backend.app.src.api.v1.groups.membership import router as group_membership_router
+from backend.app.src.api.v1.groups.invitation import router as group_invitation_router
+from backend.app.src.api.v1.groups.reports import router as group_reports_router
 
 from backend.app.src.config.logging import logger # Централізований логер
 

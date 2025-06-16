@@ -6,7 +6,10 @@
 Цей модуль може містити ендпоінти для прийому вебхуків від сервісів,
 для яких ще не створено спеціалізованих обробників (наприклад, у `calendar.py` чи `messenger.py`),
 або для дуже загальних потреб інтеграції.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
+import json # Додано для безпечного розбору JSON з байтів
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, Request, Header, HTTPException, status
 # from sqlalchemy.ext.asyncio import AsyncSession # Розкоментувати, якщо потрібен доступ до БД
@@ -57,13 +60,13 @@ async def generic_webhook_receiver(
     logger.info(f"  Заголовки: {headers}")
 
     try:
-        # Спроба розпарсити тіло як JSON для більш читабельного логування
-        json_body = await request.json() # Цей метод вже був викликаний, якщо content-type JSON, інакше може бути помилка
-                                         # Краще використовувати body, яке вже прочитано
-        logger.info(f"  Тіло (спроба JSON): {json_body}")
+        # Спроба розкодувати body_bytes (які є bytes) та розпарсити як JSON
+        decoded_body = body.decode('utf-8')
+        json_body = json.loads(decoded_body)
+        logger.info(f"  Тіло (JSON): {json_body}")
     except Exception:
-        # Якщо не JSON, логуємо як необроблений рядок (з обмеженням довжини)
-        logger.info(f"  Тіло (raw, не JSON): {body.decode(errors='ignore')[:1000]}...") # Обмеження довжини для логу
+        # Якщо не вдалося розпарсити як JSON або розкодувати, логуємо як raw string (з обмеженням довжини)
+        logger.info(f"  Тіло (raw, не JSON): {body.decode(errors='ignore')[:1000]}...")
 
     # Тут може бути логіка для визначення типу вебхука та його маршрутизації
     # на основі заголовків або вмісту тіла.

@@ -18,6 +18,8 @@
 - `middleware.py`: Специфічні для API проміжні обробники (middleware).
 - `router.py`: Визначає `api_router` та підключає версійні роутери.
 - `exceptions.py`: Обробники винятків, специфічні для API.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
 # import logging # Замінено на централізований логер

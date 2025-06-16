@@ -1,20 +1,22 @@
 # backend/app/src/services/dictionaries/messengers.py
 # import logging # Замінено на централізований логер
-# from typing import Optional, Dict, Any # Для потенційних кастомних методів
+# from typing import Optional, Dict, Any # Видалено
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.future import select # Для потенційних кастомних методів
+# from sqlalchemy.future import select # Видалено
 
 # Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.dictionaries.messengers import MessengerPlatform # Модель SQLAlchemy
+from backend.app.src.repositories.dictionaries.messenger_platform_repository import MessengerPlatformRepository # Імпорт репозиторію
+from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.messengers import ( # Схеми Pydantic
     MessengerPlatformCreate,
     MessengerPlatformUpdate,
     MessengerPlatformResponse,
 )
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import logger # Стандартизований імпорт логера
 
-class MessengerPlatformService(BaseDictionaryService[MessengerPlatform, MessengerPlatformCreate, MessengerPlatformUpdate, MessengerPlatformResponse]):
+class MessengerPlatformService(BaseDictionaryService[MessengerPlatform, MessengerPlatformRepository, MessengerPlatformCreate, MessengerPlatformUpdate, MessengerPlatformResponse]): # Додано MessengerPlatformRepository до Generic
     """
     Сервіс для управління елементами довідника "Платформи Месенджерів".
     Ці елементи представляють різні платформи обміну повідомленнями, з якими система може інтегруватися
@@ -24,13 +26,21 @@ class MessengerPlatformService(BaseDictionaryService[MessengerPlatform, Messenge
     вона для надсилання сповіщень в системі.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService):
         """
         Ініціалізує сервіс MessengerPlatformService.
 
         :param db_session: Асинхронна сесія бази даних SQLAlchemy.
+        :param cache_service: Екземпляр сервісу кешування.
         """
-        super().__init__(db_session, model=MessengerPlatform, response_schema=MessengerPlatformResponse)
+        messenger_platform_repo = MessengerPlatformRepository(model=MessengerPlatform)
+        super().__init__(
+            db_session,
+            repository=messenger_platform_repo,
+            cache_service=cache_service,
+            response_schema=MessengerPlatformResponse
+        )
+        # _model_name ініціалізується в BaseDictionaryService з repository.model.__name__
         logger.info(f"MessengerPlatformService ініціалізовано для моделі: {self._model_name}")
 
     # --- Кастомні методи для MessengerPlatformService (якщо потрібні) ---

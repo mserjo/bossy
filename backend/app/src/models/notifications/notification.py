@@ -15,7 +15,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Абсолютний імпорт базових класів та Enum
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час створення сповіщення
-from backend.app.src.core.dicts import NotificationType as NotificationTypeEnum  # Реальний Enum з core.dicts
+from backend.app.src.core.dicts import NotificationType, RelatedEntityType  # Оновлені Enum
+from sqlalchemy import Enum as SQLEnum # Імпорт SQLEnum
 from backend.app.src.config.logging import get_logger # Імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
@@ -79,15 +80,13 @@ class Notification(Base, TimestampedMixin):
     )
 
     # Використовуємо значення з Enum NotificationType
-    # TODO: Переконатися, що SQLEnum імпортовано та використовується, якщо тип колонки в БД є Enum.
-    # notification_type: Mapped[NotificationTypeEnum] = mapped_column(SQLEnum(NotificationTypeEnum), nullable=False, index=True)
-    notification_type: Mapped[str] = mapped_column(
-        String(50), nullable=False, index=True, comment="Тип сповіщення (з core.dicts.NotificationType)"
+    notification_type: Mapped[NotificationType] = mapped_column(
+        SQLEnum(NotificationType), nullable=False, index=True, comment="Тип сповіщення (з core.dicts.NotificationType)"
     )
 
     # Поля для зв'язку з конкретною сутністю, до якої відноситься сповіщення
-    related_entity_type: Mapped[Optional[str]] = mapped_column(
-        String(50), nullable=True, comment="Тип пов'язаної сутності (наприклад, 'task', 'group', 'bonus')"
+    related_entity_type: Mapped[Optional[RelatedEntityType]] = mapped_column(
+        SQLEnum(RelatedEntityType), nullable=True, comment="Тип пов'язаної сутності (наприклад, 'task', 'group', 'bonus')"
     )
     related_entity_id: Mapped[Optional[int]] = mapped_column(
         Integer, nullable=True, index=True, comment="ID пов'язаної сутності"
@@ -103,7 +102,9 @@ class Notification(Base, TimestampedMixin):
     )
 
     # Поля для __repr__
-    _repr_fields = ["id", "user_id", "notification_type", "title", "is_read"]
+    # `id` автоматично додається через Base.__repr__
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
+    _repr_fields = ("user_id", "notification_type", "title", "is_read")
 
 
 if __name__ == "__main__":
@@ -131,8 +132,8 @@ if __name__ == "__main__":
         user_id=101,
         title="Нове завдання призначено",  # TODO i18n
         message="Вам було призначено нове завдання 'Розробити API'. Термін виконання: 2023-12-31.",  # TODO i18n
-        notification_type=NotificationTypeEnum.TASK_ASSIGNED.value,  # Використання значення Enum
-        related_entity_type="task",
+        notification_type=NotificationType.TASK_ASSIGNED,  # Використання Enum
+        related_entity_type=RelatedEntityType.TASK, # Використання Enum
         related_entity_id=1
     )
     # Імітуємо часові мітки
@@ -145,4 +146,4 @@ if __name__ == "__main__":
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
     logger.info(
-        f"Використовується NotificationType Enum для поля 'notification_type', наприклад: NotificationTypeEnum.BONUS_AWARDED = '{NotificationTypeEnum.BONUS_AWARDED.value}'")
+        f"Використовується NotificationType Enum для поля 'notification_type', наприклад: NotificationType.BONUS_AWARDED = '{NotificationType.BONUS_AWARDED.value}'")

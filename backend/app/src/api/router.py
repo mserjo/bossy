@@ -11,13 +11,13 @@
 """
 
 # import logging # Замінено на централізований логер
-from fastapi import APIRouter # Depends не використовується тут напряму, лише в коментарях
+from fastapi import APIRouter # Depends видалено, оскільки використовується лише в коментарях
 
 # Повні шляхи імпорту
 from backend.app.src.api.v1 import v1_router # Імпортуємо v1_router з api/v1/__init__.py (або api.v1.router)
 from backend.app.src.api.external import external_api_router # Імпортуємо external_api_router з api/external/__init__.py (або api.external.router)
-from backend.app.src.config.logging import logger # Централізований логер
-# from .dependencies import get_current_active_user # Приклад глобальної залежності
+from backend.app.src.config import logger # Стандартизований імпорт логера
+# Коментований імпорт get_current_active_user видалено
 
 
 # Створення головного роутера API

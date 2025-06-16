@@ -74,7 +74,7 @@ class BaseMessengerIntegrationService(BaseService, ABC):
 
     service_name: str  # Має бути визначено в підкласах, наприклад, "TELEGRAM", "SLACK"
 
-    def __init__(self, db_session: AsyncSession, user_id_for_context: Optional[UUID] = None):
+    def __init__(self, db_session: AsyncSession, user_id_for_context: Optional[int] = None): # Змінено UUID на int
         """
         Ініціалізує сервіс з сесією БД та опціонально user_id для контексту.
 
@@ -113,7 +113,7 @@ class BaseMessengerIntegrationService(BaseService, ABC):
         raise NotImplementedError(f"Метод 'disconnect_bot_or_webhook' не реалізовано для {self.__class__.__name__}")
 
     @abstractmethod
-    async def get_user_platform_id(self, user_id: UUID) -> Optional[str]:
+    async def get_user_platform_id(self, user_id: int) -> Optional[str]: # Змінено UUID на int
         """
         Отримує ID, специфічний для платформи месенджера, для даного користувача застосунку.
         Цей ID може зберігатися в UserIntegration або в спеціальному полі профілю користувача.

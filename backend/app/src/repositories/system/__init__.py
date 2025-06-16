@@ -10,9 +10,9 @@
 інтерфейс для роботи з конкретною системною моделлю даних.
 """
 
-from .settings_repository import SystemSettingRepository
-from .monitoring_repository import SystemLogRepository, PerformanceMetricRepository
-from .health_repository import ServiceHealthStatusRepository
+from backend.app.src.repositories.system.settings_repository import SystemSettingRepository
+from backend.app.src.repositories.system.monitoring_repository import SystemLogRepository, PerformanceMetricRepository
+from backend.app.src.repositories.system.health_repository import ServiceHealthStatusRepository
 
 __all__ = [
     "SystemSettingRepository",

@@ -10,10 +10,10 @@
 інтерфейс для роботи з конкретною моделлю даних.
 """
 
-from .bonus_rule_repository import BonusRuleRepository
-from .user_account_repository import UserAccountRepository
-from .account_transaction_repository import AccountTransactionRepository
-from .reward_repository import RewardRepository
+from backend.app.src.repositories.bonuses.bonus_rule_repository import BonusRuleRepository
+from backend.app.src.repositories.bonuses.user_account_repository import UserAccountRepository
+from backend.app.src.repositories.bonuses.account_transaction_repository import AccountTransactionRepository
+from backend.app.src.repositories.bonuses.reward_repository import RewardRepository
 
 __all__ = [
     "BonusRuleRepository",

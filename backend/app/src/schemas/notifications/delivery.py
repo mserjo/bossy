@@ -15,26 +15,15 @@ from pydantic import Field
 # Абсолютний імпорт базових схем
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.config.logging import get_logger  # Імпорт логера
+from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType # Імпортовано Enums
+from datetime import timedelta # Переміщено timedelta сюди
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
-# TODO: Визначити та імпортувати Enums NotificationChannelType та DeliveryStatusType з core.dicts.
-# from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType
+# Enums NotificationChannelType та DeliveryStatusType імпортовано вище.
 
-# Заглушки для Enums, поки вони не визначені в core.dicts
-class TempNotificationChannelType:  # TODO: Видалити
-    EMAIL = "email"
-    SMS = "sms"
-
-
-class TempDeliveryStatusType:  # TODO: Видалити
-    PENDING = "pending"
-    SENT = "sent"
-    FAILED = "failed"
-
-
-CHANNEL_MAX_LENGTH = 50
-STATUS_MAX_LENGTH = 50
+# CHANNEL_MAX_LENGTH = 50 # Не потрібен для Enum
+# STATUS_MAX_LENGTH = 50 # Не потрібен для Enum
 EXTERNAL_ID_MAX_LENGTH = 255
 
 
@@ -43,15 +32,11 @@ class NotificationDeliveryAttemptBaseSchema(BaseSchema):
     Базова схема для полів запису про спробу доставки сповіщення.
     """
     notification_id: int = Field(description="Ідентифікатор сповіщення, яке намагалися доставити.")
-    # TODO: Замінити str на NotificationChannelType та додати валідатор.
-    channel: str = Field(
-        max_length=CHANNEL_MAX_LENGTH,
-        description=f"Канал доставки (наприклад, '{TempNotificationChannelType.EMAIL}', '{TempNotificationChannelType.SMS}')."
+    channel: NotificationChannelType = Field( # Змінено на NotificationChannelType Enum
+        description="Канал доставки."
     )
-    # TODO: Замінити str на DeliveryStatusType та додати валідатор.
-    status: str = Field(
-        max_length=STATUS_MAX_LENGTH,
-        description=f"Статус спроби доставки (наприклад, '{TempDeliveryStatusType.PENDING}', '{TempDeliveryStatusType.SENT}', '{TempDeliveryStatusType.FAILED}')."
+    status: DeliveryStatusType = Field( # Змінено на DeliveryStatusType Enum
+        description="Статус спроби доставки."
     )
     error_message: Optional[str] = Field(None, description="Повідомлення про помилку, якщо доставка не вдалася.")
     external_message_id: Optional[str] = Field(
@@ -92,8 +77,8 @@ if __name__ == "__main__":
     logger.info("\nNotificationDeliveryAttemptCreateSchema (приклад для створення):")
     create_attempt_data = {
         "notification_id": 101,
-        "channel": TempNotificationChannelType.EMAIL,  # TODO: Замінити на Enum.value
-        "status": TempDeliveryStatusType.PENDING,  # TODO: Замінити на Enum.value
+        "channel": NotificationChannelType.EMAIL, # Використовуємо Enum
+        "status": DeliveryStatusType.PENDING,  # Використовуємо Enum
     }
     create_attempt_instance = NotificationDeliveryAttemptCreateSchema(**create_attempt_data)
     logger.info(create_attempt_instance.model_dump_json(indent=2, exclude_none=True))
@@ -102,8 +87,8 @@ if __name__ == "__main__":
     attempt_response_data = {
         "id": 1,
         "notification_id": 101,
-        "channel": TempNotificationChannelType.EMAIL,  # TODO: Замінити на Enum.value
-        "status": TempDeliveryStatusType.SENT,  # TODO: Замінити на Enum.value
+        "channel": NotificationChannelType.EMAIL, # Використовуємо Enum
+        "status": DeliveryStatusType.SENT,  # Використовуємо Enum
         "external_message_id": "ses-msg-id-xyz789",
         "created_at": datetime.now() - timedelta(seconds=30),
         "updated_at": datetime.now() - timedelta(seconds=30)
@@ -116,8 +101,8 @@ if __name__ == "__main__":
     attempt_failed_data = {
         "id": 2,
         "notification_id": 102,
-        "channel": TempNotificationChannelType.SMS,  # TODO: Замінити на Enum.value
-        "status": TempDeliveryStatusType.FAILED,  # TODO: Замінити на Enum.value
+        "channel": NotificationChannelType.SMS, # Використовуємо Enum
+        "status": DeliveryStatusType.FAILED,  # Використовуємо Enum
         "error_message": "Неправильний номер телефону отримувача",  # TODO i18n
         "created_at": datetime.now(),
         "updated_at": datetime.now()
@@ -126,8 +111,7 @@ if __name__ == "__main__":
     logger.info(f"\nПриклад невдалої спроби:\n{attempt_failed_instance.model_dump_json(indent=2, exclude_none=True)}")
 
     logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних спроб доставки.")
-    logger.info(
-        "TODO: Інтегрувати Enum 'NotificationChannelType' та 'DeliveryStatusType' з core.dicts для полів 'channel' та 'status'.")
+    # TODO Коментарі про Enum видалено, оскільки вони тепер імпортовані та використовуються.
 
-# Потрібно для timedelta в __main__
-from datetime import timedelta
+# Потрібно для timedelta в __main__ - вже переміщено нагору
+# from datetime import timedelta

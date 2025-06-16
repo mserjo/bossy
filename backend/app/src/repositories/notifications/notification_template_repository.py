@@ -6,14 +6,14 @@
 `BaseDictionaryRepository` та надає методи для роботи з шаблонами сповіщень.
 """
 
-from typing import List, Optional, Tuple
+from typing import List, Optional, Tuple, Dict, Any # Додано Dict, Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Абсолютний імпорт базового репозиторію для довідників
 from backend.app.src.repositories.dictionaries.base_dict_repository import BaseDictionaryRepository
-from backend.app.src.config.logging import get_logger  # Імпорт логера
+from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
@@ -23,11 +23,10 @@ from backend.app.src.schemas.notifications.template import (
     NotificationTemplateCreateSchema,
     NotificationTemplateUpdateSchema
 )
+from backend.app.src.core.dicts import NotificationChannelType # Імпортовано Enum
 
 
-# TODO: Імпортувати Enum NotificationChannelType з core.dicts, коли він буде визначений,
-#       для використання у get_by_template_type.
-# from backend.app.src.core.dicts import NotificationChannelType
+# Enums NotificationChannelType імпортовано вище.
 
 
 class NotificationTemplateRepository(
@@ -39,18 +38,17 @@ class NotificationTemplateRepository(
     та може містити специфічні методи для роботи з шаблонами.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self):
         """
         Ініціалізує репозиторій для моделі `NotificationTemplate`.
-
-        Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        super().__init__(db_session=db_session, model=NotificationTemplate)
+        super().__init__(model=NotificationTemplate)
+        logger.info(f"Репозиторій для моделі '{self.model.__name__}' ініціалізовано.")
 
     async def get_by_template_type(
             self,
-            template_type: str,  # Очікується значення з NotificationChannelType Enum
+            session: AsyncSession,
+            template_type: NotificationChannelType,  # Змінено на NotificationChannelType Enum
             active_only: bool = True,
             skip: int = 0,
             limit: int = 100
@@ -59,24 +57,47 @@ class NotificationTemplateRepository(
         Отримує список шаблонів сповіщень за вказаним типом/каналом з пагінацією.
 
         Args:
-            template_type (str): Тип/канал шаблону (значення з NotificationChannelType Enum).
-            active_only (bool): Якщо True, повертає лише активні шаблони (state='active').
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
+            template_type (NotificationChannelType): Тип/канал шаблону (Enum).
+            active_only (bool): Якщо True, повертає лише активні шаблони.
             skip (int): Кількість записів для пропуску.
             limit (int): Максимальна кількість записів для повернення.
 
         Returns:
             Tuple[List[NotificationTemplate], int]: Кортеж зі списком шаблонів та їх загальною кількістю.
         """
-        filters = [self.model.template_type == template_type]
+        logger.debug(
+            f"Отримання шаблонів за типом: {template_type.value}, active_only: {active_only}, "
+            f"skip: {skip}, limit: {limit}"
+        )
+        # Модель NotificationTemplate.template_type очікує NotificationChannelType (SQLEnum),
+        # тому передаємо Enum член напряму.
+        filters_dict: Dict[str, Any] = {"template_type": template_type}
         if active_only:
-            # Модель NotificationTemplate успадковує BaseDictionaryModel -> BaseMainModel -> StateMixin
-            if hasattr(self.model, "state"):
-                filters.append(self.model.state == "active")  # TODO: Узгодити з Enum для станів
-            # else:
-            # logger.warning(f"Модель {self.model.__name__} не має поля 'state' для фільтрації активних шаблонів.")
+            # Модель NotificationTemplate успадковує BaseDictionaryModel -> BaseMainModel -> StateMixin,
+            # тому поле 'state' гарантовано існує.
+            # TODO: [Визначення Активного Стану] Уточнити значення для активного стану ("active" або Enum.value),
+            #       якщо модель буде використовувати Enum для поля 'state'.
+            filters_dict["state"] = "active" # Припускаємо, що активний стан це рядок "active"
 
-        order_by = [self.model.name.asc()]  # Сортувати за назвою
-        return await self.get_multi(skip=skip, limit=limit, filters=filters, order_by=order_by)
+        sort_by_field = "name"
+        sort_order_str = "asc"  # Сортувати за назвою
+
+        try:
+            items = await super().get_multi(
+                session=session,
+                skip=skip,
+                limit=limit,
+                filters=filters_dict,
+                sort_by=sort_by_field,
+                sort_order=sort_order_str
+            )
+            total_count = await super().count(session=session, filters=filters_dict)
+            logger.debug(f"Знайдено {total_count} шаблонів за типом: {template_type.value if isinstance(template_type, Enum) else template_type}") # Log enum value
+            return items, total_count
+        except Exception as e:
+            logger.error(f"Помилка при отриманні шаблонів за типом {template_type.value if isinstance(template_type, Enum) else template_type}: {e}", exc_info=True) # Log enum value
+            return [], 0
 
 
 if __name__ == "__main__":
@@ -92,8 +113,7 @@ if __name__ == "__main__":
     logger.info("  - get_by_code(code: str)")
     logger.info("  - get_by_name(name: str)")
     logger.info("\nВласні специфічні методи:")
-    logger.info("  - get_by_template_type(template_type: str, active_only: bool = True, skip: int = 0, limit: int = 100)")
+    logger.info("  - get_by_template_type(template_type: NotificationChannelType, active_only: bool = True, skip: int = 0, limit: int = 100)") # Оновлено тип
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    logger.info("TODO: Інтегрувати Enum 'NotificationChannelType' для аргументу `template_type`.")
     logger.info("TODO: Узгодити значення 'active' для фільтра `active_only` з можливим Enum для станів.")

@@ -11,15 +11,16 @@
 """
 
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Схеми, пов'язані з Групою (очікувані назви згідно з завданням)
 from backend.app.src.schemas.groups.group import (
     GroupBaseSchema,
     GroupCreateSchema,
     GroupUpdateSchema,
-    GroupResponseSchema
-    # GroupDetailResponseSchema # Якщо буде окрема деталізована схема
+    GroupSchema,  # Використовуємо фактичну назву
+    GroupDetailSchema # Додано деталізовану схему
 )
 
 # Схеми, пов'язані з Членством в Групі
@@ -27,15 +28,15 @@ from backend.app.src.schemas.groups.membership import (
     GroupMembershipBaseSchema,
     GroupMembershipCreateSchema,
     GroupMembershipUpdateSchema,
-    GroupMembershipResponseSchema
+    GroupMembershipSchema # Використовуємо фактичну назву
 )
 
 # Схеми, пов'язані з Налаштуваннями Групи
 from backend.app.src.schemas.groups.settings import (
     GroupSettingBaseSchema,
-    GroupSettingCreateSchema, # Додано згідно завдання
+    GroupSettingCreateSchema,
     GroupSettingUpdateSchema,
-    GroupSettingResponseSchema
+    GroupSettingSchema # Використовуємо фактичну назву
 )
 
 # Схеми, пов'язані із Запрошеннями до Групи
@@ -43,8 +44,8 @@ from backend.app.src.schemas.groups.invitation import (
     GroupInvitationBaseSchema,
     GroupInvitationCreateSchema,
     GroupInvitationUpdateSchema,
-    GroupInvitationResponseSchema
-    # GroupInvitationAcceptSchema # Якщо це окрема схема, а не частина Update/сервісу
+    GroupInvitationSchema, # Використовуємо фактичну назву
+    GroupInvitationAcceptSchema # Додано схему прийняття запрошення
 )
 
 __all__ = [
@@ -52,24 +53,24 @@ __all__ = [
     "GroupBaseSchema",
     "GroupCreateSchema",
     "GroupUpdateSchema",
-    "GroupResponseSchema",
-    # "GroupDetailResponseSchema",
+    "GroupSchema",
+    "GroupDetailSchema",
     # GroupMembership schemas
     "GroupMembershipBaseSchema",
     "GroupMembershipCreateSchema",
     "GroupMembershipUpdateSchema",
-    "GroupMembershipResponseSchema",
+    "GroupMembershipSchema",
     # GroupSetting schemas
     "GroupSettingBaseSchema",
     "GroupSettingCreateSchema",
     "GroupSettingUpdateSchema",
-    "GroupSettingResponseSchema",
+    "GroupSettingSchema",
     # GroupInvitation schemas
     "GroupInvitationBaseSchema",
     "GroupInvitationCreateSchema",
     "GroupInvitationUpdateSchema",
-    "GroupInvitationResponseSchema",
-    # "GroupInvitationAcceptSchema",
+    "GroupInvitationSchema",
+    "GroupInvitationAcceptSchema",
 ]
 
 logger.debug("Ініціалізація пакету схем Pydantic `groups`...")

@@ -10,14 +10,13 @@ from typing import List, Optional, Tuple, Any
 
 from sqlalchemy import select, func  # func для count
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.orm import selectinload # Якщо потрібно жадібне завантаження user або group
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.groups.membership import GroupMembership
 from backend.app.src.schemas.groups.membership import GroupMembershipCreateSchema, GroupMembershipUpdateSchema
-from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
@@ -32,39 +31,50 @@ class GroupMembershipRepository(
     списку учасників групи, списку груп для користувача та ID груп для користувача.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self):
         """
         Ініціалізує репозиторій для моделі `GroupMembership`.
-
-        Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        super().__init__(db_session=db_session, model=GroupMembership)
+        super().__init__(model=GroupMembership)
+        logger.info(f"Репозиторій для моделі '{self.model.__name__}' ініціалізовано.")
 
-    async def get_by_user_and_group(self, user_id: int, group_id: int) -> Optional[GroupMembership]:
+    async def get_by_user_and_group(
+            self, session: AsyncSession, user_id: int, group_id: int
+    ) -> Optional[GroupMembership]:
         """
         Отримує запис про членство за ID користувача та ID групи.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             user_id (int): ID користувача.
             group_id (int): ID групи.
 
         Returns:
             Optional[GroupMembership]: Екземпляр моделі `GroupMembership`, якщо знайдено, інакше None.
         """
+        logger.debug(f"Отримання GroupMembership для user_id {user_id}, group_id {group_id}")
         stmt = select(self.model).where(
             self.model.user_id == user_id,
             self.model.group_id == group_id
         )
-        result = await self.db_session.execute(stmt)
-        return result.scalar_one_or_none()
+        try:
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(
+                f"Помилка при отриманні GroupMembership для user_id {user_id}, group_id {group_id}: {e}",
+                exc_info=True
+            )
+            return None
 
-    async def get_members_of_group(self, group_id: int, skip: int = 0, limit: int = 100) -> Tuple[
-        List[GroupMembership], int]:
+    async def get_members_of_group(
+            self, session: AsyncSession, group_id: int, skip: int = 0, limit: int = 100
+    ) -> Tuple[List[GroupMembership], int]:
         """
         Отримує список членств (учасників) для вказаної групи з пагінацією.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             group_id (int): ID групи.
             skip (int): Кількість записів для пропуску.
             limit (int): Максимальна кількість записів для повернення.
@@ -72,19 +82,33 @@ class GroupMembershipRepository(
         Returns:
             Tuple[List[GroupMembership], int]: Кортеж зі списком членств та їх загальною кількістю.
         """
-        filters = [self.model.group_id == group_id]
+        logger.debug(f"Отримання учасників групи group_id: {group_id}, skip: {skip}, limit: {limit}")
+        filters_dict: Dict[str, Any] = {"group_id": group_id}
         # Можна додати сортування, наприклад, за датою приєднання або роллю
-        # order_by = [self.model.created_at.asc()]
+        # sort_by_field = "created_at"
+        # sort_order_str = "asc"
         # Або жадібне завантаження користувача:
-        # options = [selectinload(self.model.user)]
-        return await self.get_multi(skip=skip, limit=limit, filters=filters)  # , order_by=order_by, options=options)
+        # options = [selectinload(self.model.user)] # Потребує імпорту selectinload
+        try:
+            items = await super().get_multi(
+                session=session, skip=skip, limit=limit, filters=filters_dict
+                # sort_by=sort_by_field, sort_order=sort_order_str, options=options
+            )
+            total_count = await super().count(session=session, filters=filters_dict)
+            logger.debug(f"Знайдено {total_count} учасників для group_id: {group_id}")
+            return items, total_count
+        except Exception as e:
+            logger.error(f"Помилка при отриманні учасників для group_id {group_id}: {e}", exc_info=True)
+            return [], 0
 
-    async def get_user_group_memberships(self, user_id: int, skip: int = 0, limit: int = 100) -> Tuple[
-        List[GroupMembership], int]:
+    async def get_user_group_memberships(
+            self, session: AsyncSession, user_id: int, skip: int = 0, limit: int = 100
+    ) -> Tuple[List[GroupMembership], int]:
         """
         Отримує список членств у групах для вказаного користувача з пагінацією.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             user_id (int): ID користувача.
             skip (int): Кількість записів для пропуску.
             limit (int): Максимальна кількість записів для повернення.
@@ -92,25 +116,84 @@ class GroupMembershipRepository(
         Returns:
             Tuple[List[GroupMembership], int]: Кортеж зі списком членств та їх загальною кількістю.
         """
-        filters = [self.model.user_id == user_id]
+        logger.debug(f"Отримання членств для user_id: {user_id}, skip: {skip}, limit: {limit}")
+        filters_dict: Dict[str, Any] = {"user_id": user_id}
         # Можна додати сортування, наприклад, за назвою групи (потребує join з Group)
         # Або жадібне завантаження групи:
-        # options = [selectinload(self.model.group)]
-        return await self.get_multi(skip=skip, limit=limit, filters=filters)  # , options=options)
+        # options = [selectinload(self.model.group)] # Потребує імпорту selectinload
+        try:
+            items = await super().get_multi(
+                session=session, skip=skip, limit=limit, filters=filters_dict
+                # options=options
+            )
+            total_count = await super().count(session=session, filters=filters_dict)
+            logger.debug(f"Знайдено {total_count} членств для user_id: {user_id}")
+            return items, total_count
+        except Exception as e:
+            logger.error(f"Помилка при отриманні членств для user_id {user_id}: {e}", exc_info=True)
+            return [], 0
 
-    async def get_user_group_ids(self, user_id: int) -> List[int]:
+    async def get_user_group_ids(self, session: AsyncSession, user_id: int) -> List[int]:
         """
         Отримує список ID всіх груп, до яких належить вказаний користувач.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             user_id (int): ID користувача.
 
         Returns:
             List[int]: Список ID груп.
         """
+        logger.debug(f"Отримання ID груп для user_id: {user_id}")
         stmt = select(self.model.group_id).where(self.model.user_id == user_id)
-        result = await self.db_session.execute(stmt)
-        return list(result.scalars().all())
+        try:
+            result = await session.execute(stmt)
+            return list(result.scalars().all())
+        except Exception as e:
+            logger.error(f"Помилка при отриманні ID груп для user_id {user_id}: {e}", exc_info=True)
+            return []
+
+    async def count_active_admins_in_group(
+            self, session: AsyncSession, group_id: int, exclude_user_id: Optional[int] = None
+    ) -> int:
+        """
+        Підраховує кількість активних адміністраторів у групі, опціонально виключаючи одного користувача.
+
+        Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
+            group_id (int): ID групи.
+            exclude_user_id (Optional[int]): ID користувача, якого потрібно виключити з підрахунку.
+
+        Returns:
+            int: Кількість активних адміністраторів.
+        """
+        from backend.app.src.models.dictionaries.user_roles import UserRole # Локальний імпорт для уникнення циклічності на рівні модуля
+        from backend.app.src.services.groups.group import ADMIN_ROLE_CODE # Використання константи
+
+        logger.debug(f"Підрахунок активних адмінів для group_id {group_id}, виключаючи user_id {exclude_user_id}")
+
+        stmt = (
+            select(func.count(self.model.user_id))
+            .join(UserRole, self.model.role_id == UserRole.id) # Припускаємо, що поле в GroupMembership називається role_id
+            .where(
+                self.model.group_id == group_id,
+                self.model.is_active == True,
+                UserRole.code == ADMIN_ROLE_CODE
+            )
+        )
+        if exclude_user_id is not None:
+            stmt = stmt.where(self.model.user_id != exclude_user_id)
+
+        try:
+            result = await session.execute(stmt)
+            count = result.scalar_one_or_none() or 0
+            return count
+        except Exception as e:
+            logger.error(
+                f"Помилка при підрахунку активних адмінів для group_id {group_id}: {e}",
+                exc_info=True
+            )
+            return 0
 
 
 if __name__ == "__main__":
@@ -127,5 +210,6 @@ if __name__ == "__main__":
     logger.info("  - get_members_of_group(group_id: int, skip: int = 0, limit: int = 100)")
     logger.info("  - get_user_group_memberships(user_id: int, skip: int = 0, limit: int = 100)")
     logger.info("  - get_user_group_ids(user_id: int)")
+    logger.info("  - count_active_admins_in_group(group_id: int, exclude_user_id: Optional[int] = None)")
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")

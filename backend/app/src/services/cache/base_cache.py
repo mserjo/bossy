@@ -1,9 +1,10 @@
 # backend/app/src/services/cache/base_cache.py
 # import logging # Замінено на централізований логер
 from abc import ABC, abstractmethod
-from typing import Optional, Any, Set # Додано Set для потенційних типів повернення (наприклад, smembers)
+from typing import Optional, Any # Set видалено, оскільки використовується лише в коментарях
 
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+logger = get_logger(__name__) # Ініціалізація логера
 
 class BaseCacheService(ABC):
     """
@@ -120,8 +121,8 @@ class BaseCacheService(ABC):
     # --- Приклади методів для операцій з множинами (якщо бекенд підтримує, наприклад, Redis SADD, SMEMBERS) ---
     # (Закоментовано, оскільки це специфічно для певних бекендів і не є частиною базового інтерфейсу)
 
-    # async def set_add(self, key: str, *values: Any) -> int:
-    #     """Додає один або більше елементів до множини, що зберігається за ключем."""
+    # async def set_add(self, key: str, *values: Any, expire_seconds: Optional[int] = None) -> int:
+    #     """Додає один або більше елементів до множини, що зберігається за ключем. Опціонально встановлює TTL."""
     #     logger.warning(f"Метод 'set_add' не реалізований для {self.__class__.__name__} за замовчуванням.")
     #     return 0 # Або викликати NotImplementedError
 

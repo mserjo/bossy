@@ -14,10 +14,9 @@
 # Імпорт централізованого логера
 from backend.app.src.config import logger
 
-# Імпорт моделей з відповідних файлів цього пакету, використовуючи нову конвенцію імен.
-# Припускаємо, що класи в file.py та avatar.py будуть перейменовані на FileRecordModel та UserAvatarModel.
-from backend.app.src.models.files.file import FileRecordModel
-from backend.app.src.models.files.avatar import UserAvatarModel
+# Імпорт моделей з відповідних файлів цього пакету.
+from backend.app.src.models.files.file import FileRecord
+from backend.app.src.models.files.avatar import UserAvatar
 
 # TODO: В майбутньому тут можуть бути інші моделі, пов'язані з файлами,
 #       наприклад, GroupIconModel, RewardIconModel, якщо вони матимуть
@@ -26,8 +25,8 @@ from backend.app.src.models.files.avatar import UserAvatarModel
 
 # Визначаємо, які символи будуть експортовані при використанні `from backend.app.src.models.files import *`.
 __all__ = [
-    "FileRecordModel",
-    "UserAvatarModel",
+    "FileRecord",
+    "UserAvatar",
 ]
 
 logger.debug("Ініціалізація пакету моделей `files`...")

@@ -14,14 +14,12 @@ from typing import Any, Dict, Union
 from fastapi import FastAPI, Request, HTTPException, status, APIRouter
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-# from starlette.exceptions import HTTPException as StarletteHTTPException # Можна також обробляти винятки Starlette
+# Коментований імпорт StarletteHTTPException видалено
 
 # Повні шляхи імпорту
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings as global_settings  # Для доступу до DEBUG тощо
-
-
-# from backend.app.src.core.exceptions import CustomAppException # Приклад, якщо визначено
+from backend.app.src.config import logger  # Стандартизований імпорт логера
+from backend.app.src.config import settings  # Стандартизований імпорт settings
+# Коментований імпорт CustomAppException видалено
 
 
 # --- Кастомний обробник для помилок валідації Pydantic (RequestValidationError) ---
@@ -88,7 +86,7 @@ async def custom_http_exception_handler(
         error_type = exc.headers["X-Error-Type"]
 
     if 500 <= exc.status_code < 600:
-        logger.error(log_message, exc_info=exc if global_settings.DEBUG else True)  # traceback для серверних помилок
+        logger.error(log_message, exc_info=exc if settings.DEBUG else True)  # Використання settings.DEBUG
     else:
         logger.warning(log_message)
 

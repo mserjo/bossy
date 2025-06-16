@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Модель SQLAlchemy для довідника "Провайдери Календарів".
 
-Цей модуль визначає модель `CalendarProviderModel`, яка представляє записи
+Цей модуль визначає модель `CalendarProvider`, яка представляє записи
 в довіднику провайдерів календарів, з якими система може інтегруватися
 (наприклад, Google Calendar, Outlook Calendar, Apple iCloud Calendar).
 Довідник зберігає інформацію про назву провайдера, його код, опис,
@@ -16,15 +16,16 @@ from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 # Абсолютний імпорт базової моделі для довідників
-from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
-class CalendarProviderModel(BaseDictionaryModel):
+class CalendarProvider(BaseDictionary):
     """Модель SQLAlchemy для довідника "Провайдери Календарів".
 
-    Успадковує всі поля від `BaseDictionaryModel` (включаючи `id`, `name`,
+    Успадковує всі поля від `BaseDictionary` (включаючи `id`, `name`,
     `description`, `code`, `icon`, `color` та інші поля з `BaseMainModel`).
     `group_id` для цього типу довідника, ймовірно, буде `NULL`,
     оскільки це переважно системний довідник.
@@ -64,17 +65,17 @@ class CalendarProviderModel(BaseDictionaryModel):
         comment="Рекомендована частота синхронізації з цим календарем в хвилинах."
     )
 
-    # _repr_fields визначаються в BaseDictionaryModel та його батьківських класах.
+    # _repr_fields визначаються в BaseDictionary та його батьківських класах.
     # Оскільки цей клас додає специфічні поля, їх можна додати до _repr_fields,
     # якщо їх відображення в repr є корисним. За завданням - порожній кортеж.
     _repr_fields: tuple[str, ...] = ("is_active",) # Додамо is_active для прикладу, хоча завдання просить ()
 
 
 if __name__ == "__main__":
-    # Демонстраційний блок для моделі CalendarProviderModel.
-    logger.info("--- Модель Довідника: CalendarProviderModel ---")
-    logger.info("Назва таблиці: %s", CalendarProviderModel.__tablename__)
-    logger.info("Коментар до таблиці: %s", getattr(CalendarProviderModel, '__table_args__', ({},))[0].get('comment', ''))
+    # Демонстраційний блок для моделі CalendarProvider.
+    logger.info("--- Модель Довідника: CalendarProvider ---")
+    logger.info("Назва таблиці: %s", CalendarProvider.__tablename__)
+    logger.info("Коментар до таблиці: %s", getattr(CalendarProvider, '__table_args__', ({},))[0].get('comment', ''))
 
     logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = [
@@ -87,11 +88,10 @@ if __name__ == "__main__":
         logger.info("  - %s", field)
 
     # Приклад створення екземпляра (без взаємодії з БД)
-    import uuid
     from datetime import datetime, timezone
 
-    example_calendar_provider = CalendarProviderModel(
-        id=uuid.uuid4(),
+    example_calendar_provider = CalendarProvider(
+        id=1, # id тепер Integer
         name="Google Calendar", # TODO i18n: "Google Calendar"
         description="Інтеграція з Google Calendar для синхронізації завдань та подій.", # TODO i18n
         code="GOOGLE_CALENDAR",
@@ -102,8 +102,8 @@ if __name__ == "__main__":
     )
     example_calendar_provider.created_at = datetime.now(timezone.utc) # Імітація
 
-    logger.info("\nПриклад екземпляра CalendarProviderModel (без сесії):\n  %s", example_calendar_provider)
+    logger.info("\nПриклад екземпляра CalendarProvider (без сесії):\n  %s", example_calendar_provider)
     # Очікуваний __repr__ (порядок може відрізнятися):
-    # <CalendarProviderModel(id=..., name='Google Calendar', code='GOOGLE_CALENDAR', is_active=True, state_id=1, created_at=...)>
+    # <CalendarProvider(id=..., name='Google Calendar', code='GOOGLE_CALENDAR', is_active=True, state_id=1, created_at=...)>
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

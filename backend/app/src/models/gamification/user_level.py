@@ -87,8 +87,9 @@ class UserLevel(Base, TimestampedMixin):
         lazy="selectin")  # back_populates="user_levels_achieved" можна додати до Group
 
     # Поля для __repr__
+    # `id` автоматично додається через Base.__repr__
     # `created_at` (як achieved_at) та `updated_at` успадковуються з TimestampedMixin._repr_fields
-    _repr_fields = ["id", "user_id", "level_id", "group_id"]
+    _repr_fields = ("user_id", "level_id", "group_id")
 
 
 if __name__ == "__main__":

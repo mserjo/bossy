@@ -7,8 +7,8 @@ Pydantic схеми для сутності "Рівень Користувача
 - Створення нового запису про досягнення рівня (зазвичай виконується сервісом) (`UserLevelCreateSchema`).
 - Представлення даних про рівень користувача у відповідях API (`UserLevelSchema`).
 """
-from datetime import datetime
-from typing import Optional, Any  # Any для тимчасових полів
+from datetime import datetime, timedelta # Moved timedelta here
+from typing import Optional, Any  # Any для тимчасовых полів
 
 from pydantic import Field
 
@@ -34,7 +34,7 @@ class UserLevelBaseSchema(BaseSchema):
     """
     user_id: int = Field(description="Ідентифікатор користувача, який досяг рівня.")
     level_id: int = Field(description="Ідентифікатор досягнутого рівня гейміфікації.")
-    group_id: int = Field(description="Ідентифікатор групи, в межах якої досягнуто рівень.")
+    group_id: Optional[int] = Field(None, description="Ідентифікатор групи, в межах якої досягнуто рівень (NULL для глобальних рівнів).") # Змінено на Optional[int]
     # `created_at` з TimestampedSchemaMixin буде використовуватися як `achieved_at` у UserLevelSchema.
 
     # model_config успадковується з BaseSchema (from_attributes=True)
@@ -95,6 +95,3 @@ if __name__ == "__main__":
 
     logger.info("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, LevelSchema, GroupBriefSchema)")
     logger.info("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
-
-# Потрібно для timedelta в __main__
-from datetime import timedelta

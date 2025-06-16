@@ -15,7 +15,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Абсолютний імпорт базових класів та Enum
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin
-from backend.app.src.core.dicts import FileType as FileTypeEnum  # Enum для поля purpose
+from backend.app.src.core.dicts import FileType # Enum для поля purpose, renamed from FileTypeEnum
+from sqlalchemy import Enum as SQLEnum # Імпорт SQLEnum
 from backend.app.src.config.logging import get_logger # Імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
@@ -70,10 +71,8 @@ class FileRecord(Base, TimestampedMixin):
     )
 
     # Використовуємо значення з Enum FileType
-    # TODO: Переконатися, що SQLEnum імпортовано та використовується, якщо тип колонки в БД є Enum.
-    # purpose: Mapped[Optional[FileTypeEnum]] = mapped_column(SQLEnum(FileTypeEnum), nullable=True, index=True)
-    purpose: Mapped[Optional[str]] = mapped_column(
-        String(50), nullable=True, index=True, comment="Призначення файлу (avatar, task_attachment тощо)"
+    purpose: Mapped[Optional[FileType]] = mapped_column(
+        SQLEnum(FileType), nullable=True, index=True, comment="Призначення файлу (avatar, task_attachment тощо)"
     )
 
     metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(
@@ -90,7 +89,9 @@ class FileRecord(Base, TimestampedMixin):
     )
 
     # Поля для __repr__
-    _repr_fields = ["id", "file_name", "mime_type", "file_size", "uploader_user_id", "purpose"]
+    # `id` автоматично додається через Base.__repr__
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
+    _repr_fields = ("file_name", "mime_type", "file_size", "uploader_user_id", "purpose")
 
 
 if __name__ == "__main__":
@@ -122,7 +123,7 @@ if __name__ == "__main__":
         mime_type="image/jpeg",
         file_size=102400,  # 100 KB
         uploader_user_id=101,
-        purpose=FileTypeEnum.AVATAR.value,  # Використання значення Enum
+        purpose=FileType.AVATAR,  # Використання Enum
         metadata={"width": 500, "height": 500}
     )
     # Імітуємо часові мітки
@@ -131,8 +132,8 @@ if __name__ == "__main__":
 
     logger.info(f"\nПриклад екземпляра FileRecord (без сесії):\n  {example_file}")
     # Очікуваний __repr__ (порядок може відрізнятися):
-    # <FileRecord(id=1, file_name='profile_pic.jpg', mime_type='image/jpeg', file_size=102400, uploader_user_id=101, purpose='avatar', created_at=...)>
+    # <FileRecord(id=1, file_name='profile_pic.jpg', mime_type='image/jpeg', file_size=102400, uploader_user_id=101, purpose=<FileType.AVATAR: 'avatar'>, created_at=...)>
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
     logger.info(
-        f"Використовується FileType Enum для поля 'purpose', наприклад: FileTypeEnum.TASK_ATTACHMENT = '{FileTypeEnum.TASK_ATTACHMENT.value}'")
+        f"Використовується FileType Enum для поля 'purpose', наприклад: FileType.TASK_ATTACHMENT = {FileType.TASK_ATTACHMENT}")

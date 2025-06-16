@@ -6,15 +6,13 @@
 та надає методи для роботи з довідником типів завдань.
 """
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 # Абсолютний імпорт базового репозиторію для довідників
 from backend.app.src.repositories.dictionaries.base_dict_repository import BaseDictionaryRepository
 
 # Абсолютний імпорт моделі та схем для Типів Завдань
 from backend.app.src.models.dictionaries.task_types import TaskType
 from backend.app.src.schemas.dictionaries.task_types import TaskTypeCreateSchema, TaskTypeUpdateSchema
-from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
@@ -27,16 +25,18 @@ class TaskTypeRepository(BaseDictionaryRepository[TaskType, TaskTypeCreateSchema
     від `BaseDictionaryRepository`.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self):
         """
         Ініціалізує репозиторій для моделі `TaskType`.
-
-        Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        super().__init__(db_session=db_session, model=TaskType)
+        super().__init__(model=TaskType)
+        logger.info(f"Репозиторій для моделі '{self.model.__name__}' ініціалізовано.")
 
     # Тут можна додати специфічні методи для TaskTypeRepository, якщо вони потрібні.
+    # Наприклад:
+    # async def get_task_types_by_category(self, session: AsyncSession, category: str) -> List[TaskType]:
+    #     # логіка методу...
+    #     pass
 
 
 if __name__ == "__main__":

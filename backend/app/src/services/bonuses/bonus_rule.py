@@ -1,30 +1,38 @@
 # backend/app/src/services/bonuses/bonus_rule.py
-import logging
-from typing import List, Optional, Any, Dict
-from uuid import UUID
+"""
+Сервіс для управління правилами нарахування бонусів.
+
+Відповідає за створення, оновлення, видалення, отримання та пошук
+правил нарахування бонусів, враховуючи їх специфічність та умови застосування.
+"""
+from typing import List, Optional, Dict, TYPE_CHECKING # Any видалено, Dict використовується, TYPE_CHECKING додано
+# UUID видалено, оскільки всі ID, що були UUID, змінено на int, і uuid4() тут не використовується
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+from sqlalchemy import select, or_, and_ # Оновлено імпорт select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import or_, and_  # Додано and_ для складних умов
 
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.bonuses.bonus import BonusRule  # Модель SQLAlchemy BonusRule
-from backend.app.src.models.groups.group import Group  # Для правил, специфічних для групи
-from backend.app.src.models.dictionaries.task_types import TaskType  # Для правил, пов'язаних з типами завдань
-from backend.app.src.models.tasks.task import Task  # Для правил, пов'язаних з конкретними завданнями
+from backend.app.src.models.bonuses.bonus import BonusRule
+from backend.app.src.models.groups.group import Group
+from backend.app.src.models.dictionaries.task_types import TaskType
+from backend.app.src.models.tasks.task import Task
 # from backend.app.src.models.tasks.event import Event # Якщо правила можуть бути пов'язані з подіями
-from backend.app.src.models.auth.user import User  # Для created_by_user, updated_by_user
+from backend.app.src.models.auth.user import User
 
-from backend.app.src.schemas.bonuses.bonus_rule import (  # Pydantic Схеми
+from backend.app.src.schemas.bonuses.bonus_rule import (
     BonusRuleCreate,
     BonusRuleUpdate,
     BonusRuleResponse
 )
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+logger = get_logger(__name__) # Ініціалізація логера
+from backend.app.src.config import settings
+
+if TYPE_CHECKING: # Умовний імпорт для TYPE_CHECKING
+    pass
 
 
 class BonusRuleService(BaseService):
@@ -38,11 +46,11 @@ class BonusRuleService(BaseService):
         super().__init__(db_session)
         logger.info("BonusRuleService ініціалізовано.")
 
-    async def get_bonus_rule_by_id(self, rule_id: UUID) -> Optional[BonusRuleResponse]:
+    async def get_bonus_rule_by_id(self, rule_id: int) -> Optional[BonusRuleResponse]: # rule_id змінено на int
         """
         Отримує правило нарахування бонусів за його ID, з завантаженими пов'язаними сутностями.
 
-        :param rule_id: ID правила.
+        :param rule_id: ID правила (int).
         :return: Pydantic схема BonusRuleResponse або None, якщо не знайдено.
         """
         logger.debug(f"Спроба отримання правила нарахування бонусів за ID: {rule_id}")
@@ -64,12 +72,12 @@ class BonusRuleService(BaseService):
         logger.info(f"Правило нарахування бонусів з ID '{rule_id}' не знайдено.")
         return None
 
-    async def create_bonus_rule(self, rule_data: BonusRuleCreate, creator_user_id: UUID) -> BonusRuleResponse:
+    async def create_bonus_rule(self, rule_data: BonusRuleCreate, creator_user_id: int) -> BonusRuleResponse: # creator_user_id змінено на int
         """
         Створює нове правило нарахування бонусів.
 
         :param rule_data: Дані для створення правила (Pydantic схема).
-        :param creator_user_id: ID користувача, що створює правило.
+        :param creator_user_id: ID користувача (int), що створює правило.
         :return: Pydantic схема створеного BonusRuleResponse.
         :raises ValueError: Якщо пов'язані сутності не знайдено або ім'я правила не унікальне в межах області. # i18n
         """
@@ -123,14 +131,14 @@ class BonusRuleService(BaseService):
         return BonusRuleResponse.model_validate(new_rule_db)
 
     async def update_bonus_rule(
-            self, rule_id: UUID, rule_update_data: BonusRuleUpdate, current_user_id: UUID
+            self, rule_id: int, rule_update_data: BonusRuleUpdate, current_user_id: int # rule_id, current_user_id змінено на int
     ) -> Optional[BonusRuleResponse]:
         """
         Оновлює існуюче правило нарахування бонусів.
 
-        :param rule_id: ID правила для оновлення.
+        :param rule_id: ID правила (int) для оновлення.
         :param rule_update_data: Дані для оновлення (Pydantic схема).
-        :param current_user_id: ID користувача, що виконує оновлення.
+        :param current_user_id: ID користувача (int), що виконує оновлення.
         :return: Pydantic схема оновленого BonusRuleResponse або None, якщо правило не знайдено.
         :raises ValueError: Якщо пов'язані сутності не знайдено або ім'я правила не унікальне. # i18n
         """
@@ -200,12 +208,12 @@ class BonusRuleService(BaseService):
             logger.error(f"Помилка при оновленні правила ID '{rule_id}': {e}", exc_info=settings.DEBUG)
             raise
 
-    async def delete_bonus_rule(self, rule_id: UUID, current_user_id: UUID) -> bool:
+    async def delete_bonus_rule(self, rule_id: int, current_user_id: int) -> bool: # rule_id, current_user_id змінено на int
         """
         Видаляє правило нарахування бонусів.
 
-        :param rule_id: ID правила для видалення.
-        :param current_user_id: ID користувача, що виконує видалення (для аудиту).
+        :param rule_id: ID правила (int) для видалення.
+        :param current_user_id: ID користувача (int), що виконує видалення (для аудиту).
         :return: True, якщо видалення успішне, False - якщо правило не знайдено.
         """
         logger.debug(f"Спроба видалення правила ID: {rule_id} користувачем ID: {current_user_id}")
@@ -225,9 +233,9 @@ class BonusRuleService(BaseService):
 
     async def list_bonus_rules(
             self,
-            group_id: Optional[UUID] = None,
-            task_type_id: Optional[UUID] = None,
-            task_id: Optional[UUID] = None,
+            group_id: Optional[int] = None, # Змінено Optional[UUID] на Optional[int]
+            task_type_id: Optional[int] = None, # Змінено Optional[UUID] на Optional[int]
+            task_id: Optional[int] = None, # Змінено Optional[UUID] на Optional[int]
             is_active: Optional[bool] = None,  # За замовчуванням не фільтрує за активністю, щоб показати всі
             valid_on_date: Optional[datetime] = None,  # Дата для перевірки активності правила (valid_from/valid_until)
             skip: int = 0,
@@ -237,9 +245,9 @@ class BonusRuleService(BaseService):
         """
         Перелічує правила нарахування бонусів з можливістю фільтрації та пагінації.
 
-        :param group_id: Фільтр за ID групи.
-        :param task_type_id: Фільтр за ID типу завдання.
-        :param task_id: Фільтр за ID завдання.
+        :param group_id: Фільтр за ID групи (int).
+        :param task_type_id: Фільтр за ID типу завдання (int).
+        :param task_id: Фільтр за ID завдання (int).
         :param is_active: Фільтр за статусом активності правила.
         :param valid_on_date: Якщо вказано, фільтрує правила, активні на цю дату.
         :param skip: Кількість записів для пропуску.
@@ -248,7 +256,7 @@ class BonusRuleService(BaseService):
         :return: Список Pydantic схем BonusRuleResponse.
         """
         logger.debug(
-            f"Перелік правил: group={group_id}, task_type={task_type_id}, task={task_id}, active={is_active}, valid_on={valid_on_date}, global_for_group={include_global_rules_if_group_given}")
+            f"Перелік правил: group_id={group_id}, task_type_id={task_type_id}, task_id={task_id}, active={is_active}, valid_on={valid_on_date}, global_for_group={include_global_rules_if_group_given}")
 
         stmt = select(BonusRule).options(
             selectinload(BonusRule.group), selectinload(BonusRule.task_type),
@@ -269,7 +277,9 @@ class BonusRuleService(BaseService):
 
         if task_type_id: conditions.append(BonusRule.task_type_id == task_type_id)
         if task_id: conditions.append(BonusRule.task_id == task_id)
-        if is_active is not None: conditions.append(BonusRule.is_active == is_active)
+        if is_active is not None:
+            # Припускаємо, що 'active' є рядковим представленням активного стану в полі 'state'
+            conditions.append(BonusRule.state == "active" if is_active else BonusRule.state != "active")
 
         if valid_on_date:
             # Правило активне, якщо valid_from <= valid_on_date AND (valid_until IS NULL OR valid_until >= valid_on_date)
@@ -287,6 +297,8 @@ class BonusRuleService(BaseService):
             stmt = stmt.where(*conditions)
 
         # TODO: Згідно technical_task.txt, уточнити поля для сортування.
+        # Можливі поля: name, amount, state, valid_from, valid_until, created_at.
+        # Потрібно реалізувати динамічне сортування аналогічно до UserService.list_users.
         stmt = stmt.order_by(BonusRule.group_id.nulls_first(), BonusRule.name).offset(skip).limit(limit)
 
         rules_db = (await self.db_session.execute(stmt)).scalars().unique().all()
@@ -297,9 +309,9 @@ class BonusRuleService(BaseService):
 
     async def get_applicable_bonus_rules(
             self,
-            group_id: UUID,  # Контекст: поточна група
-            task_id: Optional[UUID] = None,  # Контекст: конкретне завдання, якщо є
-            task_type_id: Optional[UUID] = None,  # Контекст: тип завдання
+            group_id: int,  # Змінено UUID на int
+            task_id: Optional[int] = None,  # Змінено Optional[UUID] на Optional[int]
+            task_type_id: Optional[int] = None,  # Змінено Optional[UUID] на Optional[int]
             # TODO: Розглянути `action_type: str` для більш складних умов, якщо потрібно (напр. 'TASK_COMPLETION')
     ) -> List[BonusRuleResponse]:
         """
@@ -309,11 +321,11 @@ class BonusRuleService(BaseService):
         """
         current_time = datetime.now(timezone.utc)
         logger.debug(
-            f"Пошук застосовних правил для групи {group_id}, завдання {task_id}, типу завдання {task_type_id} на {current_time.isoformat()}")
+            f"Пошук застосовних правил для group_id={group_id}, task_id={task_id}, task_type_id={task_type_id} на {current_time.isoformat()}")
 
         # Базові умови: правило активне та валідне за датою
         base_conditions = [
-            BonusRule.is_active == True,
+            BonusRule.state == "active", # Припускаємо, що 'active' є рядковим представленням активного стану
             or_(BonusRule.valid_from.is_(None), BonusRule.valid_from <= current_time),
             or_(BonusRule.valid_until.is_(None), BonusRule.valid_until >= current_time)
         ]

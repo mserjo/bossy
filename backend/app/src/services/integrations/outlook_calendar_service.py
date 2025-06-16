@@ -48,14 +48,14 @@ class OutlookCalendarService(BaseCalendarIntegrationService):
     """
     service_name = OUTLOOK_CALENDAR_SERVICE_NAME
 
-    def __init__(self, db_session: AsyncSession, user_id_for_context: Optional[UUID] = None):
+    def __init__(self, db_session: AsyncSession, user_id_for_context: Optional[int] = None): # Змінено UUID на int
         super().__init__(db_session, user_id_for_context)
         logger.info(f"OutlookCalendarService ініціалізовано для користувача: {self.user_id_for_context or 'N/A'}.")
         # Тимчасове сховище для симуляції, буде замінено на БД
         if user_id_for_context and not hasattr(self, f"_mock_tokens_user_{user_id_for_context}_{self.service_name}"):
             setattr(self, f"_mock_tokens_user_{user_id_for_context}_{self.service_name}", None)
 
-    async def _get_user_tokens_from_db(self, user_id: UUID) -> Optional[Dict[str, Any]]:
+    async def _get_user_tokens_from_db(self, user_id: int) -> Optional[Dict[str, Any]]: # Змінено UUID на int
         """
         [ЗАГЛУШКА/TODO] Отримує токени користувача для Outlook Calendar з бази даних.
         Має взаємодіяти з моделлю UserIntegration або подібною.
@@ -69,7 +69,7 @@ class OutlookCalendarService(BaseCalendarIntegrationService):
         logger.warning(f"[ЗАГЛУШКА] _get_user_tokens_from_db (Outlook): Не знайдено токенів для {user_id}.")
         return None
 
-    async def _store_user_tokens_in_db(self, user_id: UUID, tokens: Dict[str, Any], account_identifier: str) -> bool:
+    async def _store_user_tokens_in_db(self, user_id: int, tokens: Dict[str, Any], account_identifier: str) -> bool: # Змінено UUID на int
         """
         [ЗАГЛУШКА/TODO] Зберігає або оновлює токени користувача для Outlook Calendar в БД.
         `account_identifier` - це email або ID облікового запису Microsoft.
@@ -81,7 +81,7 @@ class OutlookCalendarService(BaseCalendarIntegrationService):
         setattr(self, f"_mock_account_id_user_{user_id}_{self.service_name}", account_identifier)
         return True
 
-    async def _get_graph_api_client(self, user_id: UUID) -> Optional[
+    async def _get_graph_api_client(self, user_id: int) -> Optional[ # Змінено UUID на int
         Any]:  # Повинен повертати тип клієнта, напр. GraphServiceClient
         """
         [ЗАГЛУШКА/TODO] Створює та повертає автентифікований об'єкт клієнта Microsoft Graph API.
@@ -119,7 +119,7 @@ class OutlookCalendarService(BaseCalendarIntegrationService):
 
         return MockGraphClient()
 
-    async def connect_account(self, user_id: UUID, auth_code: str, redirect_uri: str) -> Dict[str, Any]:
+    async def connect_account(self, user_id: int, auth_code: str, redirect_uri: str) -> Dict[str, Any]: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Підключає обліковий запис Outlook Calendar."""
         logger.info(
             f"OutlookCalendar: Користувач {user_id} підключається з auth_code (довжина: {len(auth_code)}) через {redirect_uri}.")
@@ -149,7 +149,7 @@ class OutlookCalendarService(BaseCalendarIntegrationService):
             # i18n
             return {"status": "error", "message": "Не вдалося зберегти токени (симуляція)."}
 
-    async def disconnect_account(self, user_id: UUID) -> bool:
+    async def disconnect_account(self, user_id: int) -> bool: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Відключає обліковий запис Outlook Calendar."""
         logger.info(f"OutlookCalendar: Користувач {user_id} відключає обліковий запис.")
         # TODO: Реалізувати відкликання токену (якщо підтримується Microsoft Graph для сценарію) та видалення з БД.
@@ -159,7 +159,7 @@ class OutlookCalendarService(BaseCalendarIntegrationService):
         logger.info(f"[ЗАГЛУШКА] Outlook Calendar відключено для {user_id}. Токени очищено (симуляція).")
         return True
 
-    async def refresh_access_token_if_needed(self, user_id: UUID) -> bool:
+    async def refresh_access_token_if_needed(self, user_id: int) -> bool: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Оновлює access-токен Microsoft Graph, якщо потрібно."""
         logger.debug(f"OutlookCalendar: Перевірка оновлення токену для {user_id}.")
         user_tokens = await self._get_user_tokens_from_db(user_id)
@@ -190,7 +190,7 @@ class OutlookCalendarService(BaseCalendarIntegrationService):
         logger.info(f"[ЗАГЛУШКА] Access-токен Outlook оновлено для користувача {user_id}.")
         return True
 
-    async def list_user_calendars(self, user_id: UUID) -> List[CalendarInfo]:
+    async def list_user_calendars(self, user_id: int) -> List[CalendarInfo]: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Перелічує календарі користувача Outlook."""
         logger.info(f"OutlookCalendar: Перелік календарів для користувача {user_id}.")
         # TODO: Реалізувати виклик Microsoft Graph API (/me/calendars).
@@ -208,7 +208,7 @@ class OutlookCalendarService(BaseCalendarIntegrationService):
             # i18n
         ]
 
-    async def create_event(self, user_id: UUID, calendar_id: str, event_data: CalendarEventData) -> Optional[
+    async def create_event(self, user_id: int, calendar_id: str, event_data: CalendarEventData) -> Optional[ # Змінено UUID на int
         CalendarEventData]:
         """[ЗАГЛУШКА/TODO] Створює подію в Outlook Calendar."""
         logger.info(
@@ -219,7 +219,7 @@ class OutlookCalendarService(BaseCalendarIntegrationService):
         # Pydantic v2: model_dump()
         return CalendarEventData(id=f"mock_outlook_event_id_{uuid4()}", **event_data.model_dump())
 
-    async def get_event(self, user_id: UUID, calendar_id: str, event_id: str) -> Optional[CalendarEventData]:
+    async def get_event(self, user_id: int, calendar_id: str, event_id: str) -> Optional[CalendarEventData]: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Отримує подію з Outlook Calendar."""
         logger.info(
             f"[ЗАГЛУШКА] OutlookCalendar: Отримання події '{event_id}' для {user_id} в календарі '{calendar_id}'.")
@@ -232,21 +232,21 @@ class OutlookCalendarService(BaseCalendarIntegrationService):
         # i18n
         raise NotImplementedError(f"Метод 'get_event' не реалізовано для {self.__class__.__name__}")
 
-    async def update_event(self, user_id: UUID, calendar_id: str, event_id: str, event_data: CalendarEventData) -> \
-    Optional[CalendarEventData]:
+    async def update_event(self, user_id: int, calendar_id: str, event_id: str, event_data: CalendarEventData) -> \
+    Optional[CalendarEventData]: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Оновлює подію в Outlook Calendar."""
         logger.info(
             f"[ЗАГЛУШКА] OutlookCalendar: Оновлення події '{event_id}' для {user_id} в '{calendar_id}' з назвою '{event_data.title}'.")
         # Pydantic v2: model_dump()
         return CalendarEventData(id=event_id, **event_data.model_dump())
 
-    async def delete_event(self, user_id: UUID, calendar_id: str, event_id: str) -> bool:
+    async def delete_event(self, user_id: int, calendar_id: str, event_id: str) -> bool: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Видаляє подію з Outlook Calendar."""
         logger.info(
             f"[ЗАГЛУШКА] OutlookCalendar: Видалення події '{event_id}' для {user_id} в календарі '{calendar_id}'.")
         return True
 
-    async def list_events(self, user_id: UUID, calendar_id: str, start_time: datetime, end_time: datetime,
+    async def list_events(self, user_id: int, calendar_id: str, start_time: datetime, end_time: datetime, # Змінено UUID на int
                           query: Optional[str] = None) -> List[CalendarEventData]:
         """[ЗАГЛУШКА/TODO] Перелічує події з Outlook Calendar."""
         logger.info(

@@ -9,7 +9,7 @@
 """
 
 # Абсолютний імпорт базової моделі для довідників
-from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 from backend.app.src.config.logging import get_logger # Імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
@@ -19,11 +19,11 @@ logger = get_logger(__name__)
 # from sqlalchemy.orm import Mapped, mapped_column
 # from sqlalchemy import String
 
-class MessengerPlatform(BaseDictionaryModel):
+class MessengerPlatform(BaseDictionary):
     """
     Модель SQLAlchemy для довідника "Платформи месенджерів".
 
-    Успадковує всі поля від `BaseDictionaryModel` (включаючи `id`, `name`, `description`, `code`,
+    Успадковує всі поля від `BaseDictionary` (включаючи `id`, `name`, `description`, `code`,
     часові мітки, м'яке видалення, стан, нотатки та опціональний `group_id`).
     `group_id` для цього типу довідника, ймовірно, буде NULL, оскільки це системний довідник.
 
@@ -39,9 +39,9 @@ class MessengerPlatform(BaseDictionaryModel):
     # webhook_url_template: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, comment="Шаблон URL для вебхука (якщо застосовно)")
     # supports_buttons: Mapped[bool] = mapped_column(Boolean, default=False, comment="Чи підтримує платформа інтерактивні кнопки")
 
-    # _repr_fields успадковуються та збираються автоматично.
-    # Додавання специфічних полів до __repr__:
-    # _repr_fields = ["supports_buttons"]
+    # _repr_fields успадковуються та збираються автоматично з BaseDictionary.
+    # Немає додаткових специфічних полів для __repr__ на цьому рівні.
+    _repr_fields: tuple[str, ...] = ()
 
 
 if __name__ == "__main__":

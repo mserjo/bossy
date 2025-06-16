@@ -6,26 +6,22 @@
 та надає специфічні методи для роботи зі станами здоров'я різних сервісів.
 """
 
-from typing import List, Optional, Tuple, Any
+from typing import List, Optional, Dict, Any
 
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel as PydanticBaseModel  # Для UpdateSchemaType-заглушки
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
-from backend.app.src.config.logging import get_logger  # Імпорт логера
+from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.system.health import ServiceHealthStatus
-from backend.app.src.schemas.system.health import \
-    ServiceHealthStatusCreateSchema  # Припускаємо, що така схема буде для створення/оновлення
+from backend.app.src.schemas.system.health import ServiceHealthStatusCreateSchema
+from backend.app.src.core.dicts import HealthStatusType # Імпортовано Enum
 
-
-# TODO: Імпортувати Enum HealthStatusType з core.dicts
-# from backend.app.src.core.dicts import HealthStatusType
 
 # Записи про стан здоров'я зазвичай створюються або оновлюються повністю,
 # тому UpdateSchema може бути такою ж, як CreateSchema, або простою заглушкою,
@@ -45,76 +41,125 @@ class ServiceHealthStatusRepository(
     методи для отримання стану за назвою сервісу та списку нездорових сервісів.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self):
         """
         Ініціалізує репозиторій для моделі `ServiceHealthStatus`.
-
-        Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        super().__init__(db_session=db_session, model=ServiceHealthStatus)
+        super().__init__(model=ServiceHealthStatus)
+        logger.info(f"Репозиторій для моделі '{self.model.__name__}' ініціалізовано.")
 
-    async def get_by_service_name(self, service_name: str) -> Optional[ServiceHealthStatus]:
+    async def get_by_service_name(
+            self, session: AsyncSession, service_name: str
+    ) -> Optional[ServiceHealthStatus]:
         """
         Отримує запис стану здоров'я для вказаного сервісу за його унікальною назвою.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             service_name (str): Унікальна назва сервісу.
 
         Returns:
             Optional[ServiceHealthStatus]: Екземпляр моделі `ServiceHealthStatus`, якщо знайдено, інакше None.
         """
+        logger.debug(f"Отримання ServiceHealthStatus за service_name: {service_name}")
         stmt = select(self.model).where(self.model.service_name == service_name)
-        result = await self.db_session.execute(stmt)
-        return result.scalar_one_or_none()
+        try:
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(
+                f"Помилка при отриманні ServiceHealthStatus за service_name {service_name}: {e}",
+                exc_info=True
+            )
+            return None
 
-    async def get_unhealthy_services(self) -> List[ServiceHealthStatus]:
+    async def get_unhealthy_services(self, session: AsyncSession) -> List[ServiceHealthStatus]:
         """
         Отримує список всіх сервісів, які наразі не перебувають у стані 'healthy'.
+
+        Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
 
         Returns:
             List[ServiceHealthStatus]: Список записів про стан здоров'я нездорових сервісів.
         """
-        # TODO: Замінити рядок "healthy" на значення з Enum HealthStatusType.HEALTHY.value
-        filters = [self.model.status != "healthy"]
-        # Можна сортувати за часом останньої перевірки або за назвою сервісу
-        order_by = [self.model.updated_at.desc()]
+        logger.debug("Отримання списку нездорових сервісів")
+        # Модель ServiceHealthStatus.status використовує HealthStatusType (SQLEnum),
+        # тому передаємо Enum член напряму для порівняння.
+        filters_dict: Dict[str, Any] = {"status__ne": HealthStatusType.HEALTHY}
 
-        # Отримуємо всі записи, що відповідають фільтру, без пагінації (або з великим лімітом)
-        items, _ = await self.get_multi(filters=filters, order_by=order_by,
-                                        limit=1000)  # Ліміт для запобігання надмірному завантаженню
-        return items
+        sort_by_field = "updated_at"
+        sort_order_str = "desc" # Можна сортувати за часом останньої перевірки або за назвою сервісу
 
-    async def update_or_create_status(self, service_name: str, status: str,
-                                      details: Optional[str] = None) -> ServiceHealthStatus:
+        try:
+            # Отримуємо всі записи, що відповідають фільтру, без пагінації (або з великим лімітом)
+            items = await super().get_multi(
+                session=session,
+                filters=filters_dict,
+                sort_by=sort_by_field,
+                sort_order=sort_order_str,
+                limit=1000 # Ліміт для запобігання надмірному завантаженню
+            )
+            logger.debug(f"Знайдено {len(items)} нездорових сервісів.")
+            return items
+        except Exception as e:
+            logger.error(f"Помилка при отриманні списку нездорових сервісів: {e}", exc_info=True)
+            return []
+
+    async def update_or_create_status(
+            self, session: AsyncSession, service_name: str, status: HealthStatusType, details: Optional[str] = None
+    ) -> Optional[ServiceHealthStatus]:
         """
         Оновлює існуючий запис стану здоров'я сервісу або створює новий, якщо він не існує.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             service_name (str): Унікальна назва сервісу.
-            status (str): Новий статус сервісу (значення з HealthStatusType Enum).
+            status (HealthStatusType): Новий статус сервісу (Enum).
             details (Optional[str]): Додаткові деталі про стан.
 
         Returns:
-            ServiceHealthStatus: Оновлений або створений екземпляр ServiceHealthStatus.
+            Optional[ServiceHealthStatus]: Оновлений або створений екземпляр ServiceHealthStatus, або None у разі помилки.
         """
-        # TODO: Переконатися, що 'status' та 'service_name' валідні згідно з Enums/правилами
-        existing_status = await self.get_by_service_name(service_name)
-        if existing_status:
-            update_data = {"status": status, "details": details}
-            # Використовуємо метод update з BaseRepository, передаючи словник
-            # Важливо: schema для update може бути простішою або такою ж, як create
-            # Для простоти, якщо ServiceHealthStatusUpdateSchema дозволяє ці поля:
-            update_schema = ServiceHealthStatusUpdateSchema(status=status, details=details,
-                                                            service_name=service_name)  # service_name для повноти схеми, хоча не оновлюється
-            return await self.update(db_obj=existing_status, obj_in=update_schema)
-        else:
-            create_schema = ServiceHealthStatusCreateSchema(
-                service_name=service_name,
-                status=status,
-                details=details
+        logger.debug(f"Оновлення або створення статусу для сервісу '{service_name}': status={status}")
+        # TODO: [Validation] Переконатися, що 'status' та 'service_name' валідні згідно з Enums/правилами.
+        try:
+            async with session.begin_nested() if session.in_transaction() else session.begin():
+                existing_status = await self.get_by_service_name(session, service_name)
+
+                if existing_status:
+                    # Для простоти, якщо ServiceHealthStatusUpdateSchema дозволяє ці поля:
+                    # Або, якщо схема оновлення порожня, оновлюємо атрибути напряму:
+                    # existing_status.status = status
+                    # existing_status.details = details
+                    # existing_status.updated_at = datetime.now(timezone.utc) # Якщо TimestampedMixin не спрацює
+                    # session.add(existing_status)
+                    # db_obj = existing_status
+                    update_schema = ServiceHealthStatusUpdateSchema(
+                        service_name=service_name, # service_name тут для повноти схеми, хоча воно не оновлюється
+                        status=status,
+                        details=details
+                    )
+                    db_obj = await super().update(session, db_obj=existing_status, obj_in=update_schema)
+                    logger.info(f"Статус сервісу '{service_name}' оновлено.")
+                else:
+                    create_schema = ServiceHealthStatusCreateSchema(
+                        service_name=service_name,
+                        status=status,
+                        details=details
+                    )
+                    db_obj = await super().create(session, obj_in=create_schema)
+                    logger.info(f"Створено запис статусу для сервісу '{service_name}'.")
+
+                if db_obj: # Refresh може бути потрібен, якщо create/update не роблять його
+                    await session.refresh(db_obj)
+                return db_obj
+        except Exception as e:
+            logger.error(
+                f"Помилка при оновленні/створенні статусу для сервісу '{service_name}': {e}",
+                exc_info=True
             )
-            return await self.create(create_schema)
+            return None
 
 
 if __name__ == "__main__":
@@ -136,10 +181,10 @@ if __name__ == "__main__":
     logger.info("\nСпецифічні методи:")
     logger.info("  - get_by_service_name(service_name: str)")
     logger.info("  - get_unhealthy_services()")
-    logger.info("  - update_or_create_status(service_name: str, status: str, details: Optional[str])")
+    logger.info("  - update_or_create_status(service_name: str, status: HealthStatusType, details: Optional[str])") # Оновлено тип
 
     logger.info("\nПримітка: Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
-    logger.info("TODO: Інтегрувати Enum 'HealthStatusType' для аргументу `status` та у фільтрах.")
+    # logger.info("TODO: Інтегрувати Enum 'HealthStatusType' для аргументу `status` та у фільтрах.") # Вирішено
 
     # Приклад концептуального використання update_or_create_status
     # async def demo_health_repo():

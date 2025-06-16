@@ -1,45 +1,44 @@
 # backend/app/src/services/system/health.py
+# backend/app/src/services/system/health.py
 # import logging # Замінено на централізований логер
-import time  # Для вимірювання часу відповіді
-from typing import List, Dict, Any, Literal, Optional
+import time
+from typing import List, Dict, Any, Optional # Literal видалено, бо використовуємо Enum
 from datetime import datetime, timezone  # Додано timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import text  # Для виконання "сирих" SQL запитів, наприклад 'SELECT 1'
+from sqlalchemy import text
 
 # Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
-from backend.app.src.schemas.system.health import (  # Схеми Pydantic
+from backend.app.src.repositories.system.health_repository import ServiceHealthStatusRepository # Імпорт репозиторію
+from backend.app.src.schemas.system.health import (
     HealthCheckResponse,
     ComponentHealth,
-    HealthStatusEnum  # Enum або Literal для статусів
+    HealthStatusEnum
 )
-from backend.app.src.config.redis import get_redis_pool_or_none  # Оновлено для отримання пулу або None
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+# ServiceHealthStatusCreateSchema, ServiceHealthStatusUpdateSchema не потрібні сервісу напряму
+# from backend.app.src.core.dicts import HealthStatusType as CoreHealthStatusType # Якщо використовується з core.dicts
+from backend.app.src.config.redis import get_redis_pool_or_none
+from backend.app.src.config.logging import logger
+from backend.app.src.config import settings
 
-# TODO: Додати залежність: pip install httpx (якщо буде реальна перевірка зовнішніх API)
-# import httpx # Для перевірки зовнішніх HTTP сервісів
+# import httpx
 
-# Використовуємо HealthStatusEnum, якщо визначено, інакше Literal як запасний варіант
-# Це забезпечує роботу, навіть якщо HealthStatusEnum не імпортовано належним чином,
-# але для генерації схем Pydantic краще, щоб HealthStatusEnum був правильно визначений
-# в backend.app.src.schemas.system.health та імпортований.
-ComponentStatusType = HealthStatusEnum  # Припускаємо, що HealthStatusEnum визначено як Enum
+ComponentStatusType = HealthStatusEnum
 
 
 class HealthCheckService(BaseService):
     """
     Сервіс для виконання перевірок стану системи та її різних компонентів,
     таких як база даних, кеш (Redis) та інші залежні сервіси.
+    Зберігає результати перевірок у БД.
     """
 
-    def __init__(self, db_session: AsyncSession):  # Додати інші клієнти, наприклад, redis_client, якщо потрібно
+    def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        self.redis_pool = get_redis_pool_or_none()  # Отримуємо пул Redis або None, якщо не налаштовано
+        self.redis_pool = get_redis_pool_or_none()
+        self.health_repo = ServiceHealthStatusRepository() # Ініціалізація репозиторію
         if self.redis_pool:
-            # import redis.asyncio as aioredis # Локальний імпорт або на рівні модуля, якщо використовується часто
-            # self.redis_client = aioredis.Redis(connection_pool=self.redis_pool)
             logger.info("HealthCheckService: Клієнт Redis буде створено з пулу при потребі.")
         else:
             logger.warning("HealthCheckService: Пул з'єднань Redis не налаштовано. Перевірка Redis буде недоступна.")
@@ -47,170 +46,181 @@ class HealthCheckService(BaseService):
 
     async def _check_database_health(self) -> ComponentHealth:
         """
-        Перевіряє стан основної бази даних.
+        Перевіряє стан основної бази даних та зберігає результат.
         Намагається виконати простий запит.
         """
-        component_name = "database"  # i18n
+        component_name = "database"
         start_time = time.perf_counter()
         status: ComponentStatusType = HealthStatusEnum.HEALTHY
-        message = "База даних успішно підключена та відповідає."  # i18n
-        details: Dict[str, Any] = {}
+        message = "База даних успішно підключена та відповідає."
+        details_dict: Dict[str, Any] = {} # Змінено ім'я, щоб не конфліктувати з параметром details в repo
 
         try:
-            # Виконання простого запиту для перевірки з'єднання з БД
             result = await self.db_session.execute(text("SELECT 1"))
             if result.scalar_one() != 1:
-                # i18n
                 raise Exception("Запит перевірки стану бази даних не повернув 1.")
-            # Тут можна додати перевірку статусу міграцій, якщо потрібно
-            # details["migrations_status"] = "актуальний" # i18n example
         except Exception as e:
             logger.error(f"Перевірка стану бази даних не вдалася: {e}", exc_info=settings.DEBUG)
             status = HealthStatusEnum.UNHEALTHY
-            message = f"Помилка з'єднання з базою даних: {str(e)}"  # i18n
+            message = f"Помилка з'єднання з базою даних: {str(e)}"
 
         duration_ms = (time.perf_counter() - start_time) * 1000
-        details["response_time_ms"] = round(duration_ms, 2)
+        details_dict["response_time_ms"] = round(duration_ms, 2)
+
+        # Зберігаємо статус в БД
+        await self.health_repo.update_or_create_status(
+            session=self.db_session,
+            service_name=component_name,
+            status=status, # Передаємо Enum член
+            details=message if status == HealthStatusEnum.UNHEALTHY else None # Зберігаємо message як details при помилці
+        )
+        # Потрібен commit після update_or_create_status, якщо він сам не комітить.
+        # Припускаємо, що коміт буде в perform_full_health_check або зовнішньому контексті.
 
         return ComponentHealth(
             component_name=component_name,
             status=status,
             message=message,
-            details=details,
-            timestamp=datetime.now(timezone.utc)  # Використовуємо timezone.utc
+            details=details_dict,
+            timestamp=datetime.now(timezone.utc)
         )
 
     async def _check_redis_health(self) -> Optional[ComponentHealth]:
         """
-        Перевіряє стан кешу Redis.
+        Перевіряє стан кешу Redis та зберігає результат.
         Потребує наявності клієнта Redis.
         """
-        component_name = "redis_cache"  # i18n
+        component_name = "redis_cache"
         start_time = time.perf_counter()
-        details: Dict[str, Any] = {}
+        details_dict: Dict[str, Any] = {}
 
         if not self.redis_pool:
             logger.info("Клієнт Redis не налаштований, пропуск перевірки стану Redis.")
-            # Можна повернути DEGRADED або взагалі не включати цей компонент
+            status = HealthStatusEnum.DEGRADED
+            message = "Клієнт Redis не налаштований."
+            details_dict["reason"] = "Пул з'єднань Redis не доступний."
+            await self.health_repo.update_or_create_status(
+                session=self.db_session, service_name=component_name, status=status, details=message
+            )
             return ComponentHealth(
-                component_name=component_name,
-                status=HealthStatusEnum.DEGRADED,
-                message="Клієнт Redis не налаштований.",  # i18n
-                details={"reason": "Пул з'єднань Redis не доступний."},  # i18n
+                component_name=component_name, status=status, message=message, details=details_dict,
                 timestamp=datetime.now(timezone.utc)
             )
 
         status: ComponentStatusType = HealthStatusEnum.HEALTHY
-        message = "З'єднання з Redis успішне, PING отримав відповідь."  # i18n
+        message = "З'єднання з Redis успішне, PING отримав відповідь."
 
         try:
-            # TODO: Ініціалізувати redis_client тут або в __init__, якщо він потрібен часто.
-            #  Поточна реалізація get_redis_pool_or_none() повертає пул.
-            import redis.asyncio as aioredis  # Локальний імпорт
+            import redis.asyncio as aioredis
             redis_client = aioredis.Redis(connection_pool=self.redis_pool)
             if not await redis_client.ping():
-                # i18n
                 raise Exception("Команда Redis PING не вдалася (повернула False).")
-            # Опціонально: перевірити деякі ключі або статистику
-            # info = await redis_client.info()
-            # details["redis_version"] = info.get("redis_version")
-            await redis_client.close()  # Закриваємо з'єднання, отримане напряму, не з пулу для одноразового використання
+            await redis_client.close()
         except Exception as e:
             logger.error(f"Перевірка стану Redis не вдалася: {e}", exc_info=settings.DEBUG)
             status = HealthStatusEnum.UNHEALTHY
-            message = f"Помилка з'єднання з Redis: {str(e)}"  # i18n
+            message = f"Помилка з'єднання з Redis: {str(e)}"
 
         duration_ms = (time.perf_counter() - start_time) * 1000
-        details["response_time_ms"] = round(duration_ms, 2)
+        details_dict["response_time_ms"] = round(duration_ms, 2)
+
+        await self.health_repo.update_or_create_status(
+            session=self.db_session, service_name=component_name, status=status,
+            details=message if status != HealthStatusEnum.HEALTHY else None
+        )
+        # Потрібен commit після update_or_create_status
 
         return ComponentHealth(
             component_name=component_name,
             status=status,
             message=message,
-            details=details,
+            details=details_dict,
             timestamp=datetime.now(timezone.utc)
         )
 
     async def _check_external_api_health(self, api_name: str, api_url: str, http_method: str = "GET",
                                          expected_status: int = 200) -> ComponentHealth:
         """
-        [ЗАГЛУШКА/TODO] Перевіряє стан зовнішньої залежності HTTP API.
+        [ЗАГЛУШКА/TODO] Перевіряє стан зовнішньої залежності HTTP API та зберігає результат.
         Потребує реалізації з використанням httpx або подібної бібліотеки.
         """
-        component_name = f"external_api:{api_name}"  # i18n
+        component_name = f"external_api:{api_name}"
         start_time = time.perf_counter()
-        details: Dict[str, Any] = {"url": api_url, "method": http_method}
+        details_dict: Dict[str, Any] = {"url": api_url, "method": http_method}
+        status: ComponentStatusType = HealthStatusEnum.DEGRADED # За замовчуванням для заглушки
+        message = f"Перевірка API {api_name} не реалізована повністю (заглушка)."
 
-        # TODO: Реалізувати перевірку зовнішнього API за допомогою httpx.
-        # try:
-        #     async with httpx.AsyncClient(timeout=5.0) as client:
-        #         response = await client.request(http_method, api_url)
-        #         if response.status_code != expected_status:
-        #             raise Exception(f"API {api_name} повернуло статус {response.status_code}, очікувалося {expected_status}.")
-        #         # Додаткові перевірки відповіді, якщо потрібно
-        #     status = HealthStatusEnum.HEALTHY
-        #     message = f"З'єднання з API {api_name} успішне (статус {expected_status})." # i18n
-        # except Exception as e:
-        #     logger.error(f"Перевірка API {api_name} ({api_url}) не вдалася: {e}", exc_info=settings.DEBUG)
-        #     status = HealthStatusEnum.UNHEALTHY
-        #     message = f"Помилка з'єднання або відповіді від API {api_name}: {str(e)}" # i18n
-        #     if hasattr(e, 'response') and e.response is not None: details["status_code"] = e.response.status_code
+        # Логіка перевірки (закоментовано)
+        # ...
 
         duration_ms = (time.perf_counter() - start_time) * 1000
-        details["response_time_ms"] = round(duration_ms, 2)
+        details_dict["response_time_ms"] = round(duration_ms, 2)
 
         logger.warning(f"Перевірка зовнішнього API для {api_name} є заглушкою.")
+
+        await self.health_repo.update_or_create_status(
+            session=self.db_session, service_name=component_name, status=status, details=message
+        )
+        # Потрібен commit після update_or_create_status
+
         return ComponentHealth(
             component_name=component_name,
-            status=HealthStatusEnum.DEGRADED,  # Позначаємо як DEGRADED, оскільки це заглушка
-            message=f"Перевірка API {api_name} не реалізована повністю (заглушка).",  # i18n
-            details=details,
+            status=status,
+            message=message,
+            details=details_dict,
             timestamp=datetime.now(timezone.utc)
         )
 
     async def perform_full_health_check(self) -> HealthCheckResponse:
         """
-        Виконує комплексну перевірку стану всіх критичних компонентів системи.
-        Агрегує статуси окремих компонентів.
+        Виконує комплексну перевірку стану всіх критичних компонентів системи,
+        зберігає їх статуси та агрегує загальний статус.
         """
         logger.info("Виконання повної перевірки стану системи...")
-        components_health: List[ComponentHealth] = []
+        components_health_list: List[ComponentHealth] = [] # Змінено ім'я для уникнення конфлікту
 
-        # Стан бази даних
         db_health = await self._check_database_health()
-        components_health.append(db_health)
+        components_health_list.append(db_health)
 
-        # Стан Redis (якщо налаштовано)
         redis_health = await self._check_redis_health()
-        if redis_health:
-            components_health.append(redis_health)
+        if redis_health: # _check_redis_health може повернути None, якщо Redis не налаштовано
+            components_health_list.append(redis_health)
 
-        # TODO: Додати перевірки інших критичних залежностей, якщо вони є.
-        # Приклад: перевірка зовнішнього сервісу (заглушка)
-        # external_api_health = await self._check_external_api_health(
-        #     api_name="ExampleExternalService",
-        #     api_url=getattr(settings, "EXAMPLE_SERVICE_HEALTH_URL", "http://api.example.com/health")
-        # )
-        # components_health.append(external_api_health)
+        # Приклад заглушки для зовнішнього API
+        # external_api_health = await self._check_external_api_health("some_service", "http://example.com/health")
+        # components_health_list.append(external_api_health)
 
-        # Визначення загального стану системи
+        # Коміт всіх оновлень статусу, зроблених в _check_* методах
+        try:
+            await self.commit()
+            logger.info("Результати перевірки стану компонентів збережено в БД.")
+        except Exception as e:
+            await self.rollback() # Відкат у разі помилки коміту
+            logger.error(f"Помилка коміту при збереженні результатів перевірки стану: {e}", exc_info=True)
+            # Навіть якщо коміт не вдався, продовжуємо формувати відповідь з поточними даними
+            # Можливо, варто додати спеціальний статус або повідомлення про помилку збереження.
+
         overall_status: ComponentStatusType = HealthStatusEnum.HEALTHY
-        for component in components_health:
+        for component in components_health_list:
             if component.status == HealthStatusEnum.UNHEALTHY:
                 overall_status = HealthStatusEnum.UNHEALTHY
-                break  # Якщо один компонент не здоровий, вся система не здорова
+                break
             if component.status == HealthStatusEnum.DEGRADED and overall_status == HealthStatusEnum.HEALTHY:
-                overall_status = HealthStatusEnum.DEGRADED  # DEGRADED менш серйозний, ніж UNHEALTHY
+                overall_status = HealthStatusEnum.DEGRADED
 
         response = HealthCheckResponse(
             overall_status=overall_status,
-            components=components_health,
-            system_timestamp=datetime.now(timezone.utc)  # Використовуємо timezone.utc
+            components=components_health_list,
+            system_timestamp=datetime.now(timezone.utc)
         )
 
-        log_level = logging.INFO if overall_status == HealthStatusEnum.HEALTHY else logging.WARNING
-        status_value = overall_status.value if hasattr(overall_status, 'value') else overall_status  # Для Enum
-        logger.log(log_level, f"Повну перевірку стану системи завершено. Загальний статус: {status_value}")
+        # Використовуємо logger з backend.app.src.config.logging, який вже налаштований
+        # Тому logging.INFO та logging.WARNING тут не потрібні.
+        status_value = overall_status.value if hasattr(overall_status, 'value') else str(overall_status)
+        if overall_status == HealthStatusEnum.HEALTHY:
+            logger.info(f"Повну перевірку стану системи завершено. Загальний статус: {status_value}")
+        else:
+            logger.warning(f"Повну перевірку стану системи завершено. Загальний статус: {status_value}")
         return response
 
 

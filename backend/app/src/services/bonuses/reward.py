@@ -1,46 +1,43 @@
 # backend/app/src/services/bonuses/reward.py
-import logging
-from typing import List, Optional, Any, Dict  # Any замінено на Dict для redeem_reward
-from uuid import UUID
+"""
+Сервіс для управління винагородами в бонусній системі.
+
+# backend/app/src/services/bonuses/reward.py
+"""
+Сервіс для управління винагородами в бонусній системі.
+
+Відповідає за створення, оновлення, видалення, отримання винагород
+та обробку процесу їх отримання користувачами за бонусні бали.
+"""
+from typing import List, Optional # Dict, Any видалено
 from decimal import Decimal
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
+from sqlalchemy import select, or_, and_ # func видалено
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import or_, and_, func  # Додано and_, func
 
 from backend.app.src.services.base import BaseService
-from backend.app.src.models.bonuses.reward import Reward  # Модель SQLAlchemy Reward
-from backend.app.src.models.bonuses.user_reward_redemption import \
-    UserRewardRedemption  # Модель для відстеження отримань
-from backend.app.src.models.groups.group import Group  # Якщо винагороди специфічні для групи
-from backend.app.src.models.auth.user import User  # Для користувача, що отримує, та created_by/updated_by
+from backend.app.src.models.bonuses.reward import Reward
+from backend.app.src.models.bonuses.user_reward_redemption import UserRewardRedemption
+from backend.app.src.models.groups.group import Group
+from backend.app.src.models.auth.user import User
+from backend.app.src.core.dicts import TransactionType # Імпорт TransactionType Enum
 
-from backend.app.src.schemas.bonuses.reward import (  # Pydantic Схеми
+from backend.app.src.schemas.bonuses.reward import (
     RewardCreate,
     RewardUpdate,
     RewardResponse,
     RedeemRewardRequest,
-    UserRewardRedemptionResponse  # Додано для відповіді redeem_reward
+    UserRewardRedemptionResponse
 )
-from backend.app.src.schemas.bonuses.transaction import AccountTransactionCreate  # Для створення транзакції списання
-from backend.app.src.services.bonuses.account import UserAccountService  # Для роботи з рахунками
-# AccountTransactionService буде викликано через UserAccountService.adjust_account_balance
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import settings  # Для доступу до конфігурацій
-
-
-# TODO: Перенести кастомні помилки до backend/app/src/core/exceptions.py
-class RewardUnavailableError(ValueError):
-    """Помилка, якщо винагорода недоступна (неактивна, немає в наявності тощо)."""  # i18n
-    pass
-
-
-class Redemption 조건Error(ValueError):  # RedemptionConditionError
-    """Помилка, якщо умови отримання винагороди не виконані (наприклад, ліміт на користувача)."""  # i18n
-    pass
+# AccountTransactionCreate не використовується напряму цим сервісом
+from backend.app.src.services.bonuses.account import UserAccountService
+from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
+logger = get_logger(__name__) # Ініціалізація логера
+from backend.app.src.config import settings
+from backend.app.src.core.exceptions import RewardUnavailableError, RedemptionConditionError # Імпорт перенесених винятків
 
 
 class RewardService(BaseService):
@@ -54,11 +51,11 @@ class RewardService(BaseService):
         self.account_service = UserAccountService(db_session)  # Ініціалізація сервісу рахунків
         logger.info("RewardService ініціалізовано.")
 
-    async def get_reward_by_id(self, reward_id: UUID) -> Optional[RewardResponse]:
+    async def get_reward_by_id(self, reward_id: int) -> Optional[RewardResponse]: # reward_id змінено на int
         """
         Отримує винагороду за її ID, з завантаженими пов'язаними сутностями.
 
-        :param reward_id: ID винагороди.
+        :param reward_id: ID винагороди (int).
         :return: Pydantic схема RewardResponse або None, якщо не знайдено.
         """
         logger.debug(f"Спроба отримання винагороди за ID: {reward_id}")
@@ -77,12 +74,12 @@ class RewardService(BaseService):
         logger.info(f"Винагороду з ID '{reward_id}' не знайдено.")
         return None
 
-    async def create_reward(self, reward_data: RewardCreate, creator_user_id: UUID) -> RewardResponse:
+    async def create_reward(self, reward_data: RewardCreate, creator_user_id: int) -> RewardResponse: # creator_user_id змінено на int
         """
         Створює нову винагороду.
 
         :param reward_data: Дані для створення винагороди (Pydantic схема).
-        :param creator_user_id: ID користувача, що створює винагороду.
+        :param creator_user_id: ID користувача (int), що створює винагороду.
         :return: Pydantic схема створеної RewardResponse.
         :raises ValueError: Якщо пов'язані сутності не знайдено або ім'я винагороди не унікальне. # i18n
         """
@@ -127,7 +124,7 @@ class RewardService(BaseService):
         return RewardResponse.model_validate(new_reward_db)
 
     async def update_reward(
-            self, reward_id: UUID, reward_update_data: RewardUpdate, current_user_id: UUID
+            self, reward_id: int, reward_update_data: RewardUpdate, current_user_id: int # ID змінено на int
     ) -> Optional[RewardResponse]:
         """Оновлює існуючу винагороду."""
         logger.debug(f"Спроба оновлення винагороди ID: {reward_id} користувачем ID: {current_user_id}")
@@ -177,7 +174,7 @@ class RewardService(BaseService):
             logger.error(f"Помилка оновлення ID '{reward_id}': {e}", exc_info=settings.DEBUG)
             raise
 
-    async def delete_reward(self, reward_id: UUID, current_user_id: UUID) -> bool:
+    async def delete_reward(self, reward_id: int, current_user_id: int) -> bool: # ID змінено на int
         """Видаляє винагороду."""
         # TODO: Згідно `technical_task.txt`, чи є обмеження на видалення (напр., якщо є активні отримання)?
         logger.debug(f"Спроба видалення винагороди ID: {reward_id} користувачем: {current_user_id}")
@@ -192,7 +189,7 @@ class RewardService(BaseService):
         return True
 
     async def list_rewards(
-            self, group_id: Optional[UUID] = None, is_active: Optional[bool] = True,
+            self, group_id: Optional[int] = None, is_active: Optional[bool] = True, # group_id змінено на Optional[int]
             min_stock: Optional[int] = None, max_points_cost: Optional[Decimal] = None,
             valid_on_date: Optional[datetime] = None,
             skip: int = 0, limit: int = 100,
@@ -200,7 +197,7 @@ class RewardService(BaseService):
     ) -> List[RewardResponse]:
         """Перелічує винагороди з фільтрами та пагінацією."""
         logger.debug(
-            f"Перелік винагород: група={group_id}, активні={is_active}, запас>={min_stock}, ціна<={max_points_cost}, валідні_на={valid_on_date}, глобальні_для_групи={include_global_if_group_given}")
+            f"Перелік винагород: group_id={group_id}, активні={is_active}, запас>={min_stock}, ціна<={max_points_cost}, валідні_на={valid_on_date}, глобальні_для_групи={include_global_if_group_given}")
 
         stmt = select(Reward).options(
             selectinload(Reward.group),
@@ -215,9 +212,11 @@ class RewardService(BaseService):
         # Якщо group_id не вказано, за замовчуванням показує всі (і глобальні, і групові).
         # Щоб показувати тільки глобальні, якщо group_id is None, потрібен окремий прапорець/логіка.
 
-        if is_active is not None: conditions.append(Reward.is_active == is_active)
-        if min_stock is not None: conditions.append(Reward.stock_available >= min_stock)
-        if max_points_cost is not None: conditions.append(Reward.points_cost <= max_points_cost)
+        if is_active is not None:
+            # Припускаємо, що 'active' є рядковим представленням активного стану в полі 'state'
+            conditions.append(Reward.state == "active" if is_active else Reward.state != "active")
+        if min_stock is not None: conditions.append(Reward.stock_available >= min_stock) # type: ignore
+        if max_points_cost is not None: conditions.append(Reward.points_cost <= max_points_cost) # type: ignore
         if valid_on_date:
             conditions.append(and_(
                 or_(Reward.valid_from.is_(None), Reward.valid_from <= valid_on_date),
@@ -227,13 +226,15 @@ class RewardService(BaseService):
         if conditions: stmt = stmt.where(*conditions)
 
         # TODO: Згідно `technical_task.txt`, уточнити поля та напрямки сортування.
+        # Можливі поля для сортування: name, points_cost, stock_available, valid_from, valid_until, created_at.
+        # Потрібно реалізувати динамічне сортування аналогічно до UserService.list_users.
         stmt = stmt.order_by(Reward.points_cost, Reward.name).offset(skip).limit(limit)
         rewards_db = (await self.db_session.execute(stmt)).scalars().unique().all()
         return [RewardResponse.model_validate(r) for r in rewards_db]
 
     async def redeem_reward(
-            self, user_id: UUID, reward_id: UUID, redeem_data: RedeemRewardRequest,
-            group_id_context: Optional[UUID] = None
+            self, user_id: int, reward_id: int, redeem_data: RedeemRewardRequest, # user_id, reward_id змінено на int
+            group_id_context: Optional[int] = None # group_id_context змінено на Optional[int]
             # Група, в контексті якої користувач намагається отримати винагороду
     ) -> UserRewardRedemptionResponse:
         """Обробляє запит користувача на отримання винагороди."""
@@ -296,9 +297,9 @@ class RewardService(BaseService):
                 user_id=user_id,
                 group_id=account_to_use_group_id,  # Рахунок, з якого списуємо
                 amount=-total_cost,
-                transaction_type="REWARD_REDEMPTION",
+                transaction_type=TransactionType.REWARD_REDEMPTION, # Використання Enum
                 description=f"Отримано {quantity_to_redeem}x '{reward_db.name}'",  # i18n
-                related_entity_id=reward_id,
+                related_entity_id=reward_id, # reward_id тепер int, adjust_account_balance очікує int
                 commit_session=False  # Важливо! Комміт буде в кінці redeem_reward
             )
 

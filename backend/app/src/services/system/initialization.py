@@ -4,8 +4,8 @@ from typing import Dict, Any, List, Type
 from uuid import UUID  # Не використовується прямо, але може бути в моделях
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy.exc import IntegrityError  # Для обробки можливих помилок дублювання ключів
+from sqlalchemy import select, or_ # sqlalchemy.future тепер select, or_ для User check
+from sqlalchemy.exc import IntegrityError
 
 # Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
@@ -150,8 +150,11 @@ class InitialDataService(BaseService):
                     # Інші помилки можуть бути більш критичними.
                     if isinstance(e, IntegrityError):
                         logger.warning(
-                            f"Помилка цілісності (можливо, паралельне створення) для {model_cls.__name__} з кодом '{code_value}'. Пропуск.")
-                        await self.db_session.rollback()  # Відкат невдалого додавання
+                            f"Помилка цілісності (можливо, паралельне створення) для {model_cls.__name__} з кодом '{code_value}'. Пропуск. Помилка: {e}")
+                        # Не робимо rollback тут, щоб дозволити зовнішній транзакції обробити це.
+                        # Якщо це дійсно дублікат через race, зовнішній commit все одно може впасти,
+                        # але це буде оброблено в run_full_initialization.
+                        # Або, якщо запис вже існує, ця гілка не має виконуватися завдяки попередній перевірці.
                     else:
                         logger.error(
                             f"Помилка створення {model_cls.__name__} '{item_data.get('name', code_value)}': {e}",

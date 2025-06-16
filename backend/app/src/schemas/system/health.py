@@ -15,22 +15,15 @@ from pydantic import Field
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.config.logging import get_logger  # Імпорт логера
+from backend.app.src.core.dicts import HealthStatusType # Імпортовано Enum
+from datetime import timedelta # Переміщено timedelta сюди
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
-# TODO: Визначити та імпортувати Enum HealthStatusType з core.dicts
-# from backend.app.src.core.dicts import HealthStatusType
-
-# Заглушка для HealthStatusType Enum
-class TempHealthStatusType:  # TODO: Видалити після імпорту Enum
-    HEALTHY = "healthy"
-    UNHEALTHY = "unhealthy"
-    DEGRADED = "degraded"
-    UNKNOWN = "unknown"
-
+# HealthStatusType Enum імпортовано вище.
 
 SERVICE_NAME_MAX_LENGTH = 100
-HEALTH_STATUS_MAX_LENGTH = 50
+# HEALTH_STATUS_MAX_LENGTH = 50 # Не потрібен для Enum
 
 
 class ServiceHealthStatusBaseSchema(BaseSchema):
@@ -42,10 +35,8 @@ class ServiceHealthStatusBaseSchema(BaseSchema):
         max_length=SERVICE_NAME_MAX_LENGTH,
         description="Унікальна назва сервісу (наприклад, 'database', 'redis_cache', 'payment_gateway')."
     )
-    # TODO: Замінити str на HealthStatusType та додати валідатор.
-    status: str = Field(
-        max_length=HEALTH_STATUS_MAX_LENGTH,
-        description=f"Поточний статус сервісу (наприклад, '{TempHealthStatusType.HEALTHY}', '{TempHealthStatusType.UNHEALTHY}')."
+    status: HealthStatusType = Field( # Змінено на HealthStatusType Enum
+        description="Поточний статус сервісу."
     )
     details: Optional[str] = Field(
         None,
@@ -70,9 +61,8 @@ class OverallHealthStatusSchema(BaseSchema):
     Схема для представлення загального стану здоров'я системи.
     Включає загальний статус та список станів окремих залежних сервісів.
     """
-    # TODO: Замінити str на HealthStatusType та додати валідатор.
-    overall_status: str = Field(
-        description=f"Загальний агрегований статус здоров'я системи (наприклад, '{TempHealthStatusType.HEALTHY}')."
+    overall_status: HealthStatusType = Field( # Змінено на HealthStatusType Enum
+        description="Загальний агрегований статус здоров'я системи."
     )
     timestamp: datetime = Field(description="Час генерації звіту про стан здоров'я.")
     services: List[ServiceHealthStatusSchema] = Field(
@@ -89,7 +79,7 @@ if __name__ == "__main__":
     db_health_data = {
         "id": 1,
         "service_name": "PostgreSQL Database",  # TODO i18n
-        "status": TempHealthStatusType.HEALTHY,  # TODO: Замінити на Enum.value
+        "status": HealthStatusType.HEALTHY, # Використовуємо Enum
         "details": "Підключення успішне, середній час запиту 15мс.",  # TODO i18n
         "created_at": datetime.now() - timedelta(hours=1),
         "updated_at": datetime.now()  # Час останньої перевірки
@@ -100,7 +90,7 @@ if __name__ == "__main__":
     redis_health_data = {
         "id": 2,
         "service_name": "Redis Cache",  # TODO i18n
-        "status": TempHealthStatusType.UNHEALTHY,  # TODO: Замінити на Enum.value
+        "status": HealthStatusType.UNHEALTHY, # Використовуємо Enum
         "details": "Не вдалося підключитися до сервера Redis: Connection refused.",  # TODO i18n
         "created_at": datetime.now() - timedelta(minutes=30),
         "updated_at": datetime.now() - timedelta(minutes=5)
@@ -110,8 +100,7 @@ if __name__ == "__main__":
 
     logger.info("\nOverallHealthStatusSchema (приклад загального звіту про стан здоров'я):")
     overall_status_data = {
-        "overall_status": TempHealthStatusType.DEGRADED,
-        # TODO: Замінити на Enum.value (розраховується на основі станів сервісів)
+        "overall_status": HealthStatusType.DEGRADED, # Використовуємо Enum
         "timestamp": datetime.now(),
         "services": [
             db_health_instance.model_dump(),  # Використовуємо .model_dump() для отримання dict
@@ -122,7 +111,7 @@ if __name__ == "__main__":
     logger.info(overall_status_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nПримітка: Ці схеми використовуються для представлення стану здоров'я системи та її компонентів.")
-    logger.info("TODO: Інтегрувати Enum 'HealthStatusType' з core.dicts для полів 'status' та 'overall_status'.")
+    # TODO Коментар про Enum видалено, оскільки він тепер імпортований та використовується.
 
-# Потрібно для timedelta в __main__
-from datetime import timedelta
+# Потрібно для timedelta в __main__ - вже переміщено нагору
+# from datetime import timedelta

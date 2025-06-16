@@ -16,11 +16,11 @@ from pydantic import Field
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.config.logging import get_logger  # Імпорт логера
+from backend.app.src.core.dicts import RatingType # Імпортовано RatingType Enum
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
-# TODO: Визначити та імпортувати RatingType Enum з core.dicts
-# from backend.app.src.core.dicts import RatingType
+# RatingType Enum імпортовано вище.
 
 # TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
 # from backend.app.src.schemas.auth.user import UserPublicProfileSchema
@@ -41,10 +41,9 @@ class UserGroupRatingBaseSchema(BaseSchema):
                                               description="Дата початку періоду, за який розраховано рейтинг (якщо застосовно).")
     period_end_date: Optional[date] = Field(None,
                                             description="Дата кінця періоду, за який розраховано рейтинг (якщо застосовно).")
-    # TODO: Замінити str на RatingType Enum та додати валідатор.
-    rating_type: Optional[str] = Field(
+    rating_type: Optional[RatingType] = Field( # Використовує імпортований RatingType Enum
         None,
-        max_length=50,
+        # max_length=50, # Не потрібно для Enum
         description="Тип рейтингу (наприклад, 'monthly', 'overall', 'weekly').",
         examples=["monthly", "overall"]
     )
@@ -88,12 +87,17 @@ if __name__ == "__main__":
     # Демонстраційний блок для схем рейтингів користувачів у групах.
     logger.info("--- Pydantic Схеми для Рейтингів Користувачів в Групах (UserGroupRating) ---")
 
+    # Приклад використання RatingType (потребує, щоб RatingType був визначений та імпортований)
+    # Для демонстрації, якщо RatingType ще не існує, можна тимчасово закоментувати
+    # або створити фіктивний Enum RatingType тут.
+    # class RatingType(str, Enum): OVERALL = "overall"; MONTHLY = "monthly"
+
     logger.info("\nUserGroupRatingCreateSchema (приклад для створення сервісом):")
     create_rating_data = {
         "user_id": 101,
         "group_id": 1,
         "rating_score": 1500,
-        "rating_type": "overall"  # TODO: Замінити на RatingType.OVERALL.value
+        "rating_type": RatingType.OVERALL # Використання імпортованого Enum
     }
     create_rating_instance = UserGroupRatingCreateSchema(**create_rating_data)
     logger.info(create_rating_instance.model_dump_json(indent=2, exclude_none=True))
@@ -109,7 +113,7 @@ if __name__ == "__main__":
         "user_id": 101,
         "group_id": 1,
         "rating_score": 1550,
-        "rating_type": "overall",  # TODO: Замінити на RatingType.OVERALL.value
+        "rating_type": RatingType.OVERALL, # Використання імпортованого Enum
         "period_start_date": None,
         "period_end_date": None,
         "created_at": datetime.now() - timedelta(days=30),  # Коли запис було вперше створено
@@ -122,7 +126,7 @@ if __name__ == "__main__":
 
     logger.info("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, GroupBriefSchema)")
     logger.info("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
-    logger.info("TODO: Інтегрувати Enum 'RatingType' з core.dicts для поля 'rating_type'.")
+    # Коментар про TODO щодо RatingType тепер неактуальний, оскільки Enum імпортовано.
 
 # Потрібно для timedelta в __main__
 from datetime import timedelta

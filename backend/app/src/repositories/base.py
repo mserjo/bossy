@@ -1,5 +1,5 @@
-# -*- coding: utf-8 -*-
 # backend/app/src/repositories/base.py
+# -*- coding: utf-8 -*-
 """
 Базовий репозиторій (`BaseRepository`).
 
@@ -31,15 +31,18 @@ from uuid import UUID # Хоча UUID не використовується пр
 from pydantic import BaseModel as PydanticBaseModel
 from sqlalchemy import select, update as sqlalchemy_update, delete as sqlalchemy_delete, func, asc, desc
 from sqlalchemy.ext.asyncio import AsyncSession
-# Для TypeVar bound, ми посилаємося на метаклас, який мають усі моделі SQLAlchemy
-from sqlalchemy.orm import DeclarativeMeta as SQLAlchemyModelDeclarativeMeta
+# Для TypeVar bound, ми посилаємося на наш базовий клас моделей SQLAlchemy
+from backend.app.src.models.base import Base as BaseModelSQLAlchemy
+from sqlalchemy.orm import DeclarativeMeta as SQLAlchemyModelDeclarativeMeta # Залишимо для довідки, якщо знадобиться
 
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Визначення узагальнених типів для моделей та схем
-# ModelType прив'язаний до метакласу SQLAlchemy моделей. Це означає, що ModelType
-# буде типом класу моделі (наприклад, User), а не екземпляром моделі.
-ModelType = TypeVar("ModelType", bound=SQLAlchemyModelDeclarativeMeta)
+# ModelType тепер прив'язаний до нашого спільного базового класу моделей SQLAlchemy `BaseModelSQLAlchemy`.
+# Це означає, що ModelType буде типом класу моделі (наприклад, User),
+# успадкованого від BaseModelSQLAlchemy, а не просто будь-яким класом з метакласом SQLAlchemy.
+ModelType = TypeVar("ModelType", bound=BaseModelSQLAlchemy)
 CreateSchemaType = TypeVar("CreateSchemaType", bound=PydanticBaseModel)
 UpdateSchemaType = TypeVar("UpdateSchemaType", bound=PydanticBaseModel)
 
@@ -109,6 +112,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         stmt = select(self.model)
 
         if filters:
+            # Обробка фільтрів: підтримуються оператори __gt, __lt, __gte, __lte, __ne, __in, __like
             for field, value in filters.items():
                 # Поле може містити оператор, наприклад, "age__gt"
                 field_name = field.split("__")[0]
@@ -182,7 +186,8 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
             return db_obj
         except Exception as e:
             logger.error(f"Помилка при створенні запису '{self.model.__name__}': {e}", exc_info=True)
-            # TODO: Підняти специфічне виключення програми (наприклад, DatabaseCreateError)
+            # TODO: Підняти специфічне виключення програми (наприклад, DatabaseCreateError) з сервісного рівня.
+            #       На рівні репозиторію `raise` передасть оригінальну помилку SQLAlchemy нагору.
             raise
 
     async def update(
@@ -230,7 +235,8 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                 f"Помилка при оновленні запису '{self.model.__name__}' з ID {getattr(db_obj, 'id', 'N/A')}: {e}",
                 exc_info=True
             )
-            # TODO: Підняти специфічне виключення програми (наприклад, DatabaseUpdateError)
+            # TODO: Підняти специфічне виключення програми (наприклад, DatabaseUpdateError) з сервісного рівня.
+            #       На рівні репозиторію `raise` передасть оригінальну помилку SQLAlchemy нагору.
             raise
 
     async def remove(self, session: AsyncSession, *, id: Any) -> Optional[ModelType]: # Повертає екземпляр ModelType або None
@@ -263,7 +269,8 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
                     return None
         except Exception as e:
             logger.error(f"Помилка при видаленні запису '{self.model.__name__}' з ID {id}: {e}", exc_info=True)
-            # TODO: Підняти специфічне виключення програми (наприклад, DatabaseDeleteError)
+            # TODO: Підняти специфічне виключення програми (наприклад, DatabaseDeleteError) з сервісного рівня.
+            #       На рівні репозиторію `raise` передасть оригінальну помилку SQLAlchemy нагору.
             raise
 
 
@@ -286,6 +293,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         stmt = select(func.count(self.model.id)).select_from(self.model)
 
         if filters: # Логіка фільтрації аналогічна до get_multi
+            # Обробка фільтрів: підтримуються оператори __gt, __lt, __gte, __lte, __ne, __in, __like
             for field, value in filters.items():
                 field_name = field.split("__")[0]
                 column = getattr(self.model, field_name, None)
@@ -316,6 +324,7 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         except Exception as e:
             logger.error(f"Помилка при підрахунку записів '{self.model.__name__}': {e}", exc_info=True)
             # TODO: Повернути 0 чи підняти виключення? Наразі 0 для уникнення падіння.
+            #       Розглянути можливість підняття виключення, щоб сервісний рівень міг це обробити.
             return 0
 
     # --- TODOs та Замітки для подальшого покращення ---
@@ -344,18 +353,10 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     #       Це може бути значно ефективніше для великої кількості записів.
     #       Наприклад: `async def bulk_create(self, session: AsyncSession, *, objs_in: List[CreateSchemaType]) -> List[ModelType]: ...`
 
-    # TODO: [Type Hinting for ModelType] Поточне `ModelType = TypeVar("ModelType", bound=SQLAlchemyModelDeclarativeMeta)`
-    #       є коректним для передачі *класу* моделі. Екземпляри моделі будуть типу `ModelType`.
-    #       Переконатися, що це узгоджується зі статичним аналізатором (mypy).
-    #       `SQLAlchemyModelDeclarativeMeta` - це метаклас `declarative_base()`.
-    #       Альтернативою для SQLAlchemy 2.0+ могло б бути використання `TypeVar("ModelType", bound=DeclarativeBase)`
-    #       якщо всі моделі успадковуються від спільного `DeclarativeBase`.
-    #       Або `TypeVar("ModelType", bound=Any)` якщо не вдається знайти спільний базовий тип,
-    #       але це менш безпечно з точки зору типів. Поточний варіант є прийнятним.
-
-    # TODO: [Pydantic V1/V2] Код використовує `model_dump()` та `model_dump(exclude_unset=True)`,
-    #       що є синтаксисом Pydantic V2. Якщо проект може використовувати Pydantic V1,
-    #       потрібна буде сумісність (наприклад, через `obj_in.dict()`).
+    # TODO: [Type Hinting for ModelType] `ModelType` тепер обмежений `BaseModelSQLAlchemy`.
+    #       Це забезпечує, що всі моделі, які використовуються з цим репозиторієм,
+    #       мають спільний базовий клас, успадкований від `DeclarativeBase` SQLAlchemy.
+    #       Це покращує безпеку типів та автодоповнення.
 
     # TODO: [Specific Getters] Можливо, додати типові специфічні гетери, якщо вони часто потрібні,
     #       наприклад, `get_by_field(session: AsyncSession, field_name: str, field_value: Any) -> Optional[ModelType]: ...`

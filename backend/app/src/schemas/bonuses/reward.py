@@ -108,7 +108,7 @@ class RewardUpdateSchema(RewardBaseSchema):
     # group_id зазвичай не змінюється при оновленні. Якщо це потрібно, його можна додати сюди.
 
 
-class RewardSchema(BaseMainSchema):  # Успадковує id, name, description, state, notes, group_id, timestamps
+class RewardResponseSchema(BaseMainSchema):  # Renamed, Успадковує id, name, description, state, notes, group_id, timestamps
     """
     Схема для представлення даних про нагороду у відповідях API.
     Успадковує більшість полів від `BaseMainSchema`.
@@ -177,7 +177,7 @@ if __name__ == "__main__":
         "created_at": datetime.now(),
         "updated_at": datetime.now()
     }
-    reward_response_instance = RewardSchema(**reward_response_data)
+    reward_response_instance = RewardResponseSchema(**reward_response_data) # Renamed
     logger.info(reward_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nRedeemRewardRequestSchema (приклад запиту на отримання):")

@@ -1,13 +1,17 @@
 # backend/app/src/services/bonuses/account.py
-import logging
-from typing import List, Optional, Tuple, Any
-from uuid import UUID
+"""
+Сервіс для управління бонусними рахунками користувачів.
+
+Надає функціонал для створення, отримання, оновлення балансу
+та перегляду бонусних рахунків, а також для запису транзакцій.
+"""
+from typing import List, Optional, Tuple # Any видалено, Tuple використовується, Dict не потрібен тут
 from decimal import Decimal  # Для точних розрахунків балансу
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select
-from sqlalchemy.orm import selectinload, noload
+from sqlalchemy import select # Оновлено імпорт
+from sqlalchemy.orm import selectinload # noload видалено
 from sqlalchemy.exc import IntegrityError
 
 from backend.app.src.services.base import BaseService
@@ -15,6 +19,7 @@ from backend.app.src.models.bonuses.account import UserAccount  # Модель S
 from backend.app.src.models.auth.user import User  # Для зв'язку рахунку з користувачем
 from backend.app.src.models.groups.group import Group  # Якщо рахунки для групи користувачів
 from backend.app.src.models.bonuses.transaction import AccountTransaction  # Модель для транзакцій
+from backend.app.src.core.dicts import TransactionType # Імпорт TransactionType Enum
 
 from backend.app.src.schemas.bonuses.account import (  # Pydantic Схеми
     UserAccountResponse,
@@ -22,17 +27,10 @@ from backend.app.src.schemas.bonuses.account import (  # Pydantic Схеми
     # UserAccountUpdate, # Для ручних коригувань адміністратором (не реалізовано в цьому сервісі)
 )
 from backend.app.src.schemas.bonuses.transaction import AccountTransactionResponse
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
+logger = get_logger(__name__) # Ініціалізація логера
 from backend.app.src.config import settings  # Для доступу до конфігурацій
-
-
-# TODO: Перенести кастомні помилки до backend/app/src/core/exceptions.py
-class InsufficientFundsError(ValueError):
-    """Помилка недостатньо коштів на рахунку."""
-
-    def __init__(self, message="Недостатньо коштів на рахунку", current_balance: Optional[Decimal] = None):  # i18n
-        self.current_balance = current_balance
-        super().__init__(message)
+from backend.app.src.core.exceptions import InsufficientFundsError # Імпорт перенесеного винятку
 
 
 class UserAccountService(BaseService):
@@ -48,8 +46,8 @@ class UserAccountService(BaseService):
 
     async def _get_user_account_orm(
             self,
-            user_id: UUID,
-            group_id: Optional[UUID] = None,
+            user_id: int, # Змінено UUID на int
+            group_id: Optional[int] = None, # Змінено Optional[UUID] на Optional[int]
             load_relations: bool = True
     ) -> Optional[UserAccount]:
         """
@@ -79,14 +77,14 @@ class UserAccountService(BaseService):
 
     async def get_user_account(
             self,
-            user_id: UUID,
-            group_id: Optional[UUID] = None  # None для глобального рахунку
+            user_id: int, # Змінено UUID на int
+            group_id: Optional[int] = None  # Змінено Optional[UUID] на Optional[int]
     ) -> Optional[UserAccountResponse]:
         """
         Отримує бонусний рахунок користувача.
 
-        :param user_id: ID користувача.
-        :param group_id: ID групи (None для глобального рахунку).
+        :param user_id: ID користувача (int).
+        :param group_id: ID групи (int, None для глобального рахунку).
         :return: Pydantic схема відповіді UserAccountResponse або None.
         """
         log_msg = f"користувача ID '{user_id}'"
@@ -107,16 +105,16 @@ class UserAccountService(BaseService):
 
     async def get_or_create_user_account(
             self,
-            user_id: UUID,
-            group_id: Optional[UUID] = None,  # None для глобального рахунку
+            user_id: int, # Змінено UUID на int
+            group_id: Optional[int] = None,  # Змінено Optional[UUID] на Optional[int]
             initial_balance: Decimal = Decimal("0.00")
     ) -> UserAccount:  # Повертає ORM модель для внутрішнього використання
         """
         Отримує або створює бонусний рахунок користувача.
         Повертає ORM модель UserAccount.
 
-        :param user_id: ID користувача.
-        :param group_id: ID групи (None для глобального).
+        :param user_id: ID користувача (int).
+        :param group_id: ID групи (int, None для глобального).
         :param initial_balance: Початковий баланс, якщо рахунок створюється.
         :return: ORM модель UserAccount.
         :raises ValueError: Якщо користувача або групу не знайдено. # i18n
@@ -173,23 +171,23 @@ class UserAccountService(BaseService):
 
     async def adjust_account_balance(
             self,
-            user_id: UUID,
+            user_id: int, # Змінено UUID на int
             amount: Decimal,
-            transaction_type: str,  # Наприклад, 'ENROLLMENT', 'MANUAL_ADJUSTMENT', 'REWARD_PAYOUT', 'WITHDRAWAL'
+            transaction_type: TransactionType,  # Змінено на TransactionType Enum
             description: Optional[str] = None,
-            related_entity_id: Optional[UUID] = None,  # ID пов'язаної сутності (наприклад, Reward.id)
-            group_id: Optional[UUID] = None,  # None для глобального рахунку
+            related_entity_id: Optional[int] = None,  # Змінено Optional[UUID] на Optional[int]
+            group_id: Optional[int] = None,  # Змінено Optional[UUID] на Optional[int]
             commit_session: bool = True  # Чи потрібно комітити сесію в цьому методі
     ) -> Tuple[UserAccountResponse, AccountTransactionResponse]:
         """
         Коригує баланс рахунку користувача, створюючи при цьому транзакцію.
 
-        :param user_id: ID користувача.
+        :param user_id: ID користувача (int).
         :param amount: Сума для коригування (додатня для поповнення, від'ємна для списання).
-        :param transaction_type: Тип транзакції.
+        :param transaction_type: Тип транзакції (Enum TransactionType).
         :param description: Опис транзакції.
-        :param related_entity_id: ID пов'язаної сутності.
-        :param group_id: ID групи (None для глобального).
+        :param related_entity_id: ID пов'язаної сутності (int).
+        :param group_id: ID групи (int, None для глобального).
         :param commit_session: Якщо True, сесія буде закомічена.
         :return: Кортеж з оновленим UserAccountResponse та створеним AccountTransactionResponse.
         :raises InsufficientFundsError: Якщо коштів недостатньо для списання.
@@ -256,8 +254,8 @@ class UserAccountService(BaseService):
             self,
             skip: int = 0,
             limit: int = 100,
-            user_id: Optional[UUID] = None,  # Додано фільтр за user_id
-            group_id: Optional[UUID] = None,  # Якщо вказано, фільтрує для цієї групи
+            user_id: Optional[int] = None,  # Змінено Optional[UUID] на Optional[int]
+            group_id: Optional[int] = None,  # Змінено Optional[UUID] на Optional[int]
             filter_global_only: bool = False,  # Якщо True і group_id не вказано, фільтрує тільки глобальні
             min_balance: Optional[Decimal] = None
     ) -> List[UserAccountResponse]:
@@ -266,15 +264,15 @@ class UserAccountService(BaseService):
 
         :param skip: Кількість записів для пропуску.
         :param limit: Максимальна кількість записів.
-        :param user_id: Опціональний фільтр за ID користувача.
-        :param group_id: Опціональний фільтр за ID групи.
+        :param user_id: Опціональний фільтр за ID користувача (int).
+        :param group_id: Опціональний фільтр за ID групи (int).
         :param filter_global_only: Якщо True, повертає тільки глобальні рахунки (group_id IS NULL).
                                    Ігнорується, якщо group_id вказано.
         :param min_balance: Опціональний фільтр для мінімального балансу.
         :return: Список Pydantic схем UserAccountResponse.
         """
         logger.debug(
-            f"Перелік бонусних рахунків: user={user_id}, group={group_id}, global_only={filter_global_only}, min_balance={min_balance}, skip={skip}, limit={limit}")
+            f"Перелік бонусних рахунків: user_id={user_id}, group_id={group_id}, global_only={filter_global_only}, min_balance={min_balance}, skip={skip}, limit={limit}")
 
         stmt = select(UserAccount).options(
             selectinload(UserAccount.user).options(selectinload(User.user_type)),
@@ -298,7 +296,9 @@ class UserAccountService(BaseService):
         if conditions:
             stmt = stmt.where(*conditions)
 
-        # TODO: Згідно technical_task.txt, уточнити поля для сортування. Наразі: user_id, group_id.
+        # TODO: Згідно technical_task.txt, уточнити поля для сортування.
+        # Наразі: user_id, group_id. Можливі також: balance, last_transaction_at, created_at, updated_at.
+        # Потрібно реалізувати динамічне сортування аналогічно до UserService.list_users.
         stmt = stmt.order_by(UserAccount.user_id, UserAccount.group_id).offset(skip).limit(limit)
 
         accounts_db = (await self.db_session.execute(stmt)).scalars().unique().all()

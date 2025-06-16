@@ -16,7 +16,7 @@ from .webhook import router as generic_webhook_router
 from .calendar import router as calendar_webhooks_router
 from .messenger import router as messenger_webhooks_router
 
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import logger # Стандартизований імпорт логера
 
 # Створюємо агрегований роутер для всіх ендпоінтів, призначених для зовнішніх систем (вебхуків)
 external_api_router = APIRouter()

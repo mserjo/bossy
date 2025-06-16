@@ -37,7 +37,7 @@ class TelegramIntegrationService(BaseMessengerIntegrationService):
     """
     service_name = TELEGRAM_SERVICE_NAME
 
-    def __init__(self, db_session: AsyncSession, user_id_for_context: Optional[UUID] = None):
+    def __init__(self, db_session: AsyncSession, user_id_for_context: Optional[int] = None): # Змінено UUID на int
         super().__init__(db_session, user_id_for_context)
         self.telegram_bot_client: Optional[Any] = None  # Заглушка для клієнта python-telegram-bot ExtBot
 
@@ -102,7 +102,7 @@ class TelegramIntegrationService(BaseMessengerIntegrationService):
         logger.info("[ЗАГЛУШКА] Видалення вебхука Telegram викликано. Припускаємо успіх.")
         return True
 
-    async def get_user_platform_id(self, user_id: UUID) -> Optional[str]:
+    async def get_user_platform_id(self, user_id: int) -> Optional[str]: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Отримує Telegram chat_id для користувача застосунку."""
         # TODO: Реалізувати отримання Telegram chat_id з моделі UserIntegration.
         # stmt = select(UserIntegration.platform_user_id).where( # Або інше поле для chat_id

@@ -9,9 +9,9 @@
 спеціалізований інтерфейс для роботи з конкретною моделлю даних.
 """
 
-from .user_repository import UserRepository
-from .refresh_token_repository import RefreshTokenRepository
-from .session_repository import SessionRepository
+from backend.app.src.repositories.auth.user_repository import UserRepository
+from backend.app.src.repositories.auth.refresh_token_repository import RefreshTokenRepository
+from backend.app.src.repositories.auth.session_repository import SessionRepository
 
 __all__ = [
     "UserRepository",

@@ -1,20 +1,22 @@
 # backend/app/src/services/dictionaries/group_types.py
 # import logging # Замінено на централізований логер
-# from typing import List # Для потенційних кастомних методів (наразі не використовуються)
+# from typing import List # Видалено
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.future import select # Для потенційних кастомних методів
+# from sqlalchemy.future import select # Видалено
 
 # Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.dictionaries.group_types import GroupType # Модель SQLAlchemy
+from backend.app.src.repositories.dictionaries.group_type_repository import GroupTypeRepository # Імпорт репозиторію
+from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.group_types import ( # Схеми Pydantic
     GroupTypeCreate,
     GroupTypeUpdate,
     GroupTypeResponse,
 )
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import logger # Стандартизований імпорт логера
 
-class GroupTypeService(BaseDictionaryService[GroupType, GroupTypeCreate, GroupTypeUpdate, GroupTypeResponse]):
+class GroupTypeService(BaseDictionaryService[GroupType, GroupTypeRepository, GroupTypeCreate, GroupTypeUpdate, GroupTypeResponse]): # Додано GroupTypeRepository до Generic
     """
     Сервіс для управління елементами довідника "Типи Груп".
     Типи груп визначають різні категорії груп у системі, наприклад,
@@ -22,13 +24,21 @@ class GroupTypeService(BaseDictionaryService[GroupType, GroupTypeCreate, GroupTy
     Успадковує загальні CRUD-операції від BaseDictionaryService.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService):
         """
         Ініціалізує сервіс GroupTypeService.
 
         :param db_session: Асинхронна сесія бази даних SQLAlchemy.
+        :param cache_service: Екземпляр сервісу кешування.
         """
-        super().__init__(db_session, model=GroupType, response_schema=GroupTypeResponse)
+        group_type_repo = GroupTypeRepository(model=GroupType)
+        super().__init__(
+            db_session,
+            repository=group_type_repo,
+            cache_service=cache_service,
+            response_schema=GroupTypeResponse
+        )
+        # _model_name ініціалізується в BaseDictionaryService з repository.model.__name__
         logger.info(f"GroupTypeService ініціалізовано для моделі: {self._model_name}")
 
     # --- Кастомні методи для GroupTypeService (якщо потрібні) ---

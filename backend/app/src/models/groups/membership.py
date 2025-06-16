@@ -17,6 +17,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # Для відстеження часу приєднання
 from backend.app.src.core.dicts import GroupRole  # Enum для ролей в групі
+from sqlalchemy import Enum as SQLEnum # Імпорт SQLEnum
 from backend.app.src.config.logging import get_logger # Імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
@@ -58,11 +59,10 @@ class GroupMembership(Base, TimestampedMixin):
     )
 
     # Роль користувача в групі
-    # TODO: Розглянути використання SQLEnum(GroupRole) для поля 'role' для кращої цілісності на рівні БД.
-    role: Mapped[str] = mapped_column(
-        String(50),  # Довжина відповідає можливим значенням з GroupRole
+    role: Mapped[GroupRole] = mapped_column(
+        SQLEnum(GroupRole),
         nullable=False,
-        default=GroupRole.MEMBER.value,  # Роль за замовчуванням - "учасник"
+        default=GroupRole.MEMBER,  # Роль за замовчуванням - "учасник"
         comment="Роль користувача в цій групі (напр., admin, member)"
     )
 
@@ -82,8 +82,9 @@ class GroupMembership(Base, TimestampedMixin):
     group: Mapped["Group"] = relationship(back_populates="memberships", lazy="selectin")
 
     # Поля для __repr__
-    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
-    _repr_fields = ["user_id", "group_id", "role"]
+    # Ця модель має композитний ПК (user_id, group_id), тому вони повинні бути включені, оскільки Base.__repr__ шукає 'id'.
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields.
+    _repr_fields = ("user_id", "group_id", "role")
 
 
 if __name__ == "__main__":
@@ -110,7 +111,7 @@ if __name__ == "__main__":
     example_membership = GroupMembership(
         user_id=101,
         group_id=202,
-        role=GroupRole.ADMIN.value  # Використання значення Enum
+        role=GroupRole.ADMIN  # Використання Enum
     )
     # Імітуємо часові мітки
     example_membership.created_at = datetime.now(tz=timezone.utc)
@@ -118,6 +119,6 @@ if __name__ == "__main__":
 
     logger.info(f"\nПриклад екземпляра GroupMembership (без сесії):\n  {example_membership}")
     # Очікуваний __repr__ (порядок може відрізнятися):
-    # <GroupMembership(user_id=101, group_id=202, role='admin', created_at=...)>
+    # <GroupMembership(user_id=101, group_id=202, role=<GroupRole.ADMIN: 'admin'>, created_at=...)>
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

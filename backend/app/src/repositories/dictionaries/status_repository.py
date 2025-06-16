@@ -7,7 +7,9 @@
 окрім стандартних CRUD операцій та пошуку за кодом/назвою.
 """
 
-from sqlalchemy.ext.asyncio import AsyncSession
+from typing import List, Optional # Optional може знадобитися для кастомних методів
+from sqlalchemy import select # select може знадобитися для кастомних методів
+from sqlalchemy.ext.asyncio import AsyncSession # Для type hinting у кастомних методах
 
 # Абсолютний імпорт базового репозиторію для довідників
 from backend.app.src.repositories.dictionaries.base_dict_repository import BaseDictionaryRepository
@@ -15,7 +17,7 @@ from backend.app.src.repositories.dictionaries.base_dict_repository import BaseD
 # Абсолютний імпорт моделі та схем для Статусів
 from backend.app.src.models.dictionaries.statuses import Status
 from backend.app.src.schemas.dictionaries.statuses import StatusCreateSchema, StatusUpdateSchema
-from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
@@ -29,21 +31,25 @@ class StatusRepository(BaseDictionaryRepository[Status, StatusCreateSchema, Stat
     Може бути розширений специфічними методами для роботи зі статусами, якщо це необхідно.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self):
         """
         Ініціалізує репозиторій для моделі `Status`.
-
-        Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        super().__init__(db_session=db_session, model=Status)
+        super().__init__(model=Status)
+        logger.info(f"Репозиторій для моделі '{self.model.__name__}' ініціалізовано.")
 
     # Приклад специфічного методу для цього репозиторію (якщо потрібно):
-    # async def get_active_statuses(self) -> List[Status]:
+    # async def get_active_statuses(self, session: AsyncSession) -> List[Status]:
     #     """Повертає список усіх активних статусів."""
-    #     stmt = select(self.model).where(self.model.state == "active") # Припускаючи, що є поле 'state'
-    #     result = await self.db_session.execute(stmt)
-    #     return list(result.scalars().all())
+    #     logger.debug(f"Отримання активних статусів для моделі {self.model.__name__}")
+    #     # TODO: Перевірити назву поля для стану (напр. 'state', 'is_active') та значення для активного стану.
+    #     stmt = select(self.model).where(self.model.state == "active") # Припускаючи, що є поле 'state' та значення "active"
+    #     try:
+    #         result = await session.execute(stmt)
+    #         return list(result.scalars().all())
+    #     except Exception as e:
+    #         logger.error(f"Помилка при отриманні активних статусів: {e}", exc_info=True)
+    #         return []
 
 
 if __name__ == "__main__":

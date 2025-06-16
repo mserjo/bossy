@@ -7,7 +7,7 @@ Pydantic схеми для JWT токенів.
 - `TokenResponse`: Відповідь API, що містить токени доступу та оновлення.
 - `RefreshTokenRequest`: Запит на оновлення токена доступу за допомогою токена оновлення.
 """
-from datetime import datetime
+from datetime import datetime, timedelta # Moved timedelta here
 from typing import Optional, List
 
 from pydantic import Field
@@ -124,6 +124,4 @@ if __name__ == "__main__":
 
     logger.info("\nПримітка: Ці схеми використовуються для валідації даних, пов'язаних з JWT токенами.")
 
-# Потрібно для timedelta в __main__
-from datetime import timedelta
 # import json # Для кастомного дампу дат як int

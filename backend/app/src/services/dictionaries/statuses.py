@@ -1,20 +1,22 @@
 # backend/app/src/services/dictionaries/statuses.py
 # import logging # Замінено на централізований логер
-from typing import List # Потрібно для прикладу кастомного методу
+# from typing import List # Видалено
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.future import select # Потрібно для прикладу кастомного методу
+# from sqlalchemy.future import select # Видалено
 
 # Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.dictionaries.statuses import Status # Модель SQLAlchemy
+from backend.app.src.repositories.dictionaries.status_repository import StatusRepository # Імпорт репозиторію
+from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.statuses import ( # Схеми Pydantic
     StatusCreate,
     StatusUpdate,
     StatusResponse,
 )
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config import logger # Стандартизований імпорт логера
 
-class StatusService(BaseDictionaryService[Status, StatusCreate, StatusUpdate, StatusResponse]):
+class StatusService(BaseDictionaryService[Status, StatusRepository, StatusCreate, StatusUpdate, StatusResponse]): # Додано StatusRepository до Generic
     """
     Сервіс для управління елементами довідника "Статуси".
     Статуси є загальними для системи і можуть застосовуватися до різних сутностей
@@ -26,13 +28,21 @@ class StatusService(BaseDictionaryService[Status, StatusCreate, StatusUpdate, St
     (це контролюється на рівні API, сервіс надає операції).
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService):
         """
         Ініціалізує сервіс StatusService.
 
         :param db_session: Асинхронна сесія бази даних SQLAlchemy.
+        :param cache_service: Екземпляр сервісу кешування.
         """
-        super().__init__(db_session, model=Status, response_schema=StatusResponse)
+        status_repo = StatusRepository(model=Status)
+        super().__init__(
+            db_session,
+            repository=status_repo,
+            cache_service=cache_service,
+            response_schema=StatusResponse
+        )
+        # _model_name ініціалізується в BaseDictionaryService з repository.model.__name__
         logger.info(f"StatusService ініціалізовано для моделі: {self._model_name}")
 
     # --- Кастомні методи для StatusService (якщо потрібні) ---

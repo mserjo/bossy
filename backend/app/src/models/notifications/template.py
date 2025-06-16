@@ -12,19 +12,18 @@ from sqlalchemy import String, Text
 from sqlalchemy.orm import Mapped, mapped_column  # relationship тут не потрібен, якщо немає зворотніх зв'язків
 
 # Абсолютний імпорт базової моделі для довідників
-from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.core.dicts import NotificationChannelType # Імпорт Enum
+from sqlalchemy import Enum as SQLEnum # Імпорт SQLEnum
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
-# TODO: Визначити Enum NotificationChannelType в core.dicts.py (наприклад, EMAIL, SMS, IN_APP, PUSH)
-# from backend.app.src.core.dicts import NotificationChannelType
-
-class NotificationTemplate(BaseDictionaryModel):
+class NotificationTemplate(BaseDictionary):
     """
     Модель Шаблону Сповіщення.
 
-    Успадковує `BaseDictionaryModel` (id, code, name, description, state, etc.).
+    Успадковує `BaseDictionary` (id, code, name, description, state, etc.).
     Поле `code` - унікальний код шаблону (наприклад, "new_task_assigned_email").
     Поле `name` - людиночитана назва шаблону (наприклад, "Email: Нове завдання призначено").
     Поле `description` - детальний опис призначення шаблону.
@@ -33,8 +32,7 @@ class NotificationTemplate(BaseDictionaryModel):
     Атрибути:
         subject_template (Mapped[str]): Шаблон теми сповіщення (може містити плейсхолдери).
         body_template (Mapped[str]): Шаблон тіла сповіщення (HTML для email, текст для SMS/push, Markdown/JSON для in-app).
-        template_type (Mapped[str]): Тип/канал сповіщення (наприклад, "email", "sms", "in_app").
-                                     TODO: Замінити на Enum `NotificationChannelType`.
+        template_type (Mapped[NotificationChannelType]): Тип/канал сповіщення (використовує Enum `NotificationChannelType`).
     """
     __tablename__ = "notification_templates"
 
@@ -46,15 +44,13 @@ class NotificationTemplate(BaseDictionaryModel):
         Text, nullable=False, comment="Шаблон тіла сповіщення (з плейсхолдерами, може бути HTML/Markdown/Text)"
     )
 
-    # TODO: Замінити String на Enum NotificationChannelType, коли він буде визначений в core.dicts.py
-    # template_type: Mapped[NotificationChannelType] = mapped_column(SQLEnum(NotificationChannelType), nullable=False, index=True)
-    template_type: Mapped[str] = mapped_column(
-        String(50), nullable=False, index=True, comment="Тип/канал шаблону (наприклад, email, sms, in_app)"
+    template_type: Mapped[NotificationChannelType] = mapped_column(
+        SQLEnum(NotificationChannelType), nullable=False, index=True, comment="Тип/канал шаблону (наприклад, email, sms, in_app)"
     )
 
-    # _repr_fields успадковуються та збираються з BaseDictionaryModel та його предків.
+    # _repr_fields успадковуються та збираються з BaseDictionary (id, name, code, state_id тощо).
     # Додаємо специфічні для NotificationTemplate поля.
-    _repr_fields = ["template_type"]  # 'id', 'code', 'name' вже будуть з BaseDictionaryModel
+    _repr_fields = ("template_type",)
 
 
 if __name__ == "__main__":
@@ -82,14 +78,13 @@ if __name__ == "__main__":
         subject_template="Ласкаво просимо до {project_name}, {{user_name}}!",  # TODO i18n (плейсхолдери окремо)
         body_template="<p>Привіт, {{user_name}}!</p><p>Дякуємо за реєстрацію в {project_name}.</p>",
         # TODO i18n (плейсхолдери окремо)
-        template_type="email",  # TODO: Замінити на NotificationChannelType.EMAIL.value
+        template_type=NotificationChannelType.EMAIL,  # Використання Enum
         state="active"
     )
     example_template.created_at = datetime.now(tz=timezone.utc)
 
     logger.info(f"\nПриклад екземпляра NotificationTemplate (без сесії):\n  {example_template}")
     # Очікуваний __repr__ (порядок може відрізнятися):
-    # <NotificationTemplate(id=1, name='Вітальне Email Сповіщення', code='WELCOME_EMAIL', state='active', template_type='email', created_at=...)>
+    # <NotificationTemplate(id=1, name='Вітальне Email Сповіщення', code='WELCOME_EMAIL', state='active', template_type=<NotificationChannelType.EMAIL: 'email'>, created_at=...)>
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
-    logger.info("TODO: Не забудьте визначити Enum 'NotificationChannelType' в core.dicts.py та оновити поле 'template_type'.")

@@ -6,15 +6,13 @@
 та надає методи для роботи з довідником типів бонусів.
 """
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 # Абсолютний імпорт базового репозиторію для довідників
 from backend.app.src.repositories.dictionaries.base_dict_repository import BaseDictionaryRepository
 
 # Абсолютний імпорт моделі та схем для Типів Бонусів
 from backend.app.src.models.dictionaries.bonus_types import BonusType
 from backend.app.src.schemas.dictionaries.bonus_types import BonusTypeCreateSchema, BonusTypeUpdateSchema
-from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
@@ -27,16 +25,18 @@ class BonusTypeRepository(BaseDictionaryRepository[BonusType, BonusTypeCreateSch
     від `BaseDictionaryRepository`.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self):
         """
         Ініціалізує репозиторій для моделі `BonusType`.
-
-        Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        super().__init__(db_session=db_session, model=BonusType)
+        super().__init__(model=BonusType)
+        logger.info(f"Репозиторій для моделі '{self.model.__name__}' ініціалізовано.")
 
     # Тут можна додати специфічні методи для BonusTypeRepository, якщо вони потрібні.
+    # Наприклад:
+    # async def get_bonus_type_by_some_specific_field(self, session: AsyncSession, field_value: Any) -> Optional[BonusType]:
+    #     # логіка методу...
+    #     pass
 
 
 if __name__ == "__main__":

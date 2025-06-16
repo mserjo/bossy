@@ -7,7 +7,7 @@ Pydantic схеми для сутності "Аватар Користувача
 - Створення нового запису про аватар (зазвичай виконується сервісом) (`UserAvatarCreateSchema`).
 - Представлення даних про аватар користувача у відповідях API (`UserAvatarSchema`).
 """
-from datetime import datetime
+from datetime import datetime, timedelta # Moved timedelta here
 from typing import Optional, Any  # Any для тимчасових полів
 
 from pydantic import Field, AnyHttpUrl
@@ -45,7 +45,7 @@ class UserAvatarCreateSchema(UserAvatarBaseSchema):
     pass
 
 
-class UserAvatarSchema(UserAvatarBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+class UserAvatarResponseSchema(UserAvatarBaseSchema, IDSchemaMixin, TimestampedSchemaMixin): # Renamed
     """
     Схема для представлення даних про аватар користувача у відповідях API.
     Поле `created_at` (з `TimestampedSchemaMixin`) позначає час встановлення аватара.
@@ -96,11 +96,8 @@ if __name__ == "__main__":
         #     "updated_at": datetime.now() - timedelta(days=1)
         # }
     }
-    avatar_response_instance = UserAvatarSchema(**avatar_response_data)
+    avatar_response_instance = UserAvatarResponseSchema(**avatar_response_data) # Renamed
     logger.info(avatar_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nПримітка: Схеми для пов'язаних об'єктів (`user`, `file_record`) та поле `file_url`")
     logger.info("наразі є заповнювачами (Any) або потребують заповнення сервісом.")
-
-# Потрібно для timedelta в __main__
-from datetime import timedelta

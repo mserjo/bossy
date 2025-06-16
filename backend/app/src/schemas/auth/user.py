@@ -12,7 +12,7 @@ Pydantic схеми для сутності "Користувач" (User).
 from datetime import datetime
 from typing import Optional, Any  # Any для тимчасових полів user_type, system_role
 
-from pydantic import BaseModel, Field, EmailStr
+from pydantic import BaseModel, Field, EmailStr, AnyHttpUrl # Додано AnyHttpUrl
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
@@ -45,12 +45,15 @@ class UserBaseSchema(BaseSchema):
                                         description="Номер телефону користувача (необов'язково, унікальний, якщо вказано).",
                                         examples=["+380501234567"])
 
-    name: Optional[str] = Field(None, max_length=255,
+    name: str = Field(max_length=255, # Змінено на non-optional
                                 description="Відображуване ім'я користувача (може бути ПІБ або нікнейм).",
                                 examples=["Іван Франко"])
     description: Optional[str] = Field(None, description="Додатковий опис або біографія користувача.")
     notes: Optional[str] = Field(None, description="Приватні нотатки про користувача.")
 
+
+# UserCreateSchema, UserUpdateSchema, UserResponseSchema, UserPublicProfileSchema
+# Схеми для створення, оновлення, відповіді API та публічного профілю користувача.
 
 class UserCreateSchema(UserBaseSchema):
     """
@@ -62,9 +65,9 @@ class UserCreateSchema(UserBaseSchema):
     user_type_code: Optional[str] = Field(None, description="Код типу користувача з довідника (напр., 'REGULAR_USER').")
     system_role_code: Optional[str] = Field(None,
                                             description="Код системної ролі користувача з довідника (напр., 'USER').")
-    state: Optional[str] = Field(
-        default=UserState.PENDING_VERIFICATION.value,  # Стан за замовчуванням при створенні
-        max_length=50,
+    state: Optional[UserState] = Field( # Змінено тип на UserState
+        default=UserState.PENDING_VERIFICATION,  # Використовуємо Enum напряму
+        # max_length=50, # Видалено, не потрібно для Enum
         description="Початковий стан користувача (за замовчуванням 'pending_verification')."
     )
 
@@ -84,7 +87,7 @@ class UserUpdateSchema(UserBaseSchema):
 
     user_type_code: Optional[str] = Field(None, description="Новий код типу користувача з довідника.")
     system_role_code: Optional[str] = Field(None, description="Новий код системної ролі користувача з довідника.")
-    state: Optional[str] = Field(None, max_length=50, description="Новий стан користувача.")
+    state: Optional[UserState] = Field(None, description="Новий стан користувача (використовує UserState Enum).")
 
     # Перевизначення успадкованих полів, щоб зробити їх Optional[str] = None, якщо вони були обов'язковими в UserBaseSchema
     # Однак, у UserBaseSchema вони вже Optional, тому це не строго необхідно, але для ясності:
@@ -97,7 +100,7 @@ class UserUpdateSchema(UserBaseSchema):
     notes: Optional[str] = Field(None, description="Нові приватні нотатки про користувача.")
 
 
-class UserSchema(UserBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+class UserResponseSchema(UserBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
     """
     Схема для представлення даних користувача у відповідях API.
     Включає `id`, часові мітки та інші поля, безпечні для відображення.
@@ -106,7 +109,7 @@ class UserSchema(UserBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
     is_active: bool = Field(description="Чи активний обліковий запис користувача.")
     is_superuser: bool = Field(description="Чи має користувач права суперкористувача.")
     last_login_at: Optional[datetime] = Field(None, description="Час останнього входу користувача в систему.")
-    state: Optional[str] = Field(None, description="Поточний стан користувача (наприклад, з UserState Enum).")
+    state: Optional[UserState] = Field(None, description="Поточний стан користувача (використовує UserState Enum).") # Змінено тип
 
     # TODO: Замінити Any на UserTypeSchema та UserRoleSchema, коли вони будуть імпортовані.
     # Ці поля будуть заповнюватися на основі user_type_id та system_role_id з моделі User.
@@ -119,6 +122,9 @@ class UserSchema(UserBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
                                              examples=["https://example.com/avatars/user1.jpg"])
     # model_config успадковується з UserBaseSchema -> BaseSchema (from_attributes=True)
 
+
+# UserPublicProfileSchema вже визначено нижче, тому цей коментар не потрібен.
+# class UserPublicProfileSchema(BaseSchema, IDSchemaMixin):
 
 class UserPublicProfileSchema(BaseSchema, IDSchemaMixin):
     """
@@ -134,6 +140,7 @@ class UserPublicProfileSchema(BaseSchema, IDSchemaMixin):
 
 
 if __name__ == "__main__":
+    from datetime import timedelta # Додано імпорт timedelta
     # Демонстраційний блок для схем користувача.
     logger.info("--- Pydantic Схеми для Користувача (User) ---")
 
@@ -181,7 +188,7 @@ if __name__ == "__main__":
         # "system_role": {"id": 1, "name": "Користувач", "code": "USER"}, # Приклад, коли UserRoleSchema визначено
         # "avatar_url": "https://example.com/path/to/avatar.png"
     }
-    user_response_instance = UserSchema(**user_response_data)
+    user_response_instance = UserResponseSchema(**user_response_data) # Змінено UserSchema на UserResponseSchema
     logger.info(user_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nUserPublicProfileSchema (приклад публічного профілю):")

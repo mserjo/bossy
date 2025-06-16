@@ -1,33 +1,37 @@
 # backend/app/src/services/files/file_upload_service.py
-# import logging # Замінено на централізований логер
+"""
+Сервіс для обробки завантаження файлів.
+
+Відповідає за ініціалізацію процесу завантаження, обробку частин файлу,
+завершення завантаження (включаючи переміщення файлу до постійного сховища)
+та координацію з `FileRecordService` для збереження метаданих файлу.
+Наразі реалізовано для локального зберігання файлів.
+"""
 import os
 import aiofiles  # Для асинхронних файлових операцій
 import shutil  # Для переміщення файлів
-from typing import List, Optional, Dict, Any
-from uuid import UUID, uuid4
-from datetime import datetime, timezone  # timedelta не використовується, можна прибрати
+from typing import Optional, Dict, Any, Set # List видалено, Set додано
+from uuid import uuid4 # UUID видалено
+from datetime import datetime, timezone
 from pathlib import Path
 
-from sqlalchemy.ext.asyncio import \
-    AsyncSession  # Не використовується прямо в цьому сервісі, але BaseService може вимагати
+from sqlalchemy.ext.asyncio import AsyncSession
 from werkzeug.utils import secure_filename  # Для очищення імен файлів
 
-from backend.app.src.services.base import BaseService  # Повний шлях
-from backend.app.src.config.settings import settings  # Повний шлях
-from backend.app.src.schemas.files.upload import (  # Повні шляхи
+from backend.app.src.services.base import BaseService
+from backend.app.src.config.settings import settings
+from backend.app.src.schemas.files.upload import (
     FileUploadInitiateRequest,
     FileUploadInitiateResponse,
-    # PresignedUrlRequest, # Не використовується для локального сховища
-    # PresignedUrlResponse, # Не використовується для локального сховища
     FileUploadCompleteRequest,
     FileUploadResponse
 )
-from backend.app.src.schemas.files.file import FileRecordCreate, FileRecordResponse  # Повні шляхи
-from backend.app.src.services.files.file_record_service import FileRecordService  # Повний шлях
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.schemas.files.file import FileRecordCreate # FileRecordResponse не використовується напряму в цьому файлі
+from backend.app.src.services.files.file_record_service import FileRecordService
+from backend.app.src.config import logger  # Використання спільного логера з конфігу
 
 
-class FileUploadService(BaseService):
+class FileUploadService(BaseService): # type: ignore видалено
     """
     Сервіс для обробки процесу завантаження файлів.
     Включає ініціалізацію завантажень, обробку завантажених файлів (переміщення з тимчасового
@@ -35,9 +39,9 @@ class FileUploadService(BaseService):
     Зберігання файлів відбувається локально.
     """
 
-    def __init__(self, db_session: Optional[
-        AsyncSession] = None):  # db_session опціональний, якщо не використовується BaseService для DB операцій
-        super().__init__(db_session)  # db_session може бути None, якщо BaseService це дозволяє
+    def __init__(self, db_session: AsyncSession, file_record_service: FileRecordService): # db_session обов'язковий, додано file_record_service
+        super().__init__(db_session)
+        self.file_record_service = file_record_service
         self.local_storage_base_path: Path
         self.temp_upload_dir: Path
         self.permanent_storage_dir: Path
@@ -79,10 +83,10 @@ class FileUploadService(BaseService):
     async def initiate_upload(
             self,
             initiate_data: FileUploadInitiateRequest,
-            uploader_user_id: UUID
+            uploader_user_id: int # Змінено UUID на int
     ) -> FileUploadInitiateResponse:
         """Ініціює процес завантаження файлу."""
-        logger.info(f"Ініціація завантаження для файлу '{initiate_data.file_name}' користувачем '{uploader_user_id}'.")
+        logger.info(f"Ініціація завантаження для файлу '{initiate_data.file_name}' користувачем ID: {uploader_user_id}.")
 
         if initiate_data.size_bytes <= 0:
             # i18n
@@ -123,7 +127,7 @@ class FileUploadService(BaseService):
 
         temp_dir_for_upload = self.temp_upload_dir / str(upload_id)
         try:
-            temp_dir_for_upload.mkdir(parents=True, exist_ok=True)
+            await aiofiles.os.makedirs(temp_dir_for_upload, exist_ok=True) # Замінено на async mkdir
         except Exception as e:
             logger.error(f"Не вдалося створити тимчасову директорію {temp_dir_for_upload} для ID {upload_id}: {e}",
                          exc_info=True)
@@ -158,11 +162,11 @@ class FileUploadService(BaseService):
             raise ValueError(f"Не вдалося зберегти завантажені дані файлу для ID {upload_id}.")
 
     async def complete_upload(
-            self, upload_id: UUID, completion_data: FileUploadCompleteRequest, uploader_user_id: UUID
+            self, upload_id: UUID, completion_data: FileUploadCompleteRequest, uploader_user_id: int # Змінено UUID на int
     ) -> FileUploadResponse:
         """Завершує процес завантаження, переміщує файл та створює запис в БД."""
         logger.info(
-            f"Завершення завантаження для ID '{upload_id}', файл '{completion_data.file_name}' користувачем '{uploader_user_id}'.")
+            f"Завершення завантаження для ID '{upload_id}', файл '{completion_data.file_name}' користувачем ID: {uploader_user_id}.")
 
         safe_original_filename = secure_filename(completion_data.file_name)
         if not safe_original_filename:
@@ -183,14 +187,14 @@ class FileUploadService(BaseService):
         # Генерація унікального підкаталогу для постійного зберігання
         permanent_file_subdir_name = str(uuid4())  # Унікальний підкаталог
         permanent_file_target_dir = self.permanent_storage_dir / permanent_file_subdir_name
-        permanent_file_target_dir.mkdir(parents=True, exist_ok=True)
+        await aiofiles.os.makedirs(permanent_file_target_dir, exist_ok=True) # Замінено на async mkdir
         permanent_file_path = permanent_file_target_dir / safe_original_filename
 
         temp_parent_dir_to_clean = self.temp_upload_dir / str(upload_id)
 
         try:
-            # Використовуємо shutil.move, оскільки він краще працює між різними файловими системами (якщо temp на іншому розділі)
-            shutil.move(str(temp_file_path), str(permanent_file_path))
+            # Використовуємо aiofiles.os.rename для асинхронного переміщення
+            await aiofiles.os.rename(str(temp_file_path), str(permanent_file_path))
             logger.info(f"Файл переміщено з '{temp_file_path}' до постійного сховища: '{permanent_file_path}'.")
         except Exception as e:
             logger.error(f"Не вдалося перемістити файл з тимчасового до постійного сховища для ID '{upload_id}': {e}",
@@ -198,9 +202,9 @@ class FileUploadService(BaseService):
             # i18n
             raise ValueError("Не вдалося завершити збереження файлу.")
         finally:  # Очищення тимчасової директорії для цього завантаження
-            if temp_parent_dir_to_clean.exists():
+            if await aiofiles.os.path.exists(temp_parent_dir_to_clean): # Замінено на async exists
                 try:
-                    shutil.rmtree(temp_parent_dir_to_clean)
+                    await self._async_rmtree(temp_parent_dir_to_clean) # Замінено на async rmtree
                     logger.debug(f"Тимчасову директорію {temp_parent_dir_to_clean} очищено.")
                 except Exception as e_rm:
                     logger.error(f"Не вдалося очистити тимчасову директорію {temp_parent_dir_to_clean}: {e_rm}")
@@ -214,38 +218,62 @@ class FileUploadService(BaseService):
         static_url_prefix = getattr(settings, 'STATIC_URL_PATH', '/static').rstrip('/')
         file_url_for_record = f"{static_url_prefix}/permanent/{storage_path_for_record}"
 
-        file_record_service = FileRecordService(self.db_session)
-        file_record_create_data = FileRecordCreate(
-            file_name=completion_data.file_name,  # Зберігаємо оригінальне ім'я, надане клієнтом (до secure_filename)
-            mime_type=completion_data.mime_type,
-            size_bytes=actual_size,
-            storage_path=str(storage_path_for_record),  # Шлях відносно permanent_storage_dir
-            file_url=file_url_for_record,
-            uploader_user_id=uploader_user_id,
-            group_id=getattr(completion_data, 'group_id', None),
-            entity_type=getattr(completion_data, 'entity_type', None),
-            entity_id=getattr(completion_data, 'entity_id', None),
-            metadata=getattr(completion_data, 'metadata', None)
-        )
+        # TODO: Узгодити дані для створення FileRecord:
+        # 1. Схема `FileRecordCreateSchema` повинна включати поля: `storage_path: str`, `file_url: str`, `uploader_user_id: Optional[int]`, `purpose: str`.
+        # 2. Поле `purpose` для `FileRecordCreate` потрібно отримати з `FileUploadInitiateRequest` (зберегти upload_id -> purpose десь тимчасово)
+        #    або додати `purpose` до схеми `FileUploadCompleteRequest` (що менш імовірно, бо `initiate_data` вже містить `purpose`).
+        #    Поточний fallback "UNKNOWN" для purpose є тимчасовим.
+        file_record_create_data_dict = {
+            "file_name": completion_data.file_name,
+            "mime_type": completion_data.mime_type,
+            "size_bytes": actual_size,
+            "storage_path": str(storage_path_for_record),
+            "file_url": file_url_for_record,
+            "uploader_user_id": uploader_user_id, # Now int
+            "purpose": getattr(completion_data, 'purpose', "UNKNOWN"), # Тимчасовий fallback
+            "metadata": getattr(completion_data, 'metadata', None)
+        }
 
-        created_file_record_response: Optional[FileRecordResponse]
+        file_record_create_schema_instance = FileRecordCreate(**file_record_create_data_dict)
+
         try:
-            created_file_record_response = await file_record_service.create_file_record(
-                file_record_create_data, uploader_user_id=uploader_user_id
+            # Використовуємо self.file_record_service
+            created_file_record_response = await self.file_record_service.create_file_record(
+                record_data=file_record_create_schema_instance
+                # uploader_user_id тепер частина record_data і відповідно FileRecordCreateSchema
             )
-        except ValueError as ve:  # Якщо створення запису в БД не вдалося
+            if not created_file_record_response: # Додаткова перевірка, якщо create_file_record може повернути None
+                 raise ValueError("FileRecordService.create_file_record повернув None") # i18n
+        except ValueError as ve:
             logger.error(f"Не вдалося створити запис файлу після завантаження ID '{upload_id}': {ve}", exc_info=True)
-            # Спроба видалити вже збережений фізичний файл, оскільки запис в БД не створено
-            await self.delete_actual_file(str(permanent_file_path))  # Передаємо абсолютний шлях
-            raise  # Перекидаємо помилку далі
+            await self.delete_actual_file(str(permanent_file_path))
+            raise
 
         logger.info(
             f"Завантаження ID '{upload_id}' завершено. Створено Запис Файлу ID '{created_file_record_response.id}'.")
-        # i18n
         return FileUploadResponse(
-            message=f"Файл '{created_file_record_response.file_name}' успішно завантажено.",
+            message=f"Файл '{created_file_record_response.file_name}' успішно завантажено.", # i18n
             file_record=created_file_record_response
         )
+
+    async def _async_rmtree(self, directory: Path):
+        """Асинхронно видаляє директорію та весь її вміст."""
+        logger.debug(f"Асинхронне видалення директорії: {directory}")
+        try:
+            # Спочатку видаляємо всі файли та піддиректорії
+            for item_name in await aiofiles.os.listdir(directory):
+                item_path = directory / item_name
+                if await aiofiles.os.path.isdir(item_path):
+                    await self._async_rmtree(item_path) # Рекурсивний виклик для піддиректорій
+                else:
+                    await aiofiles.os.remove(item_path) # Видалення файлу
+            # Після того, як директорія порожня, видаляємо саму директорію
+            await aiofiles.os.rmdir(directory)
+            logger.debug(f"Директорію {directory} успішно видалено.")
+        except Exception as e:
+            logger.error(f"Помилка під час асинхронного видалення директорії {directory}: {e}", exc_info=True)
+            # Залежно від стратегії, можна або проковтнути помилку, або підняти її вище
+            # raise # Якщо потрібно повідомити про помилку вище
 
     async def delete_actual_file(self, storage_path: str) -> bool:
         """Видаляє фактичний файл зі сховища."""
@@ -265,11 +293,8 @@ class FileUploadService(BaseService):
             return False
 
         try:
-            if abs_file_path.is_file():
-                # Використовуємо aiofiles для асинхронного видалення, якщо це критично,
-                # але os.remove зазвичай швидкий. Для простоти поки os.remove.
-                # TODO: Розглянути `await aiofiles.os.remove(abs_file_path)` якщо є блокування.
-                os.remove(abs_file_path)
+            if await aiofiles.os.path.isfile(abs_file_path): # Замінено на async версію
+                await aiofiles.os.remove(abs_file_path) # Замінено на async версію
                 logger.info(f"Локальний файл '{abs_file_path}' успішно видалено.")
 
                 # Спроба видалити батьківську директорію (UUID_SUBDIR), якщо вона порожня
@@ -277,9 +302,10 @@ class FileUploadService(BaseService):
                 # Переконуємося, що батьківська директорія знаходиться в permanent_storage_dir і не є самою permanent_storage_dir
                 if parent_dir != self.permanent_storage_dir and str(parent_dir).startswith(
                         str(self.permanent_storage_dir.resolve())):
-                    if not any(parent_dir.iterdir()):  # Перевірка, чи директорія порожня
+                    # Перевірка, чи директорія порожня (aiofiles.os.listdir може бути використано)
+                    if not await aiofiles.os.listdir(parent_dir):
                         try:
-                            parent_dir.rmdir()
+                            await aiofiles.os.rmdir(parent_dir) # Замінено на async версію
                             logger.info(f"Порожню батьківську директорію '{parent_dir}' видалено.")
                         except OSError as e_rmdir:  # Може бути помилка, якщо директорія не порожня (race condition)
                             logger.warning(

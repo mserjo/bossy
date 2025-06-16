@@ -10,7 +10,7 @@
 """
 
 # Абсолютний імпорт базової моделі для довідників
-from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 from backend.app.src.config.logging import get_logger # Імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
@@ -19,11 +19,11 @@ logger = get_logger(__name__)
 # from sqlalchemy.orm import Mapped, mapped_column
 # from sqlalchemy import Float
 
-class BonusType(BaseDictionaryModel):
+class BonusType(BaseDictionary):
     """
     Модель SQLAlchemy для довідника "Типи бонусів".
 
-    Успадковує всі поля від `BaseDictionaryModel` (включаючи `id`, `name`, `description`, `code`,
+    Успадковує всі поля від `BaseDictionary` (включаючи `id`, `name`, `description`, `code`,
     часові мітки, м'яке видалення, стан, нотатки та опціональний `group_id`).
     `group_id` для системних типів бонусів, ймовірно, буде NULL.
 
@@ -38,9 +38,9 @@ class BonusType(BaseDictionaryModel):
     # Наприклад:
     # default_multiplier: Mapped[Optional[float]] = mapped_column(Float, nullable=True, comment="Множник за замовчуванням (наприклад, -1 для штрафів)")
 
-    # _repr_fields успадковуються та збираються автоматично.
-    # Додавання специфічних полів до __repr__:
-    # _repr_fields = ["default_multiplier"]
+    # _repr_fields успадковуються та збираються автоматично з BaseDictionary (id, name, code, state_id тощо).
+    # Немає додаткових специфічних полів для __repr__ на цьому рівні.
+    _repr_fields: tuple[str, ...] = ()
 
 
 if __name__ == "__main__":

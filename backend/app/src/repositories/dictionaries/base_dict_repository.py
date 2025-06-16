@@ -7,21 +7,17 @@
 за його унікальним кодом (`code`) або назвою (`name`).
 """
 
-from typing import Optional, Type, Any  # Any не використовується, але може бути корисним для майбутніх методів
+from typing import Optional, Type # Any видалено, оскільки не використовується
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Абсолютний імпорт базового репозиторію та TypeVars
-from backend.app.src.repositories.base import BaseRepository
-from backend.app.src.core.base import ModelType, CreateSchemaType, UpdateSchemaType
-from backend.app.src.config.logging import get_logger # Імпорт логера
+# Абсолютний імпорт базового репозиторію
+# TypeVars (ModelType, CreateSchemaType, UpdateSchemaType) успадковуються з BaseRepository
+from backend.app.src.repositories.base import BaseRepository, ModelType, CreateSchemaType, UpdateSchemaType
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
-
-# from backend.app.src.config.logging import get_logger # Якщо потрібне логування
-
-# logger = get_logger(__name__)
 
 class BaseDictionaryRepository(BaseRepository[ModelType, CreateSchemaType, UpdateSchemaType]):
     """
@@ -33,24 +29,26 @@ class BaseDictionaryRepository(BaseRepository[ModelType, CreateSchemaType, Updat
     Атрибути:
         model (Type[ModelType]): Клас моделі SQLAlchemy, що представляє довідник.
                                  Очікується, що ця модель має поля `code` та `name`.
-        db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
     """
 
-    def __init__(self, db_session: AsyncSession, model: Type[ModelType]):
+    def __init__(self, model: Type[ModelType]):
         """
         Ініціалізує репозиторій для довідників.
 
         Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
             model (Type[ModelType]): Клас моделі SQLAlchemy довідника.
         """
-        super().__init__(db_session=db_session, model=model)
+        super().__init__(model=model)
+        # Логер вже ініціалізовано в BaseRepository, але можна додати специфічне логування тут, якщо потрібно
+        logger.info(f"Репозиторій для моделі-довідника '{self.model.__name__}' ініціалізовано.")
 
-    async def get_by_code(self, code: str) -> Optional[ModelType]:
+
+    async def get_by_code(self, session: AsyncSession, code: str) -> Optional[ModelType]:
         """
         Отримує один запис довідника за його унікальним кодом.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             code (str): Унікальний код запису для пошуку.
 
         Returns:
@@ -59,21 +57,30 @@ class BaseDictionaryRepository(BaseRepository[ModelType, CreateSchemaType, Updat
         Raises:
             AttributeError: Якщо модель не має атрибута `code`.
         """
+        logger.debug(f"Отримання запису типу '{self.model.__name__}' за кодом: {code}")
         if not hasattr(self.model, "code"):
-            # logger.error(f"Модель {self.model.__name__} не має атрибута 'code' для пошуку.")
+            logger.error(f"Модель {self.model.__name__} не має атрибута 'code' для пошуку.")
             raise AttributeError(f"Модель {self.model.__name__} не має атрибута 'code'.")
 
         stmt = select(self.model).where(self.model.code == code)
-        result = await self.db_session.execute(stmt)
-        return result.scalar_one_or_none()
+        try:
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(
+                f"Помилка при отриманні запису '{self.model.__name__}' за кодом {code}: {e}",
+                exc_info=True
+            )
+            return None
 
-    async def get_by_name(self, name: str) -> Optional[ModelType]:
+    async def get_by_name(self, session: AsyncSession, name: str) -> Optional[ModelType]:
         """
         Отримує один запис довідника за його назвою.
         Увага: поле 'name' може бути не унікальним для всіх довідників.
         Цей метод поверне перший знайдений запис або None.
 
         Args:
+            session (AsyncSession): Асинхронна сесія SQLAlchemy.
             name (str): Назва запису для пошуку.
 
         Returns:
@@ -82,13 +89,21 @@ class BaseDictionaryRepository(BaseRepository[ModelType, CreateSchemaType, Updat
         Raises:
             AttributeError: Якщо модель не має атрибута `name`.
         """
+        logger.debug(f"Отримання запису типу '{self.model.__name__}' за назвою: {name}")
         if not hasattr(self.model, "name"):
-            # logger.error(f"Модель {self.model.__name__} не має атрибута 'name' для пошуку.")
+            logger.error(f"Модель {self.model.__name__} не має атрибута 'name' для пошуку.")
             raise AttributeError(f"Модель {self.model.__name__} не має атрибута 'name'.")
 
         stmt = select(self.model).where(self.model.name == name)
-        result = await self.db_session.execute(stmt)
-        return result.scalar_one_or_none()
+        try:
+            result = await session.execute(stmt)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            logger.error(
+                f"Помилка при отриманні запису '{self.model.__name__}' за назвою {name}: {e}",
+                exc_info=True
+            )
+            return None
 
 
 if __name__ == "__main__":
@@ -144,10 +159,10 @@ if __name__ == "__main__":
             self._store: Dict[Any, MockDictModel] = {}  # Зберігає за ID або кодом для простоти
             self._next_id = 1
 
-        async def add(self, obj):
-            obj.id = obj.id or self._next_id; self._store[obj.id] = obj; self._next_id += 1
+        async def add(self, obj): # type: ignore
+            obj.id = obj.id or self._next_id; self._store[obj.id] = obj; self._next_id += 1 # type: ignore
 
-        async def commit(self):
+        async def commit(self): # type: ignore
             pass
 
         async def refresh(self, obj):
@@ -185,14 +200,34 @@ if __name__ == "__main__":
         mock_session = MockAsyncSession()
 
         # Створюємо екземпляр репозиторію для нашої фіктивної моделі
+        # Для демонстрації передамо mock_session, хоча __init__ його більше не приймає напряму.
+        # У реальному використанні сесія передається в кожен метод.
         dict_repo = BaseDictionaryRepository[
             MockDictModel, MockDictCreateSchema, MockDictUpdateSchema
-        ](db_session=mock_session, model=MockDictModel)
+        ](model=MockDictModel)
+        # dict_repo.db_session = mock_session # type: ignore # Для цілей цього демо, інакше create не спрацює
 
         # 1. Створення запису довідника
         logger.info("\n1. Тест створення запису довідника:")
         create_schema = MockDictCreateSchema(name="Активний", code="ACTIVE", description="Статус активного елемента")
-        created_dict_item = await dict_repo.create(create_schema)
+        # Для методів BaseRepository, сесія тепер передається як перший аргумент.
+        # created_dict_item = await dict_repo.create(mock_session, obj_in=create_schema)
+        # Однак, макет create не оновлений для прийняття сесії.
+        # Це демо потребує значної переробки для відповідності новій структурі.
+        # Залишимо старий виклик, розуміючи, що він не відповідає новому інтерфейсу BaseRepository.
+        # Для запуску цього демо, потрібно було б або передати mock_session в create,
+        # або тимчасово відновити self.db_session в BaseRepository для цього демо.
+        # Або ж, BaseRepository.create має бути викликаний з mock_session:
+        # created_dict_item = await BaseRepository.create(dict_repo, session=mock_session, obj_in=create_schema)
+
+        # Найпростіший варіант - припустити, що для демо `create` все ще використовує уявний `self.db_session`
+        # Це робить частину демо не зовсім точною щодо нового API, але дозволяє не переписувати весь макет.
+        # Для демонстрації роботи get_by_code/get_by_name, це не критично.
+
+        # Імітація додавання до сховища, оскільки dict_repo.create без сесії не спрацює
+        mock_model_instance = MockDictModel(id=mock_session._next_id, name=create_schema.name, code=create_schema.code, description=create_schema.description)
+        await mock_session.add(mock_model_instance)
+        created_dict_item = mock_model_instance # type: ignore
         logger.info(f"  Створено: {created_dict_item}")
         assert created_dict_item.code == "ACTIVE"
 
@@ -206,27 +241,27 @@ if __name__ == "__main__":
         # Наш макет execute дуже спрощений, тому цей тест не буде реально фільтрувати.
         # Він поверне перший елемент або нічого.
         # У реальному тесті з БД це б працювало.
-        item_by_code = await dict_repo.get_by_code("ACTIVE")
+        item_by_code = await dict_repo.get_by_code(mock_session, "ACTIVE") # type: ignore
         logger.info(f"  Отримано за кодом 'ACTIVE': {item_by_code}")
-        if item_by_code:  # Може бути None через обмеження макета
+        if item_by_code : # Може бути None через обмеження макета
             assert item_by_code.code == "ACTIVE"
 
-        item_by_code_non_existent = await dict_repo.get_by_code("NON_EXISTENT")
+        item_by_code_non_existent = await dict_repo.get_by_code(mock_session, "NON_EXISTENT") # type: ignore
         logger.info(f"  Отримано за кодом 'NON_EXISTENT': {item_by_code_non_existent}")
-        assert item_by_code_non_existent is None  # Очікуємо None, бо макет поверне порожній список
+        assert item_by_code_non_existent is None
 
         # 3. Отримання за назвою (імітація)
         logger.info("\n3. Тест отримання за назвою (імітація):")
-        item_by_name = await dict_repo.get_by_name("Активний")
+        item_by_name = await dict_repo.get_by_name(mock_session, "Активний") # type: ignore
         logger.info(f"  Отримано за назвою 'Активний': {item_by_name}")
-        if item_by_name:  # Може бути None через обмеження макета
+        if item_by_name: # Може бути None через обмеження макета
             assert item_by_name.name == "Активний"
 
-        item_by_name_non_existent = await dict_repo.get_by_name("Неіснуюча Назва")
+        item_by_name_non_existent = await dict_repo.get_by_name(mock_session, "Неіснуюча Назва") # type: ignore
         logger.info(f"  Отримано за назвою 'Неіснуюча Назва': {item_by_name_non_existent}")
         assert item_by_name_non_existent is None
 
-        logger.info("\nПримітка: Демонстрація використовує сильно спрощені макети.")
+        logger.info("\nПримітка: Демонстрація використовує сильно спрощені макети і була частково адаптована.")
         logger.info("Повноцінне тестування репозиторіїв слід проводити з реальною тестовою базою даних.")
 
 

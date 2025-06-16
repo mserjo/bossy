@@ -6,15 +6,13 @@
 та надає методи для роботи з довідником типів користувачів.
 """
 
-from sqlalchemy.ext.asyncio import AsyncSession
-
 # Абсолютний імпорт базового репозиторію для довідників
 from backend.app.src.repositories.dictionaries.base_dict_repository import BaseDictionaryRepository
 
 # Абсолютний імпорт моделі та схем для Типів Користувачів
 from backend.app.src.models.dictionaries.user_types import UserType
 from backend.app.src.schemas.dictionaries.user_types import UserTypeCreateSchema, UserTypeUpdateSchema
-from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 
@@ -27,16 +25,18 @@ class UserTypeRepository(BaseDictionaryRepository[UserType, UserTypeCreateSchema
     від `BaseDictionaryRepository`.
     """
 
-    def __init__(self, db_session: AsyncSession):
+    def __init__(self):
         """
         Ініціалізує репозиторій для моделі `UserType`.
-
-        Args:
-            db_session (AsyncSession): Асинхронна сесія SQLAlchemy.
         """
-        super().__init__(db_session=db_session, model=UserType)
+        super().__init__(model=UserType)
+        logger.info(f"Репозиторій для моделі '{self.model.__name__}' ініціалізовано.")
 
     # Тут можна додати специфічні методи для UserTypeRepository, якщо вони потрібні.
+    # Наприклад:
+    # async def get_user_type_for_registration(self, session: AsyncSession) -> Optional[UserType]:
+    #     # логіка методу...
+    #     pass
 
 
 if __name__ == "__main__":

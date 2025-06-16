@@ -16,6 +16,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час спроби/подання
 from backend.app.src.core.dicts import TaskStatus  # Для статусу виконання
+from sqlalchemy import Enum as SQLEnum # Імпорт SQLEnum
 from backend.app.src.config.logging import get_logger # Імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
@@ -83,12 +84,9 @@ class TaskCompletion(Base, TimestampedMixin):
     )
 
     # Використовуємо значення з Enum TaskStatus
-    # TODO: Переконатися, що SQLEnum імпортовано та використовується, якщо тип колонки в БД є Enum.
-    #       Або ж зберігати як рядок і валідувати на рівні логіки/схем Pydantic.
-    # status: Mapped[TaskStatus] = mapped_column(SQLEnum(TaskStatus), default=TaskStatus.PENDING_REVIEW, nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(50),
-        default=TaskStatus.PENDING_REVIEW.value,
+    status: Mapped[TaskStatus] = mapped_column(
+        SQLEnum(TaskStatus),
+        default=TaskStatus.PENDING_REVIEW, # Використовуємо Enum напряму
         nullable=False,
         index=True,
         comment="Статус виконання завдання (pending_review, completed, rejected)"
@@ -105,7 +103,9 @@ class TaskCompletion(Base, TimestampedMixin):
                                                       lazy="selectin")  # back_populates="verified_completions" можна додати до User
 
     # Поля для __repr__
-    _repr_fields = ["id", "task_id", "user_id", "status", "completed_at", "verified_at"]
+    # `id` автоматично додається через Base.__repr__
+    # `created_at`, `updated_at` успадковуються з TimestampedMixin._repr_fields
+    _repr_fields = ("task_id", "user_id", "status", "completed_at", "verified_at")
 
 
 if __name__ == "__main__":
@@ -134,7 +134,7 @@ if __name__ == "__main__":
         task_id=1,
         user_id=101,
         completed_at=datetime.now(timezone.utc) - timedelta(hours=1),  # Користувач виконав годину тому
-        status=TaskStatus.PENDING_REVIEW.value  # Очікує на перевірку
+        status=TaskStatus.PENDING_REVIEW  # Очікує на перевірку, використовуємо Enum напряму
     )
     # Імітуємо часові мітки (created_at - час подання)
     example_completion.created_at = datetime.now(timezone.utc)
@@ -142,8 +142,8 @@ if __name__ == "__main__":
 
     logger.info(f"\nПриклад екземпляра TaskCompletion (без сесії):\n  {example_completion}")
     # Очікуваний __repr__ (порядок може відрізнятися):
-    # <TaskCompletion(id=1, task_id=1, user_id=101, status='pending_review', completed_at=..., created_at=...)>
+    # <TaskCompletion(id=1, task_id=1, user_id=101, status=<TaskStatus.PENDING_REVIEW: 'pending_review'>, completed_at=..., created_at=...)>
 
     logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")
     logger.info(
-        f"Використовується TaskStatus Enum для поля 'status', наприклад: TaskStatus.COMPLETED = '{TaskStatus.COMPLETED.value}'")
+        f"Використовується TaskStatus Enum для поля 'status', наприклад: TaskStatus.COMPLETED = {TaskStatus.COMPLETED}")

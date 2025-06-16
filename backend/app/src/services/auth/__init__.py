@@ -1,38 +1,25 @@
 # backend/app/src/services/auth/__init__.py
-import logging
+"""
+Ініціалізаційний файл для модуля сервісів автентифікації.
 
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+Цей модуль реекспортує основні класи сервісів, пов'язаних з автентифікацією
+та управлінням користувачами, токенами, сесіями та паролями.
+"""
 
-logger.info("Authentication services sub-package initialized.")
+from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+logger = get_logger(__name__) # Ініціалізація логера
 
-# Import specific auth service classes
-# These imports assume the service files (user.py, token.py, etc.)
-# will be created in the same directory.
+# Явний імпорт сервісів для кращої читабельності та статичного аналізу
+from backend.app.src.services.auth.user import UserService
+from backend.app.src.services.auth.token import TokenService
+from backend.app.src.services.auth.password import PasswordService
+from backend.app.src.services.auth.session import UserSessionService
 
-SERVICE_FILES = {
-    "UserService": ".user",
-    "TokenService": ".token",
-    "PasswordService": ".password",
-    "UserSessionService": ".session",
-}
+__all__ = [
+    "UserService",
+    "TokenService",
+    "PasswordService",
+    "UserSessionService",
+]
 
-# Dynamically import services and add to __all__
-__all__ = []
-
-for service_name, module_name in SERVICE_FILES.items():
-    try:
-        # The `level=1` in __import__ signifies a relative import from the current package
-        module = __import__(module_name, globals(), locals(), [service_name], 1)
-        service_class = getattr(module, service_name)
-        globals()[service_name] = service_class # Make it available in the package namespace
-        __all__.append(service_name)
-        logger.info(f"Successfully imported {service_name} from {module_name}")
-    except (ImportError, AttributeError) as e:
-        logger.warning(f"{service_name} could not be imported from {module_name}: {e}. It might not be defined yet.")
-        globals()[service_name] = None # Define as None if import fails
-
-# Clean __all__ from None entries if any service failed to import
-__all__ = [name for name in __all__ if globals().get(name) is not None]
-
-logger.info(f"Authentication services sub-package exports: {__all__}")
+logger.info(f"Сервіси автентифікації експортують: {__all__}")

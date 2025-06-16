@@ -15,24 +15,15 @@ logger = get_logger(__name__)
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    BaseDictionarySchema,
+    DictionaryBaseResponseSchema as BaseDictionarySchema, # Аліас для узгодження з поточним використанням
     DictionaryCreateSchema,
     DictionaryUpdateSchema
 )
-
-
-# TODO: Визначити та імпортувати Enum NotificationChannelType з core.dicts
-# from backend.app.src.core.dicts import NotificationChannelType
-
-# Заглушка для NotificationChannelType
-class TempNotificationChannelType:  # TODO: Видалити після імпорту Enum
-    EMAIL = "email"
-    SMS = "sms"
-    IN_APP = "in_app"
+from backend.app.src.core.dicts import NotificationChannelType # Імпортовано Enum
 
 
 TEMPLATE_SUBJECT_MAX_LENGTH = 500
-TEMPLATE_TYPE_MAX_LENGTH = 50
+# TEMPLATE_TYPE_MAX_LENGTH = 50 # Не потрібен для Enum
 
 
 class NotificationTemplateBaseSchema(BaseSchema):  # Не успадковує DictionaryCreateSchema напряму, щоб мати свої поля
@@ -49,11 +40,9 @@ class NotificationTemplateBaseSchema(BaseSchema):  # Не успадковує D
         ...,
         description="Шаблон тіла сповіщення. Може містити плейсхолдери та HTML/Markdown/текст залежно від типу."
     )
-    # TODO: Замінити str на NotificationChannelType та додати валідатор на основі Enum.
-    template_type: str = Field(
+    template_type: NotificationChannelType = Field( # Змінено на NotificationChannelType Enum
         ...,
-        max_length=TEMPLATE_TYPE_MAX_LENGTH,
-        description=f"Тип/канал шаблону (наприклад, '{TempNotificationChannelType.EMAIL}', '{TempNotificationChannelType.SMS}')."
+        description="Тип/канал шаблону."
     )
 
 
@@ -77,7 +66,7 @@ class NotificationTemplateUpdateSchema(DictionaryUpdateSchema, NotificationTempl
     # subject_template, body_template, template_type - робимо опціональними тут
     subject_template: Optional[str] = Field(None, max_length=TEMPLATE_SUBJECT_MAX_LENGTH)
     body_template: Optional[str] = None
-    template_type: Optional[str] = Field(None, max_length=TEMPLATE_TYPE_MAX_LENGTH)
+    template_type: Optional[NotificationChannelType] = Field(None, description="Новий тип/канал шаблону.") # Змінено на Enum
 
 
 class NotificationTemplateSchema(BaseDictionarySchema):
@@ -88,8 +77,7 @@ class NotificationTemplateSchema(BaseDictionarySchema):
     """
     subject_template: str = Field(description="Шаблон теми сповіщення.")
     body_template: str = Field(description="Шаблон тіла сповіщення.")
-    # TODO: Замінити str на NotificationChannelType Enum або схему, що його представляє.
-    template_type: str = Field(description="Тип/канал шаблону.")
+    template_type: NotificationChannelType = Field(description="Тип/канал шаблону.") # Змінено на Enum
 
     # model_config успадковується з BaseDictionarySchema
 
@@ -107,7 +95,7 @@ if __name__ == "__main__":
         "subject_template": "Ласкаво просимо до {project_name}, {{user_name}}!",  # TODO i18n (плейсхолдери окремо)
         "body_template": "<h1>Привіт, {{user_name}}!</h1><p>Дякуємо за реєстрацію.</p>",
         # TODO i18n (плейсхолдери окремо)
-        "template_type": TempNotificationChannelType.EMAIL,  # TODO: замінити на Enum.value
+        "template_type": NotificationChannelType.EMAIL, # Використовуємо Enum
         "state": "active"
     }
     create_template_instance = NotificationTemplateCreateSchema(**create_template_data)
@@ -130,7 +118,7 @@ if __name__ == "__main__":
         "subject_template": "Kudos: Нагадування про завдання",  # SMS не має теми, але поле може бути для уніфікації
         "body_template": "Нагадуємо: термін виконання вашого завдання '{{task_name}}' спливає {{due_date}}.",
         # TODO i18n
-        "template_type": TempNotificationChannelType.SMS,  # TODO: замінити на Enum.value
+        "template_type": NotificationChannelType.SMS, # Використовуємо Enum
         "state": "active",
         "created_at": datetime.now(),
         "updated_at": datetime.now()
@@ -139,4 +127,4 @@ if __name__ == "__main__":
     logger.info(template_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних шаблонів сповіщень.")
-    logger.info("TODO: Інтегрувати Enum 'NotificationChannelType' з core.dicts для поля 'template_type'.")
+    # logger.info("TODO: Інтегрувати Enum 'NotificationChannelType' з core.dicts для поля 'template_type'.") # Завдання виконано

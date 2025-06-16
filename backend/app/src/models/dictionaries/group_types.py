@@ -9,7 +9,7 @@
 """
 
 # Абсолютний імпорт базової моделі для довідників
-from backend.app.src.models.dictionaries.base_dict import BaseDictionaryModel
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 from backend.app.src.config.logging import get_logger # Імпорт логера
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
@@ -19,11 +19,11 @@ logger = get_logger(__name__)
 # from sqlalchemy.orm import Mapped, mapped_column
 # from sqlalchemy import Integer
 
-class GroupType(BaseDictionaryModel):
+class GroupType(BaseDictionary):
     """
     Модель SQLAlchemy для довідника "Типи груп".
 
-    Успадковує всі поля від `BaseDictionaryModel` (включаючи `id`, `name`, `description`, `code`,
+    Успадковує всі поля від `BaseDictionary` (включаючи `id`, `name`, `description`, `code`,
     часові мітки, м'яке видалення, стан, нотатки та опціональний `group_id`).
     `group_id` для системних типів груп, ймовірно, буде NULL.
 
@@ -38,9 +38,9 @@ class GroupType(BaseDictionaryModel):
     # Наприклад:
     # default_max_members: Mapped[Optional[int]] = mapped_column(Integer, nullable=True, comment="Макс. учасників за замовчуванням")
 
-    # _repr_fields успадковуються та збираються автоматично.
-    # Додавання специфічних полів до __repr__:
-    # _repr_fields = ["default_max_members"]
+    # _repr_fields успадковуються та збираються автоматично з BaseDictionary.
+    # Немає додаткових специфічних полів для __repr__ на цьому рівні.
+    _repr_fields: tuple[str, ...] = ()
 
 
 if __name__ == "__main__":

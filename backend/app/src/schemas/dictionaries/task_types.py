@@ -10,24 +10,25 @@
 
 from typing import Optional
 from datetime import datetime, timezone # timezone для прикладу в __main__
-import uuid # Для прикладу в __main__
+# import uuid # Видалено, оскільки id тепер int
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
     DictionaryCreateSchema,
-    DictionaryResponseSchema,
+    DictionaryBaseResponseSchema, # Змінено на фактичну назву базової схеми
     DictionaryUpdateSchema
 )
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # from pydantic import Field # Розкоментувати, якщо будуть специфічні поля з Field атрибутами
 
 
-class TaskTypeResponseSchema(DictionaryResponseSchema):
+class TaskTypeResponseSchema(DictionaryBaseResponseSchema):
     """Pydantic схема для представлення запису довідника "Тип Завдання" у відповідях API.
 
-    Успадковує всі поля від `DictionaryResponseSchema`.
+    Успадковує всі поля від `DictionaryBaseResponseSchema`.
     Якщо для типів завдань потрібні специфічні додаткові поля у відповідях API,
     їх можна визначити тут.
     """
@@ -60,15 +61,15 @@ if __name__ == "__main__":
 
     logger.info("\nTaskTypeResponseSchema (приклад для відповіді API):")
     task_type_data_from_db = {
-        "id": uuid.uuid4(),
+        "id": 1, # ID тепер int
         "name": "Термінове Завдання",  # TODO i18n: "Термінове Завдання"
         "code": "URGENT_TASK",
         "description": "Тип для завдань з високим пріоритетом.",  # TODO i18n
-        "icon": "fas fa-exclamation-triangle",
-        "color": "#FF0000",
+        # "icon": "fas fa-exclamation-triangle", # Видалено
+        # "color": "#FF0000",                   # Видалено
         "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
-        "is_deleted": False
+        "updated_at": datetime.now(timezone.utc)
+        # "is_deleted": False                 # Видалено
     }
 
     task_type_response_instance = TaskTypeResponseSchema(**task_type_data_from_db)

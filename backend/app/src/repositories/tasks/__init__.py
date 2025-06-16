@@ -9,15 +9,16 @@
 інтерфейс для роботи з конкретною моделлю даних.
 """
 
-from .task_repository import TaskRepository
-from .assignment_repository import TaskAssignmentRepository
-from .completion_repository import TaskCompletionRepository
-from .review_repository import TaskReviewRepository
-# EventRepository було видалено, оскільки модель Event об'єднана з Task.
+from backend.app.src.repositories.tasks.task_repository import TaskRepository
+from backend.app.src.repositories.tasks.assignment_repository import TaskAssignmentRepository
+from backend.app.src.repositories.tasks.completion_repository import TaskCompletionRepository
+from backend.app.src.repositories.tasks.review_repository import TaskReviewRepository
+from backend.app.src.repositories.tasks.event_repository import EventRepository # Додано імпорт EventRepository
 
 __all__ = [
     "TaskRepository",
     "TaskAssignmentRepository",
     "TaskCompletionRepository",
     "TaskReviewRepository",
+    "EventRepository", # Додано EventRepository до експорту
 ]

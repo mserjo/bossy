@@ -30,10 +30,9 @@ class AccountTransactionBaseSchema(BaseSchema):
     """
     Базова схема для полів транзакції по рахунку.
     """
-    account_id: int = Field(description="Ідентифікатор рахунку користувача, до якого відноситься транзакція.")
-    # TODO: Додати валідатор для transaction_type на основі Enum TransactionType
-    transaction_type: str = Field(
-        description=f"Тип транзакції. Допустимі значення: {', '.join([tt.value for tt in TransactionType])}."
+    account_id: Optional[int] = Field(None, description="Ідентифікатор рахунку користувача. Якщо None, буде визначений через user_id_for_account_lookup.")
+    transaction_type: TransactionType = Field( # Змінено на Enum TransactionType
+        description="Тип транзакції."
     )
     amount: Decimal = Field(
         description="Сума транзакції. Для списань може бути від'ємною, або завжди позитивною, а напрямок визначається типом.")
@@ -50,15 +49,7 @@ class AccountTransactionBaseSchema(BaseSchema):
 
     # model_config успадковується з BaseSchema (from_attributes=True)
 
-    @field_validator('transaction_type')
-    @classmethod
-    def validate_transaction_type(cls, value: str) -> str:
-        """Перевіряє, чи надане значення типу транзакції є допустимим членом Enum TransactionType."""
-        allowed_types = {t.value for t in TransactionType}
-        if value not in allowed_types:
-            # TODO i18n: Translatable error message
-            raise ValueError(f"Недопустимий тип транзакції '{value}'. Дозволені типи: {', '.join(allowed_types)}")
-        return value
+    # Валідатор validate_transaction_type більше не потрібен, Pydantic v2 обробляє Enum автоматично
 
 
 class AccountTransactionCreateSchema(AccountTransactionBaseSchema):
@@ -73,13 +64,14 @@ class AccountTransactionCreateSchema(AccountTransactionBaseSchema):
                                               description="ID користувача (адміністратора), який ініціював ручну транзакцію (необов'язково).")
 
 
-class AccountTransactionSchema(AccountTransactionBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+class AccountTransactionResponseSchema(AccountTransactionBaseSchema, IDSchemaMixin, TimestampedSchemaMixin): # Renamed
     """
     Схема для представлення даних про транзакцію у відповідях API.
     `created_at` з TimestampedSchemaMixin позначає час проведення транзакції.
     """
     # id, created_at, updated_at успадковані.
-    # account_id, transaction_type, amount, description, related_task_completion_id, related_reward_id успадковані.
+    # transaction_type, amount, description, related_task_completion_id, related_reward_id успадковані.
+    account_id: int = Field(description="Ідентифікатор рахунку користувача.") # Перевизначено як non-optional
 
     created_by_user_id: Optional[int] = Field(None, description="ID користувача, який створив транзакцію (якщо є).")
     # TODO: Замінити Any на UserPublicProfileSchema.
@@ -132,7 +124,7 @@ if __name__ == "__main__":
         "created_by_user_id": None,  # Системна транзакція
         # "created_by": None # Приклад UserPublicProfileSchema
     }
-    tx_response_instance = AccountTransactionSchema(**tx_response_data)
+    tx_response_instance = AccountTransactionResponseSchema(**tx_response_data) # Renamed
     logger.info(tx_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних транзакцій.")

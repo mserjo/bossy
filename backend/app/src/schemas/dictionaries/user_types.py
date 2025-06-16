@@ -11,24 +11,25 @@
 
 from typing import Optional
 from datetime import datetime, timezone # timezone для прикладу в __main__
-import uuid # Для прикладу в __main__
+# import uuid # Видалено, оскільки id тепер int
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
     DictionaryCreateSchema,
-    DictionaryResponseSchema,
+    DictionaryBaseResponseSchema, # Змінено на фактичну назву базової схеми
     DictionaryUpdateSchema
 )
 # Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # from pydantic import Field # Розкоментувати, якщо будуть специфічні поля з Field атрибутами
 
 
-class UserTypeResponseSchema(DictionaryResponseSchema):
+class UserTypeResponseSchema(DictionaryBaseResponseSchema):
     """Pydantic схема для представлення запису довідника "Тип Користувача" у відповідях API.
 
-    Успадковує всі поля від `DictionaryResponseSchema`.
+    Успадковує всі поля від `DictionaryBaseResponseSchema`.
     Якщо для типів користувачів потрібні специфічні додаткові поля у відповідях API,
     їх можна визначити тут.
     """
@@ -62,15 +63,15 @@ if __name__ == "__main__":
 
     logger.info("\nUserTypeResponseSchema (приклад для відповіді API):")
     user_type_data_from_db = {
-        "id": uuid.uuid4(),
+        "id": 1, # ID тепер int
         "name": "Зареєстрований Користувач",  # TODO i18n: "Зареєстрований Користувач"
         "code": "REGULAR_USER",
         "description": "Стандартний тип для користувачів, що пройшли реєстрацію.",  # TODO i18n
-        "icon": "fas fa-user",
-        "color": "#3498db",
+        # "icon": "fas fa-user", # Видалено
+        # "color": "#3498db",   # Видалено
         "created_at": datetime.now(timezone.utc),
-        "updated_at": datetime.now(timezone.utc),
-        "is_deleted": False
+        "updated_at": datetime.now(timezone.utc)
+        # "is_deleted": False # Видалено
     }
 
     user_type_response_instance = UserTypeResponseSchema(**user_type_data_from_db)

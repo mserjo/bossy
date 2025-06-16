@@ -342,55 +342,55 @@ class SyncCalendarTask(BaseTask):
             "events_skipped_duplicates": processing_results.get('skipped_duplicates', 0)
         }
 
-# Приклад використання (можна видалити або закоментувати):
-# async def main():
-#     logging.basicConfig(
-#         level=logging.INFO,
-#         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-#     )
-#     calendar_sync_task = SyncCalendarTask()
-#
-#     # УВАГА: Для реального тестування цього завдання потрібно:
-#     # 1. Налаштувати OAuth2 клієнти для Google та/або Outlook в Google Cloud Console / Azure Portal.
-#     # 2. Замінити *_CLIENT_ID плейсхолдери реальними значеннями.
-#     # 3. Реалізувати механізм отримання та зберігання OAuth2 токенів для користувачів.
-#     #    Метод _get_user_oauth_token має повертати дійсні токени.
-#     # 4. Встановити необхідні бібліотеки: google-api-python-client, google-auth-oauthlib, msal, httpx.
-#     # 5. Розкоментувати відповідні блоки коду в методах _fetch_...
-#
-#     logger.info("Тестування синхронізації з Google Calendar (заглушка)...")
-#     # Припустимо, що GOOGLE_CALENDAR_CLIENT_ID змінено з плейсхолдера для отримання "симульованого" токена
-#     # global GOOGLE_CALENDAR_CLIENT_ID
-#     # GOOGLE_CALENDAR_CLIENT_ID = "test_google_client_id" # Для прикладу
-#     result_google = await calendar_sync_task.execute(
-#         user_id="user_g123",
-#         calendar_provider="google",
-#         max_results=5 # Приклад передачі kwargs
-#     )
-#     logger.info(f"Результат Google Calendar Sync: {result_google}")
-#
-#     logger.info("\nТестування синхронізації з Outlook Calendar (заглушка)...")
-#     # global OUTLOOK_CALENDAR_CLIENT_ID
-#     # OUTLOOK_CALENDAR_CLIENT_ID = "test_outlook_client_id" # Для прикладу
-#     result_outlook = await calendar_sync_task.execute(
-#         user_id="user_o456",
-#         calendar_provider="Outlook" # Перевірка нечутливості до регістру
-#     )
-#     logger.info(f"Результат Outlook Calendar Sync: {result_outlook}")
-#
-#     logger.info("\nТестування непідтримуваного провайдера...")
-#     result_unknown = await calendar_sync_task.execute(user_id="user_789", calendar_provider="YahooCalendar")
-#     logger.info(f"Результат Unknown Provider Sync: {result_unknown}")
-#
-#     logger.info("\nТестування без токена (якщо _get_user_oauth_token поверне None)...")
-#     # Щоб це спрацювало, треба змінити логіку _get_user_oauth_token, щоб вона повертала None
-#     # для певного user_id або провайдера, наприклад, якщо CLIENT_ID не змінено.
-#     # global GOOGLE_CALENDAR_CLIENT_ID
-#     # GOOGLE_CALENDAR_CLIENT_ID = "your_google_client_id.apps.googleusercontent.com_placeholder" # Скидання до плейсхолдера
-#     # result_no_token = await calendar_sync_task.execute(user_id="user_no_token", calendar_provider="google")
-#     # logger.info(f"Результат Sync без токена: {result_no_token}")
-
-
-# if __name__ == "__main__":
-#     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-#     asyncio.run(main())
+# # Приклад використання (можна видалити або закоментувати):
+# # async def main():
+# #     logging.basicConfig(
+# #         level=logging.INFO,
+# #         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# #     )
+# #     calendar_sync_task = SyncCalendarTask()
+# #
+# #     # УВАГА: Для реального тестування цього завдання потрібно:
+# #     # 1. Налаштувати OAuth2 клієнти для Google та/або Outlook в Google Cloud Console / Azure Portal.
+# #     # 2. Замінити *_CLIENT_ID плейсхолдери реальними значеннями.
+# #     # 3. Реалізувати механізм отримання та зберігання OAuth2 токенів для користувачів.
+# #     #    Метод _get_user_oauth_token має повертати дійсні токени.
+# #     # 4. Встановити необхідні бібліотеки: google-api-python-client, google-auth-oauthlib, msal, httpx.
+# #     # 5. Розкоментувати відповідні блоки коду в методах _fetch_...
+# #
+# #     logger.info("Тестування синхронізації з Google Calendar (заглушка)...")
+# #     # Припустимо, що GOOGLE_CALENDAR_CLIENT_ID змінено з плейсхолдера для отримання "симульованого" токена
+# #     # global GOOGLE_CALENDAR_CLIENT_ID
+# #     # GOOGLE_CALENDAR_CLIENT_ID = "test_google_client_id" # Для прикладу
+# #     result_google = await calendar_sync_task.execute(
+# #         user_id="user_g123",
+# #         calendar_provider="google",
+# #         max_results=5 # Приклад передачі kwargs
+# #     )
+# #     logger.info(f"Результат Google Calendar Sync: {result_google}")
+# #
+# #     logger.info("\nТестування синхронізації з Outlook Calendar (заглушка)...")
+# #     # global OUTLOOK_CALENDAR_CLIENT_ID
+# #     # OUTLOOK_CALENDAR_CLIENT_ID = "test_outlook_client_id" # Для прикладу
+# #     result_outlook = await calendar_sync_task.execute(
+# #         user_id="user_o456",
+# #         calendar_provider="Outlook" # Перевірка нечутливості до регістру
+# #     )
+# #     logger.info(f"Результат Outlook Calendar Sync: {result_outlook}")
+# #
+# #     logger.info("\nТестування непідтримуваного провайдера...")
+# #     result_unknown = await calendar_sync_task.execute(user_id="user_789", calendar_provider="YahooCalendar")
+# #     logger.info(f"Результат Unknown Provider Sync: {result_unknown}")
+# #
+# #     logger.info("\nТестування без токена (якщо _get_user_oauth_token поверне None)...")
+# #     # Щоб це спрацювало, треба змінити логіку _get_user_oauth_token, щоб вона повертала None
+# #     # для певного user_id або провайдера, наприклад, якщо CLIENT_ID не змінено.
+# #     # global GOOGLE_CALENDAR_CLIENT_ID
+# #     # GOOGLE_CALENDAR_CLIENT_ID = "your_google_client_id.apps.googleusercontent.com_placeholder" # Скидання до плейсхолдера
+# #     # result_no_token = await calendar_sync_task.execute(user_id="user_no_token", calendar_provider="google")
+# #     # logger.info(f"Результат Sync без токена: {result_no_token}")
+# #
+# #
+# # if __name__ == "__main__":
+# #     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# #     asyncio.run(main())

@@ -247,31 +247,31 @@ class RecalculateUserLevelsTask(BaseTask):
             "details_sample": results_summary[:5] # Приклад повернення лише частини деталей
         }
 
-# Приклад використання (можна видалити або закоментувати):
-# async def main():
-#     logging.basicConfig(
-#         level=logging.DEBUG, # DEBUG, щоб бачити логування з _calculate_and_update_level
-#         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-#     )
-#     level_task = RecalculateUserLevelsTask()
-#
-#     logger.info("--- Перерахунок для всіх користувачів (заглушка) ---")
-#     result_all = await level_task.execute()
-#     logger.info(f"Результат (всі): {result_all['summary']}. Перші 5 деталей: {result_all['details_sample']}")
-#
-#     logger.info("\n--- Перерахунок для конкретного користувача (user_3_leveled_up) ---")
-#     result_specific_level_up = await level_task.execute(user_id="user_3_leveled_up")
-#     logger.info(f"Результат (user_3_leveled_up): {result_specific_level_up}")
-#
-#     logger.info("\n--- Перерахунок для іншого конкретного користувача (user_1_newbie) ---")
-#     result_user1 = await level_task.execute(user_id="user_1_newbie")
-#     logger.info(f"Результат (user_1_newbie): {result_user1}")
-#
-#     logger.info("\n--- Перерахунок для неіснуючого користувача (заглушка) ---")
-#     result_non_existent = await level_task.execute(user_id="non_existent_user_id")
-#     logger.info(f"Результат (неіснуючий): {result_non_existent}")
-
-
-# if __name__ == "__main__":
-#     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-#     asyncio.run(main())
+# # Приклад використання (можна видалити або закоментувати):
+# # async def main():
+# #     logging.basicConfig(
+# #         level=logging.DEBUG, # DEBUG, щоб бачити логування з _calculate_and_update_level
+# #         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# #     )
+# #     level_task = RecalculateUserLevelsTask()
+# #
+# #     logger.info("--- Перерахунок для всіх користувачів (заглушка) ---")
+# #     result_all = await level_task.execute()
+# #     logger.info(f"Результат (всі): {result_all['summary']}. Перші 5 деталей: {result_all['details_sample']}")
+# #
+# #     logger.info("\n--- Перерахунок для конкретного користувача (user_3_leveled_up) ---")
+# #     result_specific_level_up = await level_task.execute(user_id="user_3_leveled_up")
+# #     logger.info(f"Результат (user_3_leveled_up): {result_specific_level_up}")
+# #
+# #     logger.info("\n--- Перерахунок для іншого конкретного користувача (user_1_newbie) ---")
+# #     result_user1 = await level_task.execute(user_id="user_1_newbie")
+# #     logger.info(f"Результат (user_1_newbie): {result_user1}")
+# #
+# #     logger.info("\n--- Перерахунок для неіснуючого користувача (заглушка) ---")
+# #     result_non_existent = await level_task.execute(user_id="non_existent_user_id")
+# #     logger.info(f"Результат (неіснуючий): {result_non_existent}")
+# #
+# #
+# # if __name__ == "__main__":
+# #     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# #     asyncio.run(main())

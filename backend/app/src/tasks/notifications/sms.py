@@ -168,38 +168,38 @@ class SendSmsTask(BaseTask):
 
         return result
 
-# Приклад використання (можна видалити або закоментувати):
-# class SmsSendingFailedError(Exception): pass
-
-# async def main():
-#     logging.basicConfig(
-#         level=logging.INFO,
-#         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-#     )
-#     sms_task = SendSmsTask()
-#
-#     logger.info("Тест 1: Відправка тестового SMS (буде використана заглушка)")
-#     result_test_1 = await sms_task.execute(
-#         phone_number="+380501234567", # Або інший формат, який очікує ваш шлюз
-#         message="Це тестове SMS повідомлення від Kudos System (SendSmsTask)."
-#     )
-#     logger.info(f"Результат тесту 1: {result_test_1}")
-#
-#     logger.info("\nТест 2: Відправка SMS з порожнім повідомленням")
-#     result_test_2 = await sms_task.execute(
-#         phone_number="+380507654321",
-#         message=""
-#     )
-#     logger.info(f"Результат тесту 2: {result_test_2}")
-
-#     # Приклад імітації помилки (якщо реалізовано в заглушці _send_sms_via_gateway)
-#     # logger.info("\nТест 3: Імітація помилки відправки SMS")
-#     # result_error = await sms_task.execute(
-#     #     phone_number="+380500000000", # Наприклад, номер, що викликає помилку в заглушці
-#     #     message="Test SMS that should trigger an error in stub."
-#     # )
-#     # logger.info(f"Результат тесту 3: {result_error}")
-
-# if __name__ == "__main__":
-#     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-#     asyncio.run(main())
+# # Приклад використання (можна видалити або закоментувати):
+# # class SmsSendingFailedError(Exception): pass
+# #
+# # async def main():
+# #     logging.basicConfig(
+# #         level=logging.INFO,
+# #         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# #     )
+# #     sms_task = SendSmsTask()
+# #
+# #     logger.info("Тест 1: Відправка тестового SMS (буде використана заглушка)")
+# #     result_test_1 = await sms_task.execute(
+# #         phone_number="+380501234567", # Або інший формат, який очікує ваш шлюз
+# #         message="Це тестове SMS повідомлення від Kudos System (SendSmsTask)."
+# #     )
+# #     logger.info(f"Результат тесту 1: {result_test_1}")
+# #
+# #     logger.info("\nТест 2: Відправка SMS з порожнім повідомленням")
+# #     result_test_2 = await sms_task.execute(
+# #         phone_number="+380507654321",
+# #         message=""
+# #     )
+# #     logger.info(f"Результат тесту 2: {result_test_2}")
+# #
+# #     # Приклад імітації помилки (якщо реалізовано в заглушці _send_sms_via_gateway)
+# #     # logger.info("\nТест 3: Імітація помилки відправки SMS")
+# #     # result_error = await sms_task.execute(
+# #     #     phone_number="+380500000000", # Наприклад, номер, що викликає помилку в заглушці
+# #     #     message="Test SMS that should trigger an error in stub."
+# #     # )
+# #     # logger.info(f"Результат тесту 3: {result_error}")
+# #
+# # if __name__ == "__main__":
+# #     # Для Windows може знадобитися: asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# #     asyncio.run(main())

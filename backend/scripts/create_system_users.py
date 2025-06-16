@@ -5,7 +5,6 @@ import sys
 import logging
 import uuid  # Для генерації випадкових паролів, якщо потрібно
 
-# backend/scripts/create_system_users.py
 # -*- coding: utf-8 -*-
 """
 Скрипт для створення або оновлення визначених системних користувачів.
@@ -287,9 +286,6 @@ if __name__ == "__main__":
     # 4. Змінні середовища для паролів (ODIN_USER_PASSWORD, SHADOW_USER_PASSWORD, ROOT_USER_PASSWORD)
     #    можуть бути встановлені для використання визначених паролів. Якщо ні - будуть згенеровані випадкові.
     main()
-    else:
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(main_async())
 
 if __name__ == "__main__":
     # Для запуску: python backend/scripts/create_system_users.py

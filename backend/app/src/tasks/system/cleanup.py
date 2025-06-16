@@ -201,20 +201,20 @@ class CleanupTask(BaseTask):
 
         return results
 
-# Приклад використання (можна видалити або закоментувати):
-# async def main():
-#     logging.basicConfig(
-#         level=logging.INFO,
-#         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-#     )
-#     # Перед запуском завдання, переконайтеся, що директорії існують
-#     # os.makedirs(TEMP_FILES_DIR, exist_ok=True)
-#     # os.makedirs(OLD_LOGS_DIR, exist_ok=True)
-#     cleanup_task = CleanupTask()
-#     await cleanup_task.execute()
-
-# if __name__ == "__main__":
-#     # Потрібно налаштувати event loop для Windows, якщо запускається напряму
-#     # if os.name == 'nt':
-#     # asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
-#     asyncio.run(main())
+# # Приклад використання (можна видалити або закоментувати):
+# # async def main():
+# #     logging.basicConfig(
+# #         level=logging.INFO,
+# #         format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# #     )
+# #     # Перед запуском завдання, переконайтеся, що директорії існують
+# #     # os.makedirs(TEMP_FILES_DIR, exist_ok=True)
+# #     # os.makedirs(OLD_LOGS_DIR, exist_ok=True)
+# #     cleanup_task = CleanupTask()
+# #     await cleanup_task.execute()
+# #
+# # if __name__ == "__main__":
+# #     # Потрібно налаштувати event loop для Windows, якщо запускається напряму
+# #     # if os.name == 'nt':
+# #     # asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+# #     asyncio.run(main())

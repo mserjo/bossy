@@ -8,9 +8,11 @@
 та ініціалізація даних.
 
 `system_router` потім підключається до `v1_router` в `app.src.api.v1.router`.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
-import logging
+# import logging # Видалено, оскільки використовується централізований логер
 from fastapi import APIRouter, Depends
 
 # Імпорт роутерів з окремих файлів ендпоінтів
@@ -94,5 +96,5 @@ logger.info("Системний роутер API v1 (`system_router`) налаш
 
 # Експорт system_router для використання в app.src.api.v1.system.__init__.py
 # (і далі для підключення до v1_router)
-# __all__ = ["system_router"] # Не є строго обов'язковим для прямого імпорту, але може бути корисним.
+# __all__ = ["system_router"] # Видалено
 # Ми будемо імпортувати як `from .router import system_router` в __init__.py цього ж пакету.

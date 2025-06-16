@@ -6,6 +6,8 @@ API ендпоінти для управління загальними нала
 Надає CRUD-операції для перегляду та модифікації
 глобальних параметрів системи. Читання доступне автентифікованим користувачам
 (з фільтрацією публічних налаштувань), запис - тільки суперкористувачам.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
 from typing import List, Any, Optional
@@ -37,6 +39,9 @@ router = APIRouter()
 
 # --- Ендпоінти ---
 
+# ПРИМІТКА: Фільтрація публічних налаштувань для звичайних користувачів
+# та надання повного доступу для суперкористувачів реалізується
+# в методах `SystemSettingService`.
 @router.get(
     "/",
     response_model=List[SystemSettingResponseSchema],
@@ -102,6 +107,10 @@ async def get_system_setting(
                 "Ключ налаштування має бути унікальним.",  # i18n
     dependencies=[Depends(get_current_active_superuser)]
 )
+# ПРИМІТКА: Валідація типів значень для налаштувань, а також визначення
+# налаштувань "тільки для читання" (якщо такі є серед створюваних/оновлюваних
+# через API) має бути реалізовано в `SystemSettingService`,
+# як зазначено в TODO на початку файлу.
 async def create_system_setting(
         setting_data: SystemSettingCreateSchema,
         service: SystemSettingService = Depends(),
@@ -139,6 +148,10 @@ async def create_system_setting(
     description="Дозволяє суперкористувачам оновлювати значення існуючих системних налаштувань.",  # i18n
     dependencies=[Depends(get_current_active_superuser)]
 )
+# ПРИМІТКА: Валідація типів значень для налаштувань, а також визначення
+# налаштувань "тільки для читання" (якщо такі є серед створюваних/оновлюваних
+# через API) має бути реалізовано в `SystemSettingService`,
+# як зазначено в TODO на початку файлу.
 async def update_system_setting(
         setting_key: str,
         setting_update_data: SystemSettingUpdateSchema = Body(...),

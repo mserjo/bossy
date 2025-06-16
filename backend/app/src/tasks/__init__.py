@@ -9,18 +9,21 @@
 Модулі:
     base.py: Визначає базові класи та абстракції для фонових завдань.
     scheduler.py: Відповідає за конфігурацію та запуск планувальника завдань.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
-import logging
+# import logging # Видалено для використання централізованого логера
+from backend.app.src.config import logger # Централізований логер
 
 # Імпорт основних компонентів з модулів пакету.
-from .base import BaseTask
-from .scheduler import scheduler
+from backend.app.src.tasks.base import BaseTask
+from backend.app.src.tasks.scheduler import scheduler
 
 __all__ = [
     'BaseTask',
     'scheduler',
 ]
 
-logger = logging.getLogger(__name__)
-logger.info("Пакет 'tasks' ініціалізовано.")
+# logger = logging.getLogger(__name__) # Видалено
+logger.info("Пакет 'tasks' ініціалізовано та експортує 'BaseTask', 'scheduler'.")

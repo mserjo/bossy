@@ -2,6 +2,8 @@
 # -*- coding: utf-8 -*-
 """
 Ендпоінти для CRUD операцій над сутністю "Завдання".
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, Optional
 from uuid import UUID  # ID тепер UUID
@@ -11,7 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Повні шляхи імпорту
 from backend.app.src.api.dependencies import (
     get_api_db_session, get_current_active_user,
-    get_current_active_superuser, paginator
+    get_current_active_superuser, paginator, get_group_membership_service # Додано get_group_membership_service
 )
 # TODO: Створити та використовувати залежності для перевірки прав доступу до завдань/груп:
 #  - `require_group_member_or_superuser(group_id: UUID = Path(...))`
@@ -28,6 +30,7 @@ from backend.app.src.schemas.tasks.task import (
 from backend.app.src.core.pagination import PagedResponse, PageParams
 from backend.app.src.services.tasks.task import TaskService
 from backend.app.src.services.groups.membership import GroupMembershipService  # Для перевірки членства в групі
+from backend.app.src.core.constants import ADMIN_ROLE_CODE # Для перевірки ролі адміна
 from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
 
@@ -41,16 +44,19 @@ async def get_task_service(session: AsyncSession = Depends(get_api_db_session)) 
 
 
 # Залежність для GroupMembershipService (для перевірки прав)
-async def get_membership_service_dep(session: AsyncSession = Depends(get_api_db_session)) -> GroupMembershipService:
-    return GroupMembershipService(db_session=session)
+# async def get_membership_service_dep(session: AsyncSession = Depends(get_api_db_session)) -> GroupMembershipService:
+#     return GroupMembershipService(db_session=session)
+# Використовуємо get_group_membership_service з dependencies
 
 
+# ПРИМІТКА: Ця залежність перевіряє права на редагування завдання.
+# Важливою є логіка перевірки адміністратора групи (`ADMIN_ROLE_CODE`) або суперюзера.
 # Допоміжна функція-залежність для перевірки прав редагування завдання
 async def task_edit_permission_dependency(
         task_id: UUID = Path(..., description="ID Завдання"),  # i18n
         current_user: UserModel = Depends(get_current_active_user),
         task_service: TaskService = Depends(get_task_service),
-        membership_service: GroupMembershipService = Depends(get_membership_service_dep)
+        membership_service: GroupMembershipService = Depends(get_group_membership_service) # Оновлено залежність
 ) -> UserModel:
     task_orm = await task_service.get_task_orm_by_id(task_id)  # Потрібен метод, що повертає ORM модель
     if not task_orm:
@@ -59,19 +65,21 @@ async def task_edit_permission_dependency(
         return current_user
 
     membership = await membership_service.get_membership_details(group_id=task_orm.group_id, user_id=current_user.id)
-    if not membership or not membership.is_active or membership.role.code != "ADMIN":  # ADMIN_ROLE_CODE
+    if not membership or not membership.is_active or membership.role.code != ADMIN_ROLE_CODE: # Використання ADMIN_ROLE_CODE
         # i18n
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
                             detail="Недостатньо прав для редагування цього завдання.")
     return current_user
 
 
+# ПРИМІТКА: Ця залежність перевіряє права на перегляд завдання, гарантуючи,
+# що користувач є членом групи завдання або суперюзером.
 # Допоміжна функція-залежність для перевірки прав перегляду завдання
 async def task_view_permission_dependency(
         task_id: UUID = Path(..., description="ID Завдання"),  # i18n
         current_user: UserModel = Depends(get_current_active_user),
         task_service: TaskService = Depends(get_task_service),
-        membership_service: GroupMembershipService = Depends(get_membership_service_dep)
+        membership_service: GroupMembershipService = Depends(get_group_membership_service) # Оновлено залежність
 ) -> UserModel:
     task_orm = await task_service.get_task_orm_by_id(task_id)
     if not task_orm:
@@ -93,6 +101,9 @@ async def task_view_permission_dependency(
     summary="Створення нового завдання",  # i18n
     description="Дозволяє адміністратору групи або суперюзеру створити нове завдання в межах групи."  # i18n
 )
+# ПРИМІТКА: Перевірка прав на створення завдання (адміністратор групи або суперюзер)
+# наразі реалізована всередині ендпоінта. В майбутньому її варто винести
+# в окрему, більш гранульовану залежність, як зазначено в TODO.
 async def create_task(
         task_in: TaskCreate,  # group_id має бути в TaskCreate
         # Використовуємо залежність `check_group_edit_permission` з groups.py, передаючи group_id з тіла запиту.
@@ -102,7 +113,7 @@ async def create_task(
         # TODO: Реалізувати залежність, що перевіряє права адміна на `task_in.group_id`.
         current_user: UserModel = Depends(get_current_active_user),  # Тимчасово, потрібна перевірка адміна групи
         task_service: TaskService = Depends(get_task_service),
-        membership_service: GroupMembershipService = Depends(get_membership_service_dep)  # Для перевірки прав
+        membership_service: GroupMembershipService = Depends(get_group_membership_service)  # Оновлено залежність
 ):
     """
     Створює нове завдання.
@@ -114,7 +125,7 @@ async def create_task(
     # Перевірка прав доступу до групи
     if not current_user.is_superuser:
         membership = await membership_service.get_membership_details(group_id=task_in.group_id, user_id=current_user.id)
-        if not membership or not membership.is_active or membership.role.code != "ADMIN":  # ADMIN_ROLE_CODE
+        if not membership or not membership.is_active or membership.role.code != ADMIN_ROLE_CODE: # Використання ADMIN_ROLE_CODE
             # i18n
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ви не є адміністратором вказаної групи.")
 
@@ -145,6 +156,9 @@ async def create_task(
     Якщо `group_id` не надано, суперюзер бачить усі завдання, звичайний користувач - завдання з усіх своїх груп."""
     # i18n
 )
+# ПРИМІТКА: Фільтрація завдань за групою та правами доступу, а також пагінація,
+# залежать від коректної реалізації методу `list_tasks_paginated` в `TaskService`.
+# TODO щодо розширених фільтрів також важливий.
 async def read_tasks(
         group_id: Optional[UUID] = Query(None, description="ID групи для фільтрації завдань"),  # i18n
         page_params: PageParams = Depends(paginator),

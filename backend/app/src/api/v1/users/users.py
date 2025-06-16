@@ -5,10 +5,12 @@
 
 Надає CRUD-операції для системних адміністраторів (суперкористувачів)
 для управління всіма обліковими записами користувачів.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import List, TypeVar  # Optional, Any, Dict не використовуються, TypeVar для PagedResponse
 from uuid import UUID  # user_id тепер UUID
-from fastapi import APIRouter, Depends, HTTPException, status  # Query не використовується прямо тут
+from fastapi import APIRouter, Depends, HTTPException, status # Query видалено
 from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо, якщо сесія інкапсульована
 
 # Повні шляхи імпорту
@@ -37,6 +39,9 @@ router = APIRouter(
     summary="Створення нового користувача (Суперюзер)",  # i18n
     description="Дозволяє суперюзеру створити нового користувача в системі з розширеними налаштуваннями."  # i18n
 )
+# ПРИМІТКА: Успішне створення користувача залежить від реалізації методу
+# `create_user_admin` в `UserService`, який має обробляти всі необхідні
+# перевірки та призначення атрибутів згідно схеми `UserCreateSuperuser`.
 async def create_user_by_superuser(
         user_in: UserCreateSuperuser,  # Схема, що дозволяє встановлювати ролі, тип, is_active, is_superuser
         current_superuser: UserModel = Depends(get_current_active_superuser),  # Для аудиту та перевірок
@@ -81,6 +86,9 @@ async def create_user_by_superuser(
     summary="Отримання списку користувачів (Суперюзер)",  # i18n
     description="Повертає список всіх користувачів системи з пагінацією. Доступно тільки суперюзерам."  # i18n
 )
+# ПРИМІТКА: Повноцінна реалізація цього ендпоінта вимагає додавання
+# можливостей фільтрації та сортування в метод `list_users_paginated`
+# сервісу `UserService`, як зазначено в TODO.
 async def read_users_by_superuser(  # Перейменовано для уникнення конфлікту
         page_params: PageParams = Depends(paginator),  # Залежність для пагінації
         # TODO: Додати фільтри (наприклад, за роллю, типом, статусом активності) як Query параметри

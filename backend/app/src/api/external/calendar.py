@@ -6,6 +6,8 @@
 Ці ендпоінти приймають асинхронні сповіщення від зовнішніх календарних платформ
 (наприклад, Google Calendar, Outlook Calendar) про зміни в календарях користувачів,
 які надали доступ до своїх даних.
+
+Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, Request, Header, HTTPException, status, Response as FastAPIResponse
@@ -26,6 +28,8 @@ router = APIRouter()
 #  та клієнтських станів (clientState для Outlook) для валідації вебхуків.
 #  Це може зберігатися в моделі UserIntegration або окремій моделі підписок на вебхуки.
 
+# ПРИМІТКА: Наступні TODO та закоментовані секції вказують на необхідність
+# реалізації основної логіки валідації та обробки вебхуків Google Calendar.
 @router.post(
     "/google",
     summary="Вебхук для Google Calendar API Push Notifications",  # i18n
@@ -85,7 +89,8 @@ async def google_calendar_webhook(
     # i18n
     return {"status": "google_event_webhook_received", "message": "Вебхук Google Calendar оброблено (заглушка)."}
 
-
+# ПРИМІТКА: Наступні TODO та закоментовані секції вказують на необхідність
+# реалізації основної логіки валідації та обробки вебхуків Outlook Calendar.
 @router.post(
     "/outlook",
     summary="Вебхук для Outlook Calendar API (Microsoft Graph)",  # i18n

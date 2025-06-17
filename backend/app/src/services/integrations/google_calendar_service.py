@@ -14,6 +14,7 @@ from backend.app.src.services.integrations.calendar_base import (
 from backend.app.src.models.integrations.user_integration import UserIntegration  # Припустима модель для зберігання токенів
 from backend.app.src.config.settings import settings  # Для ключів API Google, OAuth client ID/secret
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # TODO: Додати залежності для Google API: pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
@@ -214,13 +215,11 @@ class GoogleCalendarService(BaseCalendarIntegrationService):
 
         if stored:
             logger.info(f"[ЗАГЛУШКА] Google Calendar підключено для користувача {user_id}.")
-            # i18n
-            return {"status": "success", "message": "Google Calendar успішно підключено (симуляція).",
+            return {"status": "success", "message": _("integrations.google_calendar.connect.success_simulation"),
                     "account_identifier": account_id_sim}
         else:
             logger.error(f"[ЗАГЛУШКА] Не вдалося зберегти токени Google для користувача {user_id}.")
-            # i18n
-            return {"status": "error", "message": "Не вдалося зберегти токени (симуляція)."}
+            return {"status": "error", "message": _("integrations.google_calendar.connect.error_save_tokens_simulation")}
 
     async def disconnect_account(self, user_id: int) -> bool: # Змінено UUID на int
         """[ЗАГЛУШКА/TODO] Відключає обліковий запис Google Calendar."""

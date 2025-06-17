@@ -75,16 +75,16 @@ class UserAvatarService(BaseService): # type: ignore видалено
 
         user = await self.db_session.get(User, user_id) # Перевірка залишається в сервісі
         if not user:
-            raise ValueError(f"Користувача з ID '{user_id}' не знайдено.")
+            raise ValueError(_("user.errors.not_found_by_id", id=user_id))
 
         file_record = await self.db_session.get(FileRecord, file_id) # Перевірка залишається в сервісі
         if not file_record:
-            raise ValueError(f"Запис файлу з ID '{file_id}' не знайдено.")
+            raise ValueError(_("file_record.errors.not_found_by_id", file_id=file_id))
 
         if not file_record.mime_type or not file_record.mime_type.startswith("image/"):
             logger.warning(
                 f"Файл ID '{file_id}' (MIME: {file_record.mime_type}) не є зображенням. Неможливо встановити як аватар.")
-            raise ValueError(f"Файл '{file_record.file_name}' не є дійсним зображенням для аватара.")
+            raise ValueError(_("user_avatar.errors.set.invalid_image_file", file_name=file_record.file_name))
 
         try:
             # Делегуємо основну логіку репозиторію
@@ -100,7 +100,7 @@ class UserAvatarService(BaseService): # type: ignore видалено
 
             if not avatar_link_db: # Якщо репозиторій повернув None (помилка всередині репо)
                  logger.error(f"Не вдалося встановити аватар для користувача ID {user_id} через помилку в репозиторії.")
-                 raise RuntimeError("Помилка встановлення аватара на рівні репозиторію.")
+                 raise RuntimeError(_("user_avatar.errors.set.repository_error"))
 
             await self.commit() # Коміт операцій, виконаних репозиторієм
 
@@ -109,13 +109,13 @@ class UserAvatarService(BaseService): # type: ignore видалено
             refreshed_avatar_link_db = await self._get_user_avatar_link_by_id_orm(avatar_link_db.id)
             if not refreshed_avatar_link_db:
                 logger.error(f"Не вдалося отримати зв'язок аватара ID {avatar_link_db.id} після коміту.")
-                raise RuntimeError("Помилка встановлення аватара: не вдалося отримати запис після збереження.")
+                raise RuntimeError(_("user_avatar.errors.set.retrieve_after_save_failed"))
 
         except IntegrityError as e: # Ця помилка може прийти з repo.set_active_avatar
             await self.rollback()
             logger.error(f"Помилка цілісності при встановленні аватара для ID '{user_id}': {e}",
                          exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося встановити аватар через конфлікт даних: {e}")
+            raise ValueError(_("user_avatar.errors.set.conflict", error_message=str(e)))
         except Exception as e: # Інші можливі винятки
             await self.rollback()
             logger.error(f"Неочікувана помилка при встановленні аватара для ID '{user_id}': {e}", exc_info=settings.DEBUG)
@@ -195,7 +195,7 @@ class UserAvatarService(BaseService): # type: ignore видалено
         if user_avatar_db.user_id != current_user_id: # Перевірка авторизації залишається в сервісі
             logger.error(
                 f"Користувач ID '{current_user_id}' не авторизований для деактивації зв'язку аватара ID '{user_avatar_id}', що належить користувачу ID '{user_avatar_db.user_id}'.")
-            raise PermissionError("Ви не маєте дозволу на деактивацію цього аватара.")
+            raise PermissionError(_("user_avatar.errors.deactivate.permission_denied"))
 
         if not user_avatar_db.is_active:
             logger.info(f"Зв'язок аватара UserAvatar ID '{user_avatar_id}' вже неактивний.")

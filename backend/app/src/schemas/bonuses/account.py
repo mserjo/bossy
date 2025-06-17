@@ -17,7 +17,8 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.config.logging import get_logger 
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # Імпорти для конкретних схем
@@ -36,17 +37,16 @@ class UserAccountBaseSchema(BaseSchema):
     """
     Базова схема для полів рахунку користувача.
     """
-    user_id: int = Field(description="Ідентифікатор користувача, якому належить рахунок.")
-    group_id: int = Field(description="Ідентифікатор групи, в межах якої існує цей рахунок.")
+    user_id: int = Field(description=_("account.fields.user_id.description"))
+    group_id: int = Field(description=_("account.fields.group_id.description"))
     balance: Decimal = Field(
         default=Decimal("0.00"),
-        description="Поточний баланс на рахунку."
+        description=_("account.fields.balance.description")
     )
-    # TODO i18n: default value 'бали'
     currency: str = Field(
-        default="бали",
-        max_length=10,  # Узгоджено з моделлю String(10)
-        description="Валюта або одиниця виміру бонусів на рахунку (наприклад, 'бали', 'очки')."
+        default="бали", # Default value itself is not translated by `_` here
+        max_length=10,
+        description=_("account.fields.currency.description")
     )
     # model_config успадковується з BaseSchema (from_attributes=True)
 
@@ -67,7 +67,7 @@ class UserAccountUpdateSchema(BaseSchema):
     Схема для оновлення балансу рахунку (наприклад, для адміністративних коригувань).
     Дозволяє оновлювати лише баланс. Інші поля (user_id, group_id, currency) зазвичай незмінні.
     """
-    balance: Optional[Decimal] = Field(None, description="Нове значення балансу для адміністративного коригування.")
+    balance: Optional[Decimal] = Field(None, description=_("account.update.fields.balance.description"))
     # Якщо потрібно оновлювати валюту (що малоймовірно для існуючого рахунку):
     # currency: Optional[str] = Field(None, max_length=50, description="Нова валюта рахунку.")
 
@@ -80,8 +80,8 @@ class UserAccountResponseSchema(UserAccountBaseSchema, IDSchemaMixin, Timestampe
     # user_id, group_id, balance, currency успадковані з UserAccountBaseSchema.
 
     user: Optional[UserPublicProfileSchema] = Field(None,
-                                                    description="Публічний профіль користувача, власника рахунку.")
-    group: Optional[GroupSchema] = Field(None, description="Коротка інформація про групу, до якої належить рахунок.")
+                                                    description=_("account.response.fields.user.description"))
+    group: Optional[GroupSchema] = Field(None, description=_("account.response.fields.group.description"))
 
 
 class UserAccountTransactionHistorySchema(UserAccountResponseSchema):
@@ -89,7 +89,7 @@ class UserAccountTransactionHistorySchema(UserAccountResponseSchema):
     Розширена схема для представлення рахунку користувача разом з історією транзакцій.
     """
     transactions: List[AccountTransactionResponseSchema] = Field(default_factory=list,
-                                                                  description="Список транзакцій по цьому рахунку.")
+                                                                  description=_("account.history_response.fields.transactions.description"))
 
 
 if __name__ == "__main__":

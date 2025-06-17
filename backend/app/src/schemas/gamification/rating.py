@@ -15,8 +15,9 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.config.logging import get_logger 
+from backend.app.src.config.logging import get_logger
 from backend.app.src.core.dicts import RatingType # Імпортовано RatingType Enum
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 from datetime import timedelta # Moved import to top
@@ -37,17 +38,16 @@ class UserGroupRatingBaseSchema(BaseSchema):
     """
     Базова схема для полів запису про рейтинг користувача в групі.
     """
-    user_id: int = Field(description="Ідентифікатор користувача.")
-    group_id: int = Field(description="Ідентифікатор групи, в якій розраховано рейтинг.")
-    rating_score: int = Field(default=0, description="Розрахований рейтинг або кількість балів користувача.")
+    user_id: int = Field(description=_("gamification.rating.fields.user_id.description"))
+    group_id: int = Field(description=_("gamification.rating.fields.group_id.description"))
+    rating_score: int = Field(default=0, description=_("gamification.rating.fields.rating_score.description"))
     period_start_date: Optional[date] = Field(None,
-                                              description="Дата початку періоду, за який розраховано рейтинг (якщо застосовно).")
+                                              description=_("gamification.rating.fields.period_start_date.description"))
     period_end_date: Optional[date] = Field(None,
-                                            description="Дата кінця періоду, за який розраховано рейтинг (якщо застосовно).")
-    rating_type: Optional[RatingType] = Field( # Використовує імпортований RatingType Enum
+                                            description=_("gamification.rating.fields.period_end_date.description"))
+    rating_type: Optional[RatingType] = Field(
         None,
-        # max_length=50, # Не потрібно для Enum
-        description="Тип рейтингу (наприклад, 'monthly', 'overall', 'weekly').",
+        description=_("gamification.rating.fields.rating_type.description"),
         examples=["monthly", "overall"]
     )
     # model_config успадковується з BaseSchema (from_attributes=True)
@@ -68,7 +68,7 @@ class UserGroupRatingUpdateSchema(
     """
     Схема для оновлення рейтингу користувача (наприклад, лише `rating_score`).
     """
-    rating_score: Optional[int] = Field(None, description="Нове значення рейтингу/балів.")
+    rating_score: Optional[int] = Field(None, description=_("gamification.rating.fields.rating_score.description")) # Reuse base
     # Інші поля, такі як period_start_date, period_end_date, rating_type зазвичай не оновлюються
     # для існуючого запису рейтингу; замість цього створюється новий запис для нового періоду/типу.
 
@@ -81,8 +81,8 @@ class UserGroupRatingSchema(UserGroupRatingBaseSchema, IDSchemaMixin, Timestampe
     # id, created_at, updated_at успадковані.
     # user_id, group_id, rating_score, period_start_date, period_end_date, rating_type успадковані.
 
-    user: Optional[UserPublicProfileSchema] = Field(None, description="Публічний профіль користувача.")
-    group: Optional[GroupSchema] = Field(None, description="Коротка інформація про групу.") # Changed from GroupBriefSchema
+    user: Optional[UserPublicProfileSchema] = Field(None, description=_("gamification.rating.response.fields.user.description"))
+    group: Optional[GroupSchema] = Field(None, description=_("gamification.rating.response.fields.group.description"))
 
 
 if __name__ == "__main__":

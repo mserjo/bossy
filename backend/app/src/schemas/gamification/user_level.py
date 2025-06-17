@@ -14,7 +14,8 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.config.logging import get_logger 
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # Імпорти для конкретних схем
@@ -33,9 +34,9 @@ class UserLevelBaseSchema(BaseSchema):
     """
     Базова схема для полів запису про рівень користувача.
     """
-    user_id: int = Field(description="Ідентифікатор користувача, який досяг рівня.")
-    level_id: int = Field(description="Ідентифікатор досягнутого рівня гейміфікації.")
-    group_id: Optional[int] = Field(None, description="Ідентифікатор групи, в межах якої досягнуто рівень (NULL для глобальних рівнів).") # Змінено на Optional[int]
+    user_id: int = Field(description=_("gamification.user_level.fields.user_id.description"))
+    level_id: int = Field(description=_("gamification.user_level.fields.level_id.description"))
+    group_id: Optional[int] = Field(None, description=_("gamification.user_level.fields.group_id.description"))
     # `created_at` з TimestampedSchemaMixin буде використовуватися як `achieved_at` у UserLevelSchema.
 
     # model_config успадковується з BaseSchema (from_attributes=True)
@@ -59,10 +60,10 @@ class UserLevelSchema(UserLevelBaseSchema, IDSchemaMixin, TimestampedSchemaMixin
     # id, created_at, updated_at успадковані.
     # user_id, level_id, group_id успадковані.
 
-    user: Optional[UserPublicProfileSchema] = Field(None, description="Публічний профіль користувача.")
-    level: Optional[LevelSchema] = Field(None, description="Інформація про досягнутий рівень.")
+    user: Optional[UserPublicProfileSchema] = Field(None, description=_("gamification.user_level.response.fields.user.description"))
+    level: Optional[LevelSchema] = Field(None, description=_("gamification.user_level.response.fields.level.description"))
     group: Optional[GroupSchema] = Field(None, # Changed from GroupBriefSchema to GroupSchema
-                                         description="Коротка інформація про групу, в якій досягнуто рівень.")
+                                         description=_("gamification.user_level.response.fields.group.description"))
 
 
 if __name__ == "__main__":

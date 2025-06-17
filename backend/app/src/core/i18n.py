@@ -172,60 +172,73 @@ def _internal_translate(key: str, lang: Optional[str] = None, **kwargs: Any) -> 
 # Alias _internal_translate to _ for external use.
 _ = _internal_translate
 
-# Example usage (can be removed or kept for testing)
 if __name__ == "__main__":
-    # Ensure locale files exist at the expected path for this example to work.
-    # Create dummy files for testing if they don't exist:
-
     print(f"Base locale path: {BASE_LOCALE_PATH}")
 
-    # Create dummy en/messages.json if it doesn't exist
-    en_messages_path = BASE_LOCALE_PATH / "en" / "messages.json"
-    if not en_messages_path.exists():
-        (BASE_LOCALE_PATH / "en").mkdir(parents=True, exist_ok=True)
-        with open(en_messages_path, "w", encoding="utf-8") as f:
-            json.dump({"test": {"greeting": "Hello, {name}!"}, "user": {"errors": {"not_found": "User not found."}}}, f, ensure_ascii=False, indent=2)
-        print(f"Created dummy {en_messages_path}")
+    # Define more comprehensive dummy data
+    dummy_en_data = {
+        "test": {"greeting": "Hello, {name}!", "simple": "This is a test."},
+        "user": {"errors": {"not_found": "User not found.", "email_exists": "Email '{email}' already exists."}},
+        "only_in_en": "This message exists only in English.",
+        "formatted_test": "Test with value: {value}"
+    }
+    dummy_uk_data = {
+        "test": {"greeting": "Привіт, {name}!", "simple": "Це тест."},
+        "user": {"errors": {"not_found": "Користувача не знайдено."}},
+        "formatted_test": "Тест зі значенням: {value}"
+        # "only_in_en" and "user.errors.email_exists" are missing for fallback testing
+    }
+    dummy_de_data = { # For testing dynamic load
+        "test": {"greeting": "Hallo, {name}!"}
+    }
 
-    # Create dummy uk/messages.json if it doesn't exist
-    uk_messages_path = BASE_LOCALE_PATH / "uk" / "messages.json"
-    if not uk_messages_path.exists():
-        (BASE_LOCALE_PATH / "uk").mkdir(parents=True, exist_ok=True)
-        with open(uk_messages_path, "w", encoding="utf-8") as f:
-            json.dump({"test": {"greeting": "Привіт, {name}!"}, "user": {"errors": {"not_found": "Користувача не знайдено."}}}, f, ensure_ascii=False, indent=2)
-        print(f"Created dummy {uk_messages_path}")
+    # Create/overwrite dummy files
+    for lang_code, data in [("en", dummy_en_data), ("uk", dummy_uk_data), ("de", dummy_de_data)]:
+        lang_dir = BASE_LOCALE_PATH / lang_code
+        lang_dir.mkdir(parents=True, exist_ok=True)
+        file_path = lang_dir / "messages.json"
+        with open(file_path, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        print(f"Created/Overwritten dummy {lang_code}/messages.json")
 
-    # Re-initialize to load dummy files if they were just created or ensure they are loaded
-    translations.clear() # Clear any potentially partially loaded state
-    _init_translations() # This will load 'uk' and 'en' based on current defaults
+    # Re-initialize translations to load the new dummy files
+    translations.clear()
+    # Set default language before init if it's not the hardcoded one, for testing _init_translations
+    # For this test, DEFAULT_LANGUAGE is 'uk', FALLBACK_LANGUAGE is 'en'
+    _init_translations()
 
-    print(f"--- Current language: {get_current_language()} ---")
-    print(f"Greeting (current lang): {_('test.greeting', name='Світ')}") # Should be UK
-    print(f"User not found (current lang): {_('user.errors.not_found')}") # Should be UK
-    print(f"Missing key (current lang): {_('app.title')}")
+    print(f"\n--- Testing with DEFAULT_LANGUAGE: {get_current_language()} (should be 'uk') ---")
+    print(f"Greeting: {_('test.greeting', name='Світ')}")
+    print(f"Simple: {_('test.simple')}")
+    print(f"User not found: {_('user.errors.not_found')}")
+    print(f"Formatted test: {_('formatted_test', value=123)}")
+    print(f"Fallback (email_exists): {_('user.errors.email_exists', email='test@example.com')}")
+    print(f"Fallback (only_in_en): {_('only_in_en')}")
+    print(f"Missing key: {_('app.title_nonexistent')}")
 
     set_current_language("en")
-    print(f"--- Current language: {get_current_language()} ---")
-    print(f"Greeting (en): {_('test.greeting', name='World')}")
-    print(f"User not found (en): {_('user.errors.not_found')}")
+    print(f"\n--- Testing with FALLBACK_LANGUAGE: {get_current_language()} (should be 'en') ---")
+    print(f"Greeting: {_('test.greeting', name='World')}")
+    print(f"Simple: {_('test.simple')}")
+    print(f"User not found: {_('user.errors.not_found')}")
+    print(f"Email exists: {_('user.errors.email_exists', email='test@example.com')}")
+    print(f"Formatted test: {_('formatted_test', value=456)}")
+    print(f"Only in en: {_('only_in_en')}")
 
-    set_current_language("uk") # Switch back
-    print(f"--- Current language: {get_current_language()} ---")
-    print(f"Greeting (uk): {_('test.greeting', name='Світ')}")
+    print(f"\n--- Testing dynamic language load: 'de' ---")
+    set_current_language("de")
+    print(f"Current language after set_current_language('de'): {get_current_language()}")
 
-    # Test fallback
-    # Assuming "user.errors.email_exists" is only in 'en' for this test
-    if translations.get("en") and translations.get("uk"):
-        # Ensure 'email_exists' is in 'en' but not 'uk' for a clean fallback test
-        if "user" not in translations["en"]: translations["en"]["user"] = {"errors": {}}
-        elif "errors" not in translations["en"]["user"]: translations["en"]["user"]["errors"] = {}
-        translations["en"]["user"]["errors"]["email_exists"] = "Email already exists."
+    if get_current_language() == "de":
+        print(f"Greeting (de): {_('test.greeting', name='Welt')}")
+        print(f"Simple (de - fallback to en): {_('test.simple')}")
+        print(f"User not found (de - fallback to en): {_('user.errors.not_found')}")
+    else:
+        print("Could not switch to 'de', test for 'de' skipped. Check if de/messages.json was loaded by set_current_language.")
 
-        if "user" in translations["uk"] and "errors" in translations["uk"]["user"] and \
-           "email_exists" in translations["uk"]["user"]["errors"]:
-             del translations["uk"]["user"]["errors"]["email_exists"]
-        print(f"Email exists (fallback to en): {_('user.errors.email_exists')}")
-
-    print(f"Missing key with params: {_('app.welcome_message', user='TestUser')}")
+    # Switch back to default for any subsequent tests if needed
+    set_current_language(DEFAULT_LANGUAGE) # DEFAULT_LANGUAGE is 'uk'
+    print(f"\n--- Switched back to DEFAULT_LANGUAGE: {get_current_language()} ---")
+    print(f"Greeting (uk again): {_('test.greeting', name='Україна')}")
 
 ```

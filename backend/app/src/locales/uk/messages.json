@@ -43,7 +43,9 @@
       "email_taken_by_other": "Email '{email}' вже зареєстровано іншим користувачем.",
       "update_conflict": "Не вдалося оновити користувача через конфлікт даних: {error_message}",
       "roles_not_found": "Ролі не знайдено: {codes}.",
-      "username_taken_by_other": "Ім'я користувача '{username}' вже використовується іншим користувачем."
+      "username_taken_by_other": "Ім'я користувача '{username}' вже використовується іншим користувачем.",
+      "reviewer_not_found_by_id": "Рецензента з ID '{user_id}' не знайдено.",
+      "not_found_by_id": "Користувача з ID '{id}' не знайдено."
     },
     "fields": {
       "username": {
@@ -129,7 +131,8 @@
       "critical_create_failed": "Критична помилка: не вдалося отримати створену групу ID {group_id} після коміту.",
       "create_conflict": "Не вдалося створити групу через конфлікт даних: {error_message}",
       "update_conflict": "Не вдалося оновити групу через конфлікт даних: {error_message}",
-      "delete_conflict_in_use": "Група '{group_name}' використовується і не може бути видалена."
+      "delete_conflict_in_use": "Група '{group_name}' використовується і не може бути видалена.",
+      "not_found_by_id": "Групу з ID '{id}' не знайдено."
     },
     "reports": {
       "activity_report_not_implemented": "Генерація звіту про активність ще не реалізована."
@@ -277,7 +280,9 @@
         "fields": {
             "is_active": {"description": "Статус активності провайдера."},
             "credentials_schema": {"description": "JSON схема необхідних облікових даних для цього провайдера (наприклад, для OAuth)."},
-            "sync_frequency_minutes": {"description": "Рекомендована частота синхронізації в хвилинах."}
+            "sync_frequency_minutes": {"description": "Рекомендована частота синхронізації в хвилинах."},
+            "description_create": "JSON схема необхідних credential для налаштування інтеграції.",
+            "description_update": "Оновлена JSON схема credential."
         }
     },
     "messengers": {},
@@ -287,7 +292,17 @@
   },
   "task": {
     "errors": {
-        "not_found_by_id": "Завдання з ID '{task_id}' не знайдено."
+        "not_found_by_id": "Завдання з ID '{task_id}' не знайдено.",
+        "task_type_not_found_by_id": "Тип завдання з ID '{task_type_id}' не знайдено.",
+        "create": {
+            "default_status_not_found": "Статус завдання є обов'язковим, але статус за замовчуванням '{status_code}' не знайдено."
+        },
+        "status_not_found_by_id": "Статус з ID '{status_id}' не знайдено.",
+        "critical_create_failed": "Критична помилка: не вдалося отримати створене завдання ID {task_id} після коміту.",
+        "create_conflict": "Не вдалося створити завдання через конфлікт даних: {error_message}",
+        "critical_update_failed": "Критична помилка: не вдалося отримати оновлене завдання ID {task_id} після коміту.",
+        "update_conflict": "Не вдалося оновити завдання через конфлікт даних: {error_message}",
+        "delete_in_use": "Завдання '{task_title}' використовується і не може бути видалене."
     },
     "fields": {
       "name": {"description": "Назва або заголовок завдання/події."},
@@ -339,29 +354,46 @@
     }
   },
   "event": {
-      "fields": {
-          "name": {"description": "Назва або заголовок події."},
-          "description": {"description": "Детальний опис події."},
-          "start_time": {"description": "Дата та час початку події (UTC)."},
-          "end_time": {"description": "Необов'язкові дата та час закінчення події (UTC)."},
-          "location": {"description": "Фізичне або віртуальне місцезнаходження події."},
-          "state": {"description": "Стан події (наприклад, 'upcoming', 'ongoing', 'past', 'cancelled')."},
-          "notes": {"description": "Внутрішні нотатки для події."}
-      },
-      "create": {
-          "fields": {"group_id": {"description": "Ідентифікатор групи, до якої належить ця подія."}}
-      },
-      "response": {
-          "fields": {
-              "group": {"description": "Базова інформація про групу, до якої належить ця подія."},
-              "created_by_user_id": {"description": "ID користувача, який створив подію."},
-              "created_by": {"description": "Профіль користувача, який створив подію."},
-              "assignments": {"description": "Список призначень, пов'язаних з подією."},
-              "completions": {"description": "Список виконань, пов'язаних з подією."}
-          }
-      }
+    "errors": {
+        "create": {
+            "type_id_missing": "Необхідно вказати 'event_type_id' або 'task_type_id' для події.",
+            "default_status_not_found": "Статус події є обов'язковим, але статус за замовчуванням '{status_code}' не знайдено."
+        },
+        "event_type_not_found_by_id": "Тип події/завдання з ID '{type_id}' не знайдено.",
+        "status_not_found_by_id": "Статус з ID '{status_id}' не знайдено.",
+        "critical_create_failed": "Критична помилка: не вдалося отримати створену подію ID {event_id} після коміту.",
+        "create_conflict": "Не вдалося створити подію через конфлікт даних: {error_message}",
+        "critical_update_failed": "Критична помилка: не вдалося отримати оновлену подію ID {event_id} після коміту.",
+        "update_conflict": "Не вдалося оновити подію через конфлікт даних: {error_message}",
+        "delete_in_use": "Подія '{event_title}' використовується і не може бути видалена."
+    },
+    "fields": {
+        "name": {"description": "Назва або заголовок події."},
+        "description": {"description": "Детальний опис події."},
+        "start_time": {"description": "Дата та час початку події (UTC)."},
+        "end_time": {"description": "Необов'язкові дата та час закінчення події (UTC)."},
+        "location": {"description": "Фізичне або віртуальне місцезнаходження події."},
+        "state": {"description": "Стан події (наприклад, 'upcoming', 'ongoing', 'past', 'cancelled')."},
+        "notes": {"description": "Внутрішні нотатки для події."}
+    },
+    "create": {
+        "fields": {"group_id": {"description": "Ідентифікатор групи, до якої належить ця подія."}}
+    },
+    "response": {
+        "fields": {
+            "group": {"description": "Базова інформація про групу, до якої належить ця подія."},
+            "created_by_user_id": {"description": "ID користувача, який створив подію."},
+            "created_by": {"description": "Профіль користувача, який створив подію."},
+            "assignments": {"description": "Список призначень, пов'язаних з подією."},
+            "completions": {"description": "Список виконань, пов'язаних з подією."}
+        }
+    }
   },
   "task_assignment": {
+      "errors": {
+          "critical_create_failed": "Критична помилка: не вдалося отримати запис призначення після збереження.",
+          "assign_conflict": "Не вдалося призначити завдання через конфлікт даних: {error_message}"
+      },
       "fields": {
           "task_id": {"description": "Ідентифікатор завдання."},
           "user_id": {"description": "Ідентифікатор користувача, якому призначено завдання."},
@@ -381,6 +413,16 @@
       }
   },
   "task_completion": {
+      "errors": {
+          "already_completed_not_repeatable": "Завдання ID '{task_id}' вже було виконано Вами і не є повторюваним.",
+          "critical_create_failed": "Не вдалося отримати створене виконання завдання.",
+          "create_conflict": "Не вдалося позначити завдання як виконане через конфлікт даних: {error_message}",
+          "not_found_by_id": "Запис завершення завдання з ID '{completion_id}' не знайдено.",
+          "not_found_by_id_for_review": "Виконання завдання з ID '{completion_id}' не знайдено.",
+          "not_pending_approval": "Завершення ID '{completion_id}' не очікує на ухвалення (поточний статус: {status}).",
+          "invalid_new_status": "Неприпустимий новий статус '{status}'. Дозволені: {allowed_statuses}.",
+          "view_permission_denied": "Ви не маєте дозволу на перегляд цього запису про виконання."
+      },
       "fields": {
           "completed_at": {"description": "Фактичний час завершення завдання користувачем (або час подання на перевірку)."},
           "status": {"description": "Статус виконання завдання."},
@@ -404,6 +446,16 @@
       }
   },
   "task_review": {
+      "errors": {
+          "completion_mismatch": "Виконання ID '{completion_id}' не належить завданню ID '{task_id}'.",
+          "already_reviewed": "Користувач ID '{user_id}' вже залишив відгук для {context}.",
+          "critical_create_failed": "Не вдалося отримати створений відгук.",
+          "create_conflict": "Не вдалося створити відгук через конфлікт даних: {error_message}",
+          "update_permission_denied": "Ви не маєте дозволу на оновлення цього відгуку.",
+          "update_failed_generic": "Помилка оновлення відгуку.",
+          "critical_update_failed_relations": "Не вдалося отримати оновлений відгук зі зв'язками.",
+          "delete_permission_denied": "Ви можете видаляти тільки власні відгуки."
+      },
       "fields": {
           "rating": {"description": "Числовий рейтинг завдання (від 1 до 5, необов'язково)."},
           "comment": {"description": "Текстовий коментар до відгуку (необов'язково)."}
@@ -421,8 +473,7 @@
       "name_exists_in_scope": "Правило бонусів з назвою '{name}' вже існує в {scope}.",
       "create_conflict": "Не вдалося створити правило бонусів через конфлікт даних: {error_message}",
       "update_conflict": "Не вдалося оновити правило бонусів через конфлікт даних: {error_message}",
-      "task_type_not_found_by_id": "Тип завдання з ID '{task_type_id}' не знайдено.",
-      "task_not_found_by_id": "Завдання з ID '{task_id}' не знайдено."
+      "task_type_not_found_by_id": "Тип завдання з ID '{task_type_id}' не знайдено."
     },
     "fields": {
         "name": {"description": "Назва правила бонусів."},
@@ -591,7 +642,8 @@
             "critical_create_failed": "Не вдалося отримати створений бейдж.",
             "create_conflict": "Не вдалося створити {model_name}: конфлікт даних.",
             "critical_update_failed": "Не вдалося отримати оновлений бейдж.",
-            "update_conflict": "Не вдалося оновити {model_name}: конфлікт даних."
+            "update_conflict": "Не вдалося оновити {model_name}: конфлікт даних.",
+            "not_found_by_id": "Бейдж з ID '{badge_id}' не знайдено."
         },
         "fields": {
             "name": {"description": "Назва бейджа гейміфікації."},
@@ -610,7 +662,6 @@
     },
     "achievement": {
         "errors": {
-            "not_found_by_id": "Бейдж з ID '{badge_id}' не знайдено.",
             "badge_not_repeatable_and_awarded": "Бейдж '{badge_name}' (ID: {badge_id}) вже було надано цьому користувачеві в даному контексті і він не є повторюваним.",
             "award_conflict": "Не вдалося нагородити досягненням через конфлікт даних: {error_message}",
             "critical_award_failed": "Критична помилка: не вдалося отримати запис досягнення після збереження."
@@ -672,7 +723,11 @@
         "errors": {
             "no_channel_or_contact": "Не знайдено каналу або контактної інформації для доставки.",
             "retry_missing_data": "Відсутні дані для повтору.",
-            "retry_sender_not_found": "Відправник для каналу '{channel}' не знайдено для повтору."
+            "retry_sender_not_found": "Відправник для каналу '{channel}' не знайдено для повтору.",
+            "send_unknown_error": "Невідома помилка надсилання.",
+            "send_exception_on_channel": "Виняток під час спроби надсилання через канал {channel_name}: {details}",
+            "retry_send_unknown_error": "Невідома помилка при повторному надсиланні.",
+            "retry_exception_on_channel": "Виняток під час повторного надсилання через канал {channel_name}: {details}"
         }
     },
     "fields": {
@@ -829,6 +884,22 @@
                 "tags": {"description": "Теги/мітки для групування або фільтрації метрик (ключ-значення JSON)."}
             }
         }
+    },
+    "health": {
+        "service_status": {
+            "fields": {
+                "service_name": {"description": "Унікальна назва сервісу (наприклад, 'database', 'redis_cache', 'payment_gateway')."},
+                "status": {"description": "Поточний статус сервісу."},
+                "details": {"description": "Додаткові деталі про стан сервісу (наприклад, повідомлення про помилку або час відповіді)."}
+            }
+        },
+        "overall_status": {
+            "fields": {
+                "overall_status": {"description": "Загальний агрегований статус здоров'я системи."},
+                "timestamp": {"description": "Час генерації звіту про стан здоров'я."},
+                "services": {"description": "Список станів здоров'я окремих залежних сервісів."}
+            }
+        }
     }
   },
   "file_record": {
@@ -839,6 +910,17 @@
         "create_conflict": "Не вдалося створити запис файлу через конфлікт даних.",
         "delete_in_use": "Запис файлу '{file_name}' використовується і не може бути видалений.",
         "not_found_by_id": "Запис файлу з ID '{file_id}' не знайдено."
+    },
+    "fields": {
+        "file_name": {"description": "Оригінальне або згенероване ім'я файлу."},
+        "mime_type": {"description": "MIME-тип файлу."},
+        "file_size": {"description": "Розмір файлу в байтах."},
+        "purpose": {"description": "Призначення файлу."},
+        "metadata": {"description": "Додаткові метадані файлу у форматі JSON (наприклад, розміри зображення, тривалість аудіо/відео)."},
+        "file_path": {"description": "Шлях до файлу на сервері або ключ в об'єктному сховищі (зазвичай не повертається клієнту напряму)."},
+        "uploader_user_id": {"description": "ID користувача, який завантажив файл."},
+        "url": {"description": "Публічний URL для доступу до файлу (якщо застосовно)."},
+        "uploader": {"description": "Інформація про користувача, який завантажив файл."}
     }
   },
   "file_upload": {
@@ -870,6 +952,38 @@
     },
     "complete": {
         "success_message": "Файл '{file_name}' успішно завантажено."
+    },
+    "initiate_request": {
+        "fields": {
+            "file_name": {"description": "Ім'я файлу, що завантажується."},
+            "mime_type": {"description": "MIME-тип файлу."},
+            "file_size": {"description": "Розмір файлу в байтах."},
+            "purpose": {"description": "Призначення файлу. Визначає подальшу обробку та зберігання."}
+        }
+    },
+    "initiate_response": {
+        "fields": {
+            "upload_url": {"description": "URL, на який клієнт має завантажити файл (PUT або POST)."},
+            "fields": {"description": "Додаткові поля, які потрібно включити в тіло POST-запиту (для S3 presigned POST)."},
+            "file_record_id": {"description": "ID створеного запису FileRecord, що очікує на завантаження файлу."}
+        }
+    },
+    "complete_request": {
+        "fields": {
+            "file_record_id": {"description": "ID запису FileRecord, для якого підтверджується завантаження."},
+            "upload_key": {"description": "Ключ об'єкта в сховищі, якщо він відрізняється від початкового file_path (необов'язково)."},
+            "e_tag": {"description": "ETag об'єкта зі сховища, використовується для перевірки цілісності (наприклад, для S3)."}
+        }
+    },
+    "response": {
+        "fields": {
+            "file_id": {"description": "ID запису файлу (синонім fileRecordId)."},
+            "file_name": {"description": "Ім'я завантаженого файлу."},
+            "url": {"description": "Фінальний URL для доступу до завантаженого файлу."},
+            "mime_type": {"description": "MIME-тип файлу."},
+            "file_size": {"description": "Розмір файлу в байтах."},
+            "purpose": {"description": "Призначення файлу."}
+        }
     }
   },
   "user_avatar": {
@@ -883,6 +997,16 @@
         "deactivate": {
             "permission_denied": "Ви не маєте дозволу на деактивацію цього аватара."
         }
+    },
+    "fields": {
+        "user_id": {"description": "Ідентифікатор користувача, якому належить аватар."},
+        "file_record_id": {"description": "Ідентифікатор запису файлу, що є аватаром."},
+        "is_active": {"description": "Чи є цей аватар поточним активним для користувача."},
+        "file_url": {"description": "URL для доступу до файлу аватара."},
+        "user": {"description": "Інформація про користувача (зазвичай не включається, якщо запит йде від цього ж користувача або аватар є частиною профілю користувача)."},
+        "file_record": {"description": "Детальна інформація про файл аватара."}
     }
-  }
+  },
+  "global_scope": "глобальній області",
+  "in_group_scope":"групі ID '{group_id}'"
 }

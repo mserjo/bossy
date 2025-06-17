@@ -17,6 +17,7 @@ from pydantic import Field
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import SettingValueType # Імпортовано Enum
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # SettingValueType Enum імпортовано вище.
@@ -34,33 +35,30 @@ class SystemSettingBaseSchema(BaseSchema):
     key: str = Field(
         ...,
         max_length=SETTING_KEY_MAX_LENGTH,
-        description="Унікальний програмний ключ налаштування.",
+        description=_("system.settings.fields.key.description"),
         examples=["site_name", "maintenance_mode"]
     )
-    name: str = Field(  # Людиночитана назва, з моделі NameDescriptionMixin (non-nullable)
+    name: str = Field(
         ...,
         max_length=SETTING_NAME_MAX_LENGTH,
-        description="Людиночитана назва налаштування (для відображення в UI).",
+        description=_("system.settings.fields.name.description"),
         examples=["Назва Сайту", "Режим Обслуговування"]
     )
     description: Optional[str] = Field(
         None,
-        description="Детальний опис призначення та використання налаштування."
+        description=_("system.settings.fields.description.description")
     )
-    # `value` тут не визначаємо, бо в Create воно обов'язкове, а в Update - опціональне.
-    # `value_type` також може відрізнятися.
-
     value_type: SettingValueType = Field(
         default=SettingValueType.STRING,
-        description="Тип значення налаштування."
+        description=_("system.settings.fields.value_type.description")
     )
     is_editable: bool = Field(
         default=True,
-        description="Чи може суперкористувач редагувати це налаштування через UI/API."
+        description=_("system.settings.fields.is_editable.description")
     )
     is_sensitive: bool = Field(
         default=False,
-        description="Чи є значення налаштування чутливим (наприклад, API ключ) і потребує маскування."
+        description=_("system.settings.fields.is_sensitive.description")
     )
     # model_config успадковується з BaseSchema (from_attributes=True)
 
@@ -71,21 +69,21 @@ class SystemSettingCreateSchema(SystemSettingBaseSchema):
     """
     # Успадковує key, name, description, value_type, is_editable, is_sensitive.
     value: Optional[Any] = Field(None,
-                                 description="Значення налаштування. Тип залежить від `value_type` (наприклад, str, int, bool, dict).")
+                                 description=_("system.settings.create.fields.value.description"))
 
 
-class SystemSettingUpdateSchema(BaseSchema):  # Не успадковує SystemSettingBaseSchema, щоб оновлювати лише value
+class SystemSettingUpdateSchema(BaseSchema):
     """
     Схема для оновлення значення існуючого системного налаштування.
     Зазвичай оновлюється лише поле `value`. Інші поля (key, value_type) є системними.
     Можна дозволити оновлення `name`, `description`, `is_editable`, `is_sensitive` за потреби.
     """
-    value: Optional[Any] = Field(None, description="Нове значення налаштування. Тип має відповідати `value_type`.")
+    value: Optional[Any] = Field(None, description=_("system.settings.update.fields.value.description"))
     name: Optional[str] = Field(None, max_length=SETTING_NAME_MAX_LENGTH,
-                                description="Нова людиночитана назва налаштування.")
-    description: Optional[str] = Field(None, description="Новий опис налаштування.")
-    is_editable: Optional[bool] = Field(None, description="Новий статус можливості редагування.")
-    is_sensitive: Optional[bool] = Field(None, description="Новий статус чутливості значення.")
+                                description=_("system.settings.update.fields.name.description"))
+    description: Optional[str] = Field(None, description=_("system.settings.update.fields.description.description"))
+    is_editable: Optional[bool] = Field(None, description=_("system.settings.update.fields.is_editable.description"))
+    is_sensitive: Optional[bool] = Field(None, description=_("system.settings.update.fields.is_sensitive.description"))
     # value_type та key зазвичай не змінюються для існуючого налаштування.
 
 
@@ -97,7 +95,7 @@ class SystemSettingSchema(SystemSettingBaseSchema, IDSchemaMixin, TimestampedSch
     # id, created_at, updated_at - успадковані.
     # key, name, description, value_type, is_editable, is_sensitive - успадковані.
     value: Optional[Any] = Field(None,
-                                 description="Значення налаштування. Увага: чутливі значення можуть бути замасковані або відсутні.")
+                                 description=_("system.settings.response.fields.value.description"))
     # Примітка: Фактичне маскування чутливих значень (`is_sensitive` = True)
     # має відбуватися на рівні сервісу або при формуванні відповіді API,
     # а не в самій схемі Pydantic (схема описує структуру даних).

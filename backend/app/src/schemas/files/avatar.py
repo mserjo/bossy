@@ -14,7 +14,8 @@ from pydantic import Field, AnyHttpUrl
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.config.logging import get_logger 
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
@@ -28,9 +29,9 @@ class UserAvatarBaseSchema(BaseSchema):
     """
     Базова схема для полів зв'язку аватара користувача.
     """
-    user_id: int = Field(description="Ідентифікатор користувача, якому належить аватар.")
-    file_record_id: int = Field(description="Ідентифікатор запису файлу, що є аватаром.")
-    is_active: bool = Field(default=True, description="Чи є цей аватар поточним активним для користувача.")
+    user_id: int = Field(description=_("user_avatar.fields.user_id.description"))
+    file_record_id: int = Field(description=_("user_avatar.fields.file_record_id.description"))
+    is_active: bool = Field(default=True, description=_("user_avatar.fields.is_active.description"))
     # model_config успадковується з BaseSchema (from_attributes=True)
 
 
@@ -54,12 +55,12 @@ class UserAvatarResponseSchema(UserAvatarBaseSchema, IDSchemaMixin, TimestampedS
 
     # TODO: Поле `file_url` має заповнюватися сервісом, отримуючи URL з пов'язаного `FileRecord`.
     #       Це може бути прямий URL або presigned URL.
-    file_url: Optional[AnyHttpUrl] = Field(None, description="URL для доступу до файлу аватара.")
+    file_url: Optional[AnyHttpUrl] = Field(None, description=_("user_avatar.fields.file_url.description"))
 
     # TODO: Замінити Any на відповідні схеми.
     user: Optional[UserPublicProfileSchema] = Field(None,
-                                                    description="Інформація про користувача (зазвичай не включається, якщо запит йде від цього ж користувача або аватар є частиною профілю користувача).")
-    file_record: Optional[FileRecordSchema] = Field(None, description="Детальна інформація про файл аватара.")
+                                                    description=_("user_avatar.fields.user.description"))
+    file_record: Optional[FileRecordSchema] = Field(None, description=_("user_avatar.fields.file_record.description"))
 
 
 if __name__ == "__main__":

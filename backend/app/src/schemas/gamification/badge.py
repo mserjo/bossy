@@ -14,7 +14,8 @@ from pydantic import Field, AnyHttpUrl
 
 # Абсолютний імпорт базових схем
 from backend.app.src.schemas.base import BaseSchema, BaseMainSchema
-from backend.app.src.config.logging import get_logger 
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # Імпорт для конкретної схеми
@@ -34,27 +35,27 @@ class BadgeBaseSchema(
     name: str = Field(
         ...,
         max_length=BADGE_NAME_MAX_LENGTH,
-        description="Назва бейджа гейміфікації.",
+        description=_("gamification.badge.fields.name.description"),
         examples=["Першопроходець", "Командний Гравець"]
     )
     description: Optional[str] = Field(
         None,
-        description="Опис умов отримання або значення цього бейджа."
+        description=_("gamification.badge.fields.description.description")
     )
-    icon_file_id: Optional[int] = Field(None, description="ID завантаженого файлу іконки бейджа.")
+    icon_file_id: Optional[int] = Field(None, description=_("gamification.badge.fields.icon_file_id.description"))
     group_id: Optional[int] = Field(
         None,
-        description="ID групи, до якої належить цей бейдж. NULL, якщо бейдж глобальний/системний."
+        description=_("gamification.badge.fields.group_id.description")
     )
     state: Optional[str] = Field(
-        None,  # Або default="active"
+        None,
         max_length=50,
-        description="Стан бейджа (наприклад, 'active', 'archived').",
+        description=_("gamification.badge.fields.state.description"),
         examples=["active"]
     )
-    notes: Optional[str] = Field(  # Додаємо notes, оскільки Badge модель успадковує NotesMixin через BaseMainModel
+    notes: Optional[str] = Field(
         None,
-        description="Додаткові нотатки щодо бейджа."
+        description=_("gamification.badge.fields.notes.description")
     )
 
 
@@ -71,13 +72,13 @@ class BadgeUpdateSchema(BadgeBaseSchema):
     Схема для оновлення існуючого бейджа гейміфікації.
     Всі поля, успадковані з `BadgeBaseSchema`, стають опціональними.
     """
-    name: Optional[str] = Field(None, max_length=BADGE_NAME_MAX_LENGTH)
-    description: Optional[str] = None
-    icon_file_id: Optional[int] = Field(None, description="Новий ID завантаженого файлу іконки бейджа.")
+    name: Optional[str] = Field(None, max_length=BADGE_NAME_MAX_LENGTH, description=_("gamification.badge.fields.name.description")) # Reuse
+    description: Optional[str] = Field(None, description=_("gamification.badge.fields.description.description")) # Reuse
+    icon_file_id: Optional[int] = Field(None, description=_("gamification.badge.fields.icon_file_id.description")) # Reuse, or specific update key
     group_id: Optional[int] = Field(None,
-                                    description="Зміна групи для бейджа (зазвичай не дозволяється або обробляється окремо).")
-    state: Optional[str] = Field(None, max_length=50)
-    notes: Optional[str] = None
+                                    description=_("gamification.badge.fields.group_id.description")) # Reuse, or specific update key
+    state: Optional[str] = Field(None, max_length=50, description=_("gamification.badge.fields.state.description")) # Reuse
+    notes: Optional[str] = Field(None, description=_("gamification.badge.fields.notes.description")) # Reuse
 
 
 class BadgeSchema(BaseMainSchema):  # Успадковує id, name, description, state, notes, group_id, timestamps
@@ -88,11 +89,11 @@ class BadgeSchema(BaseMainSchema):  # Успадковує id, name, description
     # id, name, description, state, notes, group_id, created_at, updated_at, deleted_at - успадковані
 
     # Специфічні поля моделі Badge
-    icon_url: Optional[AnyHttpUrl] = Field(None, description="URL іконки бейджа.")
+    icon_url: Optional[AnyHttpUrl] = Field(None, description=_("gamification.badge.response.fields.icon_url.description"))
 
     # Пов'язані об'єкти
-    group: Optional[GroupSchema] = Field(None, # Changed from GroupBriefSchema
-                                         description="Коротка інформація про групу, до якої належить бейдж (якщо є).")
+    group: Optional[GroupSchema] = Field(None,
+                                         description=_("gamification.badge.response.fields.group.description"))
 
     # model_config успадковується з BaseMainSchema -> BaseSchema (from_attributes=True)
 

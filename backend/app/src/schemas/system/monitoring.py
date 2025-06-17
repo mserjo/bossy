@@ -15,6 +15,7 @@ from pydantic import Field
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin  # TimestampedSchemaMixin тут не потрібен, бо timestamp є власним полем
 from backend.app.src.core.dicts import LogLevel # Імпортовано LogLevel Enum
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # LogLevel Enum імпортовано вище.
@@ -38,26 +39,26 @@ class SystemLogBaseSchema(BaseSchema):
     """
     # timestamp встановлюється сервером за замовчуванням (default=func.now() в моделі)
     timestamp: Optional[datetime] = Field(
-        default_factory=datetime.now,  # Клієнт може надати, але сервер може перезаписати
-        description="Час виникнення події логу."
+        default_factory=datetime.now,
+        description=_("system.monitoring.log.fields.timestamp.description")
     )
     level: LogLevel = Field(
-        description="Рівень логу."
+        description=_("system.monitoring.log.fields.level.description")
     )
-    message: str = Field(description="Основне повідомлення логу.")
+    message: str = Field(description=_("system.monitoring.log.fields.message.description"))
     source: Optional[str] = Field(
         None,
         max_length=LOG_SOURCE_MAX_LENGTH,
-        description="Джерело події (наприклад, назва сервісу, модуля, функції).",
+        description=_("system.monitoring.log.fields.source.description"),
         examples=["auth_service", "task_scheduler"]
     )
     details: Optional[Dict[str, Any]] = Field(
         None,
-        description="Додаткові структуровані деталі у форматі JSON."
+        description=_("system.monitoring.log.fields.details.description")
     )
     user_id: Optional[int] = Field(
         None,
-        description="ID користувача, пов'язаного з подією логу (якщо є)."
+        description=_("system.monitoring.log.fields.user_id.description")
     )
     # model_config успадковується з BaseSchema (from_attributes=True)
 
@@ -81,7 +82,7 @@ class SystemLogSchema(SystemLogBaseSchema, IDSchemaMixin):
     # timestamp, level, message, source, details, user_id успадковані.
 
     user: Optional[UserPublicProfileSchema] = Field(None,
-                                                    description="Інформація про користувача, пов'язаного з логом (якщо є).")
+                                                    description=_("system.monitoring.log.response.fields.user.description"))
 
 
 # --- Схеми для Метрик Продуктивності (PerformanceMetric) ---
@@ -93,23 +94,23 @@ class PerformanceMetricBaseSchema(BaseSchema):
     # timestamp встановлюється сервером за замовчуванням (default=func.now() в моделі)
     timestamp: Optional[datetime] = Field(
         default_factory=datetime.now,
-        description="Час запису метрики."
+        description=_("system.monitoring.metric.fields.timestamp.description")
     )
     metric_name: str = Field(
         ...,
         max_length=METRIC_NAME_MAX_LENGTH,
-        description="Назва метрики (наприклад, 'api_response_time', 'db_query_duration')."
+        description=_("system.monitoring.metric.fields.metric_name.description")
     )
-    value: float = Field(description="Значення метрики.")
+    value: float = Field(description=_("system.monitoring.metric.fields.value.description"))
     unit: Optional[str] = Field(
         None,
         max_length=METRIC_UNIT_MAX_LENGTH,
-        description="Одиниця виміру метрики (наприклад, 'ms', 's', 'count', 'MB').",
+        description=_("system.monitoring.metric.fields.unit.description"),
         examples=["ms", "count"]
     )
     tags: Optional[Dict[str, str]] = Field(
         None,
-        description="Теги/мітки для групування або фільтрації метрик (у форматі ключ-значення)."
+        description=_("system.monitoring.metric.fields.tags.description")
     )
     # model_config успадковується з BaseSchema (from_attributes=True)
 

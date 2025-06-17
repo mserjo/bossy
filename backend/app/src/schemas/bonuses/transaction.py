@@ -16,7 +16,8 @@ from pydantic import Field, field_validator
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import TransactionType  # Enum для типів транзакцій
-from backend.app.src.config.logging import get_logger 
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # Імпорт для конкретної схеми
@@ -31,19 +32,19 @@ class AccountTransactionBaseSchema(BaseSchema):
     """
     Базова схема для полів транзакції по рахунку.
     """
-    account_id: Optional[int] = Field(None, description="Ідентифікатор рахунку користувача. Якщо None, буде визначений через user_id_for_account_lookup.")
+    account_id: Optional[int] = Field(None, description=_("transaction.fields.account_id.description"))
     transaction_type: TransactionType = Field(
-        description="Тип транзакції."
+        description=_("transaction.fields.transaction_type.description")
     )
     amount: Decimal = Field(
-        description="Сума транзакції. Для списань може бути від'ємною, або завжди позитивною, а напрямок визначається типом.")
-    description: Optional[str] = Field(None, description="Опис або призначення транзакції.",
+        description=_("transaction.fields.amount.description"))
+    description: Optional[str] = Field(None, description=_("transaction.fields.description.description"),
                                        examples=["Нарахування за завдання 'X'", "Витрата на нагороду 'Y'"])
 
     related_task_completion_id: Optional[int] = Field(None,
-                                                      description="ID пов'язаного виконання завдання (якщо транзакція є результатом завдання).")
+                                                      description=_("transaction.fields.related_task_completion_id.description"))
     related_reward_id: Optional[int] = Field(None,
-                                             description="ID пов'язаної отриманої нагороди (якщо транзакція є покупкою нагороди).")
+                                             description=_("transaction.fields.related_reward_id.description"))
 
     # created_by_user_id встановлюється сервісом, не передається клієнтом при створенні звичайної транзакції
     # (може передаватися для ручних адмінських транзакцій)
@@ -62,7 +63,7 @@ class AccountTransactionCreateSchema(AccountTransactionBaseSchema):
     # Успадковує всі поля від AccountTransactionBaseSchema.
     # Поле created_by_user_id може бути додано сюди, якщо клієнт може його вказувати (наприклад, для адмін. операцій)
     created_by_user_id: Optional[int] = Field(None,
-                                              description="ID користувача (адміністратора), який ініціював ручну транзакцію (необов'язково).")
+                                              description=_("transaction.create.fields.created_by_user_id.description"))
 
 
 class AccountTransactionResponseSchema(AccountTransactionBaseSchema, IDSchemaMixin, TimestampedSchemaMixin): # Renamed
@@ -72,11 +73,11 @@ class AccountTransactionResponseSchema(AccountTransactionBaseSchema, IDSchemaMix
     """
     # id, created_at, updated_at успадковані.
     # transaction_type, amount, description, related_task_completion_id, related_reward_id успадковані.
-    account_id: int = Field(description="Ідентифікатор рахунку користувача.") # Перевизначено як non-optional
+    account_id: int = Field(description=_("transaction.response.fields.account_id.description")) # Перевизначено як non-optional
 
-    created_by_user_id: Optional[int] = Field(None, description="ID користувача, який створив транзакцію (якщо є).")
+    created_by_user_id: Optional[int] = Field(None, description=_("transaction.response.fields.created_by_user_id.description"))
     created_by: Optional[UserPublicProfileSchema] = Field(None,
-                                                          description="Інформація про користувача, який створив транзакцію (якщо є).")
+                                                          description=_("transaction.response.fields.created_by.description"))
 
     # Можна додати деталізовані пов'язані об'єкти, якщо потрібно:
     # task_completion: Optional[TaskCompletionSchema] = None # Потребує TaskCompletionSchema

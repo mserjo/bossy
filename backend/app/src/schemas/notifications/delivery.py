@@ -14,9 +14,10 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.config.logging import get_logger 
+from backend.app.src.config.logging import get_logger
 from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType # Імпортовано Enums
 from datetime import timedelta # Переміщено timedelta сюди
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # Enums NotificationChannelType та DeliveryStatusType імпортовано вище.
@@ -30,18 +31,18 @@ class NotificationDeliveryAttemptBaseSchema(BaseSchema):
     """
     Базова схема для полів запису про спробу доставки сповіщення.
     """
-    notification_id: int = Field(description="Ідентифікатор сповіщення, яке намагалися доставити.")
-    channel: NotificationChannelType = Field( # Змінено на NotificationChannelType Enum
-        description="Канал доставки."
+    notification_id: int = Field(description=_("notification.delivery_attempt.fields.notification_id.description"))
+    channel: NotificationChannelType = Field(
+        description=_("notification.delivery_attempt.fields.channel.description")
     )
-    status: DeliveryStatusType = Field( # Змінено на DeliveryStatusType Enum
-        description="Статус спроби доставки."
+    status: DeliveryStatusType = Field(
+        description=_("notification.delivery_attempt.fields.status.description")
     )
-    error_message: Optional[str] = Field(None, description="Повідомлення про помилку, якщо доставка не вдалася.")
+    error_message: Optional[str] = Field(None, description=_("notification.delivery_attempt.fields.error_message.description"))
     external_message_id: Optional[str] = Field(
         None,
         max_length=EXTERNAL_ID_MAX_LENGTH,
-        description="Зовнішній ID повідомлення від провайдера доставки (наприклад, SES Message ID, Twilio SID)."
+        description=_("notification.delivery_attempt.fields.external_message_id.description")
     )
     # model_config успадковується з BaseSchema (from_attributes=True)
 

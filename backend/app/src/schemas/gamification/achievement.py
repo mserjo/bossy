@@ -14,7 +14,8 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.config.logging import get_logger 
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # Імпорти для конкретних схем
@@ -33,10 +34,10 @@ class UserAchievementBaseSchema(BaseSchema):
     """
     Базова схема для полів запису про досягнення користувача (отримання бейджа).
     """
-    user_id: int = Field(description="Ідентифікатор користувача, який отримав досягнення.")
-    badge_id: int = Field(description="Ідентифікатор отриманого бейджа.")
+    user_id: int = Field(description=_("gamification.achievement.fields.user_id.description"))
+    badge_id: int = Field(description=_("gamification.achievement.fields.badge_id.description"))
     group_id: Optional[int] = Field(None,
-                                    description="ID групи, в контексті якої отримано досягнення (якщо бейдж груповий).")
+                                    description=_("gamification.achievement.fields.group_id.description"))
     # `created_at` з TimestampedSchemaMixin буде використовуватися як `achieved_at` у UserAchievementSchema.
 
     # model_config успадковується з BaseSchema (from_attributes=True)
@@ -60,10 +61,10 @@ class UserAchievementSchema(UserAchievementBaseSchema, IDSchemaMixin, Timestampe
     # id, created_at, updated_at успадковані.
     # user_id, badge_id, group_id успадковані.
 
-    user: Optional[UserPublicProfileSchema] = Field(None, description="Публічний профіль користувача.")
-    badge: Optional[BadgeSchema] = Field(None, description="Інформація про отриманий бейдж.")
+    user: Optional[UserPublicProfileSchema] = Field(None, description=_("gamification.achievement.response.fields.user.description"))
+    badge: Optional[BadgeSchema] = Field(None, description=_("gamification.achievement.response.fields.badge.description"))
     group: Optional[GroupSchema] = Field(None, # Changed from GroupBriefSchema
-                                         description="Коротка інформація про групу, в якій отримано досягнення (якщо є).")
+                                         description=_("gamification.achievement.response.fields.group.description"))
 
 
 if __name__ == "__main__":

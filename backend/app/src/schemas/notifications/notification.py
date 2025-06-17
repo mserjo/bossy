@@ -17,8 +17,9 @@ from pydantic import Field
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import NotificationType as NotificationTypeEnum  # Реальний Enum
 from backend.app.src.core.dicts import RelatedEntityType # Імпорт RelatedEntityType
-from backend.app.src.config.logging import get_logger 
+from backend.app.src.config.logging import get_logger
 from datetime import timedelta # Переміщено timedelta сюди
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # Імпорти для конкретних схем
@@ -38,32 +39,31 @@ class NotificationBaseSchema(BaseSchema):
     """
     Базова схема для полів сповіщення.
     """
-    user_id: int = Field(description="Ідентифікатор користувача-отримувача сповіщення.")
-    template_id: Optional[int] = Field(None, description="ID шаблону, на основі якого створено сповіщення (якщо є).")
+    user_id: int = Field(description=_("notification.fields.user_id.description"))
+    template_id: Optional[int] = Field(None, description=_("notification.fields.template_id.description"))
     title: str = Field(
         ...,
         max_length=NOTIFICATION_TITLE_MAX_LENGTH,
-        description="Заголовок сповіщення."
+        description=_("notification.fields.title.description")
     )
     message: str = Field(...,
-                         description="Тіло сповіщення (вже відрендерений текст).")  # `Text` з моделі тут просто `str`
+                         description=_("notification.fields.message.description"))
 
-    notification_type: NotificationTypeEnum = Field( # Змінено на NotificationTypeEnum
-        description="Тип сповіщення." # Використовує значення з core.dicts.NotificationType
+    notification_type: NotificationTypeEnum = Field(
+        description=_("notification.fields.notification_type.description")
     )
-    related_entity_type: Optional[RelatedEntityType] = Field( # Змінено на RelatedEntityType
+    related_entity_type: Optional[RelatedEntityType] = Field(
         None,
-        # max_length більше не потрібен для Enum
-        description="Тип пов'язаної сутності.", # Використовує значення з core.dicts.RelatedEntityType
+        description=_("notification.fields.related_entity_type.description"),
         examples=["task", "user_account"]
     )
     related_entity_id: Optional[int] = Field(
         None,
-        description="ID пов'язаної сутності."
+        description=_("notification.fields.related_entity_id.description")
     )
-    data_payload: Optional[Dict[str, Any]] = Field(  # Для додаткових структурованих даних
+    data_payload: Optional[Dict[str, Any]] = Field(
         None,
-        description="Додаткові структуровані дані для сповіщення (наприклад, для побудови посилань на клієнті)."
+        description=_("notification.fields.data_payload.description")
     )
     # model_config успадковується з BaseSchema (from_attributes=True)
 
@@ -83,7 +83,7 @@ class NotificationUpdateSchema(BaseSchema):
     Схема для оновлення статусу сповіщення (наприклад, позначка про прочитання).
     Дозволяє оновлювати лише обмежений набір полів.
     """
-    is_read: Optional[bool] = Field(None, description="Новий статус прочитання сповіщення.")
+    is_read: Optional[bool] = Field(None, description=_("notification.update.fields.is_read.description"))
     # read_at буде встановлено сервером, якщо is_read=True
 
 
@@ -96,15 +96,15 @@ class NotificationSchema(NotificationBaseSchema, IDSchemaMixin, TimestampedSchem
     # user_id, template_id, title, message, notification_type,
     # related_entity_type, related_entity_id, data_payload успадковані.
 
-    is_read: bool = Field(description="Статус прочитання сповіщення (True, якщо прочитано).")
-    read_at: Optional[datetime] = Field(None, description="Час, коли сповіщення було позначено як прочитане.")
+    is_read: bool = Field(description=_("notification.response.fields.is_read.description"))
+    read_at: Optional[datetime] = Field(None, description=_("notification.response.fields.read_at.description"))
 
     user: Optional[UserPublicProfileSchema] = Field(None,
-                                                    description="Інформація про користувача-отримувача (зазвичай не включається, оскільки запит іде від імені цього користувача).")
+                                                    description=_("notification.response.fields.user.description"))
     template: Optional[NotificationTemplateSchema] = Field(None,
-                                                           description="Інформація про використаний шаблон сповіщення (якщо був).")
+                                                           description=_("notification.response.fields.template.description"))
     delivery_attempts: List[NotificationDeliveryAttemptSchema] = Field(default_factory=list,
-                                                                       description="Історія спроб доставки цього сповіщення.")
+                                                                       description=_("notification.response.fields.delivery_attempts.description"))
 
 
 if __name__ == "__main__":

@@ -15,7 +15,8 @@ from pydantic import Field, AnyHttpUrl, field_validator
 # Абсолютний імпорт базової схеми та Enum
 from backend.app.src.schemas.base import BaseSchema
 from backend.app.src.core.dicts import FileType # Змінено імпорт FileTypeEnum на FileType
-from backend.app.src.config.logging import get_logger 
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 FILE_NAME_MAX_LENGTH_UPLOAD = 255 # Збігається з FileRecord
@@ -31,27 +32,23 @@ class PresignedUrlRequestSchema(BaseSchema): # Renamed from FileUploadInitiateRe
     file_name: str = Field(
         ...,
         max_length=FILE_NAME_MAX_LENGTH_UPLOAD,
-        description="Ім'я файлу, що завантажується.",
+        description=_("file_upload.initiate_request.fields.file_name.description"),
         examples=["my_document.pdf", "profile_image.jpg"]
     )
     mime_type: str = Field(
         ...,
         max_length=MIME_TYPE_MAX_LENGTH_UPLOAD,
-        description="MIME-тип файлу.",
+        description=_("file_upload.initiate_request.fields.mime_type.description"),
         examples=["application/pdf", "image/jpeg"]
     )
     file_size: int = Field(
         ...,
-        ge=0, # Розмір не може бути від'ємним
-        # TODO: Додати максимальний розмір файлу з налаштувань settings.MAX_FILE_SIZE_MB
-        # le=settings.MAX_FILE_SIZE_MB * 1024 * 1024,
-        description="Розмір файлу в байтах."
+        ge=0,
+        description=_("file_upload.initiate_request.fields.file_size.description")
     )
-    # Валідатор для purpose на основі Enum FileType вже існує нижче.
-    purpose: FileType = Field( # Змінено на FileType
+    purpose: FileType = Field(
         ...,
-        # max_length більше не потрібен для Enum
-        description="Призначення файлу. Визначає подальшу обробку та зберігання."
+        description=_("file_upload.initiate_request.fields.purpose.description")
     )
 
     # Валідатор validate_purpose більше не потрібен, Pydantic v2 обробляє Enum автоматично
@@ -62,12 +59,12 @@ class PresignedUrlResponseSchema(BaseSchema): # Renamed from PresignedUploadURLR
     Схема відповіді, що містить URL для прямого завантаження файлу (наприклад, presigned URL для S3)
     та ідентифікатор створеного запису файлу.
     """
-    upload_url: AnyHttpUrl = Field(description="URL, на який клієнт має завантажити файл (PUT або POST).")
+    upload_url: AnyHttpUrl = Field(description=_("file_upload.initiate_response.fields.upload_url.description"))
     fields: Optional[Dict[str, str]] = Field(
         None,
-        description="Додаткові поля, які потрібно включити в тіло POST-запиту (для S3 presigned POST)."
+        description=_("file_upload.initiate_response.fields.fields.description")
     )
-    file_record_id: int = Field(description="ID створеного запису FileRecord, що очікує на завантаження файлу.")
+    file_record_id: int = Field(description=_("file_upload.initiate_response.fields.file_record_id.description"))
 
 
 class FileUploadCompleteRequestSchema(BaseSchema):
@@ -75,15 +72,14 @@ class FileUploadCompleteRequestSchema(BaseSchema):
     Схема для запиту на підтвердження успішного завантаження файлу.
     Клієнт надсилає цей запит після того, як файл було успішно завантажено за наданим URL.
     """
-    file_record_id: int = Field(description="ID запису FileRecord, для якого підтверджується завантаження.")
-    # Наступні поля можуть бути специфічними для провайдера сховища (наприклад, S3)
+    file_record_id: int = Field(description=_("file_upload.complete_request.fields.file_record_id.description"))
     upload_key: Optional[str] = Field(
         None,
-        description="Ключ об'єкта в сховищі, якщо він відрізняється від початкового file_path (необов'язково)."
+        description=_("file_upload.complete_request.fields.upload_key.description")
     )
     e_tag: Optional[str] = Field(
         None,
-        description="ETag об'єкта зі сховища, використовується для перевірки цілісності (наприклад, для S3)."
+        description=_("file_upload.complete_request.fields.e_tag.description")
     )
     # Можна додати інші поля, такі як version_id для S3.
 
@@ -93,12 +89,12 @@ class FileUploadResponseSchema(BaseSchema): # Renamed from FileUploadResponse
     Схема відповіді після успішного завершення всього процесу завантаження файлу.
     Містить фінальну інформацію про завантажений файл.
     """
-    file_id: int = Field(description="ID запису файлу (синонім file_record_id).", alias="fileRecordId")
-    file_name: str = Field(description="Ім'я завантаженого файлу.")
-    url: AnyHttpUrl = Field(description="Фінальний URL для доступу до завантаженого файлу.")
-    mime_type: str = Field(description="MIME-тип файлу.")
-    file_size: int = Field(description="Розмір файлу в байтах.")
-    purpose: Optional[FileType] = Field(None, description="Призначення файлу.") # Змінено на FileType
+    file_id: int = Field(description=_("file_upload.response.fields.file_id.description"), alias="fileRecordId")
+    file_name: str = Field(description=_("file_upload.response.fields.file_name.description"))
+    url: AnyHttpUrl = Field(description=_("file_upload.response.fields.url.description"))
+    mime_type: str = Field(description=_("file_upload.response.fields.mime_type.description"))
+    file_size: int = Field(description=_("file_upload.response.fields.file_size.description"))
+    purpose: Optional[FileType] = Field(None, description=_("file_upload.response.fields.purpose.description"))
 
     # model_config успадковується з BaseSchema, який вже має populate_by_name = True
     # class Config:

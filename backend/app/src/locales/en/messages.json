@@ -43,7 +43,8 @@
       "email_taken_by_other": "Email '{email}' is already registered by another user.",
       "update_conflict": "Could not update user due to a data conflict: {error_message}",
       "roles_not_found": "Roles not found: {codes}.",
-      "username_taken_by_other": "Username '{username}' is already in use by another user."
+      "username_taken_by_other": "Username '{username}' is already in use by another user.",
+      "reviewer_not_found_by_id": "Reviewer user with ID '{user_id}' not found."
     },
     "fields": {
       "username": {
@@ -129,7 +130,8 @@
       "critical_create_failed": "Critical error: failed to retrieve created group ID {group_id} after commit.",
       "create_conflict": "Could not create group due to a data conflict: {error_message}",
       "update_conflict": "Could not update group due to a data conflict: {error_message}",
-      "delete_conflict_in_use": "Group '{group_name}' is in use and cannot be deleted."
+      "delete_conflict_in_use": "Group '{group_name}' is in use and cannot be deleted.",
+      "not_found_by_id": "Group with ID '{id}' not found."
     },
     "reports": {
       "activity_report_not_implemented": "Activity report generation is not yet implemented."
@@ -277,7 +279,9 @@
         "fields": {
             "is_active": {"description": "Activity status of the provider."},
             "credentials_schema": {"description": "JSON schema of required credentials for this provider (e.g., for OAuth)."},
-            "sync_frequency_minutes": {"description": "Recommended synchronization frequency in minutes."}
+            "sync_frequency_minutes": {"description": "Recommended synchronization frequency in minutes."},
+            "description_create": "JSON schema of required credentials for integration setup.",
+            "description_update": "Updated JSON schema for credentials."
         }
     },
     "messengers": {},
@@ -287,7 +291,17 @@
   },
   "task": {
     "errors": {
-        "not_found_by_id": "Task with ID '{task_id}' not found."
+        "not_found_by_id": "Task with ID '{task_id}' not found.",
+        "task_type_not_found_by_id": "Task type with ID '{task_type_id}' not found.",
+        "create": {
+            "default_status_not_found": "Task status is mandatory, but default status '{status_code}' was not found."
+        },
+        "status_not_found_by_id": "Status with ID '{status_id}' not found.",
+        "critical_create_failed": "Critical error: failed to retrieve created task ID {task_id} after commit.",
+        "create_conflict": "Could not create task due to a data conflict: {error_message}",
+        "critical_update_failed": "Critical error: failed to retrieve updated task ID {task_id} after commit.",
+        "update_conflict": "Could not update task due to a data conflict: {error_message}",
+        "delete_in_use": "Task '{task_title}' is in use and cannot be deleted."
     },
     "fields": {
       "name": {"description": "Name or title of the task/event."},
@@ -339,29 +353,46 @@
     }
   },
   "event": {
-      "fields": {
-          "name": {"description": "Name or title of the event."},
-          "description": {"description": "Detailed description of the event."},
-          "start_time": {"description": "Event start date and time (UTC)."},
-          "end_time": {"description": "Optional event end date and time (UTC)."},
-          "location": {"description": "Physical or virtual location of the event."},
-          "state": {"description": "Event state (e.g., 'upcoming', 'ongoing', 'past', 'cancelled')."},
-          "notes": {"description": "Internal notes for the event."}
-      },
-      "create": {
-          "fields": {"group_id": {"description": "Identifier of the group to which this event belongs."}}
-      },
-      "response": {
-          "fields": {
-              "group": {"description": "Basic information about the group to which this event belongs."},
-              "created_by_user_id": {"description": "ID of the user who created the event."},
-              "created_by": {"description": "Profile of the user who created the event."},
-              "assignments": {"description": "List of assignments related to the event."},
-              "completions": {"description": "List of completions related to the event."}
-          }
-      }
+    "errors": {
+        "create": {
+            "type_id_missing": "'event_type_id' or 'task_type_id' must be specified for the event.",
+            "default_status_not_found": "Event status is mandatory, but default status '{status_code}' was not found."
+        },
+        "event_type_not_found_by_id": "Event/task type with ID '{type_id}' not found.",
+        "status_not_found_by_id": "Status with ID '{status_id}' not found.",
+        "critical_create_failed": "Critical error: failed to retrieve created event ID {event_id} after commit.",
+        "create_conflict": "Could not create event due to a data conflict: {error_message}",
+        "critical_update_failed": "Critical error: failed to retrieve updated event ID {event_id} after commit.",
+        "update_conflict": "Could not update event due to a data conflict: {error_message}",
+        "delete_in_use": "Event '{event_title}' is in use and cannot be deleted."
+    },
+    "fields": {
+        "name": {"description": "Name or title of the event."},
+        "description": {"description": "Detailed description of the event."},
+        "start_time": {"description": "Event start date and time (UTC)."},
+        "end_time": {"description": "Optional event end date and time (UTC)."},
+        "location": {"description": "Physical or virtual location of the event."},
+        "state": {"description": "Event state (e.g., 'upcoming', 'ongoing', 'past', 'cancelled')."},
+        "notes": {"description": "Internal notes for the event."}
+    },
+    "create": {
+        "fields": {"group_id": {"description": "Identifier of the group to which this event belongs."}}
+    },
+    "response": {
+        "fields": {
+            "group": {"description": "Basic information about the group to which this event belongs."},
+            "created_by_user_id": {"description": "ID of the user who created the event."},
+            "created_by": {"description": "Profile of the user who created the event."},
+            "assignments": {"description": "List of assignments related to the event."},
+            "completions": {"description": "List of completions related to the event."}
+        }
+    }
   },
   "task_assignment": {
+      "errors": {
+          "critical_create_failed": "Critical error: failed to retrieve assignment record after saving.",
+          "assign_conflict": "Could not assign task due to a data conflict: {error_message}"
+      },
       "fields": {
           "task_id": {"description": "Task identifier."},
           "user_id": {"description": "Identifier of the user to whom the task is assigned."},
@@ -381,6 +412,16 @@
       }
   },
   "task_completion": {
+      "errors": {
+          "already_completed_not_repeatable": "Task ID '{task_id}' has already been completed by you and is not repeatable.",
+          "critical_create_failed": "Failed to retrieve created task completion.",
+          "create_conflict": "Could not mark task as completed due to a data conflict: {error_message}",
+          "not_found_by_id": "Task completion record with ID '{completion_id}' not found.",
+          "not_found_by_id_for_review": "Task completion with ID '{completion_id}' not found.",
+          "not_pending_approval": "Completion ID '{completion_id}' is not awaiting approval (current status: {status}).",
+          "invalid_new_status": "Invalid new status '{status}'. Allowed: {allowed_statuses}.",
+          "view_permission_denied": "You do not have permission to view this completion record."
+      },
       "fields": {
           "completed_at": {"description": "Actual task completion time by the user (or submission time)."},
           "status": {"description": "Task completion status."},
@@ -404,6 +445,16 @@
       }
   },
   "task_review": {
+      "errors": {
+          "completion_mismatch": "Completion ID '{completion_id}' does not belong to Task ID '{task_id}'.",
+          "already_reviewed": "User ID '{user_id}' has already reviewed {context}.",
+          "critical_create_failed": "Failed to retrieve created review.",
+          "create_conflict": "Could not create review due to data conflict: {error_message}",
+          "update_permission_denied": "You do not have permission to update this review.",
+          "update_failed_generic": "Error updating review.",
+          "critical_update_failed_relations": "Failed to retrieve updated review with relations.",
+          "delete_permission_denied": "You can only delete your own reviews."
+      },
       "fields": {
           "rating": {"description": "Numeric task rating (1 to 5, optional)."},
           "comment": {"description": "Text comment for the review (optional)."}
@@ -420,7 +471,8 @@
     "errors": {
       "name_exists_in_scope": "Bonus rule with name '{name}' already exists in {scope}.",
       "create_conflict": "Could not create bonus rule due to data conflict: {error_message}",
-      "update_conflict": "Could not update bonus rule due to data conflict: {error_message}"
+      "update_conflict": "Could not update bonus rule due to data conflict: {error_message}",
+      "task_type_not_found_by_id": "Task type with ID '{task_type_id}' not found."
     },
     "fields": {
         "name": {"description": "Name of the bonus rule."},
@@ -512,6 +564,7 @@
             "internal_server_error": "Internal server error during reward redemption."
         }
     },
+    "transaction_description_redeemed": "Redeemed {quantity}x '{name}'",
     "fields": {
         "name": {"description": "Reward name."},
         "description": {"description": "Detailed reward description."},
@@ -669,7 +722,11 @@
         "errors": {
             "no_channel_or_contact": "No channel or contact information found for delivery.",
             "retry_missing_data": "Missing data for retry.",
-            "retry_sender_not_found": "Sender for channel '{channel}' not found for retry."
+            "retry_sender_not_found": "Sender for channel '{channel}' not found for retry.",
+            "send_unknown_error": "Unknown sending error.",
+            "send_exception_on_channel": "Exception during send attempt on channel {channel_name}: {details}",
+            "retry_send_unknown_error": "Unknown error during retry send.",
+            "retry_exception_on_channel": "Exception during retry send on channel {channel_name}: {details}"
         }
     },
     "fields": {
@@ -826,6 +883,22 @@
                 "tags": {"description": "Tags/labels for grouping or filtering metrics (key-value JSON)."}
             }
         }
+    },
+    "health": {
+        "service_status": {
+            "fields": {
+                "service_name": {"description": "Unique name of the service (e.g., 'database', 'redis_cache', 'payment_gateway')."},
+                "status": {"description": "Current status of the service."},
+                "details": {"description": "Additional details about the service status (e.g., error message or response time)."}
+            }
+        },
+        "overall_status": {
+            "fields": {
+                "overall_status": {"description": "Overall aggregated health status of the system."},
+                "timestamp": {"description": "Timestamp of when the health report was generated."},
+                "services": {"description": "List of health statuses for individual dependent services."}
+            }
+        }
     }
   },
   "file_record": {
@@ -836,6 +909,17 @@
         "create_conflict": "Could not create file record due to data conflict.",
         "delete_in_use": "File record '{file_name}' is in use and cannot be deleted.",
         "not_found_by_id": "File record with ID '{file_id}' not found."
+    },
+    "fields": {
+        "file_name": {"description": "Original or generated name of the file."},
+        "mime_type": {"description": "MIME type of the file."},
+        "file_size": {"description": "Size of the file in bytes."},
+        "purpose": {"description": "Purpose of the file."},
+        "metadata": {"description": "Additional file metadata in JSON format (e.g., image dimensions, audio/video duration)."},
+        "file_path": {"description": "Path to the file on the server or key in object storage (usually not returned directly to the client)."},
+        "uploader_user_id": {"description": "ID of the user who uploaded the file."},
+        "url": {"description": "Public URL for accessing the file (if applicable)."},
+        "uploader": {"description": "Information about the user who uploaded the file."}
     }
   },
   "file_upload": {
@@ -867,6 +951,38 @@
     },
     "complete": {
         "success_message": "File '{file_name}' uploaded successfully."
+    },
+    "initiate_request": {
+        "fields": {
+            "file_name": {"description": "Name of the file being uploaded."},
+            "mime_type": {"description": "MIME type of the file."},
+            "file_size": {"description": "Size of the file in bytes."},
+            "purpose": {"description": "Purpose of the file. Determines further processing and storage."}
+        }
+    },
+    "initiate_response": {
+        "fields": {
+            "upload_url": {"description": "URL to which the client should upload the file (PUT or POST)."},
+            "fields": {"description": "Additional fields to include in the POST request body (for S3 presigned POST)."},
+            "file_record_id": {"description": "ID of the created FileRecord awaiting file upload."}
+        }
+    },
+    "complete_request": {
+        "fields": {
+            "file_record_id": {"description": "ID of the FileRecord for which upload is being confirmed."},
+            "upload_key": {"description": "Object key in storage if different from initial file_path (optional)."},
+            "e_tag": {"description": "ETag of the object from storage, used for integrity check (e.g., for S3)."}
+        }
+    },
+    "response": {
+        "fields": {
+            "file_id": {"description": "File record ID (alias for fileRecordId)."},
+            "file_name": {"description": "Name of the uploaded file."},
+            "url": {"description": "Final URL to access the uploaded file."},
+            "mime_type": {"description": "MIME type of the file."},
+            "file_size": {"description": "Size of the file in bytes."},
+            "purpose": {"description": "Purpose of the file."}
+        }
     }
   },
   "user_avatar": {
@@ -880,6 +996,16 @@
         "deactivate": {
             "permission_denied": "You do not have permission to deactivate this avatar."
         }
+    },
+    "fields": {
+        "user_id": {"description": "Identifier of the user to whom the avatar belongs."},
+        "file_record_id": {"description": "Identifier of the file record that is the avatar."},
+        "is_active": {"description": "Is this avatar currently active for the user."},
+        "file_url": {"description": "URL to access the avatar file."},
+        "user": {"description": "User information (usually not included if request is from this user or avatar is part of user profile)."},
+        "file_record": {"description": "Detailed information about the avatar file."}
     }
-  }
+  },
+  "global_scope": "global scope",
+  "in_group_scope":"in group ID '{group_id}'"
 }

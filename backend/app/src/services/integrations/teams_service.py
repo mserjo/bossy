@@ -14,6 +14,7 @@ from backend.app.src.services.integrations.messenger_base import (
 from backend.app.src.models.integrations.user_integration import UserIntegration # Для зберігання ID користувача Teams або посилань на розмову
 from backend.app.src.config.settings import settings # Для Microsoft App ID, пароля/секрету для бота
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # TODO: Додати залежності: pip install botbuilder-core botbuilder-schema botframework-connector msgraph-sdk-python
@@ -101,8 +102,7 @@ class TeamsIntegrationService(BaseMessengerIntegrationService):
         # TODO: Реалізувати конвертацію MessengerMessage в формат Teams (текст або Adaptive Card).
 
         if not message_text: # Teams може вимагати текст або картку
-            # i18n
-            return MessageSendResponse(status="failed", error_message="Текст повідомлення або картка не можуть бути порожніми для Teams.")
+            return MessageSendResponse(status="failed", error_message=_("integrations.messenger.errors.message_text_empty"))
 
         # if not self.bot_adapter:
         #     logger.warning("Адаптер BotFramework (Teams) не доступний для надсилання повідомлення.")

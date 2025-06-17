@@ -15,6 +15,7 @@ from backend.app.src.services.integrations.messenger_base import (
 from backend.app.src.models.integrations.user_integration import UserIntegration # Для зберігання Slack user_id / токена бота
 from backend.app.src.config.settings import settings # Для Slack Bot Token
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # TODO: Додати залежність: pip install slack_sdk
@@ -97,8 +98,7 @@ class SlackIntegrationService(BaseMessengerIntegrationService):
         # blocks = self._convert_message_to_slack_blocks(command.message)
 
         if not message_text: # and not blocks: # Slack може надсилати повідомлення тільки з блоками
-            # i18n
-            return MessageSendResponse(status="failed", error_message="Текст повідомлення або блоки не можуть бути порожніми.")
+            return MessageSendResponse(status="failed", error_message=_("integrations.messenger.errors.message_text_empty"))
 
         # if not self.slack_client:
         #     logger.warning("Клієнт Slack не доступний для надсилання повідомлення.")

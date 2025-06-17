@@ -15,6 +15,7 @@ from backend.app.src.services.integrations.messenger_base import (
 from backend.app.src.models.integrations.user_integration import UserIntegration  # Припустима модель для зберігання Viber User ID
 from backend.app.src.config.settings import settings  # Для Viber Auth Token
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # TODO: Додати залежність: pip install viberbot (або viber-bot-python) або httpx
@@ -133,9 +134,8 @@ class ViberIntegrationService(BaseMessengerIntegrationService):
         # TODO: Реалізувати конвертацію MessengerMessage в формат Viber (текст, кнопки, каруселі тощо).
 
         if not message_text:
-            # i18n
             return MessageSendResponse(status="failed",
-                                       error_message="Текст повідомлення не може бути порожнім для Viber.")
+                                       error_message=_("integrations.messenger.errors.message_text_empty"))
 
         # if not self.viber_client:
         #     logger.warning("Клієнт Viber не доступний для надсилання повідомлення.")

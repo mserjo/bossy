@@ -17,34 +17,36 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.config.logging import get_logger 
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
-# TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
-# from backend.app.src.schemas.auth.user import UserPublicProfileSchema
-# from backend.app.src.schemas.groups.group import GroupSchema # Або GroupBriefSchema
-# from .transaction import AccountTransactionSchema # Для історії транзакцій
+# Імпорти для конкретних схем
+from backend.app.src.schemas.auth.user import UserPublicProfileSchema
+from backend.app.src.schemas.groups.group import GroupSchema
+from .transaction import AccountTransactionResponseSchema # Відносний імпорт
 
-UserPublicProfileSchema = Any  # Тимчасовий заповнювач
-GroupSchema = Any  # Тимчасовий заповнювач
-AccountTransactionSchema = Any  # Тимчасовий заповнювач
+
+# Placeholder assignments removed
+# UserPublicProfileSchema = Any
+# GroupSchema = Any
+# AccountTransactionSchema = Any
 
 
 class UserAccountBaseSchema(BaseSchema):
     """
     Базова схема для полів рахунку користувача.
     """
-    user_id: int = Field(description="Ідентифікатор користувача, якому належить рахунок.")
-    group_id: int = Field(description="Ідентифікатор групи, в межах якої існує цей рахунок.")
+    user_id: int = Field(description=_("account.fields.user_id.description"))
+    group_id: int = Field(description=_("account.fields.group_id.description"))
     balance: Decimal = Field(
         default=Decimal("0.00"),
-        description="Поточний баланс на рахунку."
+        description=_("account.fields.balance.description")
     )
-    # TODO i18n: default value 'бали'
     currency: str = Field(
-        default="бали",
-        max_length=10,  # Узгоджено з моделлю String(10)
-        description="Валюта або одиниця виміру бонусів на рахунку (наприклад, 'бали', 'очки')."
+        default="бали", # Default value itself is not translated by `_` here
+        max_length=10,
+        description=_("account.fields.currency.description")
     )
     # model_config успадковується з BaseSchema (from_attributes=True)
 
@@ -65,7 +67,7 @@ class UserAccountUpdateSchema(BaseSchema):
     Схема для оновлення балансу рахунку (наприклад, для адміністративних коригувань).
     Дозволяє оновлювати лише баланс. Інші поля (user_id, group_id, currency) зазвичай незмінні.
     """
-    balance: Optional[Decimal] = Field(None, description="Нове значення балансу для адміністративного коригування.")
+    balance: Optional[Decimal] = Field(None, description=_("account.update.fields.balance.description"))
     # Якщо потрібно оновлювати валюту (що малоймовірно для існуючого рахунку):
     # currency: Optional[str] = Field(None, max_length=50, description="Нова валюта рахунку.")
 
@@ -77,19 +79,17 @@ class UserAccountResponseSchema(UserAccountBaseSchema, IDSchemaMixin, Timestampe
     # id, created_at, updated_at успадковані з міксинів.
     # user_id, group_id, balance, currency успадковані з UserAccountBaseSchema.
 
-    # TODO: Замінити Any на відповідні схеми.
     user: Optional[UserPublicProfileSchema] = Field(None,
-                                                    description="Публічний профіль користувача, власника рахунку.")
-    group: Optional[GroupSchema] = Field(None, description="Коротка інформація про групу, до якої належить рахунок.")
+                                                    description=_("account.response.fields.user.description"))
+    group: Optional[GroupSchema] = Field(None, description=_("account.response.fields.group.description"))
 
 
-class UserAccountTransactionHistorySchema(UserAccountResponseSchema): # Renamed
+class UserAccountTransactionHistorySchema(UserAccountResponseSchema):
     """
     Розширена схема для представлення рахунку користувача разом з історією транзакцій.
     """
-    # TODO: Замінити Any на AccountTransactionSchema.
-    transactions: List[AccountTransactionSchema] = Field(default_factory=list,
-                                                         description="Список транзакцій по цьому рахунку.")
+    transactions: List[AccountTransactionResponseSchema] = Field(default_factory=list,
+                                                                  description=_("account.history_response.fields.transactions.description"))
 
 
 if __name__ == "__main__":
@@ -129,24 +129,34 @@ if __name__ == "__main__":
         "currency": "бали",  # TODO i18n
         "created_at": datetime.now(),
         "updated_at": datetime.now(),
-        # "user": {"id": 1, "name": "Власник Рахунку"}, # Приклад UserPublicProfileSchema
-        # "group": {"id": 10, "name": "Група Тестування"}  # Приклад GroupSchema (коротка версія)
+        # Приклади для пов'язаних об'єктів (закоментовано, бо потребують повних даних схем)
+        # "user": {"id": 1, "username": "owner", "name": "Власник Рахунку"},
+        # "group": {"id": 10, "name": "Група Тестування", "group_type_code": "TEAM",
+        #           "created_at": str(datetime.now()), "updated_at": str(datetime.now())}
     }
-    account_response_instance = UserAccountResponseSchema(**account_response_data) # Renamed
+    account_response_instance = UserAccountResponseSchema(**account_response_data)
     logger.info(account_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nUserAccountTransactionHistorySchema (приклад відповіді API з транзакціями):")
+    # Приклад даних для транзакцій (потребує відповідності до AccountTransactionResponseSchema)
+    example_transaction_1 = {
+        "id": 1001, "account_id": 1, "transaction_type_code": "CREDIT", "amount": Decimal("50.00"),
+        "description": "Бонус за завдання", "bonus_rule_id": 5, "created_at": datetime.now(), "updated_at": datetime.now()
+        # "transaction_type": {"id":1, "code": "CREDIT", "name": "Credit"}, # Приклад якщо transaction_type є об'єктом
+        # "bonus_rule": {"id":5, "name":"Rule Name"} # Приклад якщо bonus_rule є об'єктом
+    }
+    example_transaction_2 = {
+        "id": 1002, "account_id": 1, "transaction_type_code": "DEBIT", "amount": Decimal("10.25"),
+        "description": "Покупка нагороди", "created_at": datetime.now(), "updated_at": datetime.now()
+    }
+
     history_response_data = {
-        **account_response_data,  # Успадковує поля з UserAccountResponseSchema
-        "transactions": [  # Приклад AccountTransactionSchema
-            {"id": 1001, "transaction_type": "credit", "amount": Decimal("50.00"), "description": "Бонус за завдання",
-             "created_at": datetime.now()},  # TODO i18n
-            {"id": 1002, "transaction_type": "debit", "amount": Decimal("10.25"), "description": "Покупка нагороди",
-             "created_at": datetime.now()}  # TODO i18n
-        ]
+        **account_response_data,
+        "transactions": [example_transaction_1, example_transaction_2]
     }
     history_response_instance = UserAccountTransactionHistorySchema(**history_response_data)
     logger.info(history_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    logger.info("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, GroupSchema, AccountTransactionSchema)")
-    logger.info("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
+    logger.info("\nПримітка: Схеми для пов'язаних об'єктів тепер імпортовані.")
+    logger.info("Приклади даних для цих полів у `account_response_data` та `history_response_data` можуть потребувати коригування")
+    logger.info("для повної відповідності структурам `UserPublicProfileSchema`, `GroupSchema`, та `AccountTransactionResponseSchema`.")

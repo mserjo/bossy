@@ -23,6 +23,7 @@ from backend.app.src.schemas.tasks.completion import (  # Схеми Pydantic
 )
 from backend.app.src.config import settings as global_settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # TODO: Винести статуси завершення до спільного файлу констант або Enum,
@@ -79,10 +80,10 @@ class TaskCompletionService(BaseService):
         logger.debug(f"Користувач ID '{user_id}' намагається позначити завдання ID '{task_id}' як виконане.")
 
         task = await self.db_session.get(Task, task_id, options=[selectinload(Task.task_type)])
-        if not task: raise ValueError(f"Завдання з ID '{task_id}' не знайдено.")  # i18n
+        if not task: raise ValueError(_("task.errors.not_found_by_id", task_id=task_id))
 
         if not await self.db_session.get(User, user_id):
-            raise ValueError(f"Користувача з ID '{user_id}' не знайдено.")  # i18n
+            raise ValueError(_("user.errors.not_found_by_id", id=user_id))
 
         # TODO: Узгодити з `technical_task.txt`: чи обов'язково бути призначеним на завдання для його виконання?
         #  Якщо так, додати перевірку активного TaskAssignment.
@@ -105,8 +106,8 @@ class TaskCompletionService(BaseService):
                 )
             )).scalar_one_or_none()
             if existing_completion:
-                msg = f"Завдання ID '{task_id}' вже було виконано Вами і не є повторюваним."  # i18n
-                logger.warning(f"{msg} (Користувач ID: {user_id})")
+                msg = _("task_completion.errors.already_completed_not_repeatable", task_id=task_id)
+                logger.warning(f"Task ID '{task_id}' already completed by user ID '{user_id}' and is not repeatable.") # Log can be more detailed
                 raise ValueError(msg)
 
         # Визначення початкового статусу на основі типу завдання
@@ -128,12 +129,11 @@ class TaskCompletionService(BaseService):
         try:
             await self.commit()
             refreshed_completion = await self._get_orm_completion_with_relations(new_completion_db.id)
-            if not refreshed_completion: raise RuntimeError("Не вдалося отримати створене виконання завдання.")  # i18n
+            if not refreshed_completion: raise RuntimeError(_("task_completion.errors.critical_create_failed"))
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності '{task_id}' для '{user_id}': {e}", exc_info=global_settings.DEBUG)
-            # i18n
-            raise ValueError(f"Не вдалося позначити завдання як виконане через конфлікт даних: {e}")
+            raise ValueError(_("task_completion.errors.create_conflict", error_message=str(e)))
 
         logger.info(
             f"Завдання ID '{task_id}' позначено як '{initial_status}' користувачем ID '{user_id}'. ID Завершення: {refreshed_completion.id}")
@@ -165,19 +165,19 @@ class TaskCompletionService(BaseService):
 
         completion_db = await self._get_orm_completion_with_relations(completion_id)
         if not completion_db:
-            raise ValueError(f"Запис завершення завдання з ID '{completion_id}' не знайдено.")  # i18n
+            raise ValueError(_("task_completion.errors.not_found_by_id", completion_id=completion_id))
 
         if completion_db.status != COMPLETION_STATUS_PENDING_APPROVAL:
-            msg = f"Завершення ID '{completion_id}' не очікує на ухвалення (поточний статус: {completion_db.status})."  # i18n
-            logger.warning(msg)
+            status_value = str(completion_db.status.value) if isinstance(completion_db.status, Enum) else str(completion_db.status)
+            msg = _("task_completion.errors.not_pending_approval", completion_id=completion_id, status=status_value)
+            logger.warning(f"Completion ID '{completion_id}' is not pending approval (current status: {status_value}).") # Log can be detailed
             raise ValueError(msg)
 
         # Перевірка, чи новий статус є допустимим (APPROVED або REJECTED)
         valid_new_statuses = {COMPLETION_STATUS_APPROVED, COMPLETION_STATUS_REJECTED}
         if admin_update_data.status not in valid_new_statuses:
-            # i18n
             raise ValueError(
-                f"Неприпустимий новий статус '{admin_update_data.status}'. Дозволені: {valid_new_statuses}.")
+                _("task_completion.errors.invalid_new_status", status=str(admin_update_data.status), allowed_statuses=str(valid_new_statuses)))
 
         original_status = completion_db.status
         completion_db.status = admin_update_data.status
@@ -279,8 +279,7 @@ class TaskCompletionService(BaseService):
         if user_id_check and completion_db.user_id != user_id_check:
             logger.warning(
                 f"Спроба доступу до завершення ID {completion_id} користувачем {user_id_check}, але воно належить {completion_db.user_id}.")
-            # i18n
-            raise PermissionError("Ви не маєте дозволу на перегляд цього запису про виконання.")
+            raise PermissionError(_("task_completion.errors.view_permission_denied"))
 
         return TaskCompletionResponse.model_validate(completion_db)  # Pydantic v2
 

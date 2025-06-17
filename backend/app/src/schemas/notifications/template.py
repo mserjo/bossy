@@ -19,6 +19,7 @@ from backend.app.src.schemas.dictionaries.base_dict import (
     DictionaryUpdateSchema
 )
 from backend.app.src.core.dicts import NotificationChannelType # Імпортовано Enum
+from backend.app.src.core.i18n import _ # Added import
 
 
 TEMPLATE_SUBJECT_MAX_LENGTH = 500
@@ -33,15 +34,15 @@ class NotificationTemplateBaseSchema(BaseSchema):  # Не успадковує D
     subject_template: str = Field(
         ...,
         max_length=TEMPLATE_SUBJECT_MAX_LENGTH,
-        description="Шаблон теми сповіщення. Може містити плейсхолдери (наприклад, {{user_name}})."
+        description=_("notification.template.fields.subject_template.description")
     )
     body_template: str = Field(
         ...,
-        description="Шаблон тіла сповіщення. Може містити плейсхолдери та HTML/Markdown/текст залежно від типу."
+        description=_("notification.template.fields.body_template.description")
     )
-    template_type: NotificationChannelType = Field( # Змінено на NotificationChannelType Enum
+    template_type: NotificationChannelType = Field(
         ...,
-        description="Тип/канал шаблону."
+        description=_("notification.template.fields.template_type.description")
     )
 
 
@@ -63,9 +64,9 @@ class NotificationTemplateUpdateSchema(DictionaryUpdateSchema, NotificationTempl
     """
     # name, code, description, state, notes - опціональні з DictionaryUpdateSchema
     # subject_template, body_template, template_type - робимо опціональними тут
-    subject_template: Optional[str] = Field(None, max_length=TEMPLATE_SUBJECT_MAX_LENGTH)
-    body_template: Optional[str] = None
-    template_type: Optional[NotificationChannelType] = Field(None, description="Новий тип/канал шаблону.") # Змінено на Enum
+    subject_template: Optional[str] = Field(None, max_length=TEMPLATE_SUBJECT_MAX_LENGTH, description=_("notification.template.fields.subject_template.description")) # Reuse
+    body_template: Optional[str] = Field(None, description=_("notification.template.fields.body_template.description")) # Reuse
+    template_type: Optional[NotificationChannelType] = Field(None, description=_("notification.template.fields.template_type.description")) # Reuse
 
 
 class NotificationTemplateSchema(BaseDictionarySchema):
@@ -74,9 +75,9 @@ class NotificationTemplateSchema(BaseDictionarySchema):
     Успадковує `id`, `code`, `name`, `description`, `state`, `notes`, `group_id`,
     `created_at`, `updated_at`, `deleted_at` від `BaseDictionarySchema` (який успадковує `BaseMainSchema`).
     """
-    subject_template: str = Field(description="Шаблон теми сповіщення.")
-    body_template: str = Field(description="Шаблон тіла сповіщення.")
-    template_type: NotificationChannelType = Field(description="Тип/канал шаблону.") # Змінено на Enum
+    subject_template: str = Field(description=_("notification.template.fields.subject_template.description")) # Reuse
+    body_template: str = Field(description=_("notification.template.fields.body_template.description")) # Reuse
+    template_type: NotificationChannelType = Field(description=_("notification.template.fields.template_type.description")) # Reuse
 
     # model_config успадковується з BaseDictionarySchema
 

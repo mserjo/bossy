@@ -20,6 +20,7 @@ from pydantic import Field
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin, BaseMainSchema
 from backend.app.src.core.dicts import TaskStatus as TaskStatusEnum  # Для значень за замовчуванням та валідації
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
@@ -51,94 +52,84 @@ class TaskBaseSchema(BaseSchema):
     name: str = Field(
         ...,
         max_length=TASK_NAME_MAX_LENGTH,
-        description="Назва завдання або події.",
+        description=_("task.fields.name.description"),
         examples=["Розробити новий функціонал"]
     )
     description: Optional[str] = Field(
         None,
-        description="Детальний опис завдання або події."
+        description=_("task.fields.description.description")
     )
-    # TODO: Валідувати task_type_code на основі існуючих кодів в довіднику dict_task_types
     task_type_code: str = Field(
-        description="Код типу завдання з довідника (наприклад, 'REGULAR_TASK', 'EVENT')."
+        description=_("task.fields.task_type_code.description")
     )
-
-    # TODO: Узгодити status_code/status_id з полем state з BaseMainSchema.
-    # Якщо `state` з BaseMainSchema є основним полем статусу, то `status_code` тут може бути зайвим
-    # або використовуватися для передачі коду статусу, який сервіс перетворить на `state` або `status_id` моделі.
-    # Поки що залишимо `state` для схем Create/Update, а `status` (об'єкт) та `status_code` для Response.
     state: Optional[TaskStatusEnum] = Field(
-        default=TaskStatusEnum.OPEN, # Використовуємо Enum напряму
-        # max_length=50, # Не потрібен для Enum
-        description="Стан завдання. Використовуйте значення з TaskStatus Enum.",
-        examples=[ts for ts in TaskStatusEnum] # Приклади тепер є Enum членами
+        default=TaskStatusEnum.OPEN,
+        description=_("task.fields.state.description"),
+        examples=[ts for ts in TaskStatusEnum]
     )
     due_date: Optional[datetime] = Field(
         None,
-        description="Термін виконання завдання (кінцева дата та час).",
+        description=_("task.fields.due_date.description"),
         examples=[(datetime.now() + timedelta(days=7)).isoformat()]
     )
     is_recurring: bool = Field(
         default=False,
-        description="Прапорець: чи є завдання рекурентним."
+        description=_("task.fields.is_recurring.description")
     )
     recurrence_pattern: Optional[str] = Field(
         None,
         max_length=TASK_RECURRENCE_PATTERN_MAX_LENGTH,
-        description="Шаблон повторення (наприклад, RRULE або cron-вираз).",
+        description=_("task.fields.recurrence_pattern.description"),
         examples=["RRULE:FREQ=WEEKLY;BYDAY=MO;INTERVAL=1"]
     )
-    recurrence_start_date: Optional[date] = Field(  # Використовуємо date
+    recurrence_start_date: Optional[date] = Field(
         None,
-        description="Дата початку повторення."
+        description=_("task.fields.recurrence_start_date.description")
     )
-    recurrence_end_date: Optional[date] = Field(  # Використовуємо date
+    recurrence_end_date: Optional[date] = Field(
         None,
-        description="Дата завершення повторення (якщо є)."
+        description=_("task.fields.recurrence_end_date.description")
     )
     reminder_config: Optional[Dict[str, Any]] = Field(
         None,
-        description="Конфігурація нагадувань (JSON, наприклад, {'before_due': '1d', 'repeat': 'every_4h'})."
+        description=_("task.fields.reminder_config.description")
     )
-
     is_mandatory: bool = Field(
         default=False,
-        description="Прапорець: чи є завдання обов'язковим для виконання."
+        description=_("task.fields.is_mandatory.description")
     )
     parent_task_id: Optional[int] = Field(
         None,
-        description="ID батьківського завдання (для створення підзавдання)."
+        description=_("task.fields.parent_task_id.description")
     )
     points_reward: Optional[Decimal] = Field(
         None,
-        ge=0,  # Бали не можуть бути від'ємними при прямому нарахуванні
-        description="Кількість балів за успішне виконання завдання (якщо застосовно, не може бути від'ємним).",
+        ge=0,
+        description=_("task.fields.points_reward.description"),
         examples=[Decimal("10.00"), Decimal("50.50")]
     )
     penalty_amount: Optional[Decimal] = Field(
         None,
-        ge=0,  # Штраф також вказується як позитивне число, а тип бонусу визначає списання.
-        description="Сума штрафу за невиконання або прострочення (якщо застосовно, не може бути від'ємним).",
+        ge=0,
+        description=_("task.fields.penalty_amount.description"),
         examples=[Decimal("5.00")]
     )
     notes: Optional[str] = Field(
         None,
-        description="Додаткові нотатки до завдання."
+        description=_("task.fields.notes.description")
     )
-
-    # Поля, специфічні для подій
     event_start_time: Optional[datetime] = Field(
         None,
-        description="Час початку події (якщо завдання є подією)."
+        description=_("task.fields.event_start_time.description")
     )
     event_end_time: Optional[datetime] = Field(
         None,
-        description="Час закінчення події (якщо завдання є подією)."
+        description=_("task.fields.event_end_time.description")
     )
     event_location: Optional[str] = Field(
         None,
         max_length=TASK_EVENT_LOCATION_MAX_LENGTH,
-        description="Місце проведення події (якщо застосовно)."
+        description=_("task.fields.event_location.description")
     )
 
 
@@ -159,31 +150,27 @@ class TaskUpdateSchema(TaskBaseSchema):
     Всі поля, успадковані з `TaskBaseSchema`, стають опціональними для оновлення.
     """
     # Робимо всі поля з TaskBaseSchema опціональними
-    name: Optional[str] = Field(None, max_length=TASK_NAME_MAX_LENGTH, description="Нова назва завдання.")
-    description: Optional[str] = Field(None, description="Новий опис завдання.")
-    task_type_code: Optional[str] = Field(None, description="Новий код типу завдання.")
-    state: Optional[TaskStatusEnum] = Field(None, description="Новий стан завдання.")
-    due_date: Optional[datetime] = Field(None, description="Новий термін виконання.")
+    name: Optional[str] = Field(None, max_length=TASK_NAME_MAX_LENGTH, description=_("task.update_fields.name.description"))
+    description: Optional[str] = Field(None, description=_("task.fields.description.description")) # Reuse from base
+    task_type_code: Optional[str] = Field(None, description=_("task.fields.task_type_code.description")) # Reuse
+    state: Optional[TaskStatusEnum] = Field(None, description=_("task.fields.state.description")) # Reuse
+    due_date: Optional[datetime] = Field(None, description=_("task.fields.due_date.description")) # Reuse
 
-    is_recurring: Optional[bool] = Field(None, description="Оновити прапорець повторюваності екземпляра.")
-    is_recurring_template: Optional[bool] = Field(None,
-                                                  description="Оновити прапорець, чи є це шаблоном повторюваних завдань.")
-    recurrence_pattern: Optional[str] = Field(None, max_length=TASK_RECURRENCE_PATTERN_MAX_LENGTH,
-                                              description="Новий шаблон повторення.")
-    recurrence_start_date: Optional[date] = Field(None, description="Нова дата початку повторення.")
-    recurrence_end_date: Optional[date] = Field(None, description="Нова дата завершення повторення.")
-    reminder_config: Optional[Dict[str, Any]] = Field(None, description="Нова конфігурація нагадувань.")
+    is_recurring: Optional[bool] = Field(None, description=_("task.fields.is_recurring.description")) # Reuse
+    is_recurring_template: Optional[bool] = Field(None, description=_("task.update_fields.is_recurring_template.description"))
+    recurrence_pattern: Optional[str] = Field(None, max_length=TASK_RECURRENCE_PATTERN_MAX_LENGTH, description=_("task.fields.recurrence_pattern.description")) # Reuse
+    recurrence_start_date: Optional[date] = Field(None, description=_("task.fields.recurrence_start_date.description")) # Reuse
+    recurrence_end_date: Optional[date] = Field(None, description=_("task.fields.recurrence_end_date.description")) # Reuse
+    reminder_config: Optional[Dict[str, Any]] = Field(None, description=_("task.fields.reminder_config.description")) # Reuse
 
-    is_mandatory: Optional[bool] = Field(None, description="Оновити прапорець обов'язковості завдання.")
-    parent_task_id: Optional[int] = Field(None,
-                                          description="Новий ID батьківського завдання (None для видалення зв'язку).")
-    points_reward: Optional[Decimal] = Field(None, ge=0, description="Нова кількість балів за виконання.")
-    penalty_amount: Optional[Decimal] = Field(None, ge=0, description="Нова сума штрафу.")
-    notes: Optional[str] = Field(None, description="Нові нотатки до завдання.")
-    event_start_time: Optional[datetime] = Field(None, description="Новий час початку події.")
-    event_end_time: Optional[datetime] = Field(None, description="Новий час закінчення події.")
-    event_location: Optional[str] = Field(None, max_length=TASK_EVENT_LOCATION_MAX_LENGTH,
-                                          description="Нове місце проведення події.")
+    is_mandatory: Optional[bool] = Field(None, description=_("task.fields.is_mandatory.description")) # Reuse
+    parent_task_id: Optional[int] = Field(None, description=_("task.fields.parent_task_id.description")) # Reuse
+    points_reward: Optional[Decimal] = Field(None, ge=0, description=_("task.fields.points_reward.description")) # Reuse
+    penalty_amount: Optional[Decimal] = Field(None, ge=0, description=_("task.fields.penalty_amount.description")) # Reuse
+    notes: Optional[str] = Field(None, description=_("task.fields.notes.description")) # Reuse
+    event_start_time: Optional[datetime] = Field(None, description=_("task.fields.event_start_time.description")) # Reuse
+    event_end_time: Optional[datetime] = Field(None, description=_("task.fields.event_end_time.description")) # Reuse
+    event_location: Optional[str] = Field(None, max_length=TASK_EVENT_LOCATION_MAX_LENGTH, description=_("task.fields.event_location.description")) # Reuse
 
 
 class TaskSchema(
@@ -195,64 +182,53 @@ class TaskSchema(
     # state успадковано, але тут буде перевизначено для використання Enum
 
     # Специфічні поля моделі Task, що не входять до BaseMainSchema або потребують іншого представлення
-    state: Optional[TaskStatusEnum] = Field(None, description="Стан завдання (використовує TaskStatus Enum).")
-    task_type_code: Optional[str] = Field(None, description="Код типу завдання.")
+    state: Optional[TaskStatusEnum] = Field(None, description=_("task.fields.state.description")) # Reuse
+    task_type_code: Optional[str] = Field(None, description=_("task.fields.task_type_code.description")) # Reuse
 
-    status_code: Optional[str] = Field(None, description="Код поточного статусу завдання (з довідника dict_statuses).")
+    status_code: Optional[str] = Field(None, description=_("task.response.fields.status_code.description"))
 
-    due_date: Optional[datetime] = Field(None, description="Термін виконання завдання.") # Вже є в BaseMainSchema через TaskBaseSchema успадкування, але тут для ясності
+    due_date: Optional[datetime] = Field(None, description=_("task.fields.due_date.description"))
 
     # Поля повторення та нагадувань
-    is_recurring: bool = Field(description="Чи є завдання екземпляром повторюваного (або старим полем шаблону).")
-    is_recurring_template: Optional[bool] = Field(None,
-                                                  description="Чи є це завдання шаблоном для повторюваних завдань.")
-    recurrence_pattern: Optional[str] = Field(None, description="Шаблон повторення.")
-    recurrence_start_date: Optional[date] = Field(None, description="Дата початку повторення.")
-    recurrence_end_date: Optional[date] = Field(None, description="Дата завершення повторення.")
-    last_instance_created_at: Optional[datetime] = Field(None,
-                                                         description="Час створення останнього екземпляру (для шаблонів).")
-    next_occurrence_at: Optional[datetime] = Field(None,
-                                                   description="Розрахунковий час наступного виконання (для шаблонів).")
-    last_reminder_sent_at: Optional[datetime] = Field(None, description="Час останнього надісланого нагадування.")
-    reminder_config: Optional[Dict[str, Any]] = Field(None, description="Конфігурація нагадувань.")
+    is_recurring: bool = Field(description=_("task.fields.is_recurring.description")) # Reuse
+    is_recurring_template: Optional[bool] = Field(None, description=_("task.response.fields.is_recurring_template.description"))
+    recurrence_pattern: Optional[str] = Field(None, description=_("task.fields.recurrence_pattern.description")) # Reuse
+    recurrence_start_date: Optional[date] = Field(None, description=_("task.fields.recurrence_start_date.description")) # Reuse
+    recurrence_end_date: Optional[date] = Field(None, description=_("task.fields.recurrence_end_date.description")) # Reuse
+    last_instance_created_at: Optional[datetime] = Field(None, description=_("task.response.fields.last_instance_created_at.description"))
+    next_occurrence_at: Optional[datetime] = Field(None, description=_("task.response.fields.next_occurrence_at.description"))
+    last_reminder_sent_at: Optional[datetime] = Field(None, description=_("task.response.fields.last_reminder_sent_at.description"))
+    reminder_config: Optional[Dict[str, Any]] = Field(None, description=_("task.fields.reminder_config.description")) # Reuse
 
-    is_mandatory: bool = Field(description="Чи є завдання обов'язковим.")
-    parent_task_id: Optional[int] = Field(None, description="ID батьківського завдання.")
-    points_reward: Optional[Decimal] = Field(None, description="Бали за виконання.")
-    penalty_amount: Optional[Decimal] = Field(None, description="Штраф за невиконання.")
-    event_start_time: Optional[datetime] = Field(None, description="Час початку події.")
-    event_end_time: Optional[datetime] = Field(None, description="Час закінчення події.")
-    event_location: Optional[str] = Field(None, description="Місце проведення події.")
+    is_mandatory: bool = Field(description=_("task.fields.is_mandatory.description")) # Reuse
+    parent_task_id: Optional[int] = Field(None, description=_("task.fields.parent_task_id.description")) # Reuse
+    points_reward: Optional[Decimal] = Field(None, description=_("task.fields.points_reward.description")) # Reuse
+    penalty_amount: Optional[Decimal] = Field(None, description=_("task.fields.penalty_amount.description")) # Reuse
+    event_start_time: Optional[datetime] = Field(None, description=_("task.fields.event_start_time.description")) # Reuse
+    event_end_time: Optional[datetime] = Field(None, description=_("task.fields.event_end_time.description")) # Reuse
+    event_location: Optional[str] = Field(None, description=_("task.fields.event_location.description")) # Reuse
 
     # Пов'язані об'єкти (для розширеної інформації)
-    task_type: Optional[TaskTypeSchema] = Field(None, description="Об'єкт типу завдання.")
-    status: Optional[StatusSchema] = Field(None, description="Об'єкт статусу завдання (з довідника).")
+    task_type: Optional[TaskTypeSchema] = Field(None, description=_("task.response.fields.task_type.description"))
+    status: Optional[StatusSchema] = Field(None, description=_("task.response.fields.status.description"))
 
-    parent_task: Optional[Any] = Field(None,
-                                       description="Коротка інформація про батьківське завдання (може бути TaskSchema).")
+    parent_task: Optional[Any] = Field(None, description=_("task.response.fields.parent_task.description"))
 
     # Обчислювані поля (зазвичай додаються сервісом)
-    sub_tasks_count: Optional[int] = Field(None, description="Кількість підзавдань.")
-    assignments_count: Optional[int] = Field(None, description="Кількість призначень цього завдання.")
-    completions_count: Optional[int] = Field(None, description="Кількість виконань цього завдання.")
+    sub_tasks_count: Optional[int] = Field(None, description=_("task.response.fields.sub_tasks_count.description"))
+    assignments_count: Optional[int] = Field(None, description=_("task.response.fields.assignments_count.description"))
+    completions_count: Optional[int] = Field(None, description=_("task.response.fields.completions_count.description"))
 
 
 class TaskDetailSchema(TaskSchema):
     """
     Схема для деталізованого представлення завдання, включаючи пов'язані об'єкти.
     """
-    # sub_tasks, assignments, completions, reviews, bonus_rules успадковуються з TaskSchema,
-    # але тут вони можуть бути визначені з більш конкретними типами або заповнені даними.
-
-    # TODO: Замінити Any на відповідні списки схем
-    sub_tasks: Optional[List[TaskSchema]] = Field(default_factory=list, description="Список підзавдань.")
-    assignments: Optional[List[TaskAssignmentSchema]] = Field(default_factory=list,
-                                                              description="Список призначень завдання.")
-    completions: Optional[List[TaskCompletionSchema]] = Field(default_factory=list,
-                                                              description="Список виконань завдання.")
-    reviews: Optional[List[TaskReviewSchema]] = Field(default_factory=list, description="Список відгуків на завдання.")
-    bonus_rules: Optional[List[BonusRuleSchema]] = Field(default_factory=list,
-                                                         description="Список правил нарахування бонусів, пов'язаних із завданням.")
+    sub_tasks: Optional[List[TaskSchema]] = Field(default_factory=list, description=_("task.detail_response.fields.sub_tasks.description"))
+    assignments: Optional[List[TaskAssignmentSchema]] = Field(default_factory=list, description=_("task.detail_response.fields.assignments.description"))
+    completions: Optional[List[TaskCompletionSchema]] = Field(default_factory=list, description=_("task.detail_response.fields.completions.description"))
+    reviews: Optional[List[TaskReviewSchema]] = Field(default_factory=list, description=_("task.detail_response.fields.reviews.description"))
+    bonus_rules: Optional[List[BonusRuleSchema]] = Field(default_factory=list, description=_("task.detail_response.fields.bonus_rules.description"))
 
 
 if __name__ == "__main__":

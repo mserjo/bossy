@@ -17,7 +17,8 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin, BaseMainSchema
-from backend.app.src.config.logging import get_logger 
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # BaseMainSchema не успадковується напряму RewardBaseSchema, бо group_id там опціональний,
@@ -39,12 +40,12 @@ class RewardBaseSchema(BaseSchema):
     name: str = Field(
         ...,
         max_length=REWARD_NAME_MAX_LENGTH,
-        description="Назва нагороди.",
+        description=_("reward.fields.name.description"),
         examples=["Безкоштовна кава", "Сертифікат на знижку"]
     )
     description: Optional[str] = Field(
         None,
-        description="Детальний опис нагороди."
+        description=_("reward.fields.description.description")
     )
     # group_id тут не вказується, оскільки для Create він часто береться з URL або контексту,
     # а для Update не змінюється або змінюється окремим ендпоінтом.
@@ -52,31 +53,25 @@ class RewardBaseSchema(BaseSchema):
 
     cost: Decimal = Field(
         ...,
-        ge=Decimal("0.00"),  # Вартість не може бути від'ємною
-        description="\"Вартість\" нагороди в одиницях бонусів групи.",
+        ge=Decimal("0.00"),
+        description=_("reward.fields.cost.description"),
         examples=[Decimal("50.00"), Decimal("1000.00")]
     )
     quantity_available: Optional[int] = Field(
-        None,  # None означає необмежену кількість
-        ge=0,  # Кількість не може бути від'ємною
-        description="Доступна кількість екземплярів цієї нагороди (NULL для необмеженої)."
-    )
-    icon_url: Optional[str] = Field(
         None,
-        max_length=REWARD_ICON_URL_MAX_LENGTH,
-        description="URL або шлях до іконки нагороди.",
-        examples=["https://example.com/icons/coffee_cup.png"]
+        ge=0,
+        description=_("reward.fields.quantity_available.description")
     )
-    # TODO: Розглянути використання Enum RewardState з core.dicts, якщо стани нагород фіксовані.
+    icon_file_id: Optional[int] = Field(None, description=_("reward.fields.icon_file_id.description"))
     state: Optional[str] = Field(
-        None,  # Або default="active"
+        None,
         max_length=50,
-        description="Стан нагороди (наприклад, 'active', 'archived', 'out_of_stock').",
+        description=_("reward.fields.state.description"),
         examples=["active"]
     )
     notes: Optional[str] = Field(
         None,
-        description="Додаткові нотатки щодо нагороди."
+        description=_("reward.fields.notes.description")
     )
     # model_config успадковується з BaseSchema (from_attributes=True)
 
@@ -86,7 +81,7 @@ class RewardCreateSchema(RewardBaseSchema):
     Схема для створення нової нагороди.
     `group_id` має бути наданий (зазвичай з контексту URL або тіла запиту, якщо потрібно).
     """
-    group_id: int = Field(description="Ідентифікатор групи, до якої належить ця нагорода.")
+    group_id: int = Field(description=_("reward.create.fields.group_id.description"))
     # Успадковує всі поля від RewardBaseSchema.
     pass
 
@@ -97,13 +92,13 @@ class RewardUpdateSchema(RewardBaseSchema):
     Всі поля, успадковані з `RewardBaseSchema`, стають опціональними.
     `group_id` зазвичай не оновлюється для існуючої нагороди.
     """
-    name: Optional[str] = Field(None, max_length=REWARD_NAME_MAX_LENGTH)
-    description: Optional[str] = None
-    cost: Optional[Decimal] = Field(None, ge=Decimal("0.00"))
-    quantity_available: Optional[int] = Field(None, ge=0)  # Можна встановити в 0, щоб позначити "немає в наявності"
-    icon_url: Optional[str] = Field(None, max_length=REWARD_ICON_URL_MAX_LENGTH)
-    state: Optional[str] = Field(None, max_length=50)
-    notes: Optional[str] = None
+    name: Optional[str] = Field(None, max_length=REWARD_NAME_MAX_LENGTH, description=_("reward.fields.name.description")) # Reuse base
+    description: Optional[str] = Field(None, description=_("reward.fields.description.description")) # Reuse base
+    cost: Optional[Decimal] = Field(None, ge=Decimal("0.00"), description=_("reward.fields.cost.description")) # Reuse base
+    quantity_available: Optional[int] = Field(None, ge=0, description=_("reward.fields.quantity_available.description")) # Reuse base
+    icon_file_id: Optional[int] = Field(None, description=_("reward.fields.icon_file_id.description")) # Reuse base, or use specific update key if text differs
+    state: Optional[str] = Field(None, max_length=50, description=_("reward.fields.state.description")) # Reuse base
+    notes: Optional[str] = Field(None, description=_("reward.fields.notes.description")) # Reuse base
     # group_id зазвичай не змінюється при оновленні. Якщо це потрібно, його можна додати сюди.
 
 
@@ -115,9 +110,9 @@ class RewardResponseSchema(BaseMainSchema):  # Renamed, Успадковує id,
     # id, name, description, state, notes, group_id, created_at, updated_at, deleted_at - успадковані
 
     # Специфічні поля моделі Reward, що не входять до BaseMainSchema або потребують іншого представлення
-    cost: Decimal = Field(description="Вартість нагороди в бонусах.")
-    quantity_available: Optional[int] = Field(description="Доступна кількість (NULL для необмеженої).")
-    icon_url: Optional[str] = Field(None, max_length=REWARD_ICON_URL_MAX_LENGTH, description="URL іконки нагороди.")
+    cost: Decimal = Field(description=_("reward.response.fields.cost.description"))
+    quantity_available: Optional[int] = Field(description=_("reward.response.fields.quantity_available.description"))
+    icon_url: Optional[str] = Field(None, max_length=REWARD_ICON_URL_MAX_LENGTH, description=_("reward.response.fields.icon_url.description"))
 
     # Пов'язані об'єкти (якщо потрібно)
     # group: Optional[GroupSchema] = Field(None, description="Інформація про групу, до якої належить нагорода.")
@@ -130,12 +125,9 @@ class RedeemRewardRequestSchema(BaseSchema):
     """
     Схема запиту на отримання (покупку) нагороди користувачем.
     """
-    reward_id: int = Field(description="Ідентифікатор нагороди, яку користувач хоче отримати.")
-    # user_id зазвичай береться з поточного автентифікованого користувача (сервісом).
-    # group_id також може бути отриманий з контексту, наприклад, якщо користувач діє в рамках активної групи.
-    # Якщо потрібно явно, їх можна додати сюди.
+    reward_id: int = Field(description=_("reward.redeem_request.fields.reward_id.description"))
     quantity: int = Field(default=1, gt=0,
-                          description="Кількість екземплярів нагороди для отримання (за замовчуванням 1).")
+                          description=_("reward.redeem_request.fields.quantity.description"))
 
 
 if __name__ == "__main__":
@@ -149,7 +141,7 @@ if __name__ == "__main__":
         "group_id": 1,
         "cost": Decimal("2000.00"),  # Вартість у бонусах
         "quantity_available": 100,
-        "icon_url": "https://example.com/certs/cert200.png",
+        "icon_file_id": 101, # Example file ID
         "state": "active"
     }
     create_reward_instance = RewardCreateSchema(**create_reward_data)
@@ -157,8 +149,9 @@ if __name__ == "__main__":
 
     logger.info("\nRewardUpdateSchema (приклад для оновлення):")
     update_reward_data = {
-        "description": "Сертифікат на покупки в магазині-партнері 'СуперМаркет'.",  # TODO i18n
-        "quantity_available": 50
+        "description": "Сертифікат на покупки в магазині-партнері 'СуперМаркет'.",
+        "quantity_available": 50,
+        "icon_file_id": 102 # Example new file ID
     }
     update_reward_instance = RewardUpdateSchema(**update_reward_data)
     logger.info(update_reward_instance.model_dump_json(indent=2, exclude_none=True))
@@ -171,7 +164,8 @@ if __name__ == "__main__":
         "group_id": 1,  # Або може бути None, якщо нагорода глобальна
         "cost": Decimal("500.00"),
         "quantity_available": 25,
-        "icon_url": "https://example.com/swag/kudos_tshirt.png",
+        # icon_url тут буде заповнено з property моделі, icon_file_id не є частиною ResponseSchema напряму
+        "icon_url": "https://example.com/swag/kudos_tshirt.png", # Це поле залишиться, але тепер воно буде property-based
         "state": "active",
         "created_at": datetime.now(),
         "updated_at": datetime.now()

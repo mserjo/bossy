@@ -20,6 +20,7 @@ from backend.app.src.schemas.gamification.level import (  # Схеми Pydantic
 )
 from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 
@@ -93,9 +94,9 @@ class LevelService(BaseService): # Змінено успадкування на 
         # Перевірка імені - використовуємо get_level_by_name (який робить прямий запит)
         existing_by_name = await self.get_level_by_name(name, group_id)
         if existing_by_name and (item_id_to_exclude is None or existing_by_name.id != item_id_to_exclude):
-            scope_log_msg = f"групі ID '{group_id}'" if group_id else "глобальній області"
-            msg = f"{self._model_name} з ім'ям '{name}' вже існує в {scope_log_msg}."
-            logger.warning(msg)
+            scope_log_msg = _("in_group_scope", group_id=group_id) if group_id else _("global_scope")
+            msg = _("gamification.level.errors.name_exists_in_scope", model_name=self._model_name, name=name, scope=scope_log_msg)
+            logger.warning(f"{self._model_name} with name '{name}' already exists in {scope_log_msg}.") # Log can be more detailed
             raise ValueError(msg)
 
         # Перевірка min_points_required - використовуємо новий метод репозиторію
@@ -103,9 +104,9 @@ class LevelService(BaseService): # Змінено успадкування на 
             session=self.db_session, min_points=min_points, group_id=group_id
         )
         if existing_by_points and (item_id_to_exclude is None or existing_by_points.id != item_id_to_exclude):
-            scope_log_msg = f"групі ID '{group_id}'" if group_id else "глобальній області"
-            msg = f"{self._model_name} з min_points_required '{min_points}' вже існує в {scope_log_msg}."
-            logger.warning(msg)
+            scope_log_msg = _("in_group_scope", group_id=group_id) if group_id else _("global_scope")
+            msg = _("gamification.level.errors.min_points_exists_in_scope", model_name=self._model_name, points=min_points, scope=scope_log_msg)
+            logger.warning(f"{self._model_name} with min_points_required '{min_points}' already exists in {scope_log_msg}.") # Log can be more detailed
             raise ValueError(msg)
 
     async def create(self, data: LevelCreate, created_by_user_id: int) -> LevelResponse: # Змінено UUID на int
@@ -114,7 +115,7 @@ class LevelService(BaseService): # Змінено успадкування на 
         await self._check_uniqueness(data.name, data.min_points_required, data.group_id)
 
         if data.icon_file_id and not await self.db_session.get(FileRecord, data.icon_file_id):
-            raise ValueError(f"Файл іконки з ID '{data.icon_file_id}' не знайдено.")
+            raise ValueError(_("gamification.level.errors.icon_file_not_found", file_id=data.icon_file_id))
 
         try:
             new_item_db = await self.level_repo.create(
@@ -125,11 +126,11 @@ class LevelService(BaseService): # Змінено успадкування на 
             )
             await self.commit()
             refreshed_item = await self.get_by_id(new_item_db.id)
-            if not refreshed_item: raise RuntimeError("Не вдалося отримати створений рівень.")
+            if not refreshed_item: raise RuntimeError(_("gamification.level.errors.critical_create_failed"))
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності '{data.name}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося створити {self._model_name}: конфлікт даних.")
+            raise ValueError(_("gamification.level.errors.create_conflict", model_name=self._model_name, error_message=str(e)))
 
         logger.info(f"{self._model_name} '{refreshed_item.name}' ID: {refreshed_item.id} успішно створено.")
         return refreshed_item
@@ -159,7 +160,7 @@ class LevelService(BaseService): # Змінено успадкування на 
         if 'icon_file_id' in update_data_dict and update_data_dict['icon_file_id'] is not None \
                 and update_data_dict['icon_file_id'] != item_db.icon_file_id:
             if not await self.db_session.get(FileRecord, update_data_dict['icon_file_id']):
-                raise ValueError(f"Файл іконки з ID '{update_data_dict['icon_file_id']}' не знайдено.")
+                raise ValueError(_("gamification.level.errors.icon_file_not_found", file_id=update_data_dict['icon_file_id']))
 
         # Оновлюємо через репозиторій
         # updated_at буде оброблено автоматично TimestampedMixin в BaseRepository.update
@@ -172,11 +173,11 @@ class LevelService(BaseService): # Змінено успадкування на 
             )
             await self.commit()
             refreshed_item = await self.get_by_id(updated_item_db.id)
-            if not refreshed_item: raise RuntimeError("Не вдалося отримати оновлений рівень.")
+            if not refreshed_item: raise RuntimeError(_("gamification.level.errors.critical_update_failed"))
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності ID '{item_id}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося оновити {self._model_name}: конфлікт даних.")
+            raise ValueError(_("gamification.level.errors.update_conflict", model_name=self._model_name, error_message=str(e)))
 
         logger.info(f"{self._model_name} '{refreshed_item.name}' ID: {refreshed_item.id} успішно оновлено.")
         return refreshed_item

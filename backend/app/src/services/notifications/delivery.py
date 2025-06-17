@@ -26,6 +26,7 @@ from backend.app.src.schemas.notifications.delivery import (
 from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType, NotificationType # Імпорт Enum
 from backend.app.src.config import settings
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 
@@ -102,11 +103,10 @@ class NotificationDeliveryService(BaseService):
                 f"Не знайдено відповідних каналів або контактної інформації для користувача ID '{user_id}' для сповіщення ID '{notification_id}'.")
             attempt_create_schema = NotificationDeliveryAttemptCreateSchema(
                 notification_id=notification_id,
-                channel=NotificationChannelType.UNKNOWN, # Або спеціальний тип "NONE"
+                channel=NotificationChannelType.UNKNOWN,
                 status=DeliveryStatusType.FAILED,
-                error_message="Не знайдено каналу або контактної інформації",
+                error_message=_("notification.delivery.errors.no_channel_or_contact"),
                 attempt_count=1,
-                # created_at, sent_at встановлюються автоматично або при створенні
             )
             failed_attempt_db = await self.attempt_repo.create(session=self.db_session, obj_in=attempt_create_schema)
             await self.commit()
@@ -152,7 +152,8 @@ class NotificationDeliveryService(BaseService):
                 current_attempt_db.external_message_id = send_result.get("message_id")
                 current_attempt_db.sent_at = datetime.now(timezone.utc)
                 if current_attempt_db.status == DeliveryStatusType.FAILED:
-                    current_attempt_db.error_message = str(send_result.get("error", "Невідома помилка надсилання"))
+                    error_detail = send_result.get("error")
+                    current_attempt_db.error_message = str(error_detail) if error_detail else _("notification.delivery.errors.send_unknown_error")
                 logger.info(
                     f"Спроба доставки ID '{current_attempt_db.id}' для сповіщення ID '{notification_id}' через {current_attempt_db.channel.value}: Статус {current_attempt_db.status.value}, ID Повід.: {current_attempt_db.external_message_id}")
             except Exception as e:
@@ -160,7 +161,7 @@ class NotificationDeliveryService(BaseService):
                     f"Виняток під час спроби надсилання ID '{current_attempt_db.id}' для сповіщення '{notification_id}' через {current_attempt_db.channel.value}: {e}",
                     exc_info=True)
                 current_attempt_db.status = DeliveryStatusType.FAILED
-                current_attempt_db.error_message = str(e)
+                current_attempt_db.error_message = _("notification.delivery.errors.send_exception_on_channel", channel_name=current_attempt_db.channel.value ,details=str(e))
                 current_attempt_db.sent_at = datetime.now(timezone.utc)
 
             # Оновлюємо через репозиторій, якщо схема оновлення дозволяє ці поля.
@@ -209,7 +210,7 @@ class NotificationDeliveryService(BaseService):
             if not attempt.notification or not attempt.notification.user:
                 logger.warning(f"Пропуск повтору для спроби ID {attempt.id}: відсутні дані сповіщення або користувача.")
                 attempt.status = DeliveryStatusType.FAILED_PERMANENTLY
-                attempt.error_message = "Відсутні дані для повтору"
+                attempt.error_message = _("notification.delivery.errors.retry_missing_data")
                 self.db_session.add(attempt) # Оновлюємо стару спробу
                 continue
 
@@ -221,7 +222,7 @@ class NotificationDeliveryService(BaseService):
                 logger.error(
                     f"Немає відправника для каналу '{attempt.channel.value}' спроби ID {attempt.id}. Повтор неможливий.")
                 attempt.status = DeliveryStatusType.FAILED_PERMANENTLY
-                attempt.error_message = f"Відправник для каналу '{attempt.channel.value}' не знайдено"
+                attempt.error_message = _("notification.delivery.errors.retry_sender_not_found", channel=attempt.channel.value)
                 self.db_session.add(attempt)
                 continue
 
@@ -244,7 +245,8 @@ class NotificationDeliveryService(BaseService):
                 new_retry_attempt_db.external_message_id = send_result.get("message_id")
                 new_retry_attempt_db.sent_at = datetime.now(timezone.utc)
                 if new_retry_attempt_db.status == DeliveryStatusType.FAILED:
-                    new_retry_attempt_db.error_message = str(send_result.get("error", "Помилка повторної відправки"))
+                    error_detail = send_result.get("error")
+                    new_retry_attempt_db.error_message = str(error_detail) if error_detail else _("notification.delivery.errors.retry_send_unknown_error")
                 else:
                     retried_success_count += 1
                 logger.info(
@@ -254,7 +256,7 @@ class NotificationDeliveryService(BaseService):
                     f"Виняток під час повторного надсилання для Сповіщ. ID '{attempt.notification_id}' через {attempt.channel.value}: {e}",
                     exc_info=True)
                 new_retry_attempt_db.status = DeliveryStatusType.FAILED
-                new_retry_attempt_db.error_message = str(e)
+                new_retry_attempt_db.error_message = _("notification.delivery.errors.retry_exception_on_channel", channel_name=attempt.channel.value, details=str(e))
                 new_retry_attempt_db.sent_at = datetime.now(timezone.utc)
 
             self.db_session.add(new_retry_attempt_db) # Додаємо оновлену нову спробу

@@ -14,6 +14,7 @@ from backend.app.src.services.integrations.messenger_base import (
 from backend.app.src.models.integrations.user_integration import UserIntegration  # Припустима модель для зберігання telegram_chat_id
 from backend.app.src.config.settings import settings  # Для Telegram Bot Token
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # TODO: Додати залежність: pip install python-telegram-bot --pre (для v20+) або httpx
@@ -124,8 +125,7 @@ class TelegramIntegrationService(BaseMessengerIntegrationService):
         # TODO: Реалізувати конвертацію MessengerMessage в формат Telegram (Markdown, HTML, кнопки).
 
         if not message_text:
-            # i18n
-            return MessageSendResponse(status="failed", error_message="Текст повідомлення не може бути порожнім.")
+            return MessageSendResponse(status="failed", error_message=_("integrations.messenger.errors.message_text_empty"))
 
         # if not self.telegram_bot_client:
         #     logger.warning("Клієнт Telegram не доступний для надсилання повідомлення.")

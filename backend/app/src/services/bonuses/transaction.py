@@ -30,6 +30,7 @@ from backend.app.src.schemas.bonuses.account import UserAccountResponse
 from backend.app.src.services.bonuses.account import UserAccountService
 from backend.app.src.core.exceptions import InsufficientFundsError
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 from backend.app.src.config import settings
 
@@ -82,7 +83,7 @@ class AccountTransactionService(BaseService):
             )
             if not user_account_db:
                 logger.error(f"Рахунок користувача з ID '{effective_account_id}' не знайдено.")
-                raise ValueError(f"Рахунок користувача з ID '{effective_account_id}' не знайдено.")  # i18n
+                raise ValueError(_("account.errors.not_found_by_id", account_id=effective_account_id))
         elif user_id_for_account_lookup is not None:
             logger.debug(
                 f"ID рахунку не надано в transaction_data, пошук/створення для користувача ID '{user_id_for_account_lookup}', група ID '{group_id_for_account_lookup}'.")
@@ -95,11 +96,11 @@ class AccountTransactionService(BaseService):
             effective_account_id = user_account_db.id # Встановлюємо ID для використання в транзакції
         else:
             logger.error("Не надано account_id в transaction_data або user_id_for_account_lookup.")
-            raise ValueError("Необхідно вказати account_id в даних транзакції або user_id_for_account_lookup.")  # i18n
+            raise ValueError(_("transaction.errors.create.missing_account_identifier"))
 
         if not user_account_db or effective_account_id is None: # Додаткова перевірка
             logger.error("Рахунок користувача не вдалося ідентифікувати або створити остаточно.")
-            raise ValueError("Рахунок користувача не вдалося ідентифікувати або створити остаточно.")  # i18n
+            raise ValueError(_("transaction.errors.create.account_identification_failed"))
 
         logger.info(
             f"Обробка транзакції для Рахунку ID: {user_account_db.id}, Користувач ID: {user_account_db.user_id}")
@@ -152,11 +153,11 @@ class AccountTransactionService(BaseService):
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності '{user_account_db.id}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося створити транзакцію: конфлікт даних.")  # i18n
+            raise ValueError(_("transaction.errors.create.conflict", error_message=str(e)))
         except SQLAlchemyError as e:  # Більш загальна помилка БД
             await self.rollback()
             logger.error(f"Помилка БД '{user_account_db.id}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Помилка бази даних під час обробки транзакції.")  # i18n
+            raise ValueError(_("transaction.errors.create.db_error", error_message=str(e)))
 
         logger.info(
             f"Транзакція ID '{new_transaction_db.id}' успішно створена для Рахунку ID '{user_account_db.id}'. "

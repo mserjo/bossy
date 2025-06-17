@@ -1,9 +1,1011 @@
 {
-  "common.greeting": "Hello!",
-  "common.thank_you": "Thank you!",
-  "error.general": "An unexpected error occurred. Please try again later.",
-  "error.not_found": "The requested resource was not found.",
-  "success.general": "Operation completed successfully.",
-  "success.created": "Resource successfully created.",
-  "validation.field_required": "This field is required."
+  "exceptions": {
+    "record_not_found": "Entity '{entity_name}' with identifier '{identifier}' not found.",
+    "duplicate_record": "Entity '{entity_name}' with unique field '{identifier}' already exists.",
+    "auth": {
+      "default": "Authentication error.",
+      "insufficient_permissions": "Insufficient permissions to perform this action."
+    },
+    "validation": {
+      "default": "Input data validation error."
+    },
+    "external_service": {
+      "default_error": "Error interacting with an external service.",
+      "service_prefix": "(Service: {service_name})"
+    },
+    "rate_limit_exceeded": "Request limit exceeded. Please try again later.",
+    "file_processing": {
+      "default_error": "File processing error."
+    },
+    "account": {
+      "insufficient_funds": "Insufficient funds in the account."
+    }
+  },
+  "dependencies": {
+    "auth": {
+      "credentials_check_failed": "Could not validate credentials.",
+      "malformed_token_payload": "Malformed or incomplete token payload.",
+      "invalid_token_type": "Invalid token type, access token expected.",
+      "inactive_user": "Inactive user.",
+      "not_superuser": "Insufficient permissions (superuser status required).",
+      "not_group_admin": "You are not an administrator of this group."
+    }
+  },
+  "user": {
+    "errors": {
+      "username_exists": "Username '{username}' already exists.",
+      "email_exists": "Email '{email}' is already registered.",
+      "user_type_not_found": "User type with code '{code}' not found.",
+      "status_not_found": "User status with code '{code}' not found.",
+      "system_role_not_found": "System role with code '{code}' not found.",
+      "roles_not_found_on_create": "Could not create user: roles with codes not found: {codes}.",
+      "create_conflict": "Could not create user due to a data conflict: {error_message}",
+      "email_taken_by_other": "Email '{email}' is already registered by another user.",
+      "update_conflict": "Could not update user due to a data conflict: {error_message}",
+      "roles_not_found": "Roles not found: {codes}.",
+      "username_taken_by_other": "Username '{username}' is already in use by another user.",
+      "reviewer_not_found_by_id": "Reviewer user with ID '{user_id}' not found."
+    },
+    "fields": {
+      "username": {
+        "description": "Unique username (login).",
+        "description_update": "New unique username (login).",
+        "description_public": "Unique username."
+      },
+      "email": {
+        "description": "User's email (unique).",
+        "description_update": "New user email."
+      },
+      "first_name": {
+        "description": "User's first name.",
+        "description_update": "New user first name."
+      },
+      "last_name": {
+        "description": "User's last name.",
+        "description_update": "New user last name."
+      },
+      "middle_name": {
+        "description": "User's middle name (optional)."
+      },
+      "phone_number": {
+        "description": "User's phone number (optional, unique if provided)."
+      },
+      "name": {
+        "description": "User's display name (can be full name or nickname)."
+      },
+      "description": {
+        "description": "Additional description or biography of the user."
+      },
+      "notes": {
+        "description": "Private notes about the user."
+      },
+      "password": {
+        "description": "User password (min. 8 characters).",
+        "description_update": "New user password (if changing, min. 8 characters)."
+      },
+      "user_type_code": {
+        "description": "User type code from dictionary (e.g., 'REGULAR_USER').",
+        "description_update": "New user type code from dictionary."
+      },
+      "system_role_code": {
+        "description": "System role code from dictionary (e.g., 'USER').",
+        "description_update": "New system role code from dictionary."
+      },
+      "state_code": {
+        "description": "User status code from dict_statuses dictionary.",
+        "description_update": "New user status code from dict_statuses dictionary."
+      },
+      "is_active": {
+        "description": "Account activity status.",
+        "description_response": "Is the user account active."
+      },
+      "is_superuser": {
+        "description": "Superuser status.",
+        "description_response": "Does the user have superuser rights."
+      },
+      "last_login_at": {
+        "description": "Time of the user's last login."
+      },
+      "state_object": {
+        "description": "User status object."
+      },
+      "user_type_object": {
+        "description": "User type object."
+      },
+      "system_role_object": {
+        "description": "System role object."
+      },
+      "avatar_url": {
+        "description": "User avatar URL."
+      }
+    }
+  },
+  "group": {
+    "errors": {
+      "creator_not_found": "Creator user with ID '{creator_id}' not found.",
+      "group_type_not_found": "Group type with ID '{group_type_id}' not found.",
+      "icon_file_not_found": "Icon file with ID '{icon_file_id}' not found.",
+      "default_admin_role_not_found": "Default admin role '{role_code}' not found in the database.",
+      "setup_failed_due_to_role": "Group setup failed due to missing default admin role.",
+      "critical_create_failed": "Critical error: failed to retrieve created group ID {group_id} after commit.",
+      "create_conflict": "Could not create group due to a data conflict: {error_message}",
+      "update_conflict": "Could not update group due to a data conflict: {error_message}",
+      "delete_conflict_in_use": "Group '{group_name}' is in use and cannot be deleted.",
+      "not_found_by_id": "Group with ID '{id}' not found."
+    },
+    "reports": {
+      "activity_report_not_implemented": "Activity report generation is not yet implemented."
+    },
+    "fields": {
+        "name": {"description": "Group name."},
+        "description": {"description": "Detailed group description (optional)."},
+        "group_type_code": {"description": "Group type code from dict_group_types (e.g., 'FAMILY', 'DEPARTMENT')."},
+        "state": {"description": "Group state (e.g., 'active', 'archived', 'private'). Optional."},
+        "notes": {"description": "Additional notes about the group (optional)."}
+    },
+    "create": {
+        "fields": {
+            "owner_id": {"description": "ID of the user creating and owning the group. Set by the service."}
+        }
+    },
+    "update": {
+        "fields": {
+            "name": {"description": "New group name."},
+            "description": {"description": "New group description."},
+            "group_type_code": {"description": "New group type code."},
+            "state": {"description": "New group state."},
+            "notes": {"description": "New notes about the group."},
+            "owner_id": {"description": "New ID of the group owner."}
+        }
+    },
+    "response": {
+        "fields": {
+            "owner": {"description": "Public profile of the group owner."},
+            "group_type": {"description": "Group type object."},
+            "members_count": {"description": "Number of members in the group (calculated field)."}
+        }
+    },
+    "detail_response": {
+        "fields": {
+            "members": {"description": "List of public profiles of group members."},
+            "settings": {"description": "Group settings."}
+        }
+    },
+    "settings": {
+        "fields": {
+            "currency_name": {"description": "Name of the internal currency/bonuses of the group (e.g., 'points', 'stars')."},
+            "allow_decimal_bonuses": {"description": "Are fractional bonus values allowed in the group."},
+            "max_debt_amount": {"description": "Maximum allowed 'debt' (negative balance) for a member. NULL means no limit."},
+            "task_completion_requires_review": {"description": "Does task completion require admin review before bonus calculation."},
+            "allow_task_reviews": {"description": "Are users allowed to leave reviews/ratings for tasks in the group."},
+            "allow_gamification_levels": {"description": "Is the gamification level system active in the group."},
+            "allow_gamification_badges": {"description": "Is the gamification badge system active in the group."},
+            "allow_gamification_ratings": {"description": "Is the user rating system active in the group."}
+        },
+        "create": {
+            "fields": {
+                "group_id": {"description": "Identifier of the group for which these settings are created."}
+            }
+        },
+        "update": {
+            "fields": {
+                "currency_name": {"description": "New name for bonus currency."}
+            }
+        },
+        "response": {
+            "fields": {
+                "group_id": {"description": "Identifier of the group to which these settings belong."}
+            }
+        }
+    },
+    "membership": {
+        "fields": {
+            "user_id": {"description": "User identifier."},
+            "group_id": {"description": "Group identifier."},
+            "role": {"description": "User's role in the group."}
+        },
+        "create": {
+            "fields": {
+                "user_id": {"description": "Identifier of the user being added to the group."},
+                "role": {"description": "Role assigned to the user in the group."}
+            }
+        },
+        "update": {
+            "fields": {
+                "role": {"description": "New user role in the group."}
+            }
+        },
+        "response": {
+            "fields": {
+                "user": {"description": "Public profile of the user who is a member of the group."}
+            }
+        }
+    },
+    "invitation": {
+        "fields": {
+            "email": {"description": "Email of the invited user (if invitation by email)."},
+            "phone_number": {"description": "Phone number of the invited user (if invitation by SMS)."},
+            "role_to_assign": {"description": "Role that will be assigned to the user upon accepting the invitation."}
+        },
+        "create": {
+            "fields": {
+                "expires_at": {"description": "Invitation expiration time (optional, can be set by the server)."}
+            }
+        },
+        "update": {
+            "fields": {
+                "status": {"description": "New invitation status."}
+            }
+        },
+        "response": {
+            "fields": {
+                "group_id": {"description": "Identifier of the group to which the invitation was created."},
+                "invitation_code": {"description": "Unique invitation code."},
+                "expires_at": {"description": "Invitation expiration time."},
+                "status": {"description": "Current invitation status."},
+                "created_by_user_id": {"description": "Identifier of the user who created the invitation."}
+            }
+        },
+        "accept": {
+            "fields": {
+                "invitation_code": {"description": "Unique invitation code to join the group."}
+            }
+        }
+    }
+  },
+  "dictionaries": {
+    "errors": {
+      "create_conflict": "Could not create {model_name}: data conflict. Check unique fields.",
+      "update_conflict": "Could not update {model_name}: data conflict.",
+      "delete_in_use": "{model_name} ID '{item_id}' is in use and cannot be deleted."
+    },
+    "base": {
+      "fields": {
+        "code": {"description": "Unique text code of the dictionary entry."},
+        "name": {"description": "Name of the dictionary entry."},
+        "description": {"description": "Detailed description of the dictionary entry (optional)."},
+        "state": {"description": "State of the dictionary entry (e.g., 'active', 'deprecated', optional)."},
+        "notes": {"description": "Additional notes about the dictionary entry (optional)."}
+      },
+      "update_fields": {
+        "name": {"description": "New name for the dictionary entry."},
+        "code": {"description": "New unique text code for the dictionary entry."},
+        "description": {"description": "New detailed description for the dictionary entry."},
+        "state": {"description": "New state for the dictionary entry."},
+        "notes": {"description": "New additional notes for the dictionary entry."}
+      }
+    },
+    "calendars": {
+        "fields": {
+            "is_active": {"description": "Activity status of the provider."},
+            "credentials_schema": {"description": "JSON schema of required credentials for this provider (e.g., for OAuth)."},
+            "sync_frequency_minutes": {"description": "Recommended synchronization frequency in minutes."},
+            "description_create": "JSON schema of required credentials for integration setup.",
+            "description_update": "Updated JSON schema for credentials."
+        }
+    },
+    "messengers": {},
+    "bonus_types": {},
+    "group_types": {},
+    "task_types": {}
+  },
+  "task": {
+    "errors": {
+        "not_found_by_id": "Task with ID '{task_id}' not found.",
+        "task_type_not_found_by_id": "Task type with ID '{task_type_id}' not found.",
+        "create": {
+            "default_status_not_found": "Task status is mandatory, but default status '{status_code}' was not found."
+        },
+        "status_not_found_by_id": "Status with ID '{status_id}' not found.",
+        "critical_create_failed": "Critical error: failed to retrieve created task ID {task_id} after commit.",
+        "create_conflict": "Could not create task due to a data conflict: {error_message}",
+        "critical_update_failed": "Critical error: failed to retrieve updated task ID {task_id} after commit.",
+        "update_conflict": "Could not update task due to a data conflict: {error_message}",
+        "delete_in_use": "Task '{task_title}' is in use and cannot be deleted."
+    },
+    "fields": {
+      "name": {"description": "Name or title of the task/event."},
+      "description": {"description": "Detailed description of the task/event."},
+      "task_type_code": {"description": "Task type code from dictionary (e.g., 'REGULAR_TASK', 'EVENT')."},
+      "state": {"description": "Task state. Use values from TaskStatus Enum."},
+      "due_date": {"description": "Task due date (deadline date and time)."},
+      "is_recurring": {"description": "Flag: is the task recurring."},
+      "recurrence_pattern": {"description": "Recurrence pattern (e.g., RRULE or cron expression)."},
+      "recurrence_start_date": {"description": "Recurrence start date."},
+      "recurrence_end_date": {"description": "Recurrence end date (if any)."},
+      "reminder_config": {"description": "Reminder configuration (JSON, e.g., {'before_due': '1d', 'repeat': 'every_4h'})."},
+      "is_mandatory": {"description": "Flag: is the task mandatory."},
+      "parent_task_id": {"description": "Parent task ID (for creating a subtask)."},
+      "points_reward": {"description": "Number of points for successful task completion (if applicable, non-negative)."},
+      "penalty_amount": {"description": "Penalty amount for non-completion or overdue (if applicable, non-negative)."},
+      "notes": {"description": "Additional notes for the task."},
+      "event_start_time": {"description": "Event start time (if task is an event)."},
+      "event_end_time": {"description": "Event end time (if task is an event)."},
+      "event_location": {"description": "Event location (if applicable)."}
+    },
+    "update_fields": {
+        "name": {"description": "New task name."},
+        "is_recurring_template": {"description": "Update flag: is this a recurring task template."}
+    },
+    "response": {
+        "fields": {
+            "status_code": {"description": "Current task status code (from dict_statuses)."},
+            "is_recurring_template": {"description": "Is this task a template for recurring tasks."},
+            "last_instance_created_at": {"description": "Last instance creation time (for templates)."},
+            "next_occurrence_at": {"description": "Calculated next occurrence time (for templates)."},
+            "last_reminder_sent_at": {"description": "Time of the last reminder sent."},
+            "task_type": {"description": "Task type object."},
+            "status": {"description": "Task status object (from dictionary)."},
+            "parent_task": {"description": "Brief information about the parent task."},
+            "sub_tasks_count": {"description": "Number of sub-tasks."},
+            "assignments_count": {"description": "Number of assignments for this task."},
+            "completions_count": {"description": "Number of completions for this task."}
+        }
+    },
+    "detail_response": {
+        "fields": {
+            "sub_tasks": {"description": "List of sub-tasks."},
+            "assignments": {"description": "List of task assignments."},
+            "completions": {"description": "List of task completions."},
+            "reviews": {"description": "List of task reviews."},
+            "bonus_rules": {"description": "List of bonus rules associated with the task."}
+        }
+    }
+  },
+  "event": {
+    "errors": {
+        "create": {
+            "type_id_missing": "'event_type_id' or 'task_type_id' must be specified for the event.",
+            "default_status_not_found": "Event status is mandatory, but default status '{status_code}' was not found."
+        },
+        "event_type_not_found_by_id": "Event/task type with ID '{type_id}' not found.",
+        "status_not_found_by_id": "Status with ID '{status_id}' not found.",
+        "critical_create_failed": "Critical error: failed to retrieve created event ID {event_id} after commit.",
+        "create_conflict": "Could not create event due to a data conflict: {error_message}",
+        "critical_update_failed": "Critical error: failed to retrieve updated event ID {event_id} after commit.",
+        "update_conflict": "Could not update event due to a data conflict: {error_message}",
+        "delete_in_use": "Event '{event_title}' is in use and cannot be deleted."
+    },
+    "fields": {
+        "name": {"description": "Name or title of the event."},
+        "description": {"description": "Detailed description of the event."},
+        "start_time": {"description": "Event start date and time (UTC)."},
+        "end_time": {"description": "Optional event end date and time (UTC)."},
+        "location": {"description": "Physical or virtual location of the event."},
+        "state": {"description": "Event state (e.g., 'upcoming', 'ongoing', 'past', 'cancelled')."},
+        "notes": {"description": "Internal notes for the event."}
+    },
+    "create": {
+        "fields": {"group_id": {"description": "Identifier of the group to which this event belongs."}}
+    },
+    "response": {
+        "fields": {
+            "group": {"description": "Basic information about the group to which this event belongs."},
+            "created_by_user_id": {"description": "ID of the user who created the event."},
+            "created_by": {"description": "Profile of the user who created the event."},
+            "assignments": {"description": "List of assignments related to the event."},
+            "completions": {"description": "List of completions related to the event."}
+        }
+    }
+  },
+  "task_assignment": {
+      "errors": {
+          "critical_create_failed": "Critical error: failed to retrieve assignment record after saving.",
+          "assign_conflict": "Could not assign task due to a data conflict: {error_message}"
+      },
+      "fields": {
+          "task_id": {"description": "Task identifier."},
+          "user_id": {"description": "Identifier of the user to whom the task is assigned."},
+          "status": {"description": "Assignment status."}
+      },
+      "create": {
+          "fields": {
+              "user_id": {"description": "Identifier of the user to whom the task is being assigned."},
+              "status": {"description": "Assignment status."}
+          }
+      },
+      "update": {
+          "fields": {"status": {"description": "New assignment status."}}
+      },
+      "response": {
+          "fields": {"user": {"description": "Public profile of the user to whom the task is assigned."}}
+      }
+  },
+  "task_completion": {
+      "errors": {
+          "already_completed_not_repeatable": "Task ID '{task_id}' has already been completed by you and is not repeatable.",
+          "critical_create_failed": "Failed to retrieve created task completion.",
+          "create_conflict": "Could not mark task as completed due to a data conflict: {error_message}",
+          "not_found_by_id": "Task completion record with ID '{completion_id}' not found.",
+          "not_found_by_id_for_review": "Task completion with ID '{completion_id}' not found.",
+          "not_pending_approval": "Completion ID '{completion_id}' is not awaiting approval (current status: {status}).",
+          "invalid_new_status": "Invalid new status '{status}'. Allowed: {allowed_statuses}.",
+          "view_permission_denied": "You do not have permission to view this completion record."
+      },
+      "fields": {
+          "completed_at": {"description": "Actual task completion time by the user (or submission time)."},
+          "status": {"description": "Task completion status."},
+          "notes": {"description": "User notes regarding task completion."}
+      },
+      "update": {
+          "fields": {
+              "verified_at": {"description": "Verification time by administrator."},
+              "status": {"description": "New completion status."},
+              "notes": {"description": "Additional notes (e.g., from administrator during review)."}
+          }
+      },
+      "response": {
+          "fields": {
+              "task_id": {"description": "Identifier of the completed task."},
+              "user_id": {"description": "Identifier of the user who completed the task."},
+              "verified_at": {"description": "Verification time (if verified)."},
+              "user": {"description": "Public profile of the user who completed the task."},
+              "verifier": {"description": "Public profile of the user (admin) who verified the completion."}
+          }
+      }
+  },
+  "task_review": {
+      "errors": {
+          "completion_mismatch": "Completion ID '{completion_id}' does not belong to Task ID '{task_id}'.",
+          "already_reviewed": "User ID '{user_id}' has already reviewed {context}.",
+          "critical_create_failed": "Failed to retrieve created review.",
+          "create_conflict": "Could not create review due to data conflict: {error_message}",
+          "update_permission_denied": "You do not have permission to update this review.",
+          "update_failed_generic": "Error updating review.",
+          "critical_update_failed_relations": "Failed to retrieve updated review with relations.",
+          "delete_permission_denied": "You can only delete your own reviews."
+      },
+      "fields": {
+          "rating": {"description": "Numeric task rating (1 to 5, optional)."},
+          "comment": {"description": "Text comment for the review (optional)."}
+      },
+      "response": {
+          "fields": {
+              "task_id": {"description": "Identifier of the task being reviewed."},
+              "user_id": {"description": "Identifier of the user who left the review."},
+              "user": {"description": "Public profile of the user who left the review."}
+          }
+      }
+  },
+  "bonus_rule": {
+    "errors": {
+      "name_exists_in_scope": "Bonus rule with name '{name}' already exists in {scope}.",
+      "create_conflict": "Could not create bonus rule due to data conflict: {error_message}",
+      "update_conflict": "Could not update bonus rule due to data conflict: {error_message}",
+      "task_type_not_found_by_id": "Task type with ID '{task_type_id}' not found."
+    },
+    "fields": {
+        "name": {"description": "Name of the bonus rule."},
+        "description": {"description": "Detailed description of the rule and its trigger conditions."},
+        "task_id": {"description": "ID of the task to which the rule is linked (if any)."},
+        "event_id": {"description": "ID of the event (task of type 'event') to which the rule is linked (if any)."},
+        "bonus_type_code": {"description": "Bonus type code from dictionary (e.g., 'REWARD', 'PENALTY')."},
+        "amount": {"description": "Bonus or penalty amount. Positive for accrual, negative for deduction (or depends on bonus_type_code)."},
+        "condition_description": {"description": "Text description of additional rule trigger conditions."},
+        "state": {"description": "Rule state (e.g., 'active', 'inactive', 'draft')."}
+    },
+    "response": {
+        "fields": {
+            "bonus_type": {"description": "Bonus type object."},
+            "task": {"description": "Associated task object (brief info)."},
+            "event": {"description": "Associated event object (if event_id is used separately)."}
+        }
+    }
+  },
+  "account": {
+    "errors": {
+        "create_conflict": "Could not create account for {context_message} due to data conflict.",
+        "not_found_by_id": "User account with ID '{account_id}' not found.",
+        "not_found_for_context": "Account for {context_message} not found."
+    },
+    "fields": {
+        "user_id": {"description": "Identifier of the user to whom the account belongs."},
+        "group_id": {"description": "Identifier of the group within which this account exists."},
+        "balance": {"description": "Current account balance."},
+        "currency": {"description": "Currency or unit of measurement for bonuses on the account (e.g., 'points', 'credits')."}
+    },
+    "update": {
+        "fields": {"balance": {"description": "New balance value for administrative adjustment."}}
+    },
+    "response": {
+        "fields": {
+            "user": {"description": "Public profile of the account owner user."},
+            "group": {"description": "Brief information about the group to which the account belongs."}
+        }
+    },
+    "history_response": {
+        "fields": {"transactions": {"description": "List of transactions for this account."}}
+    }
+  },
+  "transaction": {
+    "errors": {
+        "create": {
+            "missing_account_identifier": "Account_id in transaction data or user_id_for_account_lookup must be provided.",
+            "account_identification_failed": "User account could not be definitively identified or created.",
+            "conflict": "Could not create transaction: data conflict.",
+            "db_error": "Database error during transaction processing."
+        }
+    },
+    "fields": {
+        "account_id": {"description": "User account identifier. If None, will be determined via user_id_for_account_lookup."},
+        "transaction_type": {"description": "Transaction type."},
+        "amount": {"description": "Transaction amount. For deductions, can be negative, or always positive with direction determined by type."},
+        "description": {"description": "Description or purpose of the transaction."},
+        "related_task_completion_id": {"description": "ID of the related task completion (if transaction is a result of a task)."},
+        "related_reward_id": {"description": "ID of the related redeemed reward (if transaction is a reward purchase)."}
+    },
+    "create": {
+        "fields": {"created_by_user_id": {"description": "ID of the user (admin) who initiated a manual transaction (optional)."}}
+    },
+    "response": {
+        "fields": {
+            "account_id": {"description": "User account identifier."},
+            "created_by_user_id": {"description": "ID of the user who created the transaction (if any)."},
+            "created_by": {"description": "Information about the user who created the transaction (if any)."}
+        }
+    }
+  },
+  "reward": {
+    "errors": {
+        "name_exists_in_scope": "Reward with name '{name}' already exists in {scope}.",
+        "create_conflict": "Could not create reward: data conflict.",
+        "update_conflict": "Could not update reward: data conflict.",
+        "unavailable": {
+            "not_found": "Reward not found.",
+            "inactive": "Reward is inactive.",
+            "not_yet_available": "Reward will be available from {date}.",
+            "expired": "Reward validity period ended on {date}.",
+            "insufficient_stock": "Insufficient stock for '{name}'. Available: {available_stock}."
+        },
+        "redeem": {
+            "unavailable_in_group_context": "This reward is not available in your current group context.",
+            "quantity_must_be_positive": "Quantity to redeem must be positive.",
+            "user_limit_exceeded": "User redemption limit ({limit}) exceeded. Already redeemed: {redeemed_count}.",
+            "internal_server_error": "Internal server error during reward redemption."
+        }
+    },
+    "transaction_description_redeemed": "Redeemed {quantity}x '{name}'",
+    "fields": {
+        "name": {"description": "Reward name."},
+        "description": {"description": "Detailed reward description."},
+        "cost": {"description": "Reward 'cost' in group bonus units."},
+        "quantity_available": {"description": "Available quantity of this reward (NULL for unlimited)."},
+        "icon_file_id": {"description": "ID of the uploaded reward icon file."},
+        "state": {"description": "Reward state (e.g., 'active', 'archived', 'out_of_stock')."},
+        "notes": {"description": "Additional notes about the reward."}
+    },
+    "create": {
+        "fields": {"group_id": {"description": "Identifier of the group to which this reward belongs."}}
+    },
+    "response": {
+        "fields": {
+            "cost": {"description": "Reward cost in bonuses."},
+            "quantity_available": {"description": "Available quantity (NULL for unlimited)."},
+            "icon_url": {"description": "Reward icon URL."}
+        }
+    },
+    "redeem_request": {
+        "fields": {
+            "reward_id": {"description": "Identifier of the reward the user wants to redeem."},
+            "quantity": {"description": "Number of reward instances to redeem (default 1)."}
+        }
+    }
+  },
+  "gamification": {
+    "level": {
+        "errors": {
+            "name_exists_in_scope": "{model_name} with name '{name}' already exists in {scope}.",
+            "min_points_exists_in_scope": "{model_name} with min_points_required '{points}' already exists in {scope}.",
+            "icon_file_not_found": "Icon file with ID '{file_id}' not found.",
+            "critical_create_failed": "Failed to retrieve created level.",
+            "create_conflict": "Could not create {model_name}: data conflict.",
+            "critical_update_failed": "Failed to retrieve updated level.",
+            "update_conflict": "Could not update {model_name}: data conflict."
+        },
+        "fields": {
+            "name": {"description": "Gamification level name."},
+            "description": {"description": "Description of conditions or benefits of this level."},
+            "required_points": {"description": "Number of points required to achieve this level."},
+            "level_number": {"description": "Ordinal number of the level (e.g., 1, 2, 3). Used for sorting and progress determination."},
+            "icon_url": {"description": "URL or path to the icon representing the level."},
+            "group_id": {"description": "ID of the group to which this level belongs. NULL if the level is global/system."},
+            "state": {"description": "Level state (e.g., 'active', 'inactive')."},
+            "notes": {"description": "Additional notes about the level."}
+        },
+        "response": {
+            "fields": {"group": {"description": "Brief information about the group to which the level belongs (if any)."}}
+        }
+    },
+    "user_level": {
+        "errors": {
+            "critical_update_failed": "Critical error: failed to retrieve user level record after update.",
+            "update_create_conflict": "Could not update/create user level due to a data conflict: {error_message}"
+        },
+        "fields": {
+            "user_id": {"description": "Identifier of the user who achieved the level."},
+            "level_id": {"description": "Identifier of the achieved gamification level."},
+            "group_id": {"description": "Identifier of the group within which the level was achieved (NULL for global levels)."}
+        },
+        "response": {
+            "fields": {
+                "user": {"description": "Public profile of the user."},
+                "level": {"description": "Information about the achieved level."},
+                "group": {"description": "Brief information about the group in which the level was achieved."}
+            }
+        }
+    },
+    "badge": {
+        "errors": {
+            "name_exists_in_scope": "{model_name} with name '{name}' already exists in {scope}.",
+            "icon_file_not_found": "Icon file with ID '{file_id}' not found.",
+            "critical_create_failed": "Failed to retrieve created badge.",
+            "create_conflict": "Could not create {model_name}: data conflict.",
+            "critical_update_failed": "Failed to retrieve updated badge.",
+            "update_conflict": "Could not update {model_name}: data conflict."
+        },
+        "fields": {
+            "name": {"description": "Gamification badge name."},
+            "description": {"description": "Description of conditions for earning or the meaning of this badge."},
+            "icon_file_id": {"description": "ID of the uploaded badge icon file."},
+            "group_id": {"description": "ID of the group to which this badge belongs. NULL if the badge is global/system."},
+            "state": {"description": "Badge state (e.g., 'active', 'archived')."},
+            "notes": {"description": "Additional notes about the badge."}
+        },
+        "response": {
+            "fields": {
+                "icon_url": {"description": "Badge icon URL."},
+                "group": {"description": "Brief information about the group to which the badge belongs (if any)."}
+            }
+        }
+    },
+    "achievement": {
+        "errors": {
+            "not_found_by_id": "Badge with ID '{badge_id}' not found.",
+            "badge_not_repeatable_and_awarded": "Badge '{badge_name}' (ID: {badge_id}) has already been awarded to this user in this context and is not repeatable.",
+            "award_conflict": "Could not award achievement due to a data conflict: {error_message}",
+            "critical_award_failed": "Critical error: failed to retrieve achievement record after saving."
+        },
+        "fields": {
+            "user_id": {"description": "Identifier of the user who received the achievement."},
+            "badge_id": {"description": "Identifier of the earned badge."},
+            "group_id": {"description": "ID of the group in the context of which the achievement was earned (if badge is group-specific)."}
+        },
+        "response": {
+            "fields": {
+                "user": {"description": "Public profile of the user."},
+                "badge": {"description": "Information about the earned badge."},
+                "group": {"description": "Brief information about the group in which the achievement was earned (if any)."}
+            }
+        }
+    },
+    "rating": {
+        "errors": {
+            "critical_update_create_failed": "Critical error: failed to update or create rating record.",
+            "update_create_conflict": "Could not update/create rating due to a data conflict: {error_message}",
+            "critical_get_after_save_failed": "Critical error: Failed to retrieve rating after saving."
+        },
+        "fields": {
+            "user_id": {"description": "User identifier."},
+            "group_id": {"description": "Identifier of the group in which the rating is calculated."},
+            "rating_score": {"description": "Calculated rating or user's point score."},
+            "period_start_date": {"description": "Start date of the period for which the rating is calculated (if applicable)."},
+            "period_end_date": {"description": "End date of the period for which the rating is calculated (if applicable)."},
+            "rating_type": {"description": "Rating type (e.g., 'monthly', 'overall', 'weekly')."}
+        },
+        "response": {
+            "fields": {
+                "user": {"description": "Public profile of the user."},
+                "group": {"description": "Brief information about the group."}
+            }
+        }
+    }
+  },
+  "notification": {
+    "errors": {
+        "template": {
+            "not_found_by_id": "Notification template with ID '{template_id}' not found.",
+            "not_found_by_name": "Notification template '{template_name}' not found.",
+            "render_failed": "Could not render notification template '{template_name}': {error_message}",
+            "render_unexpected_error": "Unexpected error rendering template '{template_name}'.",
+            "render_syntax_error": "Syntax error in template '{template_name}': {error_message} (line {line_number})",
+            "render_undefined_variable": "Missing variable in context for template '{template_name}': {error_message}",
+            "render_fallback": {
+                "body": "Error displaying notification '{template_name}'. Please contact support. Details: {error_details}",
+                "subject": "Notification Error: {template_name}"
+            }
+        },
+        "critical_create_failed_relations": "Critical error: failed to retrieve newly created notification with relations.",
+        "create_conflict": "Could not create notification due to a data conflict: {error_message}",
+        "delete_unauthorized": "User ID '{user_id}' is not authorized to delete notification ID '{notification_id}' (owner: {owner_id})."
+    },
+    "delivery": {
+        "errors": {
+            "no_channel_or_contact": "No channel or contact information found for delivery.",
+            "retry_missing_data": "Missing data for retry.",
+            "retry_sender_not_found": "Sender for channel '{channel}' not found for retry.",
+            "send_unknown_error": "Unknown sending error.",
+            "send_exception_on_channel": "Exception during send attempt on channel {channel_name}: {details}",
+            "retry_send_unknown_error": "Unknown error during retry send.",
+            "retry_exception_on_channel": "Exception during retry send on channel {channel_name}: {details}"
+        }
+    },
+    "fields": {
+        "user_id": {"description": "Identifier of the recipient user."},
+        "template_id": {"description": "ID of the template used to create the notification (if any)."},
+        "title": {"description": "Notification title."},
+        "message": {"description": "Notification body (rendered text)."},
+        "notification_type": {"description": "Notification type."},
+        "related_entity_type": {"description": "Type of the related entity."},
+        "related_entity_id": {"description": "ID of the related entity."},
+        "data_payload": {"description": "Additional structured data for the notification (e.g., for client-side link building)."}
+    },
+    "update": {
+        "fields": {"is_read": {"description": "New read status of the notification."}}
+    },
+    "response": {
+        "fields": {
+            "is_read": {"description": "Read status of the notification (True if read)."},
+            "read_at": {"description": "Time when the notification was marked as read."},
+            "user": {"description": "Information about the recipient user (usually not included as the request is on behalf of this user)."},
+            "template": {"description": "Information about the notification template used (if any)."},
+            "delivery_attempts": {"description": "History of delivery attempts for this notification."}
+        }
+    },
+    "template": {
+        "fields": {
+            "subject_template": {"description": "Notification subject template. May contain placeholders (e.g., {{user_name}})."},
+            "body_template": {"description": "Notification body template. May contain placeholders and HTML/Markdown/text depending on the type."},
+            "template_type": {"description": "Template type/channel."}
+        }
+    },
+    "delivery_attempt": {
+        "fields": {
+            "notification_id": {"description": "Identifier of the notification that was attempted to be delivered."},
+            "channel": {"description": "Delivery channel."},
+            "status": {"description": "Delivery attempt status."},
+            "error_message": {"description": "Error message if delivery failed."},
+            "external_message_id": {"description": "External message ID from the delivery provider (e.g., SES Message ID, Twilio SID)."}
+        }
+    }
+  },
+  "integrations": {
+    "calendar": {
+        "event": {
+            "fields": {
+                "id": {"description": "Unique event ID from the provider."},
+                "title": {"description": "Event name or short description."},
+                "start_time": {"description": "Event start time (with timezone information)."},
+                "end_time": {"description": "Event end time (with timezone information)."},
+                "description": {"description": "Detailed event description."},
+                "location": {"description": "Event location."},
+                "is_all_day": {"description": "True if the event lasts all day."},
+                "attendees": {"description": "List of attendee email addresses."},
+                "meeting_link": {"description": "Link to an online meeting (e.g., Google Meet, Teams)."}
+            }
+        },
+        "info": {
+            "fields": {
+                "id": {"description": "Unique calendar ID from the provider."},
+                "name": {"description": "Display name of the calendar (e.g., 'Primary', 'Work')."},
+                "is_primary": {"description": "True if this is the user's primary calendar on the platform."},
+                "can_edit": {"description": "True if the application has write permissions for this calendar."}
+            }
+        }
+    },
+    "google_calendar": {
+        "connect": {
+            "success_simulation": "Google Calendar successfully connected (simulation).",
+            "error_save_tokens_simulation": "Failed to save tokens (simulation)."
+        }
+    },
+    "outlook_calendar": {
+        "connect": {
+            "success_simulation": "Outlook Calendar successfully connected (simulation).",
+            "error_save_tokens_simulation": "Failed to save tokens (simulation)."
+        }
+    },
+    "messenger": {
+        "errors": {
+            "message_text_empty": "Message text or blocks cannot be empty.",
+            "client_not_configured": "{service_name} client is not configured."
+        },
+        "user_profile": {
+            "fields": {
+                "id": {"description": "User ID specific to the platform (e.g., Telegram chat_id, Slack user_id)."},
+                "username": {"description": "Username on the platform, if available."},
+                "full_name": {"description": "User's full name on the platform, if available."}
+            }
+        },
+        "message": {
+            "fields": {"text": {"description": "Text content of the message."}}
+        },
+        "send_command": {
+            "fields": {
+                "recipient_platform_id": {"description": "Recipient ID specific to the platform (user or channel ID)."},
+                "message": {"description": "Message object to send."}
+            }
+        },
+        "send_response": {
+            "fields": {
+                "status": {"description": "Sending status ('success', 'failed', 'pending')."},
+                "platform_message_id": {"description": "Message ID on the external platform, if available."},
+                "error_message": {"description": "Error message if status is 'failed'."}
+            }
+        }
+    }
+  },
+  "system": {
+    "settings": {
+        "fields": {
+            "key": {"description": "Unique programmatic setting key."},
+            "name": {"description": "Human-readable setting name (for UI display)."},
+            "description": {"description": "Detailed description of the setting's purpose and usage."},
+            "value_type": {"description": "Setting value type."},
+            "is_editable": {"description": "Can the superuser edit this setting via UI/API."},
+            "is_sensitive": {"description": "Is the setting value sensitive (e.g., API key) and requires masking."}
+        },
+        "create": {
+            "fields": {"value": {"description": "Setting value. Type depends on 'value_type' (e.g., str, int, bool, dict)."}}
+        },
+        "update": {
+            "fields": {
+                "value": {"description": "New setting value. Type must match 'value_type'."},
+                "name": {"description": "New human-readable setting name."},
+                "description": {"description": "New setting description."},
+                "is_editable": {"description": "New editability status."},
+                "is_sensitive": {"description": "New sensitivity status."}
+            }
+        },
+        "response": {
+            "fields": {"value": {"description": "Setting value. Note: sensitive values may be masked or absent."}}
+        }
+    },
+    "monitoring": {
+        "log": {
+            "fields": {
+                "timestamp": {"description": "Log event timestamp."},
+                "level": {"description": "Log level."},
+                "message": {"description": "Main log message."},
+                "source": {"description": "Event source (e.g., service name, module, function)."},
+                "details": {"description": "Additional structured details in JSON format."},
+                "user_id": {"description": "ID of the user associated with the log event (if any)."}
+            },
+            "response": {
+                "fields": {"user": {"description": "Information about the user associated with the log (if any)."}}
+            }
+        },
+        "metric": {
+            "fields": {
+                "timestamp": {"description": "Metric recording time."},
+                "metric_name": {"description": "Metric name (e.g., 'api_response_time', 'db_query_duration')."},
+                "value": {"description": "Metric value."},
+                "unit": {"description": "Unit of measurement for the metric (e.g., 'ms', 's', 'count', 'MB')."},
+                "tags": {"description": "Tags/labels for grouping or filtering metrics (key-value JSON)."}
+            }
+        }
+    },
+    "health": {
+        "service_status": {
+            "fields": {
+                "service_name": {"description": "Unique name of the service (e.g., 'database', 'redis_cache', 'payment_gateway')."},
+                "status": {"description": "Current status of the service."},
+                "details": {"description": "Additional details about the service status (e.g., error message or response time)."}
+            }
+        },
+        "overall_status": {
+            "fields": {
+                "overall_status": {"description": "Overall aggregated health status of the system."},
+                "timestamp": {"description": "Timestamp of when the health report was generated."},
+                "services": {"description": "List of health statuses for individual dependent services."}
+            }
+        }
+    }
+  },
+  "file_record": {
+    "errors": {
+        "uploader_not_found": "Uploader user with ID '{user_id}' not found.",
+        "path_exists": "File record with storage path '{path}' already exists (ID: {existing_id}).",
+        "critical_create_failed": "Error creating file record: failed to retrieve after saving.",
+        "create_conflict": "Could not create file record due to data conflict.",
+        "delete_in_use": "File record '{file_name}' is in use and cannot be deleted.",
+        "not_found_by_id": "File record with ID '{file_id}' not found."
+    },
+    "fields": {
+        "file_name": {"description": "Original or generated name of the file."},
+        "mime_type": {"description": "MIME type of the file."},
+        "file_size": {"description": "Size of the file in bytes."},
+        "purpose": {"description": "Purpose of the file."},
+        "metadata": {"description": "Additional file metadata in JSON format (e.g., image dimensions, audio/video duration)."},
+        "file_path": {"description": "Path to the file on the server or key in object storage (usually not returned directly to the client)."},
+        "uploader_user_id": {"description": "ID of the user who uploaded the file."},
+        "url": {"description": "Public URL for accessing the file (if applicable)."},
+        "uploader": {"description": "Information about the user who uploaded the file."}
+    }
+  },
+  "file_upload": {
+    "errors": {
+        "critical_storage_setup_failed": "Critical error: failed to configure file storage directories. {error_message}",
+        "invalid_file_name": "Invalid file name provided.",
+        "initiate": {
+            "size_must_be_positive": "File size must be greater than zero.",
+            "size_exceeds_limit": "File size {size} bytes exceeds the maximum of {limit} bytes.",
+            "mime_type_not_allowed": "File type '{mime_type}' is not allowed for upload."
+        },
+        "upload_chunk": {
+            "prepare_failed": "Error preparing for upload for ID {upload_id}.",
+            "save_failed": "Failed to save uploaded file data for ID {upload_id}."
+        },
+        "complete": {
+            "invalid_file_name": "Invalid file name provided for completion.",
+            "data_not_found": "Uploaded file data not found for session {upload_id}.",
+            "save_failed": "Failed to complete file saving.",
+            "file_record_creation_failed_internal": "Internal error: FileRecordService.create_file_record returned None."
+        }
+    },
+    "initiate": {
+        "success_message": "Upload initiated. Send file data."
+    },
+    "upload_chunk": {
+        "last_chunk_received": "File data received. Ready for completion.",
+        "chunk_received": "Chunk {chunk_number} received. Awaiting next."
+    },
+    "complete": {
+        "success_message": "File '{file_name}' uploaded successfully."
+    },
+    "initiate_request": {
+        "fields": {
+            "file_name": {"description": "Name of the file being uploaded."},
+            "mime_type": {"description": "MIME type of the file."},
+            "file_size": {"description": "Size of the file in bytes."},
+            "purpose": {"description": "Purpose of the file. Determines further processing and storage."}
+        }
+    },
+    "initiate_response": {
+        "fields": {
+            "upload_url": {"description": "URL to which the client should upload the file (PUT or POST)."},
+            "fields": {"description": "Additional fields to include in the POST request body (for S3 presigned POST)."},
+            "file_record_id": {"description": "ID of the created FileRecord awaiting file upload."}
+        }
+    },
+    "complete_request": {
+        "fields": {
+            "file_record_id": {"description": "ID of the FileRecord for which upload is being confirmed."},
+            "upload_key": {"description": "Object key in storage if different from initial file_path (optional)."},
+            "e_tag": {"description": "ETag of the object from storage, used for integrity check (e.g., for S3)."}
+        }
+    },
+    "response": {
+        "fields": {
+            "file_id": {"description": "File record ID (alias for fileRecordId)."},
+            "file_name": {"description": "Name of the uploaded file."},
+            "url": {"description": "Final URL to access the uploaded file."},
+            "mime_type": {"description": "MIME type of the file."},
+            "file_size": {"description": "Size of the file in bytes."},
+            "purpose": {"description": "Purpose of the file."}
+        }
+    }
+  },
+  "user_avatar": {
+    "errors": {
+        "set": {
+            "invalid_image_file": "File '{file_name}' is not a valid image for an avatar.",
+            "repository_error": "Error setting avatar at the repository level.",
+            "retrieve_after_save_failed": "Error setting avatar: failed to retrieve record after saving.",
+            "conflict": "Could not set avatar due to a data conflict: {error_message}"
+        },
+        "deactivate": {
+            "permission_denied": "You do not have permission to deactivate this avatar."
+        }
+    },
+    "fields": {
+        "user_id": {"description": "Identifier of the user to whom the avatar belongs."},
+        "file_record_id": {"description": "Identifier of the file record that is the avatar."},
+        "is_active": {"description": "Is this avatar currently active for the user."},
+        "file_url": {"description": "URL to access the avatar file."},
+        "user": {"description": "User information (usually not included if request is from this user or avatar is part of user profile)."},
+        "file_record": {"description": "Detailed information about the avatar file."}
+    }
+  },
+  "global_scope": "global scope",
+  "in_group_scope":"in group ID '{group_id}'"
 }

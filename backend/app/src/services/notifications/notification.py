@@ -88,15 +88,15 @@ class NotificationService(BaseService):
             f"Спроба створення сповіщення для користувача ID '{notification_data.user_id}', назва: '{notification_data.title}'.")
 
         if not await self.db_session.get(User, notification_data.user_id): # Перевірка залишається в сервісі
-            msg = f"Користувача з ID '{notification_data.user_id}' не знайдено."
-            logger.error(msg + " Неможливо створити сповіщення.")
-            raise ValueError(msg)
+            # msg = f"Користувача з ID '{notification_data.user_id}' не знайдено." # Original log
+            logger.error(f"Користувача з ID '{notification_data.user_id}' не знайдено. Неможливо створити сповіщення.")
+            raise ValueError(_("user.errors.not_found_by_id", id=notification_data.user_id))
 
         if notification_data.template_id and \
            not await self.db_session.get(NotificationTemplate, notification_data.template_id): # Перевірка залишається в сервісі
-            msg = f"Шаблон сповіщення з ID '{notification_data.template_id}' не знайдено."
-            logger.error(msg)
-            raise ValueError(msg)
+            # msg = f"Шаблон сповіщення з ID '{notification_data.template_id}' не знайдено." # Original log
+            logger.error(f"Шаблон сповіщення з ID '{notification_data.template_id}' не знайдено.")
+            raise ValueError(_("notification.errors.template.not_found_by_id", template_id=notification_data.template_id))
 
         # Створюємо NotificationCreateSchema з NotificationCreateInternal
         # NotificationCreateSchema - це те, що очікує repo.create.
@@ -114,12 +114,12 @@ class NotificationService(BaseService):
             # Перезавантажуємо зі зв'язками для відповіді
             refreshed_notification = await self.get_notification_by_id(new_notification_db.id) # Викликаємо get_notification_by_id для завантаження зв'язків
             if not refreshed_notification: # Малоймовірно
-                raise RuntimeError("Не вдалося отримати щойно створене сповіщення зі зв'язками.")
+                raise RuntimeError(_("notification.errors.critical_create_failed_relations"))
 
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності для user ID '{notification_data.user_id}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося створити сповіщення через конфлікт даних: {e}")
+            raise ValueError(_("notification.errors.create_conflict", error_message=str(e)))
         except Exception as e: # Обробка інших можливих помилок
             await self.rollback()
             logger.error(f"Неочікувана помилка при створенні сповіщення для user ID '{notification_data.user_id}': {e}", exc_info=settings.DEBUG)
@@ -157,19 +157,20 @@ class NotificationService(BaseService):
         # template_service.get_template_by_name вже використовує репозиторій (якщо реалізовано)
         template = await self.template_service.get_template_by_name(template_name)
         if not template:
-            msg = f"Шаблон сповіщення '{template_name}' не знайдено."
-            logger.error(msg + " Неможливо створити сповіщення.")
-            raise ValueError(msg)
+            # msg = f"Шаблон сповіщення '{template_name}' не знайдено." # Original log
+            logger.error(f"Шаблон сповіщення '{template_name}' не знайдено. Неможливо створити сповіщення.")
+            raise ValueError(_("notification.errors.template.not_found_by_name", template_name=template_name))
 
         try:
             rendered_subject, rendered_body = self.template_service.render_template(template, context_data)
-        except (ValueError, KeyError) as e:
+        except (ValueError, KeyError) as e: # These are often programming errors or bad context data
             logger.error(f"Помилка рендерингу шаблону '{template_name}' для користувача '{user_id}': {e}",
                          exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося відрендерити шаблон сповіщення '{template_name}': {e}")
-        except Exception as e:
+            # Use specific error key for known render issues (like missing context keys)
+            raise ValueError(_("notification.errors.template.render_failed", template_name=template_name, error_message=str(e)))
+        except Exception as e: # Catch-all for other render exceptions
             logger.error(f"Неочікувана помилка рендерингу '{template_name}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Неочікувана помилка рендерингу шаблону '{template_name}'.")
+            raise ValueError(_("notification.errors.template.render_unexpected_error", template_name=template_name))
 
         final_payload = template.default_vars.copy() if template.default_vars else {}
         if payload_override:

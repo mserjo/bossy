@@ -17,6 +17,8 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager # Для нового стилю lifespan подій у FastAPI
 
+from backend.app.src.core.middleware.i18n_middleware import LanguageMiddleware # Added import
+
 # Абсолютні імпорти з проекту
 from backend.app.src.config.settings import settings
 from backend.app.src.config.logging import setup_logging, get_logger
@@ -98,6 +100,11 @@ app = FastAPI(
 )
 
 # --- Налаштування Middleware ---
+
+# Language Middleware (повинно бути одним з перших, але після Error handling, якщо воно впливає на відповіді помилок)
+# Наразі додаємо перед CORS.
+app.add_middleware(LanguageMiddleware)
+logger.info("LanguageMiddleware зареєстровано.")
 
 # CORS (Cross-Origin Resource Sharing)
 # Дозволяє або забороняє запити з інших доменів.

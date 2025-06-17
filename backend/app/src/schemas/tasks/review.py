@@ -18,6 +18,7 @@ from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedS
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача
 from datetime import timedelta
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 
@@ -33,11 +34,11 @@ class TaskReviewBaseSchema(BaseSchema):
         None,
         ge=1,
         le=5,
-        description="Числовий рейтинг завдання (від 1 до 5, необов'язково)."
+        description=_("task_review.fields.rating.description")
     )
     comment: Optional[str] = Field(
         None,
-        description="Текстовий коментар до відгуку (необов'язково)."
+        description=_("task_review.fields.comment.description")
     )
 
     # model_config успадковується з BaseSchema (from_attributes=True)
@@ -64,11 +65,11 @@ class TaskReviewUpdateSchema(
         None,
         ge=1,
         le=5,
-        description="Новий числовий рейтинг завдання (від 1 до 5)."
+        description=_("task_review.fields.rating.description") # Reuse from base
     )
     comment: Optional[str] = Field(
         None,
-        description="Новий текстовий коментар до відгуку."
+        description=_("task_review.fields.comment.description") # Reuse from base
     )
     # Валідація, що хоча б одне поле надано для оновлення,
     # може бути додана за допомогою model_validator.
@@ -81,11 +82,11 @@ class TaskReviewSchema(TaskReviewBaseSchema, IDSchemaMixin, TimestampedSchemaMix
     # id, created_at, updated_at успадковані.
     # rating, comment успадковані.
     # task_id та user_id потрібно додати явно, оскільки вони не в TaskReviewBaseSchema.
-    task_id: int = Field(description="Ідентифікатор завдання, до якого залишено відгук.")
-    user_id: int = Field(description="Ідентифікатор користувача, який залишив відгук.")
+    task_id: int = Field(description=_("task_review.response.fields.task_id.description"))
+    user_id: int = Field(description=_("task_review.response.fields.user_id.description"))
 
     user: Optional[UserPublicProfileSchema] = Field(None,
-                                                    description="Публічний профіль користувача, який залишив відгук.")
+                                                    description=_("task_review.response.fields.user.description"))
     # Можна додати поле `task: Optional[TaskBriefSchema] = None`, якщо потрібно.
 
 

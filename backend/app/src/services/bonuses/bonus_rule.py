@@ -29,6 +29,7 @@ from backend.app.src.schemas.bonuses.bonus_rule import (
     BonusRuleResponse
 )
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 from backend.app.src.config import settings
 
@@ -86,24 +87,24 @@ class BonusRuleService(BaseService):
 
         # Перевірка існування пов'язаних сутностей
         if rule_data.group_id and not await self.db_session.get(Group, rule_data.group_id):
-            raise ValueError(f"Групу з ID '{rule_data.group_id}' не знайдено.")  # i18n
+            raise ValueError(_("group.errors.not_found_by_id", id=rule_data.group_id))
         if rule_data.task_type_id and not await self.db_session.get(TaskType, rule_data.task_type_id):
-            raise ValueError(f"Тип завдання з ID '{rule_data.task_type_id}' не знайдено.")  # i18n
+            raise ValueError(_("bonus_rule.errors.task_type_not_found_by_id", task_type_id=rule_data.task_type_id))
         if rule_data.task_id and not await self.db_session.get(Task, rule_data.task_id):
-            raise ValueError(f"Завдання з ID '{rule_data.task_id}' не знайдено.")  # i18n
+            raise ValueError(_("task.errors.not_found_by_id", task_id=rule_data.task_id))
 
         # Перевірка унікальності імені правила в межах його області (глобальна або група)
         stmt_name_check = select(BonusRule.id).where(BonusRule.name == rule_data.name)
-        scope_log_msg = "глобальній області"  # i18n
+        scope_log_msg = _("global_scope") # Placeholder for "in global scope" or similar
         if rule_data.group_id:
             stmt_name_check = stmt_name_check.where(BonusRule.group_id == rule_data.group_id)
-            scope_log_msg = f"групі ID '{rule_data.group_id}'"  # i18n
+            scope_log_msg = _("in_group_scope", group_id=rule_data.group_id) # Placeholder for "in group ID X"
         else:
             stmt_name_check = stmt_name_check.where(BonusRule.group_id.is_(None))
 
         if (await self.db_session.execute(stmt_name_check)).scalar_one_or_none():
-            logger.warning(f"Правило з ім'ям '{rule_data.name}' вже існує в {scope_log_msg}.")
-            raise ValueError(f"Правило з ім'ям '{rule_data.name}' вже існує в {scope_log_msg}.")  # i18n
+            logger.warning(f"Правило з ім'ям '{rule_data.name}' вже існує в {scope_log_msg}.") # Log can remain more detailed
+            raise ValueError(_("bonus_rule.errors.name_exists_in_scope", name=rule_data.name, scope=scope_log_msg))
 
         # Створення об'єкта моделі
         # created_at/updated_at встановлюються автоматично, якщо налаштовано в моделі
@@ -122,7 +123,7 @@ class BonusRuleService(BaseService):
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності при створенні правила '{rule_data.name}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося створити правило через конфлікт даних: {e}")  # i18n
+            raise ValueError(_("bonus_rule.errors.create_conflict", error_message=str(e)))
         except Exception as e:  # Обробка інших можливих помилок
             await self.rollback()
             logger.error(f"Неочікувана помилка при створенні правила '{rule_data.name}': {e}", exc_info=settings.DEBUG)
@@ -155,13 +156,13 @@ class BonusRuleService(BaseService):
         # Перевірка існування нових пов'язаних сутностей, якщо вони змінюються
         if 'group_id' in update_data and rule_db.group_id != update_data['group_id']:
             if update_data['group_id'] and not await self.db_session.get(Group, update_data['group_id']):
-                raise ValueError(f"Нова група з ID '{update_data['group_id']}' не знайдена.")  # i18n
+                raise ValueError(_("group.errors.not_found_by_id", id=update_data['group_id']))
         if 'task_type_id' in update_data and rule_db.task_type_id != update_data['task_type_id']:
             if update_data['task_type_id'] and not await self.db_session.get(TaskType, update_data['task_type_id']):
-                raise ValueError(f"Новий тип завдання ID '{update_data['task_type_id']}' не знайдено.")  # i18n
+                raise ValueError(_("bonus_rule.errors.task_type_not_found_by_id", task_type_id=update_data['task_type_id']))
         if 'task_id' in update_data and rule_db.task_id != update_data['task_id']:
             if update_data['task_id'] and not await self.db_session.get(Task, update_data['task_id']):
-                raise ValueError(f"Нове завдання ID '{update_data['task_id']}' не знайдено.")  # i18n
+                raise ValueError(_("task.errors.not_found_by_id", task_id=update_data['task_id']))
 
         # Перевірка унікальності імені, якщо ім'я або група змінюються
         new_name = update_data.get('name', rule_db.name)
@@ -174,15 +175,15 @@ class BonusRuleService(BaseService):
                 BonusRule.name == new_name,
                 BonusRule.id != rule_id  # Виключаємо поточне правило
             )
-            scope_log_msg = "глобальній області"  # i18n
+            scope_log_msg = _("global_scope") # Placeholder for "in global scope"
             if new_group_id is not None:
                 stmt_name_check = stmt_name_check.where(BonusRule.group_id == new_group_id)
-                scope_log_msg = f"групі ID '{new_group_id}'"  # i18n
+                scope_log_msg = _("in_group_scope", group_id=new_group_id) # Placeholder for "in group ID X"
             else:
                 stmt_name_check = stmt_name_check.where(BonusRule.group_id.is_(None))
 
             if (await self.db_session.execute(stmt_name_check)).scalar_one_or_none():
-                raise ValueError(f"Інше правило з ім'ям '{new_name}' вже існує в {scope_log_msg}.")  # i18n
+                raise ValueError(_("bonus_rule.errors.name_exists_in_scope", name=new_name, scope=scope_log_msg))
 
         # Оновлення полів
         for field, value in update_data.items():
@@ -203,7 +204,7 @@ class BonusRuleService(BaseService):
         except IntegrityError as e:  # Обробка помилки унікальності на рівні БД
             await self.rollback()
             logger.error(f"Помилка цілісності при оновленні правила ID '{rule_id}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося оновити правило через конфлікт даних: {e}")  # i18n
+            raise ValueError(_("bonus_rule.errors.update_conflict", error_message=str(e)))
         except Exception as e:
             await self.rollback()
             logger.error(f"Помилка при оновленні правила ID '{rule_id}': {e}", exc_info=settings.DEBUG)

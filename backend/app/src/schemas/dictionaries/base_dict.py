@@ -18,7 +18,8 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем з головного модуля схем
 from backend.app.src.schemas.base import BaseSchema, BaseMainSchema
-from backend.app.src.config.logging import get_logger 
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # Максимальна довжина для поля 'name' та 'code' може бути винесена в константи,
@@ -37,9 +38,9 @@ class DictionaryBaseResponseSchema(BaseMainSchema): # Renamed from BaseDictionar
     Поле `group_id` успадковане, але для більшості системних довідників воно буде `None`.
     """
     code: str = Field(
-        ..., # Означає, що поле є обов'язковим
+        ...,
         max_length=DICT_CODE_MAX_LENGTH,
-        description="Унікальний текстовий код запису довідника.",
+        description=_("dictionaries.base.fields.code.description"),
         examples=["active", "admin_role"]
     )
     # model_config успадковується з BaseMainSchema -> BaseSchema (from_attributes=True)
@@ -52,26 +53,26 @@ class DictionaryCreateSchema(BaseSchema):
     name: str = Field(
         ...,
         max_length=DICT_NAME_MAX_LENGTH,
-        description="Назва запису довідника.",
+        description=_("dictionaries.base.fields.name.description"),
         examples=["Активний", "Роль адміністратора"]
     )
     code: str = Field(
         ...,
         max_length=DICT_CODE_MAX_LENGTH,
-        description="Унікальний текстовий код запису довідника.",
+        description=_("dictionaries.base.fields.code.description"),
         examples=["ACTIVE", "ADMIN_ROLE"]
     )
     description: Optional[str] = Field(
         None,
-        description="Детальний опис запису довідника (необов'язково)."
+        description=_("dictionaries.base.fields.description.description")
     )
     state: Optional[str] = Field(
         None,
-        description="Стан запису довідника (наприклад, 'active', 'deprecated', необов'язково)."
+        description=_("dictionaries.base.fields.state.description")
     )
     notes: Optional[str] = Field(
         None,
-        description="Додаткові нотатки щодо запису довідника (необов'язково)."
+        description=_("dictionaries.base.fields.notes.description")
     )
     # group_id тут не додається за замовчуванням, оскільки більшість довідників є глобальними.
     # Якщо конкретний довідник може бути специфічним для групи, group_id додається в його Create/Update схемах.
@@ -85,26 +86,26 @@ class DictionaryUpdateSchema(BaseSchema):
     name: Optional[str] = Field(
         None,
         max_length=DICT_NAME_MAX_LENGTH,
-        description="Нова назва запису довідника.",
+        description=_("dictionaries.base.update_fields.name.description"),
         examples=["Активний статус"]
     )
     code: Optional[str] = Field(
         None,
         max_length=DICT_CODE_MAX_LENGTH,
-        description="Новий унікальний текстовий код запису довідника.",
+        description=_("dictionaries.base.update_fields.code.description"),
         examples=["ACTIVE_STATUS"]
     )
     description: Optional[str] = Field(
         None,
-        description="Новий детальний опис запису довідника."
+        description=_("dictionaries.base.update_fields.description.description")
     )
     state: Optional[str] = Field(
         None,
-        description="Новий стан запису довідника."
+        description=_("dictionaries.base.update_fields.state.description")
     )
     notes: Optional[str] = Field(
         None,
-        description="Нові додаткові нотатки щодо запису довідника."
+        description=_("dictionaries.base.update_fields.notes.description")
     )
     # group_id тут також не додається за замовчуванням.
 

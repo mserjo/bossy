@@ -25,6 +25,7 @@ from backend.app.src.schemas.tasks.event import (
 )
 from backend.app.src.config import settings as global_settings
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 DEFAULT_EVENT_STATUS_CODE = "SCHEDULED"
@@ -97,13 +98,13 @@ class EventService(BaseService):
 
         # Перевірки існування FK залишаються в сервісі
         if not await self.db_session.get(Group, event_create_data.group_id):
-            raise ValueError(f"Групу з ID '{event_create_data.group_id}' не знайдено.")
+            raise ValueError(_("group.errors.not_found_by_id", id=event_create_data.group_id))
 
         type_id_to_check = getattr(event_create_data, 'event_type_id', getattr(event_create_data, 'task_type_id', None))
         if not type_id_to_check:
-            raise ValueError("Необхідно вказати 'event_type_id' або 'task_type_id' для події.")
+            raise ValueError(_("event.errors.create.type_id_missing"))
         if not await self.db_session.get(TaskType, type_id_to_check): # Припускаємо TaskType для обох
-            raise ValueError(f"Тип події/завдання з ID '{type_id_to_check}' не знайдено.")
+            raise ValueError(_("event.errors.event_type_not_found_by_id", type_id=type_id_to_check))
 
         status_id_to_set = event_create_data.status_id
         if not status_id_to_set:
@@ -112,12 +113,12 @@ class EventService(BaseService):
                                  ).scalar_one_or_none()
             if not default_status_db and (not hasattr(Event, 'status_id') or Event.status_id.nullable is False): # type: ignore
                 raise ValueError(
-                    f"Статус події є обов'язковим, але статус за замовчуванням '{DEFAULT_EVENT_STATUS_CODE}' не знайдено.")
+                    _("event.errors.create.default_status_not_found", status_code=DEFAULT_EVENT_STATUS_CODE))
             status_id_to_set = default_status_db
             logger.info(
                 f"Для нової події не надано ID статусу, використано статус за замовчуванням ID: {status_id_to_set or 'None (якщо nullable)'}")
         elif not await self.db_session.get(Status, status_id_to_set):
-            raise ValueError(f"Статус з ID '{status_id_to_set}' не знайдено.")
+            raise ValueError(_("event.errors.status_not_found_by_id", status_id=status_id_to_set))
 
         # Підготовка даних для create з репозиторію
         create_dict_for_repo = event_create_data.model_dump(exclude_unset=True)
@@ -144,14 +145,14 @@ class EventService(BaseService):
             created_event_detailed = await self.get_event_by_id(new_event_db.id, include_details=True)
             if not created_event_detailed:
                 raise RuntimeError(
-                    f"Критична помилка: не вдалося отримати створену подію ID {new_event_db.id} після коміту.")
+                    _("event.errors.critical_create_failed", event_id=new_event_db.id))
             logger.info(
                 f"Подію '{new_event_db.title}' (ID: {new_event_db.id}) успішно створено користувачем ID '{creator_user_id}'.")
             return created_event_detailed
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності '{event_create_data.title}': {e}", exc_info=global_settings.DEBUG)
-            raise ValueError(f"Не вдалося створити подію через конфлікт даних: {e}")
+            raise ValueError(_("event.errors.create_conflict", error_message=str(e)))
         except Exception as e:
             await self.rollback()
             logger.error(f"Неочікувана помилка '{event_create_data.title}': {e}", exc_info=global_settings.DEBUG)
@@ -175,11 +176,11 @@ class EventService(BaseService):
         if type_id_key_in_update in update_data_dict and \
                 getattr(event_db, model_type_id_attr) != update_data_dict[type_id_key_in_update]:
             if not await self.db_session.get(TaskType, update_data_dict[type_id_key_in_update]):
-                raise ValueError(f"Новий тип події/завдання ID '{update_data_dict[type_id_key_in_update]}' не знайдено.")
+                raise ValueError(_("event.errors.event_type_not_found_by_id", type_id=update_data_dict[type_id_key_in_update]))
 
         if 'status_id' in update_data_dict and event_db.status_id != update_data_dict['status_id']:
             if not await self.db_session.get(Status, update_data_dict['status_id']):
-                raise ValueError(f"Новий статус ID '{update_data_dict['status_id']}' не знайдено.")
+                raise ValueError(_("event.errors.status_not_found_by_id", status_id=update_data_dict['status_id']))
 
         # Схема оновлення для репозиторію
         # Потрібно переконатися, що EventUpdateSchema містить всі поля, які можуть бути оновлені,
@@ -197,13 +198,13 @@ class EventService(BaseService):
             await self.commit()
             updated_event_detailed = await self.get_event_by_id(updated_event_db.id, include_details=True)
             if not updated_event_detailed:
-                raise RuntimeError(f"Критична помилка: не вдалося отримати оновлену подію ID {updated_event_db.id} після коміту.")
+                raise RuntimeError(_("event.errors.critical_update_failed", event_id=updated_event_db.id))
             logger.info(f"Подію ID '{event_id}' успішно оновлено користувачем ID '{current_user_id}'.")
             return updated_event_detailed
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності ID '{event_id}': {e}", exc_info=global_settings.DEBUG)
-            raise ValueError(f"Не вдалося оновити подію через конфлікт даних: {e}")
+            raise ValueError(_("event.errors.update_conflict", error_message=str(e)))
         except Exception as e:
             await self.rollback()
             logger.error(f"Помилка оновлення ID '{event_id}': {e}", exc_info=global_settings.DEBUG)
@@ -229,7 +230,7 @@ class EventService(BaseService):
             await self.rollback()
             logger.error(f"Помилка цілісності при видаленні події ID '{event_id}' ({event_title_for_log}): {e}. Можливо, подія використовується.",
                          exc_info=global_settings.DEBUG)
-            raise ValueError(f"Подія '{event_title_for_log}' використовується і не може бути видалена.")
+            raise ValueError(_("event.errors.delete_in_use", event_title=event_title_for_log))
         except Exception as e:
             await self.rollback()
             logger.error(f"Неочікувана помилка при видаленні події ID '{event_id}' ({event_title_for_log}): {e}", exc_info=global_settings.DEBUG)

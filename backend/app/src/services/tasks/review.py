@@ -22,6 +22,7 @@ from backend.app.src.schemas.tasks.review import (
 )
 from backend.app.src.config import settings as global_settings
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 
@@ -64,16 +65,16 @@ class TaskReviewService(BaseService):
 
         # Перевірки існування FK залишаються в сервісі
         if not await self.db_session.get(Task, task_id):
-            raise ValueError(f"Завдання з ID '{task_id}' не знайдено.")
+            raise ValueError(_("task.errors.not_found_by_id", task_id=task_id))
         if not await self.db_session.get(User, reviewer_user_id):
-            raise ValueError(f"Рецензента з ID '{reviewer_user_id}' не знайдено.")
+            raise ValueError(_("user.errors.reviewer_not_found_by_id", user_id=reviewer_user_id))
 
         if completion_id:
             completion = await self.db_session.get(TaskCompletion, completion_id)
             if not completion:
-                raise ValueError(f"Виконання завдання з ID '{completion_id}' не знайдено.")
+                raise ValueError(_("task_completion.errors.not_found_by_id_for_review", completion_id=completion_id))
             if completion.task_id != task_id:
-                raise ValueError(f"Виконання ID '{completion_id}' не належить завданню ID '{task_id}'.")
+                raise ValueError(_("task_review.errors.completion_mismatch", completion_id=completion_id, task_id=task_id))
 
         # Перевірка "один відгук на користувача" через репозиторій
         # (Припускаючи, що UniqueConstraint в моделі (task_id, user_id) або (task_id, user_id, completion_id))
@@ -83,8 +84,8 @@ class TaskReviewService(BaseService):
         )
         # TODO: Розширити логіку, якщо відгук унікальний по (task_id, reviewer_user_id, completion_id)
         if existing_review and (completion_id is None or existing_review.completion_id == completion_id) :
-             context_msg = f"виконання ID '{completion_id}'" if completion_id else f"завдання ID '{task_id}'"
-             raise ValueError(f"Користувач ID '{reviewer_user_id}' вже залишив відгук для {context_msg}.")
+             context_msg = f"виконання ID '{completion_id}'" if completion_id else f"завдання ID '{task_id}'" # This context_msg remains for logging
+             raise ValueError(_("task_review.errors.already_reviewed", user_id=reviewer_user_id, context=context_msg))
 
         # Створення через репозиторій
         # TaskReviewCreateSchema має включати task_id, reviewer_user_id, completion_id
@@ -106,12 +107,12 @@ class TaskReviewService(BaseService):
             new_review_db = await self.review_repo.create(session=self.db_session, obj_in=final_create_data)
             await self.commit()
             refreshed_review = await self._get_orm_review_with_relations(new_review_db.id) # Для завантаження зв'язків
-            if not refreshed_review: raise RuntimeError("Не вдалося отримати створений відгук.")
+            if not refreshed_review: raise RuntimeError(_("task_review.errors.critical_create_failed"))
         except IntegrityError as e: # Може бути через UniqueConstraint в моделі
             await self.rollback()
             logger.error(f"Помилка цілісності при створенні відгуку для завдання ID '{task_id}': {e}",
                          exc_info=global_settings.DEBUG)
-            raise ValueError(f"Не вдалося створити відгук через конфлікт даних: {e}")
+            raise ValueError(_("task_review.errors.create_conflict", error_message=str(e)))
 
         logger.info(
             f"Відгук ID: {refreshed_review.id} успішно створено для завдання ID '{task_id}' користувачем ID '{reviewer_user_id}'.")
@@ -145,7 +146,7 @@ class TaskReviewService(BaseService):
         if review_db.reviewer_user_id != current_user_id: # Перевірка власності залишається в сервісі
             logger.error(
                 f"Користувач ID '{current_user_id}' не авторизований для оновлення відгуку ID '{review_id}' (власник: {review_db.reviewer_user_id}).")
-            raise PermissionError("Ви не маєте дозволу на оновлення цього відгуку.")
+            raise PermissionError(_("task_review.errors.update_permission_denied"))
 
         # updated_at оновлюється автоматично через TimestampedMixin в BaseRepository.update
         updated_review_db = await self.review_repo.update(
@@ -153,12 +154,12 @@ class TaskReviewService(BaseService):
         )
         if not updated_review_db: # Малоймовірно, якщо update не кинув виняток
              logger.error(f"Не вдалося оновити відгук ID {review_id} через репозиторій.")
-             raise RuntimeError("Помилка оновлення відгуку.")
+             raise RuntimeError(_("task_review.errors.update_failed_generic"))
 
         await self.commit()
 
         updated_review_response = await self._get_orm_review_with_relations(updated_review_db.id) # Перезавантажуємо зі зв'язками
-        if not updated_review_response: raise RuntimeError("Не вдалося отримати оновлений відгук зі зв'язками.")
+        if not updated_review_response: raise RuntimeError(_("task_review.errors.critical_update_failed_relations"))
 
         logger.info(f"Відгук ID '{review_id}' успішно оновлено користувачем ID '{current_user_id}'.")
         return TaskReviewResponse.model_validate(updated_review_response)
@@ -178,7 +179,7 @@ class TaskReviewService(BaseService):
         if review_db.reviewer_user_id != current_user_id: # Перевірка власності залишається в сервісі
             logger.warning(
                 f"Користувач ID '{current_user_id}' не є власником відгуку ID '{review_id}'. Видалення заборонено.")
-            raise PermissionError("Ви можете видаляти тільки власні відгуки.")
+            raise PermissionError(_("task_review.errors.delete_permission_denied"))
 
         deleted = await self.review_repo.remove(session=self.db_session, id=review_id) # Використання репозиторію
         if deleted:

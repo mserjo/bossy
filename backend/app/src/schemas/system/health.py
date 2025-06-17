@@ -14,9 +14,10 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.config.logging import get_logger 
+from backend.app.src.config.logging import get_logger
 from backend.app.src.core.dicts import HealthStatusType # Імпортовано Enum
 from datetime import timedelta # Переміщено timedelta сюди
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # HealthStatusType Enum імпортовано вище.
@@ -32,14 +33,14 @@ class ServiceHealthStatusBaseSchema(BaseSchema):
     service_name: str = Field(
         ...,
         max_length=SERVICE_NAME_MAX_LENGTH,
-        description="Унікальна назва сервісу (наприклад, 'database', 'redis_cache', 'payment_gateway')."
+        description=_("system.health.service_status.fields.service_name.description")
     )
     status: HealthStatusType = Field(
-        description="Поточний статус сервісу."
+        description=_("system.health.service_status.fields.status.description")
     )
     details: Optional[str] = Field(
         None,
-        description="Додаткові деталі про стан сервісу (наприклад, повідомлення про помилку або час відповіді)."
+        description=_("system.health.service_status.fields.details.description")
     )
     # model_config успадковується з BaseSchema (from_attributes=True)
 
@@ -61,12 +62,12 @@ class OverallHealthStatusSchema(BaseSchema):
     Включає загальний статус та список станів окремих залежних сервісів.
     """
     overall_status: HealthStatusType = Field(
-        description="Загальний агрегований статус здоров'я системи."
+        description=_("system.health.overall_status.fields.overall_status.description")
     )
-    timestamp: datetime = Field(description="Час генерації звіту про стан здоров'я.")
+    timestamp: datetime = Field(description=_("system.health.overall_status.fields.timestamp.description"))
     services: List[ServiceHealthStatusSchema] = Field(
         default_factory=list,
-        description="Список станів здоров'я окремих залежних сервісів."
+        description=_("system.health.overall_status.fields.services.description")
     )
 
 

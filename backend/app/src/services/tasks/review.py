@@ -1,16 +1,13 @@
 # backend/app/src/services/tasks/review.py
-# backend/app/src/services/tasks/review.py
-# import logging # Замінено на централізований логер
+# -*- coding: utf-8 -*-
 from typing import List, Optional
-# UUID видалено
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select # sqlalchemy.future тепер select
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.tasks.review import TaskReview
 from backend.app.src.repositories.tasks.review_repository import TaskReviewRepository # Імпорт репозиторію
@@ -23,8 +20,9 @@ from backend.app.src.schemas.tasks.review import (
     TaskReviewUpdate,
     TaskReviewResponse
 )
-from backend.app.src.config.logging import logger
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 class TaskReviewService(BaseService):
@@ -38,7 +36,7 @@ class TaskReviewService(BaseService):
         self.review_repo = TaskReviewRepository() # Ініціалізація репозиторію
         logger.info("TaskReviewService ініціалізовано.")
 
-    async def _get_orm_review_with_relations(self, review_id: int) -> Optional[TaskReview]: # Змінено UUID на int
+    async def _get_orm_review_with_relations(self, review_id: int) -> Optional[TaskReview]:
         """Внутрішній метод для отримання ORM моделі TaskReview з усіма зв'язками."""
         # Залишаємо прямий запит для гнучкого selectinload
         stmt = select(TaskReview).options(
@@ -54,10 +52,10 @@ class TaskReviewService(BaseService):
 
     async def create_task_review(
             self,
-            task_id: int, # Змінено UUID на int
-            reviewer_user_id: int, # Змінено UUID на int
+            task_id: int,
+            reviewer_user_id: int,
             review_data: TaskReviewCreate,
-            completion_id: Optional[int] = None # Змінено UUID на int
+            completion_id: Optional[int] = None
     ) -> TaskReviewResponse:
         """
         Створює новий відгук для завдання.
@@ -119,7 +117,7 @@ class TaskReviewService(BaseService):
             f"Відгук ID: {refreshed_review.id} успішно створено для завдання ID '{task_id}' користувачем ID '{reviewer_user_id}'.")
         return TaskReviewResponse.model_validate(refreshed_review)
 
-    async def get_review_by_id(self, review_id: int) -> Optional[TaskReviewResponse]: # Змінено UUID на int
+    async def get_review_by_id(self, review_id: int) -> Optional[TaskReviewResponse]:
         """Отримує відгук за його ID."""
         logger.debug(f"Спроба отримання відгуку на завдання за ID: {review_id}")
         # Використовуємо _get_orm_review_with_relations для завантаження зв'язків
@@ -131,7 +129,7 @@ class TaskReviewService(BaseService):
         return None
 
     async def update_task_review(
-            self, review_id: int, review_update_data: TaskReviewUpdate, current_user_id: int # Змінено UUID на int
+            self, review_id: int, review_update_data: TaskReviewUpdate, current_user_id: int
     ) -> Optional[TaskReviewResponse]:
         """
         Оновлює існуючий відгук на завдання.
@@ -165,7 +163,7 @@ class TaskReviewService(BaseService):
         logger.info(f"Відгук ID '{review_id}' успішно оновлено користувачем ID '{current_user_id}'.")
         return TaskReviewResponse.model_validate(updated_review_response)
 
-    async def delete_task_review(self, review_id: int, current_user_id: int) -> bool: # Змінено UUID на int
+    async def delete_task_review(self, review_id: int, current_user_id: int) -> bool:
         """
         Видаляє відгук на завдання.
         Дозволяє видаляти тільки власні відгуки (якщо не адмін/суперюзер).

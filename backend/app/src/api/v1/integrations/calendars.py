@@ -11,14 +11,13 @@
 """
 from typing import List, Optional, Dict, Any  # Generic, TypeVar, BaseModel не потрібні
 from uuid import UUID
-from datetime import datetime, timezone, timedelta # Додано для заглушки відповіді
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, \
     Request as FastAPIRequest  # Query, Path, FastAPIRequest
 from fastapi.responses import RedirectResponse  # Для OAuth2 потоку
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import get_api_db_session, get_current_active_user, get_current_active_superuser
 from backend.app.src.models.auth.user import User as UserModel
 from backend.app.src.schemas.integrations.calendar import (
@@ -33,8 +32,9 @@ from backend.app.src.services.integrations.outlook_calendar_service import Outlo
 # TODO: Додати сервіс для UserIntegrationCredential для зберігання токенів
 # from backend.app.src.services.integrations.user_integration_credential_service import UserIntegrationCredentialService
 from backend.app.src.services.dictionaries.calendars import CalendarProviderService  # Для отримання списку провайдерів
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 

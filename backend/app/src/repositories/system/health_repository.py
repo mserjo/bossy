@@ -13,8 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
-from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # Абсолютний імпорт моделі та схем

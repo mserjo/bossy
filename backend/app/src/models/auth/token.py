@@ -8,15 +8,14 @@
 нові токени доступу без повторного введення облікових даних.
 """
 from datetime import datetime
-from typing import TYPE_CHECKING, List  # List тут не потрібен, якщо немає зворотного зв'язку List
+from typing import TYPE_CHECKING, List
 
 from sqlalchemy import String, ForeignKey, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.src.models.base import Base  # Успадковуємо від Base, а не BaseMainModel
+from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # Додаємо часові мітки
-from backend.app.src.config.logging import get_logger # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 if TYPE_CHECKING:

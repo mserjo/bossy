@@ -1,5 +1,5 @@
 # backend/app/src/services/tasks/completion.py
-# import logging # Замінено на централізований логер
+# -*- coding: utf-8 -*-
 from typing import List, Optional, Any
 from uuid import UUID
 from datetime import datetime, timezone
@@ -9,7 +9,6 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.tasks.completion import TaskCompletion  # Модель SQLAlchemy TaskCompletion
 from backend.app.src.models.tasks.task import Task  # Для контексту завдання
@@ -22,8 +21,9 @@ from backend.app.src.schemas.tasks.completion import (  # Схеми Pydantic
     TaskCompletionAdminUpdateRequest,  # Адмін ухвалює/відхиляє
     TaskCompletionResponse
 )
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # TODO: Винести статуси завершення до спільного файлу констант або Enum,
 #  наприклад, backend/app/src/core/enums.py

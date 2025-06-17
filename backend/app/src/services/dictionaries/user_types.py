@@ -1,10 +1,7 @@
 # backend/app/src/services/dictionaries/user_types.py
-# import logging # Замінено на централізований логер
 from typing import Optional # Потрібно для прикладу кастомного методу
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.future import select # Видалено
 
-# Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.dictionaries.user_types import UserType # Модель SQLAlchemy
 from backend.app.src.repositories.dictionaries.user_type_repository import UserTypeRepository # Імпорт репозиторію
@@ -14,11 +11,12 @@ from backend.app.src.schemas.dictionaries.user_types import ( # Схеми Pydan
     UserTypeUpdate,
     UserTypeResponse,
 )
-from backend.app.src.config import logger # Стандартизований імпорт логера
 from backend.app.src.config import settings # Для доступу до налаштувань системи (наприклад, коду типу користувача за замовчуванням)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
-class UserTypeService(BaseDictionaryService[UserType, UserTypeRepository, UserTypeCreate, UserTypeUpdate, UserTypeResponse]): # Додано UserTypeRepository до Generic
+class UserTypeService(BaseDictionaryService[UserType, UserTypeRepository, UserTypeCreate, UserTypeUpdate, UserTypeResponse]):
     """
     Сервіс для управління елементами довідника "Типи Користувачів".
     Типи користувачів визначають різні категорії користувачів у системі

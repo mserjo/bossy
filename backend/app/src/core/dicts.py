@@ -15,8 +15,6 @@
 """
 import enum
 from backend.app.src.config.logging import get_logger
-
-# Отримання логера для цього модуля
 logger = get_logger(__name__)
 
 
@@ -74,15 +72,15 @@ class GroupType(BaseEnum):
     FAMILY = "family"           # Тип групи "Сім'я".
     DEPARTMENT = "department"   # Тип групи "Відділ".
     ORGANIZATION = "organization" # Тип групи "Організація".
-    COMMUNITY = "community"       # Спільнота за інтересами (додано)
-    OTHER = "other"               # Інший тип групи (додано)
+    COMMUNITY = "community"       # Спільнота за інтересами
+    OTHER = "other"               # Інший тип групи
 
 
 class TaskStatus(BaseEnum):
     """Представляє можливі статуси життєвого циклу завдання або події."""
-    NEW = "new"                             # Нове завдання, ще не в роботі (додано)
-    PENDING_ASSIGNMENT = "pending_assignment" # Очікує на призначення виконавця (додано)
-    ASSIGNED = "assigned"                   # Призначено виконавцю (додано)
+    NEW = "new"                             # Нове завдання, ще не в роботі
+    PENDING_ASSIGNMENT = "pending_assignment" # Очікує на призначення виконавця
+    ASSIGNED = "assigned"                   # Призначено виконавцю
     OPEN = "open"                             # Завдання відкрите та доступне для взяття в роботу.
     IN_PROGRESS = "in_progress"               # Завдання взято в роботу та виконується.
     PENDING_REVIEW = "pending_review"         # Виконання завдання завершено користувачем та очікує на перевірку/затвердження.
@@ -90,11 +88,11 @@ class TaskStatus(BaseEnum):
     REJECTED = "rejected"                     # Виконання завдання було відхилено після перевірки.
     CANCELLED = "cancelled"                   # Завдання було скасовано до його завершення.
     ON_HOLD = "on_hold"                       # Виконання завдання тимчасово призупинено.
-    ARCHIVED = "archived"                   # Архівовано (неактивне) (додано)
+    ARCHIVED = "archived"                     # Архівовано (неактивне)
     EXPIRED = "expired"                       # Термін виконання завдання минув до його завершення.
 
 
-class TaskPriority(BaseEnum): # Додано з мого плану
+class TaskPriority(BaseEnum):
     """Пріоритети завдань."""
     LOW = "low"       # Низький пріоритет
     MEDIUM = "medium" # Середній пріоритет

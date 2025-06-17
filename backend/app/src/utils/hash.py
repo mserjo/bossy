@@ -11,8 +11,7 @@ import logging  # Для локального використання в __main
 from passlib.context import CryptContext
 from passlib.exc import UnknownHashError, MalformedHashError
 
-# Імпорт централізованого логера проекту
-from backend.app.src.config.logging_config import setup_logging # type: ignore
+from backend.app.src.config.logging_config import setup_logging
 logger = setup_logging()
 
 # Налаштування контексту passlib.

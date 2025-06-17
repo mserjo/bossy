@@ -9,10 +9,8 @@
 """
 import logging  # Для локального використання в __main__
 from datetime import datetime, timezone
-# from typing import Any, Optional, TypeVar, Callable # Залишено для майбутніх функцій
 
-# Імпорт централізованого логера проекту
-from backend.app.src.config.logging_config import setup_logging # type: ignore
+from backend.app.src.config.logging_config import setup_logging
 logger = setup_logging()
 
 

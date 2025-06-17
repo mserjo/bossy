@@ -16,12 +16,9 @@ import logging
 from abc import ABC, abstractmethod
 from typing import Any, Coroutine, Optional, Awaitable
 
-# Налаштування логера для цього модуля
-# Використовується стандартний logging, оскільки це базовий клас.
-# Централізований логер з backend.app.src.config може бути використаний у конкретних реалізаціях завдань,
-# якщо вони потребують доступу до загального контексту додатку.
-# Для логера екземпляра завдання використовується префікс "task." для зручності фільтрації.
-logger = logging.getLogger(__name__)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
+
 
 class BaseTask(ABC):
     """

@@ -19,8 +19,7 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі UserSession та схеми UserSessionCreate
 from backend.app.src.models.auth.session import UserSession
 from backend.app.src.schemas.auth.session import UserSessionCreate
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # Для UserSessionUpdateSchema, якщо оновлення не передбачено, можна використати PydanticBaseModel.
@@ -89,12 +88,12 @@ class SessionRepository(BaseRepository[UserSession, UserSessionCreate, UserSessi
                 result = await session.execute(stmt)
             rowcount = result.rowcount
             logger.info(
-                f"Видалено {rowcount} прострочених UserSession" # Змінено Session на UserSession
+                f"Видалено {rowcount} прострочених UserSession"
                 f"{' для користувача ID ' + str(user_id) if user_id else ' для всіх користувачів'}."
             )
             return rowcount
         except Exception as e:
-            logger.error(f"Помилка при видаленні прострочених UserSession: {e}", exc_info=True) # Змінено Session на UserSession
+            logger.error(f"Помилка при видаленні прострочених UserSession: {e}", exc_info=True)
             # TODO: Розглянути підняття специфічного виключення
             return 0
 

@@ -12,7 +12,6 @@
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
-# import logging # Видалено, оскільки використовується централізований логер
 from fastapi import APIRouter, Depends
 
 # Імпорт роутерів з окремих файлів ендпоінтів
@@ -24,8 +23,8 @@ from backend.app.src.api.v1.system import init_data
 
 # Можна імпортувати загальні залежності, якщо вони потрібні для всього /system шляху
 # from backend.app.src.api.dependencies import get_current_active_superuser
-# Логер з конфігурації
-from backend.app.src.config.logging import logger # Використовуємо централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 system_router = APIRouter(
     # Префікс для всіх системних шляхів ("/system") буде додано при підключенні

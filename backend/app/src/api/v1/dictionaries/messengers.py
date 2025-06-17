@@ -15,16 +15,14 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
-from backend.app.src.api.dependencies import get_api_db_session, get_current_active_superuser, get_current_active_user, \
-    paginator
+from backend.app.src.api.dependencies import get_api_db_session, get_current_active_superuser, get_current_active_user, paginator
 from backend.app.src.models.auth.user import User as UserModel
-from backend.app.src.schemas.dictionaries.messengers import MessengerPlatformCreate, MessengerPlatformUpdate, \
-    MessengerPlatformResponse
+from backend.app.src.schemas.dictionaries.messengers import MessengerPlatformCreate, MessengerPlatformUpdate, MessengerPlatformResponse
 from backend.app.src.services.dictionaries.messengers import MessengerPlatformService
 # from backend.app.src.repositories.dictionaries import MessengerPlatformRepository # Видалено
 from backend.app.src.core.pagination import PagedResponse, PageParams
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     # Префікс /messenger-platforms буде додано в __init__.py батьківського роутера

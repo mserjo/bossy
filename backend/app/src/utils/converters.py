@@ -9,8 +9,7 @@
 import logging # Імпортуємо logging для локального використання в __main__
 from typing import Optional
 
-# Імпорт централізованого логера проекту
-from backend.app.src.config.logging_config import setup_logging # type: ignore
+from backend.app.src.config.logging_config import setup_logging
 logger = setup_logging()
 
 # Спроба імпортувати бібліотеку markdown.

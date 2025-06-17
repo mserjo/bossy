@@ -6,14 +6,10 @@
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
-# import logging # Замінено на централізований логер
 from typing import AsyncGenerator, Optional, Any, Dict  # AsyncGenerator для сесії БД
 
-from fastapi import Depends, HTTPException, status, Path, Query  # Додано Path, Query
+from fastapi import Depends, HTTPException, status, Path, Query
 from fastapi.security import OAuth2PasswordBearer
-
-# Повні шляхи імпорту
-from backend.app.src.config import logger  # Стандартизований імпорт логера
 from backend.app.src.config.settings import settings
 from backend.app.src.core.database import get_db_session  # Припускаємо, що ця функція існує
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -36,8 +32,9 @@ from backend.app.src.services.dictionaries import (
     StatusService, UserRoleService, UserTypeService, GroupTypeService,
     TaskTypeService, BonusTypeService, CalendarProviderService, MessengerPlatformService
 )
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
-# ADMIN_ROLE_CODE = "ADMIN" # TODO: Перенесено до core.constants
 
 # --- Залежність для сесії бази даних ---
 async def get_api_db_session() -> AsyncGenerator[AsyncSession, None]:

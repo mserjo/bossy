@@ -1,16 +1,14 @@
 # backend/app/src/services/gamification/badge.py
-# import logging # Замінено на централізований логер
-from typing import List, Optional # Any видалено
-from datetime import datetime, timezone  # Додано для updated_at
+from typing import List, Optional
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select # sqlalchemy.future видалено
 from sqlalchemy.orm import selectinload, or_  # Додано для завантаження зв'язків та or_
-from sqlalchemy.exc import IntegrityError # Додано для обробки помилок
+from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
-from backend.app.src.services.base import BaseService # Змінено на BaseService
-from backend.app.src.models.gamification.badge import Badge  # Модель SQLAlchemy Badge
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.gamification.badge import Badge
 from backend.app.src.repositories.gamification.badge_repository import BadgeRepository # Імпорт репозиторію
 # BaseCacheService не потрібен, якщо сервіс не використовує BaseDictionaryService
 # from backend.app.src.services.cache.base_cache import BaseCacheService
@@ -22,8 +20,9 @@ from backend.app.src.schemas.gamification.badge import (  # Схеми Pydantic
     BadgeUpdate,
     BadgeResponse,
 )
-from backend.app.src.config import logger  # Стандартизований імпорт логера
 from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 class BadgeService(BaseService): # Змінено успадкування на BaseService

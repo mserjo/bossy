@@ -15,8 +15,7 @@ from pydantic import Field, AnyHttpUrl, field_validator
 # Абсолютний імпорт базової схеми та Enum
 from backend.app.src.schemas.base import BaseSchema
 from backend.app.src.core.dicts import FileType # Змінено імпорт FileTypeEnum на FileType
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger 
 logger = get_logger(__name__)
 
 FILE_NAME_MAX_LENGTH_UPLOAD = 255 # Збігається з FileRecord

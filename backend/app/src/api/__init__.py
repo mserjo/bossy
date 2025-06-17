@@ -22,8 +22,8 @@
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
-# import logging # Замінено на централізований логер
-from backend.app.src.config import logger # Стандартизований імпорт логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Головний роутер API буде визначено в api.router та імпортовано звідти
 # для підключення в main.py додатку.

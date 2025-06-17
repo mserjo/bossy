@@ -17,8 +17,7 @@ from backend.app.src.repositories.dictionaries.base_dict_repository import BaseD
 # Абсолютний імпорт моделі та схем для Статусів
 from backend.app.src.models.dictionaries.statuses import Status
 from backend.app.src.schemas.dictionaries.statuses import StatusCreateSchema, StatusUpdateSchema
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 

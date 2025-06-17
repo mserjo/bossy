@@ -8,17 +8,15 @@
 """
 
 import asyncio
-import logging
 import os
 import subprocess # Хоча ми використовуємо asyncio.create_subprocess_exec, імпорт може бути корисним для розуміння
 from datetime import datetime
-from typing import Any, Dict # Додано для типізації run
+from typing import Any, Dict
 
 from app.src.tasks.base import BaseTask
 # from app.src.config.settings import settings # Для доступу до налаштувань БД та шляхів
-
-# Налаштування логера для цього модуля
-logger = logging.getLogger(__name__)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Приклад конфігурації (має бути винесено в settings)
 DB_NAME = os.getenv("DB_NAME", "kudos_db")

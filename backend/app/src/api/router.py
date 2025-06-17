@@ -12,14 +12,12 @@
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
-# import logging # Замінено на централізований логер
 from fastapi import APIRouter # Depends видалено, оскільки використовується лише в коментарях
 
-# Повні шляхи імпорту
 from backend.app.src.api.v1 import v1_router # Імпортуємо v1_router з api/v1/__init__.py (або api.v1.router)
 from backend.app.src.api.external import external_api_router # Імпортуємо external_api_router з api/external/__init__.py (або api.external.router)
-from backend.app.src.config import logger # Стандартизований імпорт логера
-# Коментований імпорт get_current_active_user видалено
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 # Створення головного роутера API

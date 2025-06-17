@@ -20,8 +20,6 @@ from pydantic import Field
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin, BaseMainSchema
 from backend.app.src.core.dicts import TaskStatus as TaskStatusEnum  # Для значень за замовчуванням та валідації
 from backend.app.src.config.logging import get_logger
-
-# Отримання логера для цього модуля
 logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
@@ -69,7 +67,7 @@ class TaskBaseSchema(BaseSchema):
     # Якщо `state` з BaseMainSchema є основним полем статусу, то `status_code` тут може бути зайвим
     # або використовуватися для передачі коду статусу, який сервіс перетворить на `state` або `status_id` моделі.
     # Поки що залишимо `state` для схем Create/Update, а `status` (об'єкт) та `status_code` для Response.
-    state: Optional[TaskStatusEnum] = Field( # Змінено на TaskStatusEnum
+    state: Optional[TaskStatusEnum] = Field(
         default=TaskStatusEnum.OPEN, # Використовуємо Enum напряму
         # max_length=50, # Не потрібен для Enum
         description="Стан завдання. Використовуйте значення з TaskStatus Enum.",
@@ -164,7 +162,7 @@ class TaskUpdateSchema(TaskBaseSchema):
     name: Optional[str] = Field(None, max_length=TASK_NAME_MAX_LENGTH, description="Нова назва завдання.")
     description: Optional[str] = Field(None, description="Новий опис завдання.")
     task_type_code: Optional[str] = Field(None, description="Новий код типу завдання.")
-    state: Optional[TaskStatusEnum] = Field(None, description="Новий стан завдання.") # Змінено на TaskStatusEnum
+    state: Optional[TaskStatusEnum] = Field(None, description="Новий стан завдання.")
     due_date: Optional[datetime] = Field(None, description="Новий термін виконання.")
 
     is_recurring: Optional[bool] = Field(None, description="Оновити прапорець повторюваності екземпляра.")
@@ -197,7 +195,7 @@ class TaskSchema(
     # state успадковано, але тут буде перевизначено для використання Enum
 
     # Специфічні поля моделі Task, що не входять до BaseMainSchema або потребують іншого представлення
-    state: Optional[TaskStatusEnum] = Field(None, description="Стан завдання (використовує TaskStatus Enum).") # Перевизначено
+    state: Optional[TaskStatusEnum] = Field(None, description="Стан завдання (використовує TaskStatus Enum).")
     task_type_code: Optional[str] = Field(None, description="Код типу завдання.")
 
     status_code: Optional[str] = Field(None, description="Код поточного статусу завдання (з довідника dict_statuses).")

@@ -1,10 +1,6 @@
 # backend/app/src/services/dictionaries/group_types.py
-# import logging # Замінено на централізований логер
-# from typing import List # Видалено
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.future import select # Видалено
 
-# Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.dictionaries.group_types import GroupType # Модель SQLAlchemy
 from backend.app.src.repositories.dictionaries.group_type_repository import GroupTypeRepository # Імпорт репозиторію
@@ -14,9 +10,11 @@ from backend.app.src.schemas.dictionaries.group_types import ( # Схеми Pyda
     GroupTypeUpdate,
     GroupTypeResponse,
 )
-from backend.app.src.config import logger # Стандартизований імпорт логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
-class GroupTypeService(BaseDictionaryService[GroupType, GroupTypeRepository, GroupTypeCreate, GroupTypeUpdate, GroupTypeResponse]): # Додано GroupTypeRepository до Generic
+
+class GroupTypeService(BaseDictionaryService[GroupType, GroupTypeRepository, GroupTypeCreate, GroupTypeUpdate, GroupTypeResponse]):
     """
     Сервіс для управління елементами довідника "Типи Груп".
     Типи груп визначають різні категорії груп у системі, наприклад,

@@ -1,10 +1,6 @@
 # backend/app/src/services/dictionaries/user_roles.py
-# import logging # Замінено на централізований логер
-# from typing import Optional # Видалено
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.future import select # Видалено
 
-# Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.dictionaries.user_roles import UserRole # Модель SQLAlchemy
 from backend.app.src.repositories.dictionaries.user_role_repository import UserRoleRepository # Імпорт репозиторію
@@ -14,9 +10,11 @@ from backend.app.src.schemas.dictionaries.user_roles import ( # Схеми Pydan
     UserRoleUpdate,
     UserRoleResponse,
 )
-from backend.app.src.config import logger # Стандартизований імпорт логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
-class UserRoleService(BaseDictionaryService[UserRole, UserRoleRepository, UserRoleCreate, UserRoleUpdate, UserRoleResponse]): # Додано UserRoleRepository до Generic
+
+class UserRoleService(BaseDictionaryService[UserRole, UserRoleRepository, UserRoleCreate, UserRoleUpdate, UserRoleResponse]):
     """
     Сервіс для управління елементами довідника "Ролі Користувачів".
     Ролі визначають набір прав та обов'язків користувачів у системі

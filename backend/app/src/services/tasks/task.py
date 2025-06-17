@@ -1,6 +1,4 @@
 # backend/app/src/services/tasks/task.py
-# backend/app/src/services/tasks/task.py
-# import logging # Замінено на централізований логер
 from typing import List, Optional, Any
 # UUID видалено
 from datetime import datetime, timezone
@@ -10,7 +8,6 @@ from sqlalchemy import select # sqlalchemy.future тепер select
 from sqlalchemy.orm import selectinload, noload # joinedload видалено
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.tasks.task import Task
 from backend.app.src.repositories.tasks.task_repository import TaskRepository # Імпорт репозиторію
@@ -29,8 +26,9 @@ from backend.app.src.schemas.tasks.task import (
     TaskResponse,
     TaskDetailedResponse
 )
-from backend.app.src.config.logging import logger
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 DEFAULT_TASK_STATUS_CODE = "OPEN" # TODO: Перенести в конфігурацію
 
@@ -47,8 +45,7 @@ class TaskService(BaseService):
         self.task_repo = TaskRepository() # Ініціалізація репозиторію
         logger.info("TaskService ініціалізовано.")
 
-    async def get_task_by_id(self, task_id: int, include_details: bool = False) -> Optional[ # Змінено UUID на int
-        TaskResponse]:
+    async def get_task_by_id(self, task_id: int, include_details: bool = False) -> Optional[TaskResponse]:
         """
         Отримує завдання за його ID.
         Опціонально може включати більше деталей.
@@ -77,7 +74,7 @@ class TaskService(BaseService):
         logger.info(f"Завдання з ID '{task_id}' не знайдено.")
         return None
 
-    async def create_task(self, task_create_data: TaskCreate, creator_user_id: int) -> TaskDetailedResponse: # Змінено UUID на int
+    async def create_task(self, task_create_data: TaskCreate, creator_user_id: int) -> TaskDetailedResponse:
         """
         Створює нове завдання.
         """
@@ -151,8 +148,7 @@ class TaskService(BaseService):
                          exc_info=global_settings.DEBUG)
             raise
 
-    async def update_task(self, task_id: int, task_update_data: TaskUpdate, current_user_id: int) -> Optional[ # Змінено UUID на int
-        TaskDetailedResponse]:
+    async def update_task(self, task_id: int, task_update_data: TaskUpdate, current_user_id: int) -> Optional[TaskDetailedResponse]:
         """Оновлює деталі завдання."""
         logger.debug(f"Спроба оновлення завдання ID: {task_id} користувачем ID: {current_user_id}")
 

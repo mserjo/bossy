@@ -13,8 +13,9 @@
 - Реекспорт базового класу репозиторію (`BaseRepository`).
 """
 
-from backend.app.src.config import logger
 from backend.app.src.repositories.base import BaseRepository # Оновлено на абсолютний шлях
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 __all__ = [
     "BaseRepository",

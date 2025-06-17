@@ -1,4 +1,5 @@
 # backend/app/src/services/auth/password.py
+# -*- coding: utf-8 -*-
 """
 Сервіс для управління паролями користувачів.
 
@@ -7,7 +8,6 @@
 """
 from datetime import datetime, timedelta, timezone
 from typing import Optional
-# from uuid import UUID # Видалено, user_id та інші ID зазвичай int
 import secrets # Для генерації безпечних випадкових токенів
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,9 +18,9 @@ from backend.app.src.services.base import BaseService
 from backend.app.src.models.auth.user import User # Модель користувача SQLAlchemy
 from backend.app.src.models.auth.password_reset_token import PasswordResetToken # Модель токена скидання пароля SQLAlchemy
 from backend.app.src.core.security import get_password_hash, verify_password # Ключові утиліти для паролів
-from backend.app.src.config import settings # Імпорт конфігурації
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-logger = get_logger(__name__) # Ініціалізація логера
+from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Конфігурація часу дії токена скидання пароля перенесена до settings.py
 # PASSWORD_RESET_TOKEN_EXPIRE_HOURS = 1 # Години -- видалено, використовуємо settings

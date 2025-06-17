@@ -6,15 +6,14 @@
 та надає специфічні методи для роботи з призначеннями завдань користувачам.
 """
 
-from typing import List, Optional, Tuple, Any, Dict # Додано Dict
+from typing import List, Optional, Tuple, Any, Dict
 
 from sqlalchemy import select, func # join видалено
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
-from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # Абсолютний імпорт моделей та схем

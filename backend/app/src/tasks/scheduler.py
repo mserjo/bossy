@@ -15,7 +15,6 @@
     add_scheduled_task(): Допоміжна функція для додавання нових завдань до планувальника.
 """
 
-import logging
 import asyncio
 from typing import Callable, Any, Dict
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -35,8 +34,8 @@ from app.src.tasks.gamification.levels import RecalculateUserLevelsTask
 from app.src.tasks.gamification.badges import AwardBadgesTask
 from app.src.tasks.gamification.ratings import UpdateUserRatingsTask
 
-# Налаштування логера для цього модуля
-logger = logging.getLogger(__name__)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Конфігурація JobStore та Executor для APScheduler
 # JobStore зберігає завдання (тут в пам'яті, для продакшену може бути БД)
@@ -150,7 +149,6 @@ def initialize_scheduled_tasks():
     #         "subject": "Щотижневий Дайджест Kudos",
     #         "html_body": "<h1>Ваш тижневий дайджест...</h1><p>Деталі...</p>", # Потребує генерації контенту
     #         "text_body": "Ваш тижневий дайджест...
-Деталі..."
     #     },
     #     id="weekly_digest_email_task",
     #     replace_existing=True

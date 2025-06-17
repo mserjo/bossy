@@ -10,18 +10,16 @@
 """
 
 import asyncio
-import logging
 import os
 import shutil
 import time
 from datetime import datetime, timedelta
-from typing import Any, Dict # Додано для типізації run
+from typing import Any, Dict
 
 from app.src.tasks.base import BaseTask
 # from app.src.config.settings import settings # Для доступу до шляхів, налаштувань зберігання
-
-# Налаштування логера для цього модуля
-logger = logging.getLogger(__name__)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Приклад конфігурації шляхів (має бути винесено в settings)
 TEMP_FILES_DIR = "/tmp/kudos_temp_files"

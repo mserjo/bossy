@@ -5,19 +5,18 @@
 Надає бізнес-логіку для створення, оновлення, видалення, отримання груп,
 а також для управління членством та іншими аспектами груп.
 """
-from typing import List, Optional, Dict, Any # Tuple не використовується в сигнатурах
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func # Оновлено імпорт select, func може знадобитися
-from sqlalchemy.orm import selectinload, noload # joinedload видалено
+from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.groups.group import Group
-from backend.app.src.repositories.groups.group_repository import GroupRepository # Імпорт репозиторію
+from backend.app.src.repositories.groups.group_repository import GroupRepository
 from backend.app.src.models.auth.user import User
 from backend.app.src.models.dictionaries.group_types import GroupType
 from backend.app.src.models.groups.membership import GroupMembership
@@ -30,8 +29,9 @@ from backend.app.src.schemas.groups.group import (
     GroupResponse,
     GroupDetailedResponse
 )
-from backend.app.src.config import logger  # Використання спільного логера з конфігу
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # TODO: [Configuration] Визначити константу для коду ролі "ADMIN" в конфігурації або в `core.constants`.
 ADMIN_ROLE_CODE = "ADMIN"
@@ -75,7 +75,7 @@ class GroupService(BaseService):
                         ),
                         selectinload(GroupMembership.role) # Змінено з user_role на role, відповідно до моделі GroupMembership
                     ),
-                    selectinload(Group.settings), # Додано settings, якщо є
+                    selectinload(Group.settings),
                 )
             else: # Мінімальне завантаження для GroupResponse
                 query = query.options(

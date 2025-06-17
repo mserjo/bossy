@@ -5,17 +5,15 @@
 
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-# import logging # Замінено на централізований логер
 from typing import Annotated  # Для FastAPI.Depends з Python 3.9+
 
 from fastapi import APIRouter, Depends, HTTPException, status, Response, Request
 from fastapi.security import OAuth2PasswordRequestForm  # Для форми логіну
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import (
     get_api_db_session,
-    get_user_service,  # Отримуємо реальні сервіси
+    get_user_service,
     get_token_service,
     # TODO: Створити/використати залежність, що витягує refresh_token з cookie та валідує його через TokenService
     #  Наприклад: get_validated_refresh_token_cookie -> Tuple[str, User] (токен_рядок, користувач)
@@ -27,9 +25,10 @@ from backend.app.src.models.auth.user import User  # Модель SQLAlchemy
 from backend.app.src.schemas.auth.token import TokenResponse
 # LoginRequest (Pydantic модель) може бути не потрібна, якщо використовувати OAuth2PasswordRequestForm
 # from backend.app.src.schemas.auth.login import LoginRequest # Якщо використовується кастомна схема
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings  # Для налаштувань cookie
 from fastapi import Response as FastAPIResponse # для HTTP_204_NO_CONTENT
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 

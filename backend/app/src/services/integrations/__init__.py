@@ -1,8 +1,6 @@
 # backend/app/src/services/integrations/__init__.py
-import logging
-
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 logger.info("Integration services sub-package initialized.")
 

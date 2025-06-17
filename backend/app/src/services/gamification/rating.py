@@ -1,15 +1,13 @@
 # backend/app/src/services/gamification/rating.py
-# import logging # Замінено на централізований логер
-from typing import List, Optional # Dict, Any, UUID видалено
-from datetime import datetime, timezone, date # date додано
+from typing import List, Optional
+from datetime import datetime, timezone, date
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func # sqlalchemy.future видалено, func додано
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.gamification.rating import UserGroupRating
 from backend.app.src.repositories.gamification.rating_repository import UserGroupRatingRepository # Імпорт репозиторію
@@ -24,8 +22,9 @@ from backend.app.src.schemas.gamification.rating import (
     GroupLeaderboardResponse
 )
 from backend.app.src.core.dicts import RatingType # Імпорт RatingType Enum
-from backend.app.src.config.logging import logger
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 DEFAULT_RATING_TYPE = RatingType.OVERALL # Змінено на Enum
 

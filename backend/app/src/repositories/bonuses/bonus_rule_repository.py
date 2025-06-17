@@ -18,8 +18,7 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.bonuses.bonus_rule import BonusRule
 from backend.app.src.schemas.bonuses.bonus_rule import BonusRuleCreateSchema, BonusRuleUpdateSchema
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # from backend.app.src.core.dicts import SomeStateEnum # Якщо поле state використовує Enum
@@ -66,7 +65,6 @@ class BonusRuleRepository(BaseRepository[BonusRule, BonusRuleCreateSchema, Bonus
             # видалено блок hasattr(self.model, "is_active") оскільки is_active не є стандартним полем моделі BonusRule
             # Якщо поле стану буде іншим або використовувати Enum, це місце потребуватиме оновлення.
             # Коментар про logger.warning видалено, оскільки else блок, де він був, видалено.
-                )
 
         try:
             # Використовуємо get_multi з дуже великим лімітом для отримання всіх відповідних записів.
@@ -105,12 +103,14 @@ class BonusRuleRepository(BaseRepository[BonusRule, BonusRuleCreateSchema, Bonus
             filters_dict["state"] = "active" # Припускаємо, що активний стан це рядок "active"
             # видалено блок hasattr(self.model, "is_active")
             # Коментар про logger.warning видалено, оскільки else блок, де він був, видалено.
-                )
 
         try:
             # TODO: [Оптимізація Get All] Аналогічно до get_rules_for_task.
             items = await super().get_multi(session=session, filters=filters_dict, limit=1_000_000)
             logger.debug(f"Знайдено {len(items)} правил для події ID: {event_task_id}")
+        except Exception as e:
+            logger.error(f"Помилка при отриманні правил для події {event_task_id}: {e}", exc_info=True)
+            return []
         return items
 
 

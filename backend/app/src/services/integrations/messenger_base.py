@@ -1,17 +1,14 @@
 # backend/app/src/services/integrations/messenger_base.py
-# import logging # Замінено на централізований логер
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession  # Для потенційної взаємодії з БД (токени/налаштування)
 
-# Повні шляхи імпорту
-from backend.app.src.services.base import \
-    BaseService  # Опціонально: успадкувати, якщо потрібна сесія БД для спільних завдань
-from backend.app.src.models.auth.user import \
-    User  # Для контексту користувача (не використовується прямо тут, але в підкласах)
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.services.base import BaseService  # Опціонально: успадкувати, якщо потрібна сесія БД для спільних завдань
+from backend.app.src.models.auth.user import User  # Для контексту користувача (не використовується прямо тут, але в підкласах)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 from pydantic import BaseModel, Field  # Використовуємо Pydantic для структур даних
 

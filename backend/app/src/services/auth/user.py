@@ -1,4 +1,5 @@
 # backend/app/src/services/auth/user.py
+# -*- coding: utf-8 -*-
 """
 Сервіс для управління користувачами.
 
@@ -6,12 +7,11 @@
 атрибутами користувачів, такими як ролі, статус та інше.
 """
 from datetime import datetime, timezone
-from typing import List, Optional, Any, Set, TYPE_CHECKING, Union # Type видалено
-# UUID видалено, оскільки user_id тепер int і uuid4() тут не використовується
+from typing import List, Optional, Any, Set, TYPE_CHECKING, Union
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select # Оновлено імпорт
-from sqlalchemy.orm import selectinload # joinedload не використовується, можна видалити
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 
 from backend.app.src.services.base import BaseService
@@ -25,8 +25,8 @@ from backend.app.src.schemas.auth.user import (
     UserResponseWithRoles,
 )
 from backend.app.src.core.security import get_password_hash
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-logger = get_logger(__name__) # Ініціалізація логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 from backend.app.src.config import settings  # Для доступу до DEBUG тощо
 from backend.app.src.core.dicts import UserState # Імпорт UserState для фільтрації
 

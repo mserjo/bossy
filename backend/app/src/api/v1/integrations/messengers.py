@@ -9,13 +9,12 @@
 
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-from typing import List, Optional, Dict, Any  # Generic, TypeVar, BaseModel не потрібні
+from typing import List, Optional, Dict, Any
 from uuid import UUID
-from datetime import datetime, timezone # Додано для заглушки відповіді
+from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import get_api_db_session, get_current_active_user, get_current_active_superuser
 # TODO: Створити/використати залежності для перевірки прав адміна групи
 from backend.app.src.api.v1.groups.groups import check_group_edit_permission  # Тимчасово

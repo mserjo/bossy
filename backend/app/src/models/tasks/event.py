@@ -5,29 +5,27 @@ SQLAlchemy модель для Подій.
 Події можуть бути схожі на завдання, але можуть представляти зустрічі, віхи або інформаційні елементи.
 """
 
-import logging
 from typing import Optional, List, TYPE_CHECKING
 from datetime import datetime
 
 from sqlalchemy import String, DateTime, ForeignKey, Integer
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.src.models.base import BaseMainModel # Змінено на BaseMainModel
+from backend.app.src.models.base import BaseMainModel
 # from backend.app.src.core.dicts import EventFrequency # Якщо події також мають повторюваність
-
-# Налаштування логера для цього модуля
-logger = logging.getLogger(__name__)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 if TYPE_CHECKING:
     from backend.app.src.models.auth.user import User
-    from backend.app.src.models.groups.group import Group # Додано для зв'язку group
+    from backend.app.src.models.groups.group import Group
     from backend.app.src.models.tasks.assignment import TaskAssignment
     from backend.app.src.models.tasks.completion import TaskCompletion
     # from backend.app.src.models.dictionaries.task_types import TaskType # Якщо використовується task_types для event_type
     # Або визначити нову таблицю та модель dict_event_types
 
 
-class Event(BaseMainModel): # Змінено на BaseMainModel
+class Event(BaseMainModel):
     """
     Представляє подію в межах групи (наприклад, зустріч, призначення, віха, свято).
     Успадковує від BaseMainModel, що надає поля: id, name, description, state, group_id, notes, created_at, updated_at, deleted_at.

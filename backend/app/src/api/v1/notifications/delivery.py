@@ -13,14 +13,14 @@ from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Path  # Query не використовується прямо тут
 from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо, якщо сесія в сервісі
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import get_api_db_session, get_current_active_superuser, paginator
 from backend.app.src.models.auth.user import User as UserModel  # Для типізації current_admin_user
 from backend.app.src.schemas.notifications.delivery import NotificationDeliveryAttemptResponse
 from backend.app.src.core.pagination import PagedResponse, PageParams
 from backend.app.src.services.notifications.delivery import NotificationDeliveryService
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     # Префікс /delivery-attempts буде додано в __init__.py батьківського роутера notifications

@@ -14,7 +14,6 @@ from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Path
 from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо, якщо сесія в сервісі
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import get_api_db_session, get_current_active_user, get_current_active_superuser
 from backend.app.src.models.auth.user import User as UserModel
 from backend.app.src.schemas.bonuses.transaction import (
@@ -24,8 +23,9 @@ from backend.app.src.schemas.bonuses.transaction import (
 from backend.app.src.schemas.bonuses.account import UserAccountResponse  # Для відповіді create_manual_transaction
 from backend.app.src.services.bonuses.transaction import AccountTransactionService
 from backend.app.src.services.bonuses.account import UserAccountService  # Для валідації рахунку при ручній транзакції
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 

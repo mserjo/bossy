@@ -14,8 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # Абсолютний імпорт моделі та схем
@@ -48,7 +47,7 @@ class NotificationRepository(BaseRepository[Notification, NotificationCreateSche
             user_id: int,
             *,
             is_read: Optional[bool] = None,
-            notification_type: Optional[NotificationType] = None,  # Змінено на NotificationType Enum
+            notification_type: Optional[NotificationType] = None,
             skip: int = 0,
             limit: int = 100
     ) -> Tuple[List[Notification], int]:

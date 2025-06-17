@@ -15,9 +15,8 @@ from pydantic import Field # field_validator видалено, оскільки 
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, TimestampedSchemaMixin
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача
-from backend.app.src.config.logging import get_logger # Імпорт логера
 from backend.app.src.core.dicts import TaskAssignmentStatus # Імпортовано Enum
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # TaskAssignmentStatus Enum імпортовано вище.
@@ -29,7 +28,7 @@ class TaskAssignmentBaseSchema(BaseSchema):
     """
     task_id: int = Field(description="Ідентифікатор завдання.")
     user_id: int = Field(description="Ідентифікатор користувача, якому призначено завдання.")
-    status: Optional[TaskAssignmentStatus] = Field( # Змінено на TaskAssignmentStatus Enum
+    status: Optional[TaskAssignmentStatus] = Field(
         None,
         description="Статус призначення."
     )
@@ -43,7 +42,7 @@ class TaskAssignmentCreateSchema(BaseSchema):
     `task_id` зазвичай передається як параметр шляху.
     """
     user_id: int = Field(description="Ідентифікатор користувача, якому призначається завдання.")
-    status: Optional[TaskAssignmentStatus] = Field( # Змінено на TaskAssignmentStatus Enum
+    status: Optional[TaskAssignmentStatus] = Field(
         default=TaskAssignmentStatus.ASSIGNED,  # Статус за замовчуванням при створенні
         description="Статус призначення."
     )
@@ -54,8 +53,7 @@ class TaskAssignmentUpdateSchema(BaseSchema):
     Схема для оновлення статусу призначення завдання.
     Дозволяє оновлювати лише поле `status`.
     """
-    status: TaskAssignmentStatus = Field( # Змінено на TaskAssignmentStatus Enum
-        description="Новий статус призначення.")
+    status: TaskAssignmentStatus = Field(description="Новий статус призначення.")
 
 
 class TaskAssignmentSchema(TaskAssignmentBaseSchema, TimestampedSchemaMixin):

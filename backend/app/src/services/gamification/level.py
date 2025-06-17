@@ -1,15 +1,12 @@
 # backend/app/src/services/gamification/level.py
-# import logging # Замінено на централізований логер
 from typing import List, Optional, Any
-# UUID видалено, оскільки ID тепер int
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_ # sqlalchemy.future видалено, or_ додано
+from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError # Додано для обробки помилок
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService # Змінено на BaseService
 from backend.app.src.models.gamification.level import Level  # Модель SQLAlchemy Level
 from backend.app.src.repositories.gamification.level_repository import LevelRepository # Імпорт репозиторію
@@ -21,8 +18,9 @@ from backend.app.src.schemas.gamification.level import (  # Схеми Pydantic
     LevelUpdate,
     LevelResponse,
 )
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 class LevelService(BaseService): # Змінено успадкування на BaseService

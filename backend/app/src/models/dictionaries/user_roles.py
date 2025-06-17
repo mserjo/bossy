@@ -10,8 +10,7 @@
 
 # Абсолютний імпорт базової моделі для довідників
 from backend.app.src.models.dictionaries.base_dict import BaseDictionary
-from backend.app.src.config.logging import get_logger # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 

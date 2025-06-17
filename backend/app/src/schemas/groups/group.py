@@ -22,8 +22,7 @@ from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedS
 
 # TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для owner та members
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger 
 logger = get_logger(__name__)
 
 # from backend.app.src.schemas.dictionaries.group_types import GroupTypeSchema # Для group_type

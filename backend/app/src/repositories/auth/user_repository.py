@@ -19,8 +19,7 @@ from backend.app.src.models.auth.user import User
 from backend.app.src.schemas.auth.user import UserCreateSchema, UserUpdateSchema
 # Абсолютний імпорт функції хешування паролю
 from backend.app.src.config.security import get_password_hash
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 class UserRepository(BaseRepository[User, UserCreateSchema, UserUpdateSchema]):
@@ -178,6 +177,8 @@ class UserRepository(BaseRepository[User, UserCreateSchema, UserUpdateSchema]):
                 await session.flush()
                 await session.refresh(db_obj)
             logger.info(f"Оновлено користувача: {db_obj.email}, ID: {db_obj.id}")
+        except Exception as e:
+            logger.error(f"Exception error: {e}", exc_info=True)
         return db_obj
 
 

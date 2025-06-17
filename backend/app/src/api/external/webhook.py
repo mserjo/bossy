@@ -9,17 +9,16 @@
 
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-import json # Додано для безпечного розбору JSON з байтів
+import json
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, Request, Header, HTTPException, status
 # from sqlalchemy.ext.asyncio import AsyncSession # Розкоментувати, якщо потрібен доступ до БД
-# import logging # Замінено на централізований логер
 
-# Повні шляхи імпорту
 # from backend.app.src.api.dependencies import get_api_db_session # Якщо потрібен доступ до БД
 # from backend.app.src.services.external.webhook_service import WebhookService # Приклад майбутнього сервісу
-from backend.app.src.config.logging import logger # Централізований логер
 from backend.app.src.config import settings # Для доступу до секретів, якщо потрібна валідація
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 

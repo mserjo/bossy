@@ -13,12 +13,12 @@ from backend.app.src.repositories.tasks.task_repository import TaskRepository
 from backend.app.src.repositories.tasks.assignment_repository import TaskAssignmentRepository
 from backend.app.src.repositories.tasks.completion_repository import TaskCompletionRepository
 from backend.app.src.repositories.tasks.review_repository import TaskReviewRepository
-from backend.app.src.repositories.tasks.event_repository import EventRepository # Додано імпорт EventRepository
+from backend.app.src.repositories.tasks.event_repository import EventRepository
 
 __all__ = [
     "TaskRepository",
     "TaskAssignmentRepository",
     "TaskCompletionRepository",
     "TaskReviewRepository",
-    "EventRepository", # Додано EventRepository до експорту
+    "EventRepository",
 ]

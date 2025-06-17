@@ -20,8 +20,7 @@ from backend.app.src.repositories.base import BaseRepository
 from backend.app.src.models.gamification.user_level import UserLevel
 from backend.app.src.models.gamification.level import Level  # Для join в get_current_level_for_user_in_group
 from backend.app.src.schemas.gamification.user_level import UserLevelCreateSchema
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 

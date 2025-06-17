@@ -10,7 +10,6 @@ from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import (
     get_api_db_session, get_current_active_user,
     get_current_active_superuser,  # Для доступу до чужих даних або даних всієї групи
@@ -24,8 +23,9 @@ from backend.app.src.schemas.bonuses.transaction import AccountTransactionRespon
 from backend.app.src.core.pagination import PagedResponse, PageParams
 from backend.app.src.services.bonuses.account import UserAccountService
 from backend.app.src.services.bonuses.transaction import AccountTransactionService  # Для історії транзакцій
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -237,11 +237,11 @@ async def list_group_user_accounts(
 # Потребує прав суперюзера.
 
 logger.info(f"Роутер для бонусних рахунків (`{router.prefix}`) визначено.")
-        total=total_transactions,
-        page=page_params.page,
-        size=page_params.size,
-        results=transactions_list  # Сервіс вже повертає список Pydantic моделей
-    )
+    #     total=total_transactions,
+    #     page=page_params.page,
+    #     size=page_params.size,
+    #     results=transactions_list  # Сервіс вже повертає список Pydantic моделей
+    # )
 
 
 @router.get(
@@ -269,7 +269,7 @@ async def get_user_bonus_accounts(  # Перейменовано
 
     # Поки що, ця логіка аналогічна /me, але для іншого юзера (потребує розширення прав)
     global_account_orm = await account_service.get_user_account_orm(user_id=user_id_target, group_id=None,
-                                                                    load_relations=True)  # type: ignore
+                                                                    load_relations=True)
     accounts_response = []
     if global_account_orm:
         accounts_response.append(UserAccountResponse.model_validate(global_account_orm))

@@ -1,14 +1,11 @@
 # backend/app/src/services/notifications/delivery.py
-# import logging # Замінено на централізований логер
 from typing import List, Optional, Dict, Any # Type видалено
-# UUID видалено
 from datetime import datetime, timezone, timedelta
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select # sqlalchemy.future тепер select
 from sqlalchemy.orm import selectinload
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.notifications.notification import Notification
 from backend.app.src.models.notifications.delivery import NotificationDeliveryAttempt
@@ -24,11 +21,12 @@ from backend.app.src.services.integrations.slack_service import SlackIntegration
 
 from backend.app.src.schemas.notifications.delivery import (
     NotificationDeliveryAttemptResponse,
-    NotificationDeliveryAttemptCreateSchema # Додано
+    NotificationDeliveryAttemptCreateSchema
 )
 from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType, NotificationType # Імпорт Enum
-from backend.app.src.config.logging import logger
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 class NotificationDeliveryService(BaseService):

@@ -1,4 +1,5 @@
 # backend/app/src/services/bonuses/account.py
+# -*- coding: utf-8 -*-
 """
 Сервіс для управління бонусними рахунками користувачів.
 
@@ -27,8 +28,8 @@ from backend.app.src.schemas.bonuses.account import (  # Pydantic Схеми
     # UserAccountUpdate, # Для ручних коригувань адміністратором (не реалізовано в цьому сервісі)
 )
 from backend.app.src.schemas.bonuses.transaction import AccountTransactionResponse
-from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
-logger = get_logger(__name__) # Ініціалізація логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 from backend.app.src.config import settings  # Для доступу до конфігурацій
 from backend.app.src.core.exceptions import InsufficientFundsError # Імпорт перенесеного винятку
 

@@ -16,7 +16,8 @@
 Наприклад: `from backend.app.src.core import SomeCoreException`.
 """
 
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Приклади ре-експорту (розкоментуйте та адаптуйте за потреби):
 # from backend.app.src.core.exceptions import ItemNotFoundError, PermissionDeniedError

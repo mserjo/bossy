@@ -31,9 +31,6 @@
 Наприклад, `from backend.app.src.models import Base, User` (якщо User ре-експортовано тут або в __init__ підпакету auth).
 """
 
-# Імпорт централізованого логера
-from backend.app.src.config import logger
-
 # Імпорт та експорт базових класів моделей для легкого доступу з будь-якої точки програми.
 # Використовуємо абсолютні імпорти для ясності та надійності.
 from backend.app.src.models.base import Base, BaseModel, BaseMainModel
@@ -50,6 +47,8 @@ from backend.app.src.models import groups
 from backend.app.src.models import notifications
 from backend.app.src.models import system
 from backend.app.src.models import tasks
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Визначаємо, які символи будуть експортовані при використанні `from backend.app.src.models import *`.
 # Рекомендується використовувати явні імпорти, але `__all__` контролює "зірочковий" імпорт.

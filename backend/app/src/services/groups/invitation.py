@@ -1,15 +1,13 @@
 # backend/app/src/services/groups/invitation.py
-# import logging # Замінено на централізований логер
 from typing import List, Optional
 from uuid import uuid4 # UUID тепер тільки для генерації коду
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_ # sqlalchemy.future видалено, or_ додано
+from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.groups.invitation import GroupInvitation
 from backend.app.src.repositories.groups.invitation_repository import GroupInvitationRepository # Імпорт репозиторію
@@ -26,8 +24,9 @@ from backend.app.src.schemas.groups.invitation import (
 from backend.app.src.schemas.groups.membership import GroupMembershipResponse
 from backend.app.src.services.groups.membership import GroupMembershipService
 from backend.app.src.core.dicts import InvitationStatus, GroupRole # Імпорт Enum
-from backend.app.src.config.logging import logger
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 DEFAULT_INVITATION_EXPIRE_DAYS = getattr(settings, 'DEFAULT_INVITATION_EXPIRE_DAYS', 7)
 
@@ -69,8 +68,8 @@ class GroupInvitationService(BaseService):
 
     async def create_invitation(
             self,
-            group_id: int, # Змінено UUID на int
-            inviter_user_id: int, # Змінено UUID на int
+            group_id: int,
+            inviter_user_id: int,
             role_to_assign_code: str,
             invite_data: GroupInvitationCreate
     ) -> GroupInvitationResponse:

@@ -13,7 +13,6 @@ from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import (
     get_api_db_session, get_current_active_user,
     paginator,  # paginator може не використовуватися, якщо лідерборд має власний ліміт
@@ -29,9 +28,10 @@ from backend.app.src.schemas.gamification.rating import (
 )
 from backend.app.src.core.pagination import PageParams  # PagedResponse тут може не знадобитися
 from backend.app.src.services.gamification.rating import UserRatingService
-from backend.app.src.services.groups.membership import GroupMembershipService # Додано для типізації
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.services.groups.membership import GroupMembershipService
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     # Префікс /ratings буде додано в __init__.py батьківського роутера gamification

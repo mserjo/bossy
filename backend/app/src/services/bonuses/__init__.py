@@ -1,4 +1,5 @@
 # backend/app/src/services/bonuses/__init__.py
+# -*- coding: utf-8 -*-
 """
 Ініціалізаційний файл для модуля сервісів, пов'язаних з бонусною системою.
 
@@ -6,8 +7,8 @@
 правилами нарахування бонусів, розрахунком бонусів, нагородами та транзакціями.
 """
 
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-logger = get_logger(__name__) # Ініціалізація логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Явний імпорт сервісів для кращої читабельності та статичного аналізу
 from backend.app.src.services.bonuses.bonus_rule import BonusRuleService

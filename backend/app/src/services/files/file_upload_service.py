@@ -10,7 +10,7 @@
 import os
 import aiofiles  # Для асинхронних файлових операцій
 import shutil  # Для переміщення файлів
-from typing import Optional, Dict, Any, Set # List видалено, Set додано
+from typing import Optional, Dict, Any, Set
 from uuid import uuid4 # UUID видалено
 from datetime import datetime, timezone
 from pathlib import Path
@@ -28,7 +28,8 @@ from backend.app.src.schemas.files.upload import (
 )
 from backend.app.src.schemas.files.file import FileRecordCreate # FileRecordResponse не використовується напряму в цьому файлі
 from backend.app.src.services.files.file_record_service import FileRecordService
-from backend.app.src.config import logger  # Використання спільного логера з конфігу
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 class FileUploadService(BaseService): # type: ignore видалено
@@ -39,7 +40,7 @@ class FileUploadService(BaseService): # type: ignore видалено
     Зберігання файлів відбувається локально.
     """
 
-    def __init__(self, db_session: AsyncSession, file_record_service: FileRecordService): # db_session обов'язковий, додано file_record_service
+    def __init__(self, db_session: AsyncSession, file_record_service: FileRecordService):
         super().__init__(db_session)
         self.file_record_service = file_record_service
         self.local_storage_base_path: Path
@@ -54,8 +55,7 @@ class FileUploadService(BaseService): # type: ignore видалено
         """
         Налаштовує шляхи локального сховища з конфігурації та забезпечує існування директорій.
         """
-        _base_path_str = getattr(settings, 'LOCAL_FILE_STORAGE_PATH',
-                                 "./static_uploads")  # Змінено шлях за замовчуванням
+        _base_path_str = getattr(settings, 'LOCAL_FILE_STORAGE_PATH', "./static_uploads")
         self.local_storage_base_path = Path(_base_path_str).resolve()  # Робимо шлях абсолютним
         self.temp_upload_dir = self.local_storage_base_path / "temp"
         self.permanent_storage_dir = self.local_storage_base_path / "permanent"
@@ -83,7 +83,7 @@ class FileUploadService(BaseService): # type: ignore видалено
     async def initiate_upload(
             self,
             initiate_data: FileUploadInitiateRequest,
-            uploader_user_id: int # Змінено UUID на int
+            uploader_user_id: int
     ) -> FileUploadInitiateResponse:
         """Ініціює процес завантаження файлу."""
         logger.info(f"Ініціація завантаження для файлу '{initiate_data.file_name}' користувачем ID: {uploader_user_id}.")
@@ -162,7 +162,7 @@ class FileUploadService(BaseService): # type: ignore видалено
             raise ValueError(f"Не вдалося зберегти завантажені дані файлу для ID {upload_id}.")
 
     async def complete_upload(
-            self, upload_id: UUID, completion_data: FileUploadCompleteRequest, uploader_user_id: int # Змінено UUID на int
+            self, upload_id: UUID, completion_data: FileUploadCompleteRequest, uploader_user_id: int
     ) -> FileUploadResponse:
         """Завершує процес завантаження, переміщує файл та створює запис в БД."""
         logger.info(

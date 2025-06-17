@@ -11,12 +11,11 @@
 завантаження та доступу до файлів.
 """
 
-# Імпорт централізованого логера
-from backend.app.src.config import logger
-
 # Імпорт моделей з відповідних файлів цього пакету.
 from backend.app.src.models.files.file import FileRecord
 from backend.app.src.models.files.avatar import UserAvatar
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # TODO: В майбутньому тут можуть бути інші моделі, пов'язані з файлами,
 #       наприклад, GroupIconModel, RewardIconModel, якщо вони матимуть

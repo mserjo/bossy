@@ -12,13 +12,12 @@ Pydantic схеми для сутності "Користувач" (User).
 from datetime import datetime
 from typing import Optional, Any  # Any для тимчасових полів user_type, system_role
 
-from pydantic import BaseModel, Field, EmailStr, AnyHttpUrl # Додано AnyHttpUrl
+from pydantic import BaseModel, Field, EmailStr, AnyHttpUrl
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import UserState  # Для значення за замовчуванням
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретні схеми довідників, коли вони будуть повністю визначені та імпортовані.
@@ -45,7 +44,7 @@ class UserBaseSchema(BaseSchema):
                                         description="Номер телефону користувача (необов'язково, унікальний, якщо вказано).",
                                         examples=["+380501234567"])
 
-    name: str = Field(max_length=255, # Змінено на non-optional
+    name: str = Field(max_length=255,
                                 description="Відображуване ім'я користувача (може бути ПІБ або нікнейм).",
                                 examples=["Іван Франко"])
     description: Optional[str] = Field(None, description="Додатковий опис або біографія користувача.")
@@ -65,7 +64,7 @@ class UserCreateSchema(UserBaseSchema):
     user_type_code: Optional[str] = Field(None, description="Код типу користувача з довідника (напр., 'REGULAR_USER').")
     system_role_code: Optional[str] = Field(None,
                                             description="Код системної ролі користувача з довідника (напр., 'USER').")
-    state: Optional[UserState] = Field( # Змінено тип на UserState
+    state: Optional[UserState] = Field(
         default=UserState.PENDING_VERIFICATION,  # Використовуємо Enum напряму
         # max_length=50, # Видалено, не потрібно для Enum
         description="Початковий стан користувача (за замовчуванням 'pending_verification')."
@@ -109,7 +108,7 @@ class UserResponseSchema(UserBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
     is_active: bool = Field(description="Чи активний обліковий запис користувача.")
     is_superuser: bool = Field(description="Чи має користувач права суперкористувача.")
     last_login_at: Optional[datetime] = Field(None, description="Час останнього входу користувача в систему.")
-    state: Optional[UserState] = Field(None, description="Поточний стан користувача (використовує UserState Enum).") # Змінено тип
+    state: Optional[UserState] = Field(None, description="Поточний стан користувача (використовує UserState Enum).")
 
     # TODO: Замінити Any на UserTypeSchema та UserRoleSchema, коли вони будуть імпортовані.
     # Ці поля будуть заповнюватися на основі user_type_id та system_role_id з моделі User.
@@ -140,7 +139,7 @@ class UserPublicProfileSchema(BaseSchema, IDSchemaMixin):
 
 
 if __name__ == "__main__":
-    from datetime import timedelta # Додано імпорт timedelta
+    from datetime import timedelta
     # Демонстраційний блок для схем користувача.
     logger.info("--- Pydantic Схеми для Користувача (User) ---")
 
@@ -188,7 +187,7 @@ if __name__ == "__main__":
         # "system_role": {"id": 1, "name": "Користувач", "code": "USER"}, # Приклад, коли UserRoleSchema визначено
         # "avatar_url": "https://example.com/path/to/avatar.png"
     }
-    user_response_instance = UserResponseSchema(**user_response_data) # Змінено UserSchema на UserResponseSchema
+    user_response_instance = UserResponseSchema(**user_response_data)
     logger.info(user_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nUserPublicProfileSchema (приклад публічного профілю):")

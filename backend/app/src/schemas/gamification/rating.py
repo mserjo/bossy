@@ -15,9 +15,8 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.config.logging import get_logger  # Імпорт логера
+from backend.app.src.config.logging import get_logger 
 from backend.app.src.core.dicts import RatingType # Імпортовано RatingType Enum
-# Отримання логера для цього модуля
 logger = get_logger(__name__)
 
 # RatingType Enum імпортовано вище.

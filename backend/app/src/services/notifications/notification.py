@@ -1,7 +1,5 @@
 # backend/app/src/services/notifications/notification.py
-# import logging # Замінено на централізований логер
 from typing import List, Optional, Dict, Any
-# UUID видалено
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,7 +7,6 @@ from sqlalchemy import select # sqlalchemy.future тепер select
 from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.notifications.notification import Notification
 from backend.app.src.repositories.notifications.notification_repository import NotificationRepository # Імпорт репозиторію
@@ -27,8 +24,9 @@ from backend.app.src.services.cache.base_cache import BaseCacheService # Пот�
 from backend.app.src.core.dicts import NotificationType as NotificationTypeEnum # Імпорт Enum
 # Припускаємо, що NotificationStatusType буде визначено або імпортовано, поки що використовуємо рядки.
 
-from backend.app.src.config.logging import logger
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 class NotificationService(BaseService):
@@ -40,7 +38,7 @@ class NotificationService(BaseService):
     NotificationDeliveryService.
     """
 
-    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService): # Додано cache_service
+    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService):
         super().__init__(db_session)
         self.notification_repo = NotificationRepository() # Ініціалізація репозиторію
         # NotificationTemplateService тепер вимагає cache_service

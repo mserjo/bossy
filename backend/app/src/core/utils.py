@@ -16,13 +16,11 @@
 - `get_from_dict_or_object`: Безпечне отримання значень зі словників/об'єктів.
 """
 import re
-from datetime import timedelta # datetime, timezone видалено, бо функції, що їх використовували, видалені
+from datetime import timedelta
 from typing import Any, Optional, List, Dict, Union
 from decimal import Decimal, ROUND_HALF_UP
 # random, string видалено, бо функції, що їх використовували, видалені
 from backend.app.src.config.logging import get_logger
-
-# Отримання логера для цього модуля
 logger = get_logger(__name__)
 
 
@@ -53,7 +51,6 @@ def slugify(text: str, separator: str = "-") -> str:
         return ""
     text = text.lower()
     # Замінюємо непідтримувані символи. Зберігаємо латиницю, кирилицю (українські літери), цифри, пробіли, дефіси.
-    # Додано літери: ґ, є, і, ї.
     text = re.sub(r"[^a-zа-яґєіїї0-9\s-]", "", text, flags=re.UNICODE)
     # Замінюємо пробіли та групи дефісів на один вказаний роздільник.
     text = re.sub(r"[\s-]+", separator, text).strip(separator)

@@ -15,8 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Абсолютний імпорт базового репозиторію
 # TypeVars (ModelType, CreateSchemaType, UpdateSchemaType) успадковуються з BaseRepository
 from backend.app.src.repositories.base import BaseRepository, ModelType, CreateSchemaType, UpdateSchemaType
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 class BaseDictionaryRepository(BaseRepository[ModelType, CreateSchemaType, UpdateSchemaType]):

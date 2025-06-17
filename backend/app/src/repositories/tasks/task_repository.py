@@ -27,8 +27,7 @@ from backend.app.src.models.dictionaries.task_types import TaskType
 from backend.app.src.models.dictionaries.statuses import Status
 from backend.app.src.schemas.tasks.task import TaskCreateSchema, TaskUpdateSchema
 from backend.app.src.core.dicts import TaskStatus as TaskStatusEnum
-from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 

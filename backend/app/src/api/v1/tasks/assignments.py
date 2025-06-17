@@ -10,7 +10,6 @@ from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import (
     get_api_db_session, get_current_active_user,
     # TODO: Створити/використати залежності для перевірки прав, наприклад:
@@ -29,8 +28,9 @@ from backend.app.src.core.pagination import PagedResponse, PageParams
 from backend.app.src.services.tasks.assignment import TaskAssignmentService
 from backend.app.src.services.tasks.task import TaskService  # Для отримання group_id завдання
 from backend.app.src.services.tasks.event import EventService  # Для отримання group_id події
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     # Префікс /assignments буде додано в __init__.py батьківського роутера tasks

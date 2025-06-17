@@ -11,16 +11,11 @@ Middleware в FastAPI дозволяє обробляти кожен запит 
 """
 
 import time
-# import logging # Видалено, оскільки використовується налаштований logger
 from typing import Callable, Awaitable
-
 from fastapi import Request, Response
-# ASGIApp імпорт видалено
-
-# Повні шляхи імпорту
-from backend.app.src.config import logger  # Стандартизований імпорт логера
 from backend.app.src.config import settings  # Для доступу до налаштувань, наприклад, DEBUG або VALID_API_KEYS
-
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # --- Middleware для додавання часу обробки запиту ---
 

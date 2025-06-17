@@ -1,11 +1,12 @@
 # backend/app/src/services/bonuses/bonus_rule.py
+# -*- coding: utf-8 -*-
 """
 Сервіс для управління правилами нарахування бонусів.
 
 Відповідає за створення, оновлення, видалення, отримання та пошук
 правил нарахування бонусів, враховуючи їх специфічність та умови застосування.
 """
-from typing import List, Optional, Dict, TYPE_CHECKING # Any видалено, Dict використовується, TYPE_CHECKING додано
+from typing import List, Optional, Dict, TYPE_CHECKING
 # UUID видалено, оскільки всі ID, що були UUID, змінено на int, і uuid4() тут не використовується
 from datetime import datetime, timezone
 
@@ -27,8 +28,8 @@ from backend.app.src.schemas.bonuses.bonus_rule import (
     BonusRuleUpdate,
     BonusRuleResponse
 )
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-logger = get_logger(__name__) # Ініціалізація логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 from backend.app.src.config import settings
 
 if TYPE_CHECKING: # Умовний імпорт для TYPE_CHECKING

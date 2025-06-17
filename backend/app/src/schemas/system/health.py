@@ -8,16 +8,15 @@ Pydantic схеми для сутностей, пов'язаних зі стан
                                 включаючи стан залежних сервісів.
 """
 from datetime import datetime
-from typing import Optional, List, Any  # Any може не знадобитися, якщо всі типи конкретні
+from typing import Optional, List, Any
 
 from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.config.logging import get_logger  # Імпорт логера
+from backend.app.src.config.logging import get_logger 
 from backend.app.src.core.dicts import HealthStatusType # Імпортовано Enum
 from datetime import timedelta # Переміщено timedelta сюди
-# Отримання логера для цього модуля
 logger = get_logger(__name__)
 
 # HealthStatusType Enum імпортовано вище.
@@ -35,7 +34,7 @@ class ServiceHealthStatusBaseSchema(BaseSchema):
         max_length=SERVICE_NAME_MAX_LENGTH,
         description="Унікальна назва сервісу (наприклад, 'database', 'redis_cache', 'payment_gateway')."
     )
-    status: HealthStatusType = Field( # Змінено на HealthStatusType Enum
+    status: HealthStatusType = Field(
         description="Поточний статус сервісу."
     )
     details: Optional[str] = Field(
@@ -61,7 +60,7 @@ class OverallHealthStatusSchema(BaseSchema):
     Схема для представлення загального стану здоров'я системи.
     Включає загальний статус та список станів окремих залежних сервісів.
     """
-    overall_status: HealthStatusType = Field( # Змінено на HealthStatusType Enum
+    overall_status: HealthStatusType = Field(
         description="Загальний агрегований статус здоров'я системи."
     )
     timestamp: datetime = Field(description="Час генерації звіту про стан здоров'я.")

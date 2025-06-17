@@ -14,10 +14,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 from backend.app.src.core.dicts import RatingType # Імпорт RatingType Enum
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
+
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.gamification.rating import UserGroupRating
 from backend.app.src.schemas.gamification.rating import (

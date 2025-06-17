@@ -6,27 +6,21 @@
 `BaseDictionaryRepository` та надає методи для роботи з шаблонами сповіщень.
 """
 
-from typing import List, Optional, Tuple, Dict, Any # Додано Dict, Any
+from typing import List, Optional, Tuple, Dict, Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Абсолютний імпорт базового репозиторію для довідників
 from backend.app.src.repositories.dictionaries.base_dict_repository import BaseDictionaryRepository
-from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
-# Абсолютний імпорт моделі та схем
 from backend.app.src.models.notifications.template import NotificationTemplate
 from backend.app.src.schemas.notifications.template import (
     NotificationTemplateCreateSchema,
     NotificationTemplateUpdateSchema
 )
-from backend.app.src.core.dicts import NotificationChannelType # Імпортовано Enum
-
-
-# Enums NotificationChannelType імпортовано вище.
+from backend.app.src.core.dicts import NotificationChannelType
 
 
 class NotificationTemplateRepository(
@@ -48,7 +42,7 @@ class NotificationTemplateRepository(
     async def get_by_template_type(
             self,
             session: AsyncSession,
-            template_type: NotificationChannelType,  # Змінено на NotificationChannelType Enum
+            template_type: NotificationChannelType,
             active_only: bool = True,
             skip: int = 0,
             limit: int = 100

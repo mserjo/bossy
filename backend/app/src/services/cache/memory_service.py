@@ -11,8 +11,8 @@ from typing import Optional, Any, Dict, Set # Union видалено
 from datetime import datetime, timedelta, timezone  # Для точного терміну дії в логах
 
 from backend.app.src.services.cache.base_cache import BaseCacheService
-from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
-logger = get_logger(__name__) # Ініціалізація логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 # TODO: [Concurrency] Розглянути використання asyncio.Lock для операцій читання-модифікації-запису

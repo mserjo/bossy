@@ -18,11 +18,10 @@ from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # LogLevel Enum імпортовано вище.
-# TODO: Замінити Any на UserPublicProfileSchema, коли вона буде доступна/рефакторена.
-# from backend.app.src.schemas.auth.user import UserPublicProfileSchema
+from backend.app.src.schemas.auth.user import UserPublicProfileSchema
 
-UserPublicProfileSchema = Any  # Тимчасовий заповнювач
 
+# Placeholder UserPublicProfileSchema = Any removed
 
 # LOG_LEVEL_MAX_LENGTH = 50 # Не потрібен для Enum
 LOG_MESSAGE_MAX_LENGTH_DISPLAY = 1000  # Для відображення, Text в моделі може бути довшим
@@ -81,7 +80,6 @@ class SystemLogSchema(SystemLogBaseSchema, IDSchemaMixin):
     # id успадковано.
     # timestamp, level, message, source, details, user_id успадковані.
 
-    # TODO: Замінити Any на UserPublicProfileSchema.
     user: Optional[UserPublicProfileSchema] = Field(None,
                                                     description="Інформація про користувача, пов'язаного з логом (якщо є).")
 
@@ -154,10 +152,16 @@ if __name__ == "__main__":
     log_response_data = {
         "id": 1,
         "timestamp": datetime.now(),
-        "level": LogLevel.ERROR, # Використовуємо Enum
-        "message": "Не вдалося підключитися до зовнішнього сервісу 'X'.",  # TODO i18n
+        "level": LogLevel.ERROR,
+        "message": "Не вдалося підключитися до зовнішнього сервісу 'X'.",
         "source": "integration_module",
-        # "user": {"id": 101, "name": "Ініціатор Дії"} # Приклад UserPublicProfileSchema
+        "user_id": 101, # Додамо user_id для консистентності з прикладом user
+        "user": { # Приклад UserPublicProfileSchema
+            "id": 101,
+            "username": "logger_user",
+            "name": "Ініціатор Логування", # TODO i18n
+            "avatar_url": "https://example.com/avatars/logger.png"
+        }
     }
     log_response_instance = SystemLogSchema(**log_response_data)
     logger.info(log_response_instance.model_dump_json(indent=2, exclude_none=True))
@@ -184,5 +188,4 @@ if __name__ == "__main__":
     logger.info(metric_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних системного моніторингу.")
-    # logger.info("TODO: Інтегрувати Enum 'LogLevel' з core.dicts для поля 'level' в SystemLog.") # Вирішено
-    logger.info("TODO: Замінити Any на UserPublicProfileSchema в SystemLogSchema.")
+    logger.info("UserPublicProfileSchema тепер використовується в SystemLogSchema.")

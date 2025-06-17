@@ -19,10 +19,12 @@ from backend.app.src.core.dicts import TransactionType  # Enum для типів
 from backend.app.src.config.logging import get_logger 
 logger = get_logger(__name__)
 
-# TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
-# from backend.app.src.schemas.auth.user import UserPublicProfileSchema # Для created_by
+# Імпорт для конкретної схеми
+from backend.app.src.schemas.auth.user import UserPublicProfileSchema
 
-UserPublicProfileSchema = Any  # Тимчасовий заповнювач
+
+# Placeholder assignment removed
+# UserPublicProfileSchema = Any
 
 
 class AccountTransactionBaseSchema(BaseSchema):
@@ -73,7 +75,6 @@ class AccountTransactionResponseSchema(AccountTransactionBaseSchema, IDSchemaMix
     account_id: int = Field(description="Ідентифікатор рахунку користувача.") # Перевизначено як non-optional
 
     created_by_user_id: Optional[int] = Field(None, description="ID користувача, який створив транзакцію (якщо є).")
-    # TODO: Замінити Any на UserPublicProfileSchema.
     created_by: Optional[UserPublicProfileSchema] = Field(None,
                                                           description="Інформація про користувача, який створив транзакцію (якщо є).")
 
@@ -120,12 +121,17 @@ if __name__ == "__main__":
         "description": "Щомісячний бонус лояльності.",  # TODO i18n
         "created_at": datetime.now(),
         "updated_at": datetime.now(),
-        "created_by_user_id": None,  # Системна транзакція
-        # "created_by": None # Приклад UserPublicProfileSchema
+        "created_by_user_id": 1,
+        "created_by": { # Приклад UserPublicProfileSchema
+            "id": 1,
+            "username": "admin_user",
+            "name": "Адміністратор Системи", # TODO i18n
+            "avatar_url": "https://example.com/avatars/admin.png"
+        }
     }
-    tx_response_instance = AccountTransactionResponseSchema(**tx_response_data) # Renamed
+    tx_response_instance = AccountTransactionResponseSchema(**tx_response_data)
     logger.info(tx_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    logger.info("\nПримітка: Ці схеми використовуються для валідації та серіалізації даних транзакцій.")
+    logger.info("\nПримітка: Схема `UserPublicProfileSchema` тепер імпортована та використовується в `AccountTransactionResponseSchema`.")
     logger.info(
         f"Використовується TransactionType Enum для поля 'transaction_type', наприклад: TransactionType.REFUND = '{TransactionType.REFUND.value}'")

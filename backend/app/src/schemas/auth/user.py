@@ -32,6 +32,7 @@ class UserBaseSchema(BaseSchema):
     """
     Базова схема для полів користувача, що використовуються як для створення, так і для читання.
     """
+    username: str = Field(..., max_length=100, description="Унікальне ім'я користувача (логін).", examples=["john_doe"])
     email: EmailStr = Field(description="Електронна пошта користувача (унікальна).")
     first_name: Optional[str] = Field(None, max_length=100, description="Ім'я користувача.", examples=["Іван"])
     last_name: Optional[str] = Field(None, max_length=100, description="Прізвище користувача.", examples=["Франко"])
@@ -71,6 +72,7 @@ class UserUpdateSchema(UserBaseSchema):
     Схема для оновлення даних існуючого користувача.
     Всі поля є опціональними.
     """
+    username: Optional[str] = Field(None, max_length=100, description="Нове унікальне ім'я користувача (логін).")
     email: Optional[EmailStr] = Field(None, description="Нова електронна пошта користувача.")
     # first_name, last_name, etc. успадковані та вже Optional[str] = None
     password: Optional[str] = Field(None, min_length=8,
@@ -100,6 +102,7 @@ class UserResponseSchema(UserBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
     Включає `id`, часові мітки та інші поля, безпечні для відображення.
     """
     # id, created_at, updated_at успадковані з міксинів
+    username: str = Field(description="Унікальне ім'я користувача (логін).") # Added username
     is_active: bool = Field(description="Чи активний обліковий запис користувача.")
     is_superuser: bool = Field(description="Чи має користувач права суперкористувача.")
     last_login_at: Optional[datetime] = Field(None, description="Час останнього входу користувача в систему.")
@@ -125,6 +128,7 @@ class UserPublicProfileSchema(BaseSchema, IDSchemaMixin):
     Містить лише обмежений набір полів, безпечних для публічного показу.
     """
     # id успадковано
+    username: Optional[str] = Field(None, description="Унікальне ім'я користувача.") # Added username
     name: Optional[str] = Field(None, description="Відображуване ім'я користувача.", examples=["Іван Ф."])
     # TODO: Визначити, як отримувати URL аватара (аналогічно до UserSchema).
     avatar_url: Optional[AnyHttpUrl] = Field(None, description="URL аватара користувача.")
@@ -138,48 +142,52 @@ if __name__ == "__main__":
     logger.info("--- Pydantic Схеми для Користувача (User) ---")
 
     logger.info("\nUserBaseSchema (приклад):")
-    base_data = {"email": "base@example.com", "first_name": "Базовий", "last_name": "Користувач"}  # TODO i18n
+    base_data = {"username": "baseuser", "email": "base@example.com", "name": "Базовий Користувач", "first_name": "Базовий", "last_name": "Користувач"}
     base_instance = UserBaseSchema(**base_data)
     logger.info(base_instance.model_dump_json(indent=2))
 
     logger.info("\nUserCreateSchema (приклад):")
     create_data = {
+        "username": "newbie",
         "email": "newuser@example.com",
         "password": "HardPassword123!",
-        "first_name": "Новий",  # TODO i18n
-        "last_name": "Користувач",  # TODO i18n
-        "name": "Новий Користувач",  # TODO i18n
+        "name": "Новий Користувач",
+        "first_name": "Новий",
+        "last_name": "Користувач",
         "user_type_code": "REGULAR_USER",
         "system_role_code": "USER",
-        "state": UserState.ACTIVE.value
+        "state_code": "ACTIVE" # Changed from state: UserState.ACTIVE.value
     }
     create_instance = UserCreateSchema(**create_data)
     logger.info(create_instance.model_dump_json(indent=2))
+
+    # Приклад з помилкою (наприклад, відсутній username, якщо він обов'язковий в UserBaseSchema)
     # try:
-    #     UserCreateSchema(email="test@test.com", password="short")  # Невалідна довжина пароля - state field is changed.
+    #     UserCreateSchema(email="test@test.com", password="password123", name="Test Name")
     # except Exception as e:
-    #     logger.info(f"Помилка валідації UserCreateSchema (очікувано): {e}")
+    #     logger.info(f"Помилка валідації UserCreateSchema (очікувано, якщо username обов'язковий): {e}")
+
 
     logger.info("\nUserUpdateSchema (приклад):")
-    update_data = {"first_name": "Оновлене Ім'я", "phone_number": "+380509876543"}  # TODO i18n
+    update_data = {"username": "updated_user", "first_name": "Оновлене Ім'я", "phone_number": "+380509876543"}
     update_instance = UserUpdateSchema(**update_data)
     logger.info(update_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nUserSchema (приклад відповіді API):")
     user_response_data = {
         "id": 1,
+        "username": "apiuser",
         "email": "api.user@example.com",
-        "name": "API Користувач",  # TODO i18n
-        "first_name": "API", "last_name": "Користувач",  # TODO i18n
+        "name": "API Користувач",
+        "first_name": "API", "last_name": "Користувач",
         "is_active": True,
         "is_superuser": False,
         "created_at": datetime.now(),
         "updated_at": datetime.now(),
         "last_login_at": datetime.now() - timedelta(hours=1),
-        # "state": UserState.ACTIVE.value, # state field is changed to be an object
-        "state": {"id": 1, "name": "Активний", "code": "ACTIVE", "description": "Стан активного користувача"}, # Example StatusResponseSchema
-        "user_type": {"id": 1, "name": "Звичайний", "code": "REGULAR_USER", "description": "Стандартний тип користувача"}, # Example UserTypeResponseSchema
-        "system_role": {"id": 1, "name": "Користувач", "code": "USER", "description": "Базова системна роль"}, # Example UserRoleResponseSchema
+        "state": {"id": 1, "name": "Активний", "code": "ACTIVE", "description": "Стан активного користувача"},
+        "user_type": {"id": 1, "name": "Звичайний", "code": "REGULAR_USER", "description": "Стандартний тип користувача"},
+        "system_role": {"id": 1, "name": "Користувач", "code": "USER", "description": "Базова системна роль"},
         "avatar_url": "https://example.com/path/to/avatar.png"
     }
     user_response_instance = UserResponseSchema(**user_response_data)
@@ -188,8 +196,9 @@ if __name__ == "__main__":
     logger.info("\nUserPublicProfileSchema (приклад публічного профілю):")
     public_profile_data = {
         "id": 2,
-        "name": "Публічний Юзер",  # TODO i18n
-        # "avatar_url": "https://example.com/path/to/public_avatar.png"
+        "username": "public_user_name",
+        "name": "Публічний Юзер",
+        "avatar_url": "https://example.com/path/to/public_avatar.png"
     }
     public_profile_instance = UserPublicProfileSchema(**public_profile_data)
     logger.info(public_profile_instance.model_dump_json(indent=2, exclude_none=True))

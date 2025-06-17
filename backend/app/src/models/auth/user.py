@@ -55,6 +55,13 @@ class User(BaseMainModel):
     email: Mapped[str] = mapped_column(
         String(255), unique=True, index=True, nullable=False, comment="Електронна пошта користувача (унікальна)"
     )
+    username: Mapped[str] = mapped_column(
+        String(100),
+        unique=True,
+        index=True,
+        nullable=False,
+        comment="Унікальне ім'я користувача для входу або ідентифікації"
+    )
     hashed_password: Mapped[str] = mapped_column(
         String(255), nullable=False, comment="Хешований пароль користувача"
     )  # Довжина може бути збільшена, якщо використовуються дуже стійкі алгоритми хешування
@@ -120,7 +127,7 @@ class User(BaseMainModel):
     # Поля для __repr__, успадковані з BaseMainModel та його міксинів, будуть автоматично
     # зібрані кастомним методом __repr__ в класі Base.
     # Додаємо специфічні для User поля, які хочемо бачити в repr.
-    _repr_fields = ["email", "is_active", "is_superuser", "first_name", "last_name"]
+    _repr_fields = ["username", "email", "is_active", "is_superuser", "first_name", "last_name"]
 
     @property
     def avatar_url(self) -> Optional[str]:

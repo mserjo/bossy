@@ -17,9 +17,10 @@ from backend.app.src.schemas.base import BaseSchema, BaseMainSchema
 from backend.app.src.config.logging import get_logger 
 logger = get_logger(__name__)
 
-# TODO: Замінити Any на конкретну схему GroupSchema (коротка версія), коли вона буде готова.
-# from backend.app.src.schemas.groups.group import GroupBriefSchema
-GroupBriefSchema = Any  # Тимчасовий заповнювач
+# Імпорт для конкретної схеми
+from backend.app.src.schemas.groups.group import GroupSchema
+
+# Placeholder GroupBriefSchema = Any removed
 
 BADGE_NAME_MAX_LENGTH = 255
 BADGE_ICON_URL_MAX_LENGTH = 512  # Збігається з моделлю
@@ -93,9 +94,8 @@ class BadgeSchema(BaseMainSchema):  # Успадковує id, name, description
     icon_url: Optional[AnyHttpUrl] = Field(None, description="URL іконки бейджа.")
 
     # Пов'язані об'єкти
-    # TODO: Замінити Any на GroupBriefSchema, коли вона буде імпортована.
-    group: Optional[GroupBriefSchema] = Field(None,
-                                              description="Коротка інформація про групу, до якої належить бейдж (якщо є).")
+    group: Optional[GroupSchema] = Field(None, # Changed from GroupBriefSchema
+                                         description="Коротка інформація про групу, до якої належить бейдж (якщо є).")
 
     # model_config успадковується з BaseMainSchema -> BaseSchema (from_attributes=True)
 
@@ -137,5 +137,4 @@ if __name__ == "__main__":
     badge_response_instance = BadgeSchema(**badge_response_data)
     logger.info(badge_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    logger.info("\nПримітка: Схема для `group` наразі є заповнювачем (Any).")
-    logger.info("Її потрібно буде замінити на `GroupBriefSchema` після її визначення.")
+    logger.info("\nПримітка: Схема для `group` тепер використовує `GroupSchema`.")

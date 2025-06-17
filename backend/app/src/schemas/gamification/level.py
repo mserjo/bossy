@@ -17,9 +17,10 @@ from backend.app.src.schemas.base import BaseSchema, BaseMainSchema
 from backend.app.src.config.logging import get_logger 
 logger = get_logger(__name__)
 
-# TODO: Замінити Any на конкретну схему GroupSchema (коротка версія), коли вона буде готова.
-# from backend.app.src.schemas.groups.group import GroupBriefSchema
-GroupBriefSchema = Any  # Тимчасовий заповнювач
+# Імпорт для конкретної схеми
+from backend.app.src.schemas.groups.group import GroupSchema
+
+# Placeholder GroupBriefSchema = Any removed
 
 LEVEL_NAME_MAX_LENGTH = 255
 LEVEL_ICON_URL_MAX_LENGTH = 512
@@ -108,9 +109,8 @@ class LevelSchema(BaseMainSchema):  # Успадковує id, name, description
     icon_url: Optional[AnyHttpUrl] = Field(None, description="URL іконки рівня.")
 
     # Пов'язані об'єкти
-    # TODO: Замінити Any на GroupBriefSchema, коли вона буде імпортована.
-    group: Optional[GroupBriefSchema] = Field(None,
-                                              description="Коротка інформація про групу, до якої належить рівень (якщо є).")
+    group: Optional[GroupSchema] = Field(None,
+                                         description="Коротка інформація про групу, до якої належить рівень (якщо є).")
 
     # model_config успадковується з BaseMainSchema -> BaseSchema (from_attributes=True)
 
@@ -152,10 +152,10 @@ if __name__ == "__main__":
         "required_points": 5000,
         "level_number": 3,
         "icon_url": "https://example.com/icons/silver_level.png",
-        # "group": {"id": 1, "name": "Команда Альфа"} # Приклад GroupBriefSchema
+        # "group": {"id": 1, "name": "Команда Альфа", "group_type_code": "TEAM",
+        #           "created_at": str(datetime.now()), "updated_at": str(datetime.now())} # Приклад GroupSchema
     }
     level_response_instance = LevelSchema(**level_response_data)
     logger.info(level_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    logger.info("\nПримітка: Схема для `group` наразі є заповнювачем (Any).")
-    logger.info("Її потрібно буде замінити на `GroupBriefSchema` після її визначення.")
+    logger.info("\nПримітка: Схема для `group` тепер використовує `GroupSchema`.")

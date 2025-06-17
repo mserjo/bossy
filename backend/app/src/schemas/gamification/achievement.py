@@ -17,14 +17,16 @@ from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedS
 from backend.app.src.config.logging import get_logger 
 logger = get_logger(__name__)
 
-# TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
-# from backend.app.src.schemas.auth.user import UserPublicProfileSchema
-# from backend.app.src.schemas.gamification.badge import BadgeSchema
-# from backend.app.src.schemas.groups.group import GroupBriefSchema
+# Імпорти для конкретних схем
+from backend.app.src.schemas.auth.user import UserPublicProfileSchema
+from backend.app.src.schemas.gamification.badge import BadgeSchema
+from backend.app.src.schemas.groups.group import GroupSchema
 
-UserPublicProfileSchema = Any  # Тимчасовий заповнювач
-BadgeSchema = Any  # Тимчасовий заповнювач
-GroupBriefSchema = Any  # Тимчасовий заповнювач
+
+# Placeholder assignments removed
+# UserPublicProfileSchema = Any
+# BadgeSchema = Any
+# GroupBriefSchema = Any
 
 
 class UserAchievementBaseSchema(BaseSchema):
@@ -58,11 +60,10 @@ class UserAchievementSchema(UserAchievementBaseSchema, IDSchemaMixin, Timestampe
     # id, created_at, updated_at успадковані.
     # user_id, badge_id, group_id успадковані.
 
-    # TODO: Замінити Any на відповідні схеми.
     user: Optional[UserPublicProfileSchema] = Field(None, description="Публічний профіль користувача.")
     badge: Optional[BadgeSchema] = Field(None, description="Інформація про отриманий бейдж.")
-    group: Optional[GroupBriefSchema] = Field(None,
-                                              description="Коротка інформація про групу, в якій отримано досягнення (якщо є).")
+    group: Optional[GroupSchema] = Field(None, # Changed from GroupBriefSchema
+                                         description="Коротка інформація про групу, в якій отримано досягнення (якщо є).")
 
 
 if __name__ == "__main__":
@@ -86,15 +87,18 @@ if __name__ == "__main__":
         "group_id": 1,
         "created_at": datetime.now() - timedelta(days=5),  # Час отримання
         "updated_at": datetime.now() - timedelta(days=5),
-        # "user": {"id": 101, "name": "Активний Користувач"}, # Приклад UserPublicProfileSchema
-        # "badge": {"id": 2, "name": "Зірка Спільноти", "icon_url": "..."}, # Приклад BadgeSchema
-        # "group": {"id": 1, "name": "Команда Розробки"} # Приклад GroupBriefSchema
+        # Приклади для пов'язаних об'єктів (закоментовано, бо потребують повних даних схем)
+        # "user": {"id": 101, "username": "achiever", "name": "Активний Користувач"},
+        # "badge": {"id": 2, "name": "Зірка Спільноти", "icon_url": "...",
+        #           "created_at": str(datetime.now()), "updated_at": str(datetime.now())},
+        # "group": {"id": 1, "name": "Команда Розробки", "group_type_code": "PROJECT",
+        #           "created_at": str(datetime.now()), "updated_at": str(datetime.now())}
     }
     achievement_response_instance = UserAchievementSchema(**achievement_response_data)
     logger.info(achievement_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    logger.info("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, BadgeSchema, GroupBriefSchema)")
-    logger.info("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
+    logger.info("\nПримітка: Схеми для пов'язаних об'єктів тепер імпортовані.")
+    logger.info("Приклади даних для цих полів у `achievement_response_data` закоментовані,")
+    logger.info("оскільки потребують повної структури відповідних схем.")
 
-# Потрібно для timedelta в __main__
-from datetime import timedelta
+# timedelta імпортовано на початку файлу

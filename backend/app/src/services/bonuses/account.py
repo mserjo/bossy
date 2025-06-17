@@ -143,11 +143,27 @@ class UserAccountService(BaseService):
                 logger.error(f"Групу з ID '{group_id}' не знайдено при спробі створити бонусний рахунок.")
                 raise ValueError(f"Групу з ID '{group_id}' не знайдено.")  # i18n
 
+        # Визначення валюти для нового рахунку
+        group_currency = "бали" # Значення за замовчуванням
+        if group: # group - це ORM об'єкт Group
+            # lazy="selectin" для Group.settings має завантажити налаштування при доступі
+            if group.settings and group.settings.currency_name:
+                group_currency = group.settings.currency_name
+                logger.info(f"Для групи ID {group_id} знайдено валюту '{group_currency}' в налаштуваннях.")
+            else:
+                logger.warning(f"GroupSetting або currency_name не знайдено для групи ID {group_id}. "
+                               f"Використовується валюта за замовчуванням '{group_currency}'.")
+        else: # Глобальний рахунок
+            # Можна мати глобальне налаштування валюти за замовчуванням, якщо потрібно
+            logger.info(f"Створюється глобальний рахунок, використовується валюта за замовчуванням '{group_currency}'.")
+
+
         # Створюємо новий рахунок
         new_account_db = UserAccount(
             user_id=user_id,
             group_id=group_id,  # Може бути None для глобального
             balance=initial_balance,
+            currency=group_currency, # Використання визначеної валюти
             # created_at, updated_at - обробляються базовою моделлю або БД
             # last_transaction_at - буде None до першої транзакції
         )

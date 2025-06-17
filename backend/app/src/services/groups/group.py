@@ -22,6 +22,7 @@ from backend.app.src.models.dictionaries.group_types import GroupType
 from backend.app.src.models.groups.membership import GroupMembership
 from backend.app.src.models.dictionaries.user_roles import UserRole
 from backend.app.src.models.files.file import FileRecord
+from backend.app.src.models.groups.settings import GroupSetting # Added import
 
 from backend.app.src.schemas.groups.group import (
     GroupCreate,
@@ -174,7 +175,15 @@ class GroupService(BaseService):
             )
             self.db_session.add(initial_membership)
 
-            await self.commit() # Основний коміт для групи та членства
+            # Створення налаштувань групи за замовчуванням
+            logger.debug(f"Створення налаштувань за замовчуванням для групи ID: {new_group_db.id}")
+            default_group_settings = GroupSetting(
+                group_id=new_group_db.id
+                # currency_name and other fields will take default values from the GroupSetting model definition
+            )
+            self.db_session.add(default_group_settings)
+
+            await self.commit() # Основний коміт для групи, членства та налаштувань
 
             created_group_detailed = await self.get_group_by_id(new_group_db.id, include_details=True)
             if not created_group_detailed:

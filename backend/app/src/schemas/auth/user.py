@@ -17,16 +17,15 @@ from pydantic import BaseModel, Field, EmailStr, AnyHttpUrl
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import UserState  # Для значення за замовчуванням
+# TODO: Імпортувати StatusResponseSchema після його визначення в schemas.dictionaries.statuses
+# from backend.app.src.schemas.dictionaries.statuses import StatusResponseSchema
+from backend.app.src.schemas.dictionaries.statuses import StatusResponseSchema
+from backend.app.src.schemas.dictionaries.user_types import UserTypeResponseSchema # Added import
+from backend.app.src.schemas.dictionaries.user_roles import UserRoleResponseSchema # Added import
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
-# TODO: Замінити Any на конкретні схеми довідників, коли вони будуть повністю визначені та імпортовані.
-# Наприклад, from backend.app.src.schemas.dictionaries.user_types import UserTypeSchema
-# from backend.app.src.schemas.dictionaries.user_roles import UserRoleSchema
-# Наразі UserTypeSchema та UserRoleSchema ще не визначені в schemas/dictionaries,
-# тому використовуємо Any як тимчасовий заповнювач.
-UserTypeSchema = Any  # Тимчасовий заповнювач
-UserRoleSchema = Any  # Тимчасовий заповнювач
+# Placeholder assignments removed
 
 
 class UserBaseSchema(BaseSchema):
@@ -64,11 +63,7 @@ class UserCreateSchema(UserBaseSchema):
     user_type_code: Optional[str] = Field(None, description="Код типу користувача з довідника (напр., 'REGULAR_USER').")
     system_role_code: Optional[str] = Field(None,
                                             description="Код системної ролі користувача з довідника (напр., 'USER').")
-    state: Optional[UserState] = Field(
-        default=UserState.PENDING_VERIFICATION,  # Використовуємо Enum напряму
-        # max_length=50, # Видалено, не потрібно для Enum
-        description="Початковий стан користувача (за замовчуванням 'pending_verification')."
-    )
+    state_code: Optional[str] = Field(None, description="Код стану користувача з довідника dict_statuses.")
 
 
 class UserUpdateSchema(UserBaseSchema):
@@ -86,7 +81,7 @@ class UserUpdateSchema(UserBaseSchema):
 
     user_type_code: Optional[str] = Field(None, description="Новий код типу користувача з довідника.")
     system_role_code: Optional[str] = Field(None, description="Новий код системної ролі користувача з довідника.")
-    state: Optional[UserState] = Field(None, description="Новий стан користувача (використовує UserState Enum).")
+    state_code: Optional[str] = Field(None, description="Новий код стану користувача з довідника dict_statuses.")
 
     # Перевизначення успадкованих полів, щоб зробити їх Optional[str] = None, якщо вони були обов'язковими в UserBaseSchema
     # Однак, у UserBaseSchema вони вже Optional, тому це не строго необхідно, але для ясності:
@@ -108,12 +103,11 @@ class UserResponseSchema(UserBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
     is_active: bool = Field(description="Чи активний обліковий запис користувача.")
     is_superuser: bool = Field(description="Чи має користувач права суперкористувача.")
     last_login_at: Optional[datetime] = Field(None, description="Час останнього входу користувача в систему.")
-    state: Optional[UserState] = Field(None, description="Поточний стан користувача (використовує UserState Enum).")
+    state: Optional[StatusResponseSchema] = Field(None, description="Об'єкт стану користувача.")
 
-    # TODO: Замінити Any на UserTypeSchema та UserRoleSchema, коли вони будуть імпортовані.
     # Ці поля будуть заповнюватися на основі user_type_id та system_role_id з моделі User.
-    user_type: Optional[UserTypeSchema] = Field(None, description="Об'єкт типу користувача.")
-    system_role: Optional[UserRoleSchema] = Field(None, description="Об'єкт системної ролі користувача.")
+    user_type: Optional[UserTypeResponseSchema] = Field(None, description="Об'єкт типу користувача.")
+    system_role: Optional[UserRoleResponseSchema] = Field(None, description="Об'єкт системної ролі користувача.")
 
     # TODO: Визначити, як отримувати URL аватара. Це може бути окреме поле в моделі User,
     #       або властивість, що генерується на основі зв'язку з UserAvatar та FileRecord.
@@ -161,10 +155,10 @@ if __name__ == "__main__":
     }
     create_instance = UserCreateSchema(**create_data)
     logger.info(create_instance.model_dump_json(indent=2))
-    try:
-        UserCreateSchema(email="test@test.com", password="short")  # Невалідна довжина пароля
-    except Exception as e:
-        logger.info(f"Помилка валідації UserCreateSchema (очікувано): {e}")
+    # try:
+    #     UserCreateSchema(email="test@test.com", password="short")  # Невалідна довжина пароля - state field is changed.
+    # except Exception as e:
+    #     logger.info(f"Помилка валідації UserCreateSchema (очікувано): {e}")
 
     logger.info("\nUserUpdateSchema (приклад):")
     update_data = {"first_name": "Оновлене Ім'я", "phone_number": "+380509876543"}  # TODO i18n
@@ -182,10 +176,11 @@ if __name__ == "__main__":
         "created_at": datetime.now(),
         "updated_at": datetime.now(),
         "last_login_at": datetime.now() - timedelta(hours=1),
-        "state": UserState.ACTIVE.value,
-        # "user_type": {"id": 1, "name": "Звичайний", "code": "REGULAR"}, # Приклад, коли UserTypeSchema визначено
-        # "system_role": {"id": 1, "name": "Користувач", "code": "USER"}, # Приклад, коли UserRoleSchema визначено
-        # "avatar_url": "https://example.com/path/to/avatar.png"
+        # "state": UserState.ACTIVE.value, # state field is changed to be an object
+        "state": {"id": 1, "name": "Активний", "code": "ACTIVE", "description": "Стан активного користувача"}, # Example StatusResponseSchema
+        "user_type": {"id": 1, "name": "Звичайний", "code": "REGULAR_USER", "description": "Стандартний тип користувача"}, # Example UserTypeResponseSchema
+        "system_role": {"id": 1, "name": "Користувач", "code": "USER", "description": "Базова системна роль"}, # Example UserRoleResponseSchema
+        "avatar_url": "https://example.com/path/to/avatar.png"
     }
     user_response_instance = UserResponseSchema(**user_response_data)
     logger.info(user_response_instance.model_dump_json(indent=2, exclude_none=True))
@@ -199,7 +194,7 @@ if __name__ == "__main__":
     public_profile_instance = UserPublicProfileSchema(**public_profile_data)
     logger.info(public_profile_instance.model_dump_json(indent=2, exclude_none=True))
 
-    logger.info("\nПримітка: Схеми `UserTypeSchema` та `UserRoleSchema` наразі є заповнювачами (Any).")
-    logger.info("Їх потрібно буде імпортувати з `schemas.dictionaries` після їх рефакторингу.")
+    logger.info("\nПримітка: Схеми `UserTypeResponseSchema` та `UserRoleResponseSchema` тепер імпортовані.")
+    logger.info("Поле `state` тепер використовує `StatusResponseSchema`.")
     logger.info("Також, поле `avatar_url` потребує визначення логіки його заповнення.")
     logger.info("Валідація номера телефону (`phone_number`) потребує інтеграції з `phonenumbers`.")

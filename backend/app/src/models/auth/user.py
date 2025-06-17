@@ -17,7 +17,9 @@ from typing import TYPE_CHECKING, List, Optional
 from sqlalchemy import String, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
+from backend.app.src.config import settings # Added import
 from backend.app.src.models.base import BaseMainModel
+from backend.app.src.models.dictionaries.statuses import Status # Added import
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
@@ -33,6 +35,7 @@ if TYPE_CHECKING:
     from backend.app.src.models.auth.token import RefreshToken  # Модель токенів оновлення
     from backend.app.src.models.files.avatar import UserAvatar  # Модель аватарів користувачів
     from backend.app.src.models.groups.membership import GroupMembership  # Модель членства в групах
+    from backend.app.src.models.dictionaries.statuses import Status # Added import for TYPE_CHECKING
 
 
 class User(BaseMainModel):
@@ -97,6 +100,8 @@ class User(BaseMainModel):
     # --- Зв'язки (Relationships) ---
     user_type: Mapped[Optional["UserType"]] = relationship(foreign_keys=[user_type_id], lazy="selectin")
     system_role: Mapped[Optional["UserRole"]] = relationship(foreign_keys=[system_role_id], lazy="selectin")
+    # Зв'язок зі станом користувача через успадковане поле state_id з StateMixin
+    state: Mapped[Optional["Status"]] = relationship(foreign_keys="User.state_id", lazy="selectin")
 
     sessions: Mapped[List["UserSession"]] = relationship(
         back_populates="user", cascade="all, delete-orphan", lazy="selectin"
@@ -116,6 +121,34 @@ class User(BaseMainModel):
     # зібрані кастомним методом __repr__ в класі Base.
     # Додаємо специфічні для User поля, які хочемо бачити в repr.
     _repr_fields = ["email", "is_active", "is_superuser", "first_name", "last_name"]
+
+    @property
+    def avatar_url(self) -> Optional[str]:
+        """
+        Повертає повний URL до активного аватара користувача або None.
+        """
+        if self.avatar and self.avatar.is_active and self.avatar.file_record and self.avatar.file_record.file_path:
+            # settings.SERVER_HOST має бути встановлений, наприклад, "http://localhost:8000"
+            # settings.STATIC_URL має бути встановлений, наприклад, "/static/"
+            base_url = str(settings.SERVER_HOST).rstrip('/')
+            file_path = str(self.avatar.file_record.file_path)
+
+            if file_path.startswith('/'):
+                # Якщо file_path - це вже абсолютний шлях (наприклад, /media/avatars/...)
+                return f"{base_url}{file_path}"
+            else:
+                # Якщо file_path відносний (наприклад, avatars/user_1/avatar.jpg)
+                # і має бути об'єднаний з settings.STATIC_URL
+                static_url_prefix = str(getattr(settings, 'STATIC_URL', '/static/'))
+                if not static_url_prefix.startswith('/'):
+                    static_url_prefix = '/' + static_url_prefix
+                if not static_url_prefix.endswith('/'):
+                    static_url_prefix += '/'
+
+                # Об'єднуємо base_url, static_url_prefix та file_path
+                # file_path.lstrip('/') для уникнення подвійних слешів, якщо static_url_prefix вже закінчується на /
+                return f"{base_url}{static_url_prefix}{file_path.lstrip('/')}"
+        return None
 
 
 if __name__ == "__main__":

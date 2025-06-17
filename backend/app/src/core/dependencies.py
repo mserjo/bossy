@@ -18,70 +18,31 @@
 (`models.auth.user` та `schemas.auth.token`) після їх створення/рефакторингу.
 """
 
-from typing import Optional # AsyncGenerator було видалено, оскільки не використовується в цьому файлі.
-from fastapi import Depends, HTTPException, status # Path тут не використовується, але може знадобитися для get_current_group_admin
+from typing import Optional
+from fastapi import Depends, HTTPException, status, Path # Added Path
 from fastapi.security import OAuth2PasswordBearer
-# JWTError імпортується для можливої обробки, хоча decode_token вже це робить
-# from jose import JWTError # Закоментовано, бо decode_token вже обробляє JWTError
-from pydantic import BaseModel, ValidationError # BaseModel для TokenPayload-заповнювача
-from datetime import datetime, timezone, timedelta # Використовується в __main__ для прикладу
+# from jose import JWTError
+from pydantic import ValidationError # BaseModel removed as TokenPayload is now imported
+from datetime import datetime, timezone, timedelta
+
+# SQLAlchemy select
+from sqlalchemy import select
 
 # Абсолютні імпорти з проекту
 from backend.app.src.config.settings import settings
 from backend.app.src.config.security import decode_token
 from backend.app.src.config.database import get_db, AsyncSession
 from backend.app.src.config.logging import get_logger
+
+# Реальні імпорти для UserModel та TokenPayload
+from backend.app.src.models.auth.user import User as UserModel
+from backend.app.src.schemas.auth.token import TokenPayload
+
+# Імпорти для get_current_group_admin
+from backend.app.src.models.groups.membership import GroupMembership
+from backend.app.src.core.dicts import GroupRole
+
 logger = get_logger(__name__)
-
-# TODO: Замінити UserModel на імпорт реальної моделі користувача, наприклад:
-# from backend.app.src.models.auth.user import User as UserModel
-# Наразі UserModel є класом-заповнювачем для демонстрації структури.
-class UserModel:
-    """
-    Клас-заповнювач для моделі користувача (User).
-
-    ВАЖЛИВО: Цей клас ПОВИНЕН БУТИ ЗАМІНЕНИЙ на імпорт реальної моделі User
-    з `backend.app.src.models.auth.user` після її визначення.
-
-    Поля, що очікуються залежностями:
-    - id (int): Унікальний ідентифікатор користувача.
-    - email (str): Електронна пошта користувача.
-    - is_active (bool): Прапорець активності користувача.
-    - is_superuser (bool): Прапорець, чи є користувач суперкористувачем.
-    """
-    id: int
-    email: str
-    is_active: bool
-    is_superuser: bool
-
-    def __init__(self, id: int, email: str, is_active: bool = True, is_superuser: bool = False):
-        self.id = id
-        self.email = email
-        self.is_active = is_active
-        self.is_superuser = is_superuser
-
-# TODO: Замінити TokenPayload на імпорт реальної Pydantic схеми, наприклад:
-# from backend.app.src.schemas.auth.token import TokenPayload
-# Наразі TokenPayload є схемою-заповнювачем.
-class TokenPayload(BaseModel):
-    """
-    Схема-заповнювач для корисного навантаження JWT токена (TokenPayload).
-
-    ВАЖЛИВО: Ця схема ПОВИННА БУТИ ЗАМІНЕНА на імпорт реальної схеми TokenPayload
-    з `backend.app.src.schemas.auth.token` після її визначення.
-
-    Поля, що очікуються залежностями:
-    - sub (Optional[str]): Ідентифікатор суб'єкта (зазвичай email або ID користувача).
-    - user_id (Optional[int]): Явний ID користувача, якщо 'sub' використовується для іншого.
-    - type (Optional[str]): Тип токена ("access" або "refresh").
-    - exp (Optional[int]): Час закінчення терміну дії токена (timestamp).
-    - iss (Optional[str]): Видавець токена (перевіряється в decode_token).
-    - aud (Optional[str]): Аудиторія токена (перевіряється в decode_token).
-    """
-    sub: Optional[str] = None
-    user_id: Optional[int] = None
-    type: Optional[str] = None
-    # exp, iss, aud тут не потрібні, оскільки вони використовуються та перевіряються decode_token
 
 
 # `OAuth2PasswordBearer` - це клас FastAPI, що допомагає отримувати токени Bearer
@@ -131,7 +92,11 @@ async def get_current_user(
         raise credentials_exception
 
     try:
-        token_data = TokenPayload(**payload)
+        # Pydantic v2 uses model_validate, v1 uses parse_obj or direct instantiation
+        if hasattr(TokenPayload, 'model_validate'):
+            token_data = TokenPayload.model_validate(payload)
+        else: # Fallback for Pydantic v1 or if model_validate is not standard
+            token_data = TokenPayload(**payload)
     except ValidationError as e:
         logger.warning(f"Помилка валідації TokenPayload: {e}", exc_info=True)
         raise malformed_payload_exception
@@ -233,45 +198,43 @@ async def get_current_superuser(
     logger.debug(f"Користувач '{current_active_user.email}' (ID: {current_active_user.id}) підтверджений як суперкористувач.")
     return current_active_user
 
-# --- TODO: Реалізувати залежність get_current_group_admin ---
-# Залежність для перевірки, чи є поточний користувач адміністратором вказаної групи.
-# Ця залежність потребуватиме доступу до моделей Group, GroupMembership та, можливо,
-# параметра шляху `group_id` (який можна отримати через `request.path_params` або FastAPI Path).
-#
-# Приклад сигнатури:
-# from fastapi import Path
-# async def get_current_group_admin(
-#     current_active_user: UserModel = Depends(get_current_active_user),
-#     group_id: int = Path(..., description="ID групи, до якої перевіряється доступ"), # Отримання group_id з шляху
-#     db: AsyncSession = Depends(get_db)
-# ) -> UserModel:
-#     """
-#     Перевіряє, чи є поточний активний користувач адміністратором (або вищою роллю,
-#     наприклад, суперкористувачем) для вказаної групи.
-#     """
-#     logger.info(f"Перевірка прав адміністратора для користувача ID {current_active_user.id} у групі ID {group_id}")
-#     # Спочатку перевіримо, чи є користувач суперкористувачем - суперкористувачі мають доступ до всього.
-#     if hasattr(current_active_user, 'is_superuser') and current_active_user.is_superuser:
-#         logger.debug(f"Користувач ID {current_active_user.id} є суперкористувачем, надано доступ до групи ID {group_id}.")
-#         return current_active_user
-#
-#     # TODO: Тут має бути логіка запиту до бази даних для перевірки членства та ролі користувача в групі.
-#     # Наприклад, з використанням сервісу або репозиторію:
-#     # from backend.app.src.services.groups import GroupMembershipService # Потрібно створити
-#     # membership_service = GroupMembershipService(db)
-#     # role = await membership_service.get_user_role_in_group(user_id=current_active_user.id, group_id=group_id)
-#     # if role not in [UserGroupRole.ADMIN, UserGroupRole.OWNER]: # Припустимо, є Enum UserGroupRole
-#     #     logger.warning(f"Користувач ID {current_active_user.id} не є адміністратором групи ID {group_id}. Роль: {role}")
-#     #     raise HTTPException(
-#     # status_code=status.HTTP_403_FORBIDDEN,
-#     # detail="Ви не є адміністратором цієї групи." # TODO i18n: Translatable message
-#     #     )
-#     # logger.info(f"Користувач ID {current_active_user.id} підтверджений як адміністратор групи ID {group_id}.")
-#     # return current_active_user
-#
-#     # Тимчасова логіка-заповнювач (видалити після реалізації реальної логіки)
-#     logger.warning(f"Логіка get_current_group_admin для групи ID {group_id} ще не реалізована. Тимчасово відхилено.")
-#     raise HTTPException(status_code=status.HTTP_501_NOT_IMPLEMENTED, detail="Перевірка адміністратора групи ще не реалізована.") # TODO i18n: Translatable message
+
+async def get_current_group_admin(
+    current_active_user: UserModel = Depends(get_current_active_user),
+    group_id: int = Path(..., description="ID групи, до якої перевіряється доступ"),
+    db: AsyncSession = Depends(get_db)
+) -> UserModel:
+    """
+    Перевіряє, чи є поточний активний користувач адміністратором (або вищою роллю,
+    наприклад, суперкористувачем) для вказаної групи.
+    """
+    logger.info(f"Перевірка прав адміністратора для користувача ID {current_active_user.id} у групі ID {group_id}")
+
+    # Спочатку перевіримо, чи є користувач суперкористувачем - суперкористувачі мають доступ до всього.
+    if hasattr(current_active_user, 'is_superuser') and current_active_user.is_superuser:
+        logger.debug(f"Користувач ID {current_active_user.id} є суперкористувачем, надано доступ до групи ID {group_id}.")
+        return current_active_user
+
+    # Запит до бази даних для перевірки членства та ролі користувача в групі.
+    stmt = select(GroupMembership).where(
+        GroupMembership.user_id == current_active_user.id,
+        GroupMembership.group_id == group_id
+    )
+    result = await db.execute(stmt)
+    membership: Optional[GroupMembership] = result.scalar_one_or_none()
+
+    if membership is None or membership.role != GroupRole.ADMIN:
+        logger.warning(
+            f"Користувач ID {current_active_user.id} не є адміністратором групи ID {group_id}. "
+            f"Членство: {'знайдено' if membership else 'не знайдено'}, Роль: {membership.role if membership else 'N/A'}."
+        )
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Ви не є адміністратором цієї групи." # TODO i18n: Translatable message
+        )
+
+    logger.info(f"Користувач ID {current_active_user.id} підтверджений як адміністратор групи ID {group_id}.")
+    return current_active_user
 
 
 # Блок для демонстрації та базового тестування при прямому запуску модуля.

@@ -3,6 +3,7 @@ import json
 import os
 from typing import Dict, Any, Optional
 from pathlib import Path
+from contextvars import ContextVar
 
 from backend.app.src.config.logging import get_logger
 
@@ -21,6 +22,8 @@ def translate_placeholder(key: str, **kwargs: Any) -> str:
 # For now, hardcode for demonstration or allow setting via a global/method.
 DEFAULT_LANGUAGE = "uk" # Default to Ukrainian for now, can be changed
 FALLBACK_LANGUAGE = "en"
+
+current_request_language: ContextVar[str] = ContextVar("current_request_language", default=DEFAULT_LANGUAGE)
 
 translations: Dict[str, Dict[str, Any]] = {}
 # Path to the locales directory relative to this i18n.py file's parent directory (src)
@@ -68,32 +71,6 @@ def _init_translations():
 # This is a simple approach; more sophisticated apps might load on demand or at app startup.
 _init_translations()
 
-# Global variable for current language, can be changed at runtime for testing/demo
-# In a real app, this should be thread-local or request-specific.
-_current_language = DEFAULT_LANGUAGE
-
-def set_current_language(lang_code: str):
-    """Sets the current language for translations. Reloads if necessary."""
-    global _current_language
-    if lang_code not in translations:
-        logger.info(f"Language '{lang_code}' not preloaded. Attempting to load.")
-        loaded_data = load_translations(lang_code)
-        if loaded_data:
-            translations[lang_code] = loaded_data
-            _current_language = lang_code
-            logger.info(f"Current language set to '{lang_code}'.")
-        else:
-            logger.error(f"Could not load translations for language '{lang_code}'. Current language remains '{_current_language}'.")
-            # Optionally, fall back to default or English if the desired lang can't be loaded
-            # For now, just logs error and doesn't change if new lang fails to load
-    else:
-        _current_language = lang_code
-        logger.info(f"Current language set to '{lang_code}'.")
-
-
-def get_current_language() -> str:
-    return _current_language
-
 def _internal_translate(key: str, lang: Optional[str] = None, **kwargs: Any) -> str:
     """
     Translates a given key using loaded translation files.
@@ -102,7 +79,9 @@ def _internal_translate(key: str, lang: Optional[str] = None, **kwargs: Any) -> 
     Falls back to FALLBACK_LANGUAGE if key is not found in current language.
     If key is not found in fallback either, returns a placeholder string.
     """
-    current_lang_to_use = lang or _current_language
+    # Determine the language to use: explicit 'lang' param, or from ContextVar
+    language_from_context = current_request_language.get()
+    current_lang_to_use = lang or language_from_context
 
     # Ensure translations are loaded for the current language if not already
     if current_lang_to_use not in translations:
@@ -110,17 +89,26 @@ def _internal_translate(key: str, lang: Optional[str] = None, **kwargs: Any) -> 
         loaded_data = load_translations(current_lang_to_use)
         if loaded_data:
             translations[current_lang_to_use] = loaded_data
-        else: # If dynamic load fails, try fallback or default
-            logger.error(f"Failed to load '{current_lang_to_use}'. Falling back to default/fallback language for key '{key}'.")
-            if _current_language != FALLBACK_LANGUAGE and FALLBACK_LANGUAGE in translations:
-                 current_lang_to_use = FALLBACK_LANGUAGE
-            elif DEFAULT_LANGUAGE in translations: # Check if default language is loaded
-                 current_lang_to_use = DEFAULT_LANGUAGE
-            elif translations: # If any translation is loaded, pick the first one
+        else: # If dynamic load fails, try fallback or default based on context
+            logger.error(f"Failed to load '{current_lang_to_use}' for key '{key}'. Trying fallbacks.")
+            # If 'lang' was specified and failed, try the context language
+            if lang and language_from_context != current_lang_to_use and language_from_context in translations:
+                logger.debug(f"Falling back to context language '{language_from_context}' for key '{key}'.")
+                current_lang_to_use = language_from_context
+            # If context language also not loaded or 'lang' was not specified, try FALLBACK_LANGUAGE
+            elif FALLBACK_LANGUAGE in translations and current_lang_to_use != FALLBACK_LANGUAGE :
+                logger.debug(f"Falling back to FALLBACK_LANGUAGE '{FALLBACK_LANGUAGE}' for key '{key}'.")
+                current_lang_to_use = FALLBACK_LANGUAGE
+            # If fallback is also not available but DEFAULT_LANGUAGE is (e.g. context was something else)
+            elif DEFAULT_LANGUAGE in translations and current_lang_to_use != DEFAULT_LANGUAGE:
+                logger.debug(f"Falling back to DEFAULT_LANGUAGE '{DEFAULT_LANGUAGE}' for key '{key}'.")
+                current_lang_to_use = DEFAULT_LANGUAGE
+            # If no relevant translations are loaded at all
+            elif translations:
                  current_lang_to_use = next(iter(translations))
-            else: # No translations loaded at all
+                 logger.debug(f"Falling back to first available loaded language '{current_lang_to_use}' for key '{key}'.")
+            else:
                  return f"NO_TRANSLATIONS_LOADED_FOR_KEY: {key}"
-
 
     keys = key.split('.')
 
@@ -207,7 +195,8 @@ if __name__ == "__main__":
     # For this test, DEFAULT_LANGUAGE is 'uk', FALLBACK_LANGUAGE is 'en'
     _init_translations()
 
-    print(f"\n--- Testing with DEFAULT_LANGUAGE: {get_current_language()} (should be 'uk') ---")
+    # current_request_language will default to DEFAULT_LANGUAGE ('uk')
+    print(f"\n--- Testing with DEFAULT_LANGUAGE (from ContextVar default): {current_request_language.get()} ---")
     print(f"Greeting: {_('test.greeting', name='Світ')}")
     print(f"Simple: {_('test.simple')}")
     print(f"User not found: {_('user.errors.not_found')}")
@@ -216,29 +205,36 @@ if __name__ == "__main__":
     print(f"Fallback (only_in_en): {_('only_in_en')}")
     print(f"Missing key: {_('app.title_nonexistent')}")
 
-    set_current_language("en")
-    print(f"\n--- Testing with FALLBACK_LANGUAGE: {get_current_language()} (should be 'en') ---")
+    print(f"\n--- Testing with FALLBACK_LANGUAGE: en (setting ContextVar) ---")
+    token_en = current_request_language.set("en")
+    print(f"ContextVar current language: {current_request_language.get()}")
     print(f"Greeting: {_('test.greeting', name='World')}")
     print(f"Simple: {_('test.simple')}")
     print(f"User not found: {_('user.errors.not_found')}")
     print(f"Email exists: {_('user.errors.email_exists', email='test@example.com')}")
     print(f"Formatted test: {_('formatted_test', value=456)}")
     print(f"Only in en: {_('only_in_en')}")
+    current_request_language.reset(token_en)
 
-    print(f"\n--- Testing dynamic language load: 'de' ---")
-    set_current_language("de")
-    print(f"Current language after set_current_language('de'): {get_current_language()}")
+    print(f"\n--- Testing dynamic language load: 'de' (setting ContextVar) ---")
+    token_de = current_request_language.set("de")
+    print(f"ContextVar current language: {current_request_language.get()}")
+    # Ensure 'de' is loaded if not already by _internal_translate's logic
+    if "de" not in translations: # Simulate that it might not be loaded by _init_translations
+        print(f"Attempting to load 'de' dynamically via _()...")
 
-    if get_current_language() == "de":
-        print(f"Greeting (de): {_('test.greeting', name='Welt')}")
+    print(f"Greeting (de): {_('test.greeting', name='Welt')}") # This will trigger load for 'de'
+
+    if "de" in translations: # Check if 'de' was loaded
+        print(f"Greeting (de) after ensuring load: {_('test.greeting', name='Welt')}")
         print(f"Simple (de - fallback to en): {_('test.simple')}")
         print(f"User not found (de - fallback to en): {_('user.errors.not_found')}")
     else:
-        print("Could not switch to 'de', test for 'de' skipped. Check if de/messages.json was loaded by set_current_language.")
+        print("Could not switch to 'de' or load 'de' dynamically. Test for 'de' skipped/incomplete.")
+    current_request_language.reset(token_de)
 
-    # Switch back to default for any subsequent tests if needed
-    set_current_language(DEFAULT_LANGUAGE) # DEFAULT_LANGUAGE is 'uk'
-    print(f"\n--- Switched back to DEFAULT_LANGUAGE: {get_current_language()} ---")
+    # ContextVar should be back to 'uk' (its default)
+    print(f"\n--- Switched back to DEFAULT_LANGUAGE (ContextVar default): {current_request_language.get()} ---")
     print(f"Greeting (uk again): {_('test.greeting', name='Україна')}")
 
 ```

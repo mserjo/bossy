@@ -9,7 +9,6 @@
 """
 
 import asyncio
-import logging
 from typing import Any, Dict, Optional, List
 
 from app.src.tasks.base import BaseTask
@@ -18,8 +17,8 @@ from app.src.tasks.base import BaseTask
 # from app.src.tasks.notifications.messenger import SendMessengerNotificationTask # Для сповіщень
 # from app.src.tasks.gamification.badges import AwardBadgesTask # Для видачі бейджів за рівень
 
-# Налаштування логера для цього модуля
-logger = logging.getLogger(__name__)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Приклад визначення рівнів (має бути в конфігурації або моделі даних GamificationService)
 LEVEL_THRESHOLDS_EXAMPLE = {

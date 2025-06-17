@@ -19,8 +19,7 @@ from typing import Optional, List, Any
 
 from sqlalchemy import Text, func, ForeignKey
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column  # removed declared_attr as it's used in mixins
-from backend.app.src.config.logging import get_logger # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # Імпорт міксинів з локального файлу mixins.py

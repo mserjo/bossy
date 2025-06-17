@@ -1,8 +1,7 @@
 # backend/app/src/services/tasks/__init__.py
-import logging
-
-# Initialize logger for this module
-logger = logging.getLogger(__name__)
+# -*- coding: utf-8 -*-
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 logger.info("Task and Event services sub-package initialized.")
 

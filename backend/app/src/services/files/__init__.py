@@ -6,12 +6,12 @@
 завантаженням файлів та управлінням аватарами користувачів.
 """
 
-from backend.app.src.config import logger
-
 # Явний імпорт сервісів для кращої читабельності та статичного аналізу
 from backend.app.src.services.files.file_record_service import FileRecordService
 from backend.app.src.services.files.file_upload_service import FileUploadService
 from backend.app.src.services.files.user_avatar_service import UserAvatarService
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 __all__ = [
     "FileRecordService",

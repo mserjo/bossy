@@ -15,13 +15,13 @@ import logging
 import argparse
 import glob
 from datetime import datetime, timedelta, timezone
-from typing import List  # Додано List для типізації
+from typing import List
 
 # Налаштування базового логування для скрипта
 # Використовуємо стандартний логер, оскільки цей скрипт є утилітою командного рядка
 # і може не мати доступу до конфігурації логування основного додатку.
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)  # Логер для цього модуля
+logger = logging.getLogger(__name__)
 
 # Додавання шляху до батьківської директорії (backend), щоб дозволити імпорт з backend.app.src.*
 # Це корисно, якщо, наприклад, DEFAULT_TARGET_DIRECTORIES потрібно брати з backend.app.src.core.settings

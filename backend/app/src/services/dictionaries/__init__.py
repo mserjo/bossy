@@ -6,8 +6,6 @@
 та конкретні реалізації сервісів для кожного типу довідника.
 """
 
-from backend.app.src.config import logger
-
 # Явний імпорт сервісів для кращої читабельності та статичного аналізу
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.services.dictionaries.statuses import StatusService
@@ -18,6 +16,8 @@ from backend.app.src.services.dictionaries.task_types import TaskTypeService
 from backend.app.src.services.dictionaries.bonus_types import BonusTypeService
 from backend.app.src.services.dictionaries.calendars import CalendarProviderService
 from backend.app.src.services.dictionaries.messengers import MessengerPlatformService
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 __all__ = [
     "BaseDictionaryService",

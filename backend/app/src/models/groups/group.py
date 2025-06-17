@@ -11,8 +11,7 @@ from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import String, ForeignKey, Text  # Text може знадобитися для description з міксину
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from backend.app.src.config.logging import get_logger # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # Абсолютний імпорт базових класів та міксинів

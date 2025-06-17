@@ -1,5 +1,4 @@
 # backend/app/src/services/system/initialization.py
-# import logging # Замінено на централізований логер
 from typing import Dict, Any, List, Type
 from uuid import UUID  # Не використовується прямо, але може бути в моделях
 
@@ -7,7 +6,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_ # sqlalchemy.future тепер select, or_ для User check
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.auth.user import User
 from backend.app.src.models.dictionaries.user_roles import UserRole
@@ -15,11 +13,12 @@ from backend.app.src.models.dictionaries.user_types import UserType
 from backend.app.src.models.dictionaries.group_types import GroupType
 from backend.app.src.models.dictionaries.task_types import TaskType
 from backend.app.src.models.dictionaries.bonus_types import BonusType
-from backend.app.src.models.dictionaries.statuses import Status  # Додано для ініціалізації статусів
+from backend.app.src.models.dictionaries.statuses import Status
 
 from backend.app.src.core.security import get_password_hash  # Для хешування паролів системних користувачів
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings  # Для отримання паролів системних користувачів
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # --- Визначення даних за замовчуванням ---
 # Ці дані також можуть бути завантажені з конфігураційного файлу (наприклад, YAML, JSON)
@@ -300,7 +299,7 @@ class InitialDataService(BaseService):
             results["group_types"] = await self.initialize_group_types()
             results["task_types"] = await self.initialize_task_types()
             results["bonus_types"] = await self.initialize_bonus_types()
-            results["statuses"] = await self.initialize_statuses()  # Додано ініціалізацію статусів
+            results["statuses"] = await self.initialize_statuses()
 
             if not await self._check_essential_data_exists():
                 # i18n

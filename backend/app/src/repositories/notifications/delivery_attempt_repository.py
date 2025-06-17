@@ -18,9 +18,8 @@ from backend.app.src.models.notifications.delivery import NotificationDeliveryAt
 from backend.app.src.schemas.notifications.delivery import NotificationDeliveryAttemptCreateSchema
 # NotificationDeliveryAttemptUpdateSchema зазвичай не потрібна
 from pydantic import BaseModel as PydanticBaseModel  # Для "заглушки" UpdateSchema
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+from backend.app.src.config.logging import get_logger
 from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType # Імпортовано Enums
-# Отримання логера для цього модуля
 logger = get_logger(__name__)
 
 # Enums NotificationChannelType та DeliveryStatusType імпортовано вище.
@@ -101,7 +100,7 @@ class NotificationDeliveryAttemptRepository(
     async def get_failed_attempts_by_channel(
             self,
             session: AsyncSession,
-            channel: NotificationChannelType,  # Змінено на NotificationChannelType Enum
+            channel: NotificationChannelType,
             skip: int = 0,
             limit: int = 100
     ) -> Tuple[List[NotificationDeliveryAttempt], int]:

@@ -8,21 +8,21 @@
 
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-from typing import Any, Dict # Optional видалено, оскільки не використовується
+from typing import Any, Dict
 from uuid import UUID # ID тепер UUID
-from datetime import datetime, timezone, timedelta # Додано для заглушки відповіді
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, Depends, HTTPException, status, Path
 from sqlalchemy.ext.asyncio import AsyncSession # Не використовується прямо, якщо сесія в сервісі
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import get_api_db_session, get_current_active_user
 # TODO: Використати або створити залежність `check_group_view_permission` (або `require_group_member_or_superuser`)
 from backend.app.src.api.v1.groups.groups import check_group_view_permission # Приклад імпорту залежності
 from backend.app.src.models.auth.user import User as UserModel
 # from backend.app.src.services.groups.report_service import GroupReportService # Майбутній сервіс для звітів
 # from backend.app.src.schemas.groups.report import GroupActivityReportResponse # Майбутня схема для звіту
-from backend.app.src.config.logging import logger # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     # Префікс /{group_id}/reports буде додано в __init__.py батьківського роутера

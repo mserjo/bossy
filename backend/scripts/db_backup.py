@@ -16,7 +16,7 @@ import sys
 import logging  # Стандартний модуль логування
 import argparse
 from datetime import datetime
-from typing import Optional, List, Union, Any  # Додано для типізації
+from typing import Optional, List, Union, Any
 
 # --- Налаштування шляхів для імпорту модулів додатку ---
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))

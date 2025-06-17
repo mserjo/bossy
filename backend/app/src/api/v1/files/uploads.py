@@ -13,7 +13,6 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Form, Path, Body
 from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо, якщо сесія в сервісі
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import get_api_db_session, get_current_active_user
 from backend.app.src.models.auth.user import User as UserModel
 from backend.app.src.schemas.files.upload import (
@@ -24,8 +23,9 @@ from backend.app.src.schemas.files.upload import (
     FileDataUploadResponse  # Додано для відповіді на завантаження даних
 )
 from backend.app.src.services.files.file_upload_service import FileUploadService
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     # Префікс /uploads буде додано в __init__.py батьківського роутера files

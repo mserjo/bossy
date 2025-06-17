@@ -16,7 +16,7 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.tasks.review import TaskReview
 from backend.app.src.schemas.tasks.review import TaskReviewCreateSchema, TaskReviewUpdateSchema
-from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
+from backend.app.src.config.logging import get_logger
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 

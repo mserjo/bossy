@@ -14,10 +14,6 @@
 використовувати `from backend.app.src.utils import get_password_hash`.
 """
 
-# Імпорт централізованого логера проекту
-from backend.app.src.config.logging_config import setup_logging
-logger = setup_logging()
-
 # Імпорт та ре-експорт корисних функцій з модулів цього пакету.
 # Це формує публічний API пакету `utils`.
 from backend.app.src.utils.converters import markdown_to_html
@@ -27,6 +23,9 @@ from backend.app.src.utils.hash import get_password_hash, verify_password
 from backend.app.src.utils.helpers import get_current_utc_timestamp
 from backend.app.src.utils.security import generate_secure_random_string
 from backend.app.src.utils.validators import is_strong_password, is_valid_phone_number
+from backend.app.src.config.logging_config import setup_logging
+logger = setup_logging()
+
 
 # Список символів, які експортуються при використанні `from backend.app.src.utils import *`.
 # Рекомендується явно імпортувати необхідні функції, але `__all__` визначає поведінку "зірочкового" імпорту.

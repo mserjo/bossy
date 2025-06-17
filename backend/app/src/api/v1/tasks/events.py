@@ -11,12 +11,11 @@ from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import (
     get_api_db_session, get_current_active_user,
     # TODO: Використати або створити залежності для перевірки прав доступу до подій/груп,
     # аналогічні тим, що можуть бути для завдань (наприклад, check_event_view_permission)
-    paginator, get_group_membership_service # Додано get_group_membership_service
+    paginator, get_group_membership_service
 )
 from backend.app.src.api.v1.groups.groups import check_group_edit_permission, check_group_view_permission  # Тимчасово
 from backend.app.src.models.auth.user import User as UserModel
@@ -27,8 +26,9 @@ from backend.app.src.core.pagination import PagedResponse, PageParams  # Вик�
 from backend.app.src.services.tasks.event import EventService
 from backend.app.src.services.groups.membership import GroupMembershipService  # Для перевірки членства
 from backend.app.src.core.constants import ADMIN_ROLE_CODE # Для перевірки ролі адміна
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 

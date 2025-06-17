@@ -13,10 +13,8 @@ from sqlalchemy import select, func, delete as sqlalchemy_delete  # delete дл�
 from sqlalchemy.ext.asyncio import AsyncSession
 from pydantic import BaseModel as PydanticBaseModel  # Для UpdateSchemaType-заглушок
 
-# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
-from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 from enum import Enum # Додано для isinstance check
 
@@ -28,8 +26,6 @@ from backend.app.src.schemas.system.monitoring import (
 )
 from backend.app.src.core.dicts import LogLevel # Імпортовано LogLevel Enum
 
-
-# LogLevel Enum імпортовано вище.
 
 # Системні логи та метрики зазвичай не оновлюються; вони є записами подій.
 # Тому UpdateSchema може бути простою заглушкою.
@@ -56,7 +52,7 @@ class SystemLogRepository(BaseRepository[SystemLog, SystemLogCreateSchema, Syste
     async def get_logs_by_level(
             self,
             session: AsyncSession,
-            level: LogLevel,  # Змінено на LogLevel Enum
+            level: LogLevel,
             skip: int = 0,
             limit: int = 100
     ) -> Tuple[List[SystemLog], int]:

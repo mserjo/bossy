@@ -12,8 +12,7 @@ from backend.app.src.repositories.dictionaries.base_dict_repository import BaseD
 # Абсолютний імпорт моделі та схем для Платформ Месенджерів
 from backend.app.src.models.dictionaries.messengers import MessengerPlatform
 from backend.app.src.schemas.dictionaries.messengers import MessengerPlatformCreateSchema, MessengerPlatformUpdateSchema
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 

@@ -16,15 +16,13 @@
 для автоматичної генерації інформативного рядкового представлення об'єктів.
 """
 
-from datetime import datetime # Додано імпорт datetime з модуля datetime
+from datetime import datetime
 from typing import List, Optional
 
 from sqlalchemy import Boolean, DateTime, ForeignKey, String, Text, func
 from sqlalchemy.orm import Mapped, declared_attr, mapped_column
-
-# Імпорт централізованого логера (якщо потрібне логування на рівні модуля,
-# хоча для міксинів це зазвичай не потрібно).
-# from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 class TimestampedMixin:
@@ -82,7 +80,7 @@ class SoftDeleteMixin:
     def deleted_at(cls) -> Mapped[Optional[datetime]]:
         """Дата та час "м'якого" видалення запису (UTC). `None`, якщо запис не видалено."""
         return mapped_column(
-            DateTime(timezone=True), # Додано timezone=True
+            DateTime(timezone=True),
             nullable=True,
             index=True,
             comment="Час м'якого видалення запису (UTC), якщо видалено"
@@ -237,7 +235,6 @@ class NotesMixin:
 #
 # if __name__ == "__main__":
 #     from backend.app.src.models.base import Base # Потрібно імпортувати Base
-#     from backend.app.src.config import logger # Потрібен логер для __main__
 #
 #     class SampleModelWithMixins(
 #         Base, # Важливо успадковувати Base

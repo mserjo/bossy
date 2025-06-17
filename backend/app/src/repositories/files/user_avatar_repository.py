@@ -19,10 +19,8 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.files.avatar import UserAvatar
 from backend.app.src.schemas.files.avatar import UserAvatarCreateSchema # UserAvatarUpdateSchema не визначено в schemas/files/avatar.py
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 from pydantic import BaseModel as PydanticBaseModel # Для UpdateSchemaType placeholder
-
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # Створюємо placeholder для UserAvatarUpdateSchema, оскільки він не визначений у файлі схем
@@ -260,7 +258,7 @@ if __name__ == "__main__":
     logger.info("\nСпецифічні методи:")
     logger.info("  - get_by_user_id(user_id: int) -> Optional[UserAvatar]")
     logger.info("  - get_active_avatar_for_user(user_id: int) -> Optional[UserAvatar]")
-    logger.info("  - set_active_avatar(user_id: int, file_record_id: int) -> Optional[UserAvatar]") # Змінено повернення на Optional
+    logger.info("  - set_active_avatar(user_id: int, file_record_id: int) -> Optional[UserAvatar]")
     logger.info("  - find_by_user_and_file(user_id: int, file_record_id: int) -> Optional[UserAvatar]")
     logger.info("  - list_by_user_id(user_id: int, skip: int = 0, limit: int = 100) -> List[UserAvatar]")
     logger.info("  - deactivate_all_for_user(user_id: int, updated_by_user_id: Optional[int] = None) -> int")

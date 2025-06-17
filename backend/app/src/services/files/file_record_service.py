@@ -6,7 +6,7 @@
 Фактичне завантаження або видалення файлів зі сховища координується з іншими сервісами
 (наприклад, FileUploadService).
 """
-from typing import List, Optional, Any # Додано Any
+from typing import List, Optional, Any
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,11 +25,10 @@ from backend.app.src.schemas.files.file import (
     FileRecordUpdate,
     FileRecordResponse
 )
-from backend.app.src.config import logger  # Використання спільного логера з конфігу
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
-
-# from .file_upload_service import FileUploadService # Розглянути переміщення імпорту, якщо немає циркулярності
 
 class FileRecordService(BaseService): # type: ignore видалено
     """
@@ -144,7 +143,7 @@ class FileRecordService(BaseService): # type: ignore видалено
             file_id: int, # file_id: UUID -> int
             metadata_update_data: FileRecordUpdate,
             # TODO: Додати current_user_id для аудиту, якщо поле updated_by_user_id є в моделі FileRecord
-            # current_user_id: Optional[int] = None # Змінено UUID на int
+            # current_user_id: Optional[int] = None
     ) -> Optional[FileRecordResponse]:
         """Оновлює метадані запису файлу (наприклад, ім'я, опис)."""
         logger.debug(f"Спроба оновлення метаданих для запису файлу ID: {file_id}")
@@ -199,8 +198,8 @@ class FileRecordService(BaseService): # type: ignore видалено
 
     async def delete_file_record(
             self,
-            file_id: int, # file_id: UUID -> int
-            # current_user_id: Optional[int] = None, # Змінено UUID на int
+            file_id: int,
+            # current_user_id: Optional[int] = None,
             delete_from_storage: bool = True  # Чи видаляти також фізичний файл
     ) -> bool:
         """

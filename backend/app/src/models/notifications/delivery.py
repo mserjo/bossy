@@ -15,10 +15,9 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Абсолютний імпорт базових класів
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час спроби доставки
-from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.config.logging import get_logger
 from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType # Імпорт Enum
 from sqlalchemy import Enum as SQLEnum # Імпорт SQLEnum
-# Отримання логера для цього модуля
 logger = get_logger(__name__)
 
 

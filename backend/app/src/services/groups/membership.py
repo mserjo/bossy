@@ -1,16 +1,12 @@
 # backend/app/src/services/groups/membership.py
-# import logging # Замінено на централізований логер
 from typing import List, Optional
-# UUID видалено
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func # sqlalchemy.future тепер select
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
-# func вже імпортовано
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.groups.membership import GroupMembership
 from backend.app.src.repositories.groups.membership_repository import GroupMembershipRepository # Імпорт репозиторію
@@ -24,10 +20,11 @@ from backend.app.src.models.files.avatar import UserAvatar # Для User -> User
 from backend.app.src.schemas.groups.membership import (
     GroupMembershipResponse,
     GroupMemberResponse,
-    GroupMembershipCreateSchema # Додано
+    GroupMembershipCreateSchema
 )
-from backend.app.src.config.logging import logger
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 ADMIN_ROLE_CODE = "ADMIN"
 USER_ROLE_CODE = "USER"

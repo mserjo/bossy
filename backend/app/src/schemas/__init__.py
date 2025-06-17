@@ -18,9 +18,6 @@
 серіалізацію даних, а також автоматичну генерацію документації OpenAPI.
 """
 
-# Імпорт централізованого логера
-from backend.app.src.config import logger
-
 # Експорт основних базових схем для прямого доступу.
 # Назви відповідають тим, що будуть визначені в `base.py` згідно з завданням.
 from backend.app.src.schemas.base import (
@@ -47,6 +44,8 @@ from backend.app.src.schemas import groups
 from backend.app.src.schemas import notifications
 from backend.app.src.schemas import system
 from backend.app.src.schemas import tasks
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Визначаємо, які символи будуть експортовані при використанні `from backend.app.src.schemas import *`.
 # Включаємо базові схеми та підпакети.

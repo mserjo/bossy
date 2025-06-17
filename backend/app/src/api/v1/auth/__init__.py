@@ -11,14 +11,13 @@
 """
 from fastapi import APIRouter
 
-# Повні шляхи імпорту
 from backend.app.src.api.v1.auth.login import router as login_router
 from backend.app.src.api.v1.auth.register import router as register_router
 from backend.app.src.api.v1.auth.token import router as token_router
 from backend.app.src.api.v1.auth.password import router as password_router
 from backend.app.src.api.v1.auth.profile import router as profile_router
-
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 auth_router = APIRouter()
 

@@ -10,7 +10,6 @@
 """
 
 import asyncio
-import logging
 from typing import Any, Dict, Optional
 
 from app.src.tasks.base import BaseTask
@@ -20,8 +19,9 @@ from app.src.tasks.base import BaseTask
 # from app.src.config.settings import settings # Для можливих конфігурацій ботів
 # from app.src.tasks.notifications.messenger import SendMessengerNotificationTask # Для відправки відповіді
 
-# Налаштування логера для цього модуля
-logger = logging.getLogger(__name__)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
+
 
 class ProcessIncomingMessageTask(BaseTask):
     """

@@ -1,15 +1,11 @@
 # backend/app/src/services/tasks/scheduler.py
-# backend/app/src/services/tasks/scheduler.py
-# import logging # Замінено на централізований логер
 from typing import List, Optional
-# UUID видалено
 from datetime import datetime, timedelta, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_ # sqlalchemy.future тепер select, or_ додано
+from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.tasks.task import Task  # Модель SQLAlchemy Task
 from backend.app.src.models.tasks.assignment import TaskAssignment  # Для призначення завдань
@@ -19,8 +15,9 @@ from backend.app.src.models.dictionaries.statuses import Status  # Для отр
 # from backend.app.src.services.tasks.assignment import TaskAssignmentService # Для призначення повторюваних завдань
 # from backend.app.src.services.notifications.notification import NotificationService # Для нагадувань (замість InternalNotificationService)
 
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # TODO: Винести типи повторень в Enum або в довідник в БД.
 RECURRENCE_DAILY = "DAILY"
@@ -47,7 +44,7 @@ class TaskSchedulingService(BaseService):
         # self.task_repo = TaskRepository() # Ініціалізація репозиторію (якщо використовується)
         logger.info("TaskSchedulingService ініціалізовано.")
 
-    async def process_recurring_tasks(self) -> List[int]: # Змінено List[UUID] на List[int]
+    async def process_recurring_tasks(self) -> List[int]:
         """
         Визначає шаблони повторюваних завдань, для яких настав час створення нового екземпляра,
         та створює ці нові екземпляри.
@@ -57,7 +54,7 @@ class TaskSchedulingService(BaseService):
         """
         logger.info("Обробка повторюваних завдань...")
         now = datetime.now(timezone.utc)
-        newly_created_task_ids: List[int] = [] # Змінено List[UUID] на List[int]
+        newly_created_task_ids: List[int] = []
 
         # Запит передбачає, що модель Task має: is_recurring_template, is_active, recurrence_end_date
         # TODO: Замінити на TaskRepository.get_recurring_task_templates_due()

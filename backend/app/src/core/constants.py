@@ -15,8 +15,8 @@
 """
 import logging # Для демонстраційного блоку if __name__ == "__main__"
 
-# Імпорт централізованого логера
-from backend.app.src.config import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # --- Константи пагінації ---
 DEFAULT_PAGE_NUMBER: int = 1  # Номер сторінки за замовчуванням для запитів з пагінацією.

@@ -1,5 +1,4 @@
 # backend/app/src/services/integrations/google_calendar_service.py
-# import logging # Замінено на централізований логер
 from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime, timezone, timedelta
@@ -7,16 +6,15 @@ from datetime import datetime, timezone, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select  # Для взаємодії з БД (токени)
 
-# Повні шляхи імпорту
 from backend.app.src.services.integrations.calendar_base import (
     BaseCalendarIntegrationService,
     CalendarEventData,
     CalendarInfo
 )
-from backend.app.src.models.integrations.user_integration import \
-    UserIntegration  # Припустима модель для зберігання токенів
+from backend.app.src.models.integrations.user_integration import UserIntegration  # Припустима модель для зберігання токенів
 from backend.app.src.config.settings import settings  # Для ключів API Google, OAuth client ID/secret
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # TODO: Додати залежності для Google API: pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib
 # from google.oauth2.credentials import Credentials

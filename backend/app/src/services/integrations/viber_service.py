@@ -1,12 +1,10 @@
 # backend/app/src/services/integrations/viber_service.py
-# import logging # Замінено на централізований логер
 from typing import List, Optional, Dict, Any
 from uuid import UUID, uuid4
 from datetime import datetime  # Додано для позначки часу в мок-відповіді
 
 from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо, але може бути потрібен для BaseService
 
-# Повні шляхи імпорту
 from backend.app.src.services.integrations.messenger_base import (
     BaseMessengerIntegrationService,
     MessengerUserProfile,
@@ -14,10 +12,10 @@ from backend.app.src.services.integrations.messenger_base import (
     MessageSendCommand,
     MessageSendResponse
 )
-from backend.app.src.models.integrations.user_integration import \
-    UserIntegration  # Припустима модель для зберігання Viber User ID
+from backend.app.src.models.integrations.user_integration import UserIntegration  # Припустима модель для зберігання Viber User ID
 from backend.app.src.config.settings import settings  # Для Viber Auth Token
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # TODO: Додати залежність: pip install viberbot (або viber-bot-python) або httpx
 # from viberbot import Api

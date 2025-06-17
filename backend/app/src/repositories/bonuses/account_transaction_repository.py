@@ -20,8 +20,7 @@ from backend.app.src.schemas.bonuses.transaction import AccountTransactionCreate
 from backend.app.src.core.dicts import TransactionType # Імпорт TransactionType Enum
 # AccountTransactionUpdateSchema зазвичай не потрібна, транзакції незмінні
 from pydantic import BaseModel as PydanticBaseModel  # Для "заглушки" UpdateSchema
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # Транзакції зазвичай не оновлюються, а створюються нові (наприклад, коригуюча транзакція).
@@ -95,7 +94,7 @@ class AccountTransactionRepository(
             self,
             session: AsyncSession,
             account_id: int,
-            transaction_type: TransactionType,  # Змінено на TransactionType Enum
+            transaction_type: TransactionType,
             skip: int = 0,
             limit: int = 100
     ) -> Tuple[List[AccountTransaction], int]:

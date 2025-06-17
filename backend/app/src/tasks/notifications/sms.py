@@ -7,15 +7,14 @@
 """
 
 import asyncio
-import logging
 from typing import Any, Dict, Optional
 
 from app.src.tasks.base import BaseTask
 # from app.src.config.settings import settings # Для доступу до конфігурації SMS-шлюзу
 # import httpx # Розкоментуйте, якщо будете використовувати httpx для реальної інтеграції
 
-# Налаштування логера для цього модуля
-logger = logging.getLogger(__name__)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Приклад конфігурації SMS-шлюзу (має бути винесено в settings та захищено)
 # Ці значення є повністю фіктивними.

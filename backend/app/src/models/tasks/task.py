@@ -19,8 +19,7 @@ from sqlalchemy import DateTime # Explicitly import DateTime for clarity
 
 # Абсолютний імпорт базової моделі та інших необхідних типів
 from backend.app.src.models.base import BaseMainModel
-from backend.app.src.config.logging import get_logger # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 from backend.app.src.core.dicts import TaskStatus # Буде використовуватися для поля state
@@ -197,9 +196,9 @@ if __name__ == "__main__":
 
     logger.info("\nОчікувані поля (успадковані та власні):")
     expected_fields = [
-        'id', 'name', 'description', 'state', 'state_id', 'group_id', 'notes', # Додано state_id
+        'id', 'name', 'description', 'state', 'state_id', 'group_id', 'notes',
         'created_at', 'updated_at', 'deleted_at',
-        'task_type_id', 'due_date', # Видалено status_id
+        'task_type_id', 'due_date',
         'is_recurring', # Зберігається для сумісності або для позначення екземплярів
         'is_recurring_template', 'recurrence_pattern', 'recurrence_start_date', 'recurrence_end_date',
         'last_instance_created_at', 'next_occurrence_at',

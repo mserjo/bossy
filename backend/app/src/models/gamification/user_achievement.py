@@ -15,8 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 # Абсолютний імпорт базових класів та міксинів
 from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час отримання досягнення
-from backend.app.src.config.logging import get_logger # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 if TYPE_CHECKING:

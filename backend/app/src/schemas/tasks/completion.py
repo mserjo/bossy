@@ -17,9 +17,8 @@ from pydantic import Field  # field_validator видалено, оскільки
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача та верифікатора
 from backend.app.src.core.dicts import TaskStatus  # Enum для статусів виконання
-from backend.app.src.config.logging import get_logger # Імпорт логера
 from datetime import timedelta # Переміщено timedelta сюди
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 
@@ -35,8 +34,8 @@ class TaskCompletionBaseSchema(BaseSchema):
         default_factory=datetime.now,  # Встановлює поточний час, якщо не надано
         description="Фактичний час завершення завдання користувачем (або час подання на перевірку)."
     )
-    status: TaskStatus = Field( # Змінено на TaskStatus Enum
-        default=TaskStatus.PENDING_REVIEW, # Використовуємо Enum напряму
+    status: TaskStatus = Field(
+        default=TaskStatus.PENDING_REVIEW,
         description="Статус виконання завдання."
     )
     notes: Optional[str] = Field(None, description="Нотатки користувача щодо виконання завдання.")
@@ -66,8 +65,7 @@ class TaskCompletionUpdateSchema(
     verified_at: Optional[datetime] = Field(None, description="Час перевірки виконання адміністратором.")
     # verifier_id: Optional[int] = None # Встановлюється сервісом на основі поточного адміністратора
 
-    status: Optional[TaskStatus] = Field(None, # Змінено на TaskStatus Enum
-                                  description="Новий статус виконання.")
+    status: Optional[TaskStatus] = Field(None, description="Новий статус виконання.")
     notes: Optional[str] = Field(None, description="Додаткові нотатки (наприклад, від адміністратора при перевірці).")
 
     # Валідатор validate_status_on_update більше не потрібен

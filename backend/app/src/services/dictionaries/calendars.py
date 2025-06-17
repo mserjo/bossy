@@ -1,10 +1,6 @@
 # backend/app/src/services/dictionaries/calendars.py
-# import logging # Замінено на централізований логер
-# from typing import Optional # Видалено
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.future import select # Видалено
 
-# Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.dictionaries.calendars import CalendarProvider # Модель SQLAlchemy
 from backend.app.src.repositories.dictionaries.calendar_provider_repository import CalendarProviderRepository # Імпорт репозиторію
@@ -14,9 +10,11 @@ from backend.app.src.schemas.dictionaries.calendars import ( # Схеми Pydant
     CalendarProviderUpdate,
     CalendarProviderResponse,
 )
-from backend.app.src.config import logger # Стандартизований імпорт логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
-class CalendarProviderService(BaseDictionaryService[CalendarProvider, CalendarProviderRepository, CalendarProviderCreate, CalendarProviderUpdate, CalendarProviderResponse]): # Додано CalendarProviderRepository до Generic
+
+class CalendarProviderService(BaseDictionaryService[CalendarProvider, CalendarProviderRepository, CalendarProviderCreate, CalendarProviderUpdate, CalendarProviderResponse]):
     """
     Сервіс для управління елементами довідника "Постачальники Календарів".
     Ці елементи представляють різні платформи календарів, з якими система може інтегруватися

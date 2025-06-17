@@ -1,10 +1,6 @@
 # backend/app/src/services/dictionaries/messengers.py
-# import logging # Замінено на централізований логер
-# from typing import Optional, Dict, Any # Видалено
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.future import select # Видалено
 
-# Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.dictionaries.messengers import MessengerPlatform # Модель SQLAlchemy
 from backend.app.src.repositories.dictionaries.messenger_platform_repository import MessengerPlatformRepository # Імпорт репозиторію
@@ -14,9 +10,11 @@ from backend.app.src.schemas.dictionaries.messengers import ( # Схеми Pydan
     MessengerPlatformUpdate,
     MessengerPlatformResponse,
 )
-from backend.app.src.config import logger # Стандартизований імпорт логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
-class MessengerPlatformService(BaseDictionaryService[MessengerPlatform, MessengerPlatformRepository, MessengerPlatformCreate, MessengerPlatformUpdate, MessengerPlatformResponse]): # Додано MessengerPlatformRepository до Generic
+
+class MessengerPlatformService(BaseDictionaryService[MessengerPlatform, MessengerPlatformRepository, MessengerPlatformCreate, MessengerPlatformUpdate, MessengerPlatformResponse]):
     """
     Сервіс для управління елементами довідника "Платформи Месенджерів".
     Ці елементи представляють різні платформи обміну повідомленнями, з якими система може інтегруватися

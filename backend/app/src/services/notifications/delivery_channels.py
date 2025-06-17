@@ -1,14 +1,13 @@
 # backend/app/src/services/notifications/delivery_channels.py
-# import logging # Замінено на централізований логер
 from abc import ABC, abstractmethod
 from typing import Dict, Any, Optional, List
 from uuid import uuid4
 
-# Повні шляхи імпорту
 from backend.app.src.models.auth.user import User # Для деталей користувача (email, телефон)
 from backend.app.src.models.notifications.notification import Notification # Вміст сповіщення
 from backend.app.src.config.settings import settings # Для ключів API, налаштувань SMTP тощо
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # TODO: Додати імпорти для конкретних SDK/бібліотек каналів, коли буде реалізовано
 # Наприклад:

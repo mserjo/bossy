@@ -19,8 +19,7 @@ from datetime import datetime
 from typing import List, Optional, TypeVar, Generic, Any
 
 from pydantic import BaseModel, ConfigDict, Field, EmailStr, AnyHttpUrl # EmailStr, AnyHttpUrl для можливого використання в майбутніх базових схемах
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger 
 logger = get_logger(__name__)
 
 # Узагальнений тип для використання в DataResponse та PaginatedResponse

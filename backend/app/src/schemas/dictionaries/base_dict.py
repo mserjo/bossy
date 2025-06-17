@@ -18,8 +18,7 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем з головного модуля схем
 from backend.app.src.schemas.base import BaseSchema, BaseMainSchema
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger 
 logger = get_logger(__name__)
 
 # Максимальна довжина для поля 'name' та 'code' може бути винесена в константи,

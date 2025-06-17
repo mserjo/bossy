@@ -18,8 +18,7 @@ from backend.app.src.repositories.base import BaseRepository
 from backend.app.src.models.groups.group import Group
 from backend.app.src.models.groups.membership import GroupMembership  # Для join в get_groups_for_member
 from backend.app.src.schemas.groups.group import GroupCreateSchema, GroupUpdateSchema
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 

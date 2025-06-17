@@ -1,19 +1,16 @@
 # backend/app/src/services/tasks/event.py
-# backend/app/src/services/tasks/event.py
-# import logging # Замінено на централізований логер
+# -*- coding: utf-8 -*-
 from typing import List, Optional, Any
-# UUID видалено
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select # sqlalchemy.future тепер select
-from sqlalchemy.orm import selectinload, noload # joinedload видалено
+from sqlalchemy import select
+from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.tasks.event import Event
-from backend.app.src.repositories.tasks.event_repository import EventRepository # Імпорт репозиторію
+from backend.app.src.repositories.tasks.event_repository import EventRepository
 from backend.app.src.models.auth.user import User
 from backend.app.src.models.groups.group import Group
 from backend.app.src.models.dictionaries.task_types import TaskType
@@ -26,8 +23,9 @@ from backend.app.src.schemas.tasks.event import (
     EventResponse,
     EventDetailedResponse
 )
-from backend.app.src.config.logging import logger
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 DEFAULT_EVENT_STATUS_CODE = "SCHEDULED"
 
@@ -44,7 +42,7 @@ class EventService(BaseService):
         self.event_repo = EventRepository() # Ініціалізація репозиторію
         logger.info("EventService ініціалізовано.")
 
-    async def _get_orm_event_with_relations(self, event_id: int, include_details: bool = True) -> Optional[Event]: # Змінено UUID на int
+    async def _get_orm_event_with_relations(self, event_id: int, include_details: bool = True) -> Optional[Event]:
         """Внутрішній метод для отримання ORM моделі Event з завантаженням зв'язків."""
         # Залишаємо прямий запит для гнучкого selectinload
         query = select(Event).where(Event.id == event_id)
@@ -75,7 +73,7 @@ class EventService(BaseService):
 
         return (await self.db_session.execute(query)).scalar_one_or_none()
 
-    async def get_event_by_id(self, event_id: int, include_details: bool = False) -> Optional[EventResponse]: # Змінено UUID на int
+    async def get_event_by_id(self, event_id: int, include_details: bool = False) -> Optional[EventResponse]:
         """
         Отримує подію за її ID.
         Опціонально може включати більше деталей.
@@ -91,7 +89,7 @@ class EventService(BaseService):
         logger.info(f"Подію з ID '{event_id}' не знайдено.")
         return None
 
-    async def create_event(self, event_create_data: EventCreate, creator_user_id: int) -> EventDetailedResponse: # Змінено UUID на int
+    async def create_event(self, event_create_data: EventCreate, creator_user_id: int) -> EventDetailedResponse:
         """
         Створює нову подію.
         """
@@ -159,8 +157,7 @@ class EventService(BaseService):
             logger.error(f"Неочікувана помилка '{event_create_data.title}': {e}", exc_info=global_settings.DEBUG)
             raise
 
-    async def update_event(self, event_id: int, event_update_data: EventUpdate, current_user_id: int) -> Optional[ # Змінено UUID на int
-        EventDetailedResponse]:
+    async def update_event(self, event_id: int, event_update_data: EventUpdate, current_user_id: int) -> Optional[EventDetailedResponse]:
         """Оновлює деталі події."""
         logger.debug(f"Спроба оновлення події ID: {event_id} користувачем ID: {current_user_id}")
 

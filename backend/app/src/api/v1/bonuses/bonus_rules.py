@@ -10,15 +10,14 @@
 
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
+from typing import List, Optional
 from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import (
     get_api_db_session, get_current_active_user,
-    get_current_active_superuser, paginator, get_group_membership_service # Додано get_group_membership_service
+    get_current_active_superuser, paginator, get_group_membership_service
 )
 # TODO: Створити/використати залежності для перевірки прав, наприклад:
 #  `require_group_admin_or_superuser_for_group_specific(group_id: Optional[UUID] = Query(None))`
@@ -33,8 +32,9 @@ from backend.app.src.schemas.bonuses.bonus_rule import (
 from backend.app.src.core.pagination import PagedResponse, PageParams
 from backend.app.src.services.bonuses.bonus_rule import BonusRuleService
 from backend.app.src.services.groups.group import GroupService  # Для перевірки існування групи
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     # Префікс /rules буде додано в __init__.py батьківського роутера bonuses

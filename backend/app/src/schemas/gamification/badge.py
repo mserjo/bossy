@@ -13,9 +13,8 @@ from typing import Optional, Any  # Any для тимчасових полів
 from pydantic import Field, AnyHttpUrl
 
 # Абсолютний імпорт базових схем
-from backend.app.src.schemas.base import BaseSchema, BaseMainSchema  # IDSchemaMixin, TimestampedSchemaMixin вже в BaseMainSchema
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.schemas.base import BaseSchema, BaseMainSchema
+from backend.app.src.config.logging import get_logger 
 logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретну схему GroupSchema (коротка версія), коли вона буде готова.

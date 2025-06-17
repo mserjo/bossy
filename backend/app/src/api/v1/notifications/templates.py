@@ -13,7 +13,6 @@ from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import get_api_db_session, get_current_active_superuser, paginator
 from backend.app.src.models.auth.user import User as UserModel  # Для current_admin_user
 from backend.app.src.schemas.notifications.template import (
@@ -23,8 +22,9 @@ from backend.app.src.schemas.notifications.template import (
 )
 from backend.app.src.core.pagination import PagedResponse, PageParams
 from backend.app.src.services.notifications.template import NotificationTemplateService
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     # Префікс /templates буде додано в __init__.py батьківського роутера notifications

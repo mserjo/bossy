@@ -1,4 +1,5 @@
 # backend/app/src/services/auth/__init__.py
+# -*- coding: utf-8 -*-
 """
 Ініціалізаційний файл для модуля сервісів автентифікації.
 
@@ -6,8 +7,8 @@
 та управлінням користувачами, токенами, сесіями та паролями.
 """
 
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-logger = get_logger(__name__) # Ініціалізація логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Явний імпорт сервісів для кращої читабельності та статичного аналізу
 from backend.app.src.services.auth.user import UserService

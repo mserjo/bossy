@@ -12,10 +12,8 @@ from uuid import UUID # Для поля session_token
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.config.logging import get_logger  # Імпорт логера
 from pydantic import Field
-
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 
@@ -30,7 +28,7 @@ class UserSessionResponse(BaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
     expires_at: datetime = Field(description="Час закінчення терміну дії сесії.")
     user_agent: Optional[str] = Field(None, description="User-Agent клієнта, з якого створено сесію.")
     ip_address: Optional[str] = Field(None, description="IP-адреса клієнта, з якого створено сесію.")
-    last_active_at: datetime = Field(description="Час останньої активності сесії.") # Змінено на non-optional
+    last_active_at: datetime = Field(description="Час останньої активності сесії.")
 
     # model_config успадковується з BaseSchema (from_attributes=True)
 
@@ -56,22 +54,22 @@ if __name__ == "__main__":
     session_data_example = {
         "id": 1,
         "user_id": 101,
-        "session_token": uuid.uuid4(), # Змінено з session_key
+        "session_token": uuid.uuid4(),
         "expires_at": datetime.now() + timedelta(hours=2),
         "user_agent": "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.114 Safari/537.36",
         "ip_address": "192.168.1.100",
-        "last_active_at": datetime.now() - timedelta(minutes=1), # Додано
+        "last_active_at": datetime.now() - timedelta(minutes=1),
         "created_at": datetime.now() - timedelta(minutes=5),
         "updated_at": datetime.now(),
     }
 
-    session_instance = UserSessionResponse(**session_data_example) # Змінено з SessionSchema
+    session_instance = UserSessionResponse(**session_data_example)
     logger.info(f"\nПриклад екземпляра UserSessionResponse:\n{session_instance.model_dump_json(indent=2, exclude_none=True)}")
 
     logger.info("\n--- Pydantic Схема для Створення Сесії (UserSessionCreate) ---")
     create_data_example = {
         "user_id": 102,
-        "session_token": uuid.uuid4(), # Змінено з session_key
+        "session_token": uuid.uuid4(),
         "expires_at": datetime.now() + timedelta(days=7),
         "user_agent": "My Test Client 1.0",
         "ip_address": "127.0.0.1"

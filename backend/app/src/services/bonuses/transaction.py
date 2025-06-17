@@ -1,4 +1,5 @@
 # backend/app/src/services/bonuses/transaction.py
+# -*- coding: utf-8 -*-
 """
 Сервіс для управління транзакціями по бонусних рахунках.
 
@@ -7,7 +8,7 @@
 """
 from typing import List, Optional, Tuple
 from decimal import Decimal
-from datetime import datetime, timezone, timedelta # timedelta додано
+from datetime import datetime, timezone, timedelta
 from enum import Enum # Додано для isinstance в логуванні
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,8 +29,8 @@ from backend.app.src.schemas.bonuses.transaction import (
 from backend.app.src.schemas.bonuses.account import UserAccountResponse
 from backend.app.src.services.bonuses.account import UserAccountService
 from backend.app.src.core.exceptions import InsufficientFundsError
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-logger = get_logger(__name__) # Ініціалізація логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 from backend.app.src.config import settings
 
 

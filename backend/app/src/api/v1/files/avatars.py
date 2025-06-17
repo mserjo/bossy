@@ -12,14 +12,14 @@ from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Path
 from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо, якщо сесія в сервісі
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import get_api_db_session, get_current_active_user
 from backend.app.src.models.auth.user import User as UserModel
 from backend.app.src.schemas.files.avatar import UserAvatarResponse
 # from backend.app.src.schemas.files.file import FileRecordResponse # Не використовується прямо тут
 from backend.app.src.services.files.user_avatar_service import UserAvatarService
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     # Префікс /avatars буде додано в __init__.py батьківського роутера files

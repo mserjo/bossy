@@ -26,8 +26,9 @@ from typing import AsyncGenerator, Optional
 
 import redis.asyncio as aioredis # Використовуємо redis.asyncio для асинхронного клієнта
 
-# Абсолютний імпорт налаштувань та централізованого логера
-from backend.app.src.config import logger, settings
+from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Глобальна змінна для зберігання єдиного екземпляра клієнта Redis.
 # Це дозволяє ініціалізувати клієнт один раз і повторно використовувати його
@@ -135,8 +136,6 @@ async def get_redis() -> AsyncGenerator[aioredis.Redis, None]:
 
 # Блок для демонстраційних цілей або простого тестування функціональності модуля
 if __name__ == "__main__":
-    # Логер вже налаштований через імпорт `from backend.app.src.config import logger, settings`
-    # та виклик setup_logging() в __init__.py пакета config.
     # Якщо цей файл запускається абсолютно окремо і config.__init__ не виконувався,
     # може знадобитися локальне налаштування логування тут.
     # Однак, припускаючи, що logger з config вже налаштований:

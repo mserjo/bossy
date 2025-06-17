@@ -13,17 +13,15 @@
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
-# import logging # Видалено для використання централізованого логера
-from backend.app.src.config import logger # Централізований логер
-
 # Імпорт основних компонентів з модулів пакету.
 from backend.app.src.tasks.base import BaseTask
 from backend.app.src.tasks.scheduler import scheduler
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 __all__ = [
     'BaseTask',
     'scheduler',
 ]
 
-# logger = logging.getLogger(__name__) # Видалено
 logger.info("Пакет 'tasks' ініціалізовано та експортує 'BaseTask', 'scheduler'.")

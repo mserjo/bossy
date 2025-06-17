@@ -1,14 +1,13 @@
 # backend/app/src/services/base.py
-# import logging # Замінено на централізований логер
-from typing import TypeVar, Generic, Optional, Any, Type  # Додано Type
-# from uuid import UUID # Видалено, оскільки object_id тепер int
+# -*- coding: utf-8 -*-
+from typing import TypeVar, Generic, Optional, Any, Type
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select  # Оновлено імпорт
 
-from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
-logger = get_logger(__name__) # Ініціалізація логера
 from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 from backend.app.src.models.base import Base as BaseModelSQLAlchemy # Імпорт для ModelType bound
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Генеричний тип для моделей SQLAlchemy, обмежений нашим базовим класом моделей
 ModelType = TypeVar("ModelType", bound=BaseModelSQLAlchemy)
@@ -19,7 +18,7 @@ ModelType = TypeVar("ModelType", bound=BaseModelSQLAlchemy)
 # from backend.app.src.repositories.base import BaseRepository # Приклад базового репозиторію
 # RepositoryType = TypeVar("RepositoryType", bound=BaseRepository)
 
-class BaseService(Generic[ModelType]):  # Прибрано RepositoryType, оскільки не використовується
+class BaseService(Generic[ModelType]):
     """
     Базовий клас для всіх сервісів.
     Надає спільні функціональні можливості та залежності для класів сервісів,
@@ -49,10 +48,6 @@ class BaseService(Generic[ModelType]):  # Прибрано RepositoryType, ос�
             raise ValueError(msg)
 
         self.db_session: AsyncSession = db_session
-        # Логер вже ініціалізовано вище, тому тут не потрібне додаткове логування ініціалізації.
-        # logger.debug(
-        #     f"{self.__class__.__name__} ініціалізовано з ID сесії БД: {id(db_session)}"
-        # )
 
     async def commit(self) -> None:
         """

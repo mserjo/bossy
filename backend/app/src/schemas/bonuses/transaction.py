@@ -16,8 +16,7 @@ from pydantic import Field, field_validator
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import TransactionType  # Enum для типів транзакцій
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger 
 logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
@@ -31,7 +30,7 @@ class AccountTransactionBaseSchema(BaseSchema):
     Базова схема для полів транзакції по рахунку.
     """
     account_id: Optional[int] = Field(None, description="Ідентифікатор рахунку користувача. Якщо None, буде визначений через user_id_for_account_lookup.")
-    transaction_type: TransactionType = Field( # Змінено на Enum TransactionType
+    transaction_type: TransactionType = Field(
         description="Тип транзакції."
     )
     amount: Decimal = Field(

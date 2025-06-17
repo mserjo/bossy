@@ -30,9 +30,7 @@ from datetime import datetime, timezone, timedelta # Використовуєт�
 from backend.app.src.config.settings import settings
 from backend.app.src.config.security import decode_token
 from backend.app.src.config.database import get_db, AsyncSession
-from backend.app.src.config.logging import get_logger # Імпорт логера
-
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # TODO: Замінити UserModel на імпорт реальної моделі користувача, наприклад:

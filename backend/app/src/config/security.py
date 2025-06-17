@@ -18,7 +18,6 @@
 
 Утиліти для хешування паролів винесені до окремого модуля `backend.app.src.utils.hash`.
 """
-import logging # Для локального використання в __main__
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
 
@@ -26,8 +25,9 @@ from typing import Any, Dict, Optional
 from jose import JWTError, jwt
 from jose import exceptions as jose_exceptions
 
-# Абсолютний імпорт налаштувань та централізованого логера
-from backend.app.src.config import logger, settings
+from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 # --- Утиліти для роботи з JWT (JSON Web Token) ---
@@ -189,66 +189,62 @@ def decode_token(token: str) -> Optional[Dict[str, Any]]:
 
 
 if __name__ == "__main__":
-    # Логер вже налаштований через імпорт `from backend.app.src.config import logger`
-    # та виклик setup_logging() в __init__.py пакета config.
-    main_logger = logging.getLogger(__name__) # Використовуємо окремий логер для __main__
-
-    main_logger.info("--- Тестування створення та декодування JWT ---")
+    logger.info("--- Тестування створення та декодування JWT ---")
     user_data_payload: Dict[str, Any] = {"sub": "testuser@example.com", "user_id": 123, "role": "user"}
 
     # Токен доступу
     access_token = create_access_token(user_data_payload)
-    main_logger.info("Згенерований токен доступу: %s", access_token)
+    logger.info("Згенерований токен доступу: %s", access_token)
     decoded_access_payload = decode_token(access_token)
     if decoded_access_payload:
-        main_logger.info("Декодоване корисне навантаження токена доступу: %s", decoded_access_payload)
+        logger.info("Декодоване корисне навантаження токена доступу: %s", decoded_access_payload)
         exp_timestamp = decoded_access_payload.get('exp')
         if exp_timestamp:
-            main_logger.info("Токен доступу закінчується (UTC): %s", datetime.fromtimestamp(exp_timestamp, timezone.utc))
+            logger.info("Токен доступу закінчується (UTC): %s", datetime.fromtimestamp(exp_timestamp, timezone.utc))
         assert decoded_access_payload.get("sub") == user_data_payload["sub"]
         assert decoded_access_payload.get("type") == "access"
         assert decoded_access_payload.get("iss") == settings.JWT_ISSUER
         assert decoded_access_payload.get("aud") == settings.JWT_AUDIENCE
     else:
-        main_logger.warning("Не вдалося декодувати токен доступу (або він недійсний/прострочений).")
+        logger.warning("Не вдалося декодувати токен доступу (або він недійсний/прострочений).")
 
     # Токен оновлення
     refresh_token = create_refresh_token(user_data_payload)
-    main_logger.info("\nЗгенерований токен оновлення: %s", refresh_token)
+    logger.info("\nЗгенерований токен оновлення: %s", refresh_token)
     decoded_refresh_payload = decode_token(refresh_token)
     if decoded_refresh_payload:
-        main_logger.info("Декодоване корисне навантаження токена оновлення: %s", decoded_refresh_payload)
+        logger.info("Декодоване корисне навантаження токена оновлення: %s", decoded_refresh_payload)
         exp_timestamp = decoded_refresh_payload.get('exp')
         if exp_timestamp:
-            main_logger.info("Токен оновлення закінчується (UTC): %s", datetime.fromtimestamp(exp_timestamp, timezone.utc))
+            logger.info("Токен оновлення закінчується (UTC): %s", datetime.fromtimestamp(exp_timestamp, timezone.utc))
         assert decoded_refresh_payload.get("type") == "refresh"
     else:
-        main_logger.warning("Не вдалося декодувати токен оновлення (або він недійсний/прострочений).")
+        logger.warning("Не вдалося декодувати токен оновлення (або він недійсний/прострочений).")
 
     # Тестування простроченого токена
-    main_logger.info("\n--- Тестування простроченого токена ---")
+    logger.info("\n--- Тестування простроченого токена ---")
     expired_access_token = create_access_token(user_data_payload, expires_delta=timedelta(seconds=-3600))
-    main_logger.info("Згенерований прострочений токен доступу: %s", expired_access_token)
+    logger.info("Згенерований прострочений токен доступу: %s", expired_access_token)
     decoded_expired_payload = decode_token(expired_access_token)
     if decoded_expired_payload:
-        main_logger.error("ПОМИЛКА ТЕСТУ: Декодовано прострочений токен: %s", decoded_expired_payload)
+        logger.error("ПОМИЛКА ТЕСТУ: Декодовано прострочений токен: %s", decoded_expired_payload)
         assert False, "Прострочений токен не повинен декодуватися."
     else:
-        main_logger.info("КОРЕКТНО: Не вдалося декодувати прострочений токен доступу.")
+        logger.info("КОРЕКТНО: Не вдалося декодувати прострочений токен доступу.")
 
     # Тестування недійсного токена (неправильний підпис)
-    main_logger.info("\n--- Тестування недійсного токена (неправильний підпис) ---")
+    logger.info("\n--- Тестування недійсного токена (неправильний підпис) ---")
     invalid_signature_token = access_token[:-5] + "XXXXX" # Змінюємо частину підпису
-    main_logger.info("Недійсний токен (змінений підпис): %s", invalid_signature_token)
+    logger.info("Недійсний токен (змінений підпис): %s", invalid_signature_token)
     decoded_invalid_payload = decode_token(invalid_signature_token)
     if decoded_invalid_payload:
-        main_logger.error("ПОМИЛКА ТЕСТУ: Декодовано токен з недійсним підписом: %s", decoded_invalid_payload)
+        logger.error("ПОМИЛКА ТЕСТУ: Декодовано токен з недійсним підписом: %s", decoded_invalid_payload)
         assert False, "Токен з недійсним підписом не повинен декодуватися."
     else:
-        main_logger.info("КОРЕКТНО: Не вдалося декодувати токен з недійсним підписом.")
+        logger.info("КОРЕКТНО: Не вдалося декодувати токен з недійсним підписом.")
 
     # Тестування токена з неправильним видавцем (issuer)
-    main_logger.info("\n--- Тестування токена з неправильним видавцем ---")
+    logger.info("\n--- Тестування токена з неправильним видавцем ---")
     original_issuer = settings.JWT_ISSUER
     # Створюємо токен з правильним видавцем
     temp_payload_issuer = {"sub": "test_user_issuer", "type": "access", "iss": original_issuer, "aud": settings.JWT_AUDIENCE}
@@ -257,14 +253,14 @@ if __name__ == "__main__":
     settings.JWT_ISSUER = "some.other.issuer.com" # Тимчасово змінюємо очікуваного видавця
     decoded_wrong_issuer = decode_token(token_correct_issuer)
     if decoded_wrong_issuer:
-        main_logger.error("ПОМИЛКА ТЕСТУ: Декодовано токен, хоча видавець мав бути неправильним: %s", decoded_wrong_issuer)
+        logger.error("ПОМИЛКА ТЕСТУ: Декодовано токен, хоча видавець мав бути неправильним: %s", decoded_wrong_issuer)
         assert False, "Токен з неправильним видавцем не повинен декодуватися."
     else:
-        main_logger.info("КОРЕКТНО: Не вдалося декодувати токен через невідповідність видавця.")
+        logger.info("КОРЕКТНО: Не вдалося декодувати токен через невідповідність видавця.")
     settings.JWT_ISSUER = original_issuer # Повертаємо оригінальне значення
 
     # Тестування токена з неправильною аудиторією (audience)
-    main_logger.info("\n--- Тестування токена з неправильною аудиторією ---")
+    logger.info("\n--- Тестування токена з неправильною аудиторією ---")
     original_audience = settings.JWT_AUDIENCE
     # Створюємо токен з правильною аудиторією
     temp_payload_audience = {"sub": "test_user_audience", "type": "access", "iss": settings.JWT_ISSUER, "aud": original_audience}
@@ -273,10 +269,10 @@ if __name__ == "__main__":
     settings.JWT_AUDIENCE = "some.other.audience.com" # Тимчасово змінюємо очікувану аудиторію
     decoded_wrong_audience = decode_token(token_correct_audience)
     if decoded_wrong_audience:
-        main_logger.error("ПОМИЛКА ТЕСТУ: Декодовано токен, хоча аудиторія мала бути неправильною: %s", decoded_wrong_audience)
+        logger.error("ПОМИЛКА ТЕСТУ: Декодовано токен, хоча аудиторія мала бути неправильною: %s", decoded_wrong_audience)
         assert False, "Токен з неправильною аудиторією не повинен декодуватися."
     else:
-        main_logger.info("КОРЕКТНО: Не вдалося декодувати токен через невідповідність аудиторії.")
+        logger.info("КОРЕКТНО: Не вдалося декодувати токен через невідповідність аудиторії.")
     settings.JWT_AUDIENCE = original_audience # Повертаємо оригінальне значення
 
-    main_logger.info("\nТестування функцій безпеки завершено.")
+    logger.info("\nТестування функцій безпеки завершено.")

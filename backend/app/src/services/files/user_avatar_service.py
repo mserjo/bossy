@@ -20,9 +20,9 @@ from backend.app.src.repositories.files.user_avatar_repository import UserAvatar
 from backend.app.src.models.auth.user import User
 
 from backend.app.src.schemas.files.avatar import UserAvatarResponse
-# UserAvatarCreate, UserAvatarUpdate не імпортуються, оскільки дані для них формуються в сервісі
-from backend.app.src.config import logger  # Використання спільного логера з конфігу
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 class UserAvatarService(BaseService): # type: ignore видалено

@@ -9,8 +9,7 @@ Pydantic схеми для сутності "Шаблон Сповіщення" 
 from typing import Optional
 
 from pydantic import Field
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger 
 logger = get_logger(__name__)
 
 # Абсолютний імпорт базових схем для довідників

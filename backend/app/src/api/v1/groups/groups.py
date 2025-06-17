@@ -10,7 +10,6 @@ from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query  # Query для можливих фільтрів
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import (
     get_api_db_session,
     get_current_active_user,
@@ -31,8 +30,9 @@ from backend.app.src.core.pagination import PagedResponse, PageParams  # Вик�
 from backend.app.src.services.groups.group import GroupService
 from backend.app.src.services.groups.membership import GroupMembershipService  # Для перевірки прав
 from backend.app.src.core.constants import ADMIN_ROLE_CODE # Для перевірки ролі адміна
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # TODO: Створити та використовувати залежність `get_current_active_group_admin_or_superuser`
 #  яка приймає `group_id: UUID = Path(...)` та перевіряє, чи є поточний користувач

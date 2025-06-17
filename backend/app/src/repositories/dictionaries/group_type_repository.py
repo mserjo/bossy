@@ -12,8 +12,7 @@ from backend.app.src.repositories.dictionaries.base_dict_repository import BaseD
 # Абсолютний імпорт моделі та схем для Типів Груп
 from backend.app.src.models.dictionaries.group_types import GroupType
 from backend.app.src.schemas.dictionaries.group_types import GroupTypeCreateSchema, GroupTypeUpdateSchema
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 

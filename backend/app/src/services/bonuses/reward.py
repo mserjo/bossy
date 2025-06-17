@@ -1,20 +1,17 @@
 # backend/app/src/services/bonuses/reward.py
-"""
-Сервіс для управління винагородами в бонусній системі.
-
-# backend/app/src/services/bonuses/reward.py
+# -*- coding: utf-8 -*-
 """
 Сервіс для управління винагородами в бонусній системі.
 
 Відповідає за створення, оновлення, видалення, отримання винагород
 та обробку процесу їх отримання користувачами за бонусні бали.
 """
-from typing import List, Optional # Dict, Any видалено
+from typing import List, Optional
 from decimal import Decimal
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, or_, and_ # func видалено
+from sqlalchemy import select, or_, and_
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 
@@ -34,8 +31,8 @@ from backend.app.src.schemas.bonuses.reward import (
 )
 # AccountTransactionCreate не використовується напряму цим сервісом
 from backend.app.src.services.bonuses.account import UserAccountService
-from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
-logger = get_logger(__name__) # Ініціалізація логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 from backend.app.src.config import settings
 from backend.app.src.core.exceptions import RewardUnavailableError, RedemptionConditionError # Імпорт перенесених винятків
 

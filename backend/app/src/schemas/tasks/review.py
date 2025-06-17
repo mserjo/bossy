@@ -16,9 +16,8 @@ from pydantic import Field
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача
-from backend.app.src.config.logging import get_logger # Імпорт логера
-from datetime import timedelta # Переміщено timedelta сюди
-# Отримання логера для цього модуля
+from datetime import timedelta
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 

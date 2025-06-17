@@ -18,8 +18,7 @@ from sqlalchemy import String, ForeignKey
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.src.models.base import BaseMainModel
-from backend.app.src.config.logging import get_logger # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # _repr_fields з BaseMainModel та його міксинів будуть автоматично зібрані

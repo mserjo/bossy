@@ -1,10 +1,10 @@
 # backend/app/src/services/cache/base_cache.py
-# import logging # Замінено на централізований логер
 from abc import ABC, abstractmethod
 from typing import Optional, Any # Set видалено, оскільки використовується лише в коментарях
 
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-logger = get_logger(__name__) # Ініціалізація логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
+
 
 class BaseCacheService(ABC):
     """

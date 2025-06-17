@@ -12,8 +12,7 @@ from pydantic import BaseModel, Field, EmailStr
 
 # Абсолютний імпорт базової схеми
 from backend.app.src.schemas.base import BaseSchema
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger 
 logger = get_logger(__name__)
 
 # Імпорт констант для валідації, якщо потрібно (наприклад, PASSWORD_REGEX)
@@ -60,14 +59,14 @@ if __name__ == "__main__":
     # Демонстраційний блок для схем логіну та відновлення пароля.
     logger.info("--- Pydantic Схеми для Логіну та Відновлення Паролю ---")
 
-    logger.info("\nLoginRequestSchema (приклад):") # Змінено LoginRequest на LoginRequestSchema
+    logger.info("\nLoginRequestSchema (приклад):")
     login_data = {"username": "testlogin@example.com", "password": "securepassword123"}
-    login_instance = LoginRequestSchema(**login_data) # Змінено LoginRequest на LoginRequestSchema
+    login_instance = LoginRequestSchema(**login_data)
     logger.info(login_instance.model_dump_json(indent=2))
     try:
-        LoginRequestSchema(username="not-an-email", password="pw") # Змінено LoginRequest на LoginRequestSchema
+        LoginRequestSchema(username="not-an-email", password="pw")
     except Exception as e:
-        logger.info(f"Помилка валідації LoginRequestSchema (очікувано): {e}") # Змінено LoginRequest на LoginRequestSchema
+        logger.info(f"Помилка валідації LoginRequestSchema (очікувано): {e}")
 
     logger.info("\nPasswordResetRequestSchema (приклад):")
     password_reset_request_data = {"email": "forgotpassword@example.com"}

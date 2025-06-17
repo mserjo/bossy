@@ -8,7 +8,6 @@
 """
 
 import asyncio
-import logging
 import smtplib
 import ssl # Для SSL context при SMTP_SSL
 from email.mime.text import MIMEText
@@ -17,9 +16,8 @@ from typing import Any, Dict, Optional
 
 from app.src.tasks.base import BaseTask
 # from app.src.config.settings import settings # Для доступу до конфігурації SMTP
-
-# Налаштування логера для цього модуля
-logger = logging.getLogger(__name__)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Приклад конфігурації SMTP (має бути винесено в settings та захищено)
 SMTP_SERVER = "localhost"  # settings.SMTP_SERVER Зазвичай "smtp.example.com"

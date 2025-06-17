@@ -12,9 +12,7 @@
 from typing import Any, Dict, Optional
 from fastapi import APIRouter, Depends, Request, Header, HTTPException, status, Response as FastAPIResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-# import logging # Замінено на централізований логер
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import get_api_db_session  # Залежність для сесії БД
 from backend.app.src.services.integrations.google_calendar_service import GoogleCalendarService
 from backend.app.src.services.integrations.outlook_calendar_service import OutlookCalendarService

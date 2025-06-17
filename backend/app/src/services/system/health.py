@@ -1,14 +1,11 @@
 # backend/app/src/services/system/health.py
-# backend/app/src/services/system/health.py
-# import logging # Замінено на централізований логер
 import time
-from typing import List, Dict, Any, Optional # Literal видалено, бо використовуємо Enum
-from datetime import datetime, timezone  # Додано timezone
+from typing import List, Dict, Any, Optional
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import text
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.repositories.system.health_repository import ServiceHealthStatusRepository # Імпорт репозиторію
 from backend.app.src.schemas.system.health import (
@@ -19,10 +16,10 @@ from backend.app.src.schemas.system.health import (
 # ServiceHealthStatusCreateSchema, ServiceHealthStatusUpdateSchema не потрібні сервісу напряму
 # from backend.app.src.core.dicts import HealthStatusType as CoreHealthStatusType # Якщо використовується з core.dicts
 from backend.app.src.config.redis import get_redis_pool_or_none
-from backend.app.src.config.logging import logger
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
-# import httpx
 
 ComponentStatusType = HealthStatusEnum
 

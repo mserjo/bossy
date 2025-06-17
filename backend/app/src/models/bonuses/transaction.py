@@ -19,8 +19,7 @@ from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin  # `created_at` як час транзакції
 from backend.app.src.core.dicts import TransactionType  # Enum для типів транзакцій
 from sqlalchemy import Enum as SQLEnum # Імпорт SQLEnum
-from backend.app.src.config.logging import get_logger # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 if TYPE_CHECKING:
@@ -63,7 +62,7 @@ class AccountTransaction(Base, TimestampedMixin):
         primary_key=True, index=True, autoincrement=True, comment="Унікальний ідентифікатор транзакції"
     )
     account_id: Mapped[int] = mapped_column(
-        ForeignKey('user_accounts.id', name='fk_account_transaction_account_id', ondelete="CASCADE"), # Змінено на CASCADE
+        ForeignKey('user_accounts.id', name='fk_account_transaction_account_id', ondelete="CASCADE"),
         nullable=False,
         index=True,
         comment="ID рахунку користувача, до якого відноситься транзакція"

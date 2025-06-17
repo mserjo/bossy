@@ -9,7 +9,7 @@ Pydantic схеми для сутності "Сповіщення" (Notification
 - Представлення даних про сповіщення у відповідях API (`NotificationSchema`).
 """
 from datetime import datetime
-from typing import Optional, List, Dict, Any  # Any для тимчасових полів
+from typing import Optional, List, Dict, Any
 
 from pydantic import Field
 
@@ -17,9 +17,8 @@ from pydantic import Field
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import NotificationType as NotificationTypeEnum  # Реальний Enum
 from backend.app.src.core.dicts import RelatedEntityType # Імпорт RelatedEntityType
-from backend.app.src.config.logging import get_logger  # Імпорт логера
+from backend.app.src.config.logging import get_logger 
 from datetime import timedelta # Переміщено timedelta сюди
-# Отримання логера для цього модуля
 logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.

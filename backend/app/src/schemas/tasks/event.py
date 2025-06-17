@@ -5,12 +5,11 @@ Pydantic схеми для Подій.
 """
 
 from typing import Optional, List
-from datetime import datetime, timezone, timedelta # timedelta for examples if needed
+from datetime import datetime, timezone, timedelta
 from pydantic import Field
 
 # Абсолютний імпорт базових схем та Enum
-from backend.app.src.config.logging import get_logger # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 from backend.app.src.schemas.base import BaseSchema, BaseMainSchema # BaseMainSchema for response

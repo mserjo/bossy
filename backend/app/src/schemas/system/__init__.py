@@ -23,15 +23,14 @@
 Всі схеми успадковують `BaseSchema` для забезпечення спільної конфігурації Pydantic.
 """
 
-# Імпорт централізованого логера
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # Схеми для Стану Здоров'я Системи
 from backend.app.src.schemas.system.health import (
-    ServiceHealthStatusBaseSchema, # Додано, якщо потрібно експортувати базову
+    ServiceHealthStatusBaseSchema,
     ServiceHealthStatusSchema,
-    OverallHealthStatusSchema # Змінено з HealthCheckResponseSchema
+    OverallHealthStatusSchema,
 )
 
 # Схеми для Системних Налаштувань
@@ -39,37 +38,37 @@ from backend.app.src.schemas.system.settings import (
     SystemSettingBaseSchema,
     SystemSettingCreateSchema,
     SystemSettingUpdateSchema,
-    SystemSettingSchema # Змінено з SystemSettingResponseSchema
+    SystemSettingSchema,
 )
 
 # Схеми для Моніторингу (Логи та Метрики)
 from backend.app.src.schemas.system.monitoring import (
     SystemLogBaseSchema,
     SystemLogCreateSchema,
-    SystemLogSchema, # Змінено з SystemLogResponseSchema
+    SystemLogSchema,
     PerformanceMetricBaseSchema,
     PerformanceMetricCreateSchema,
-    PerformanceMetricSchema # Змінено з PerformanceMetricResponseSchema
+    PerformanceMetricSchema,
 )
 
 __all__ = [
     # Health Status schemas
-    "ServiceHealthStatusBaseSchema", # Додано
+    "ServiceHealthStatusBaseSchema",
     "ServiceHealthStatusSchema",
-    "OverallHealthStatusSchema", # Змінено
+    "OverallHealthStatusSchema",
     # SystemSetting schemas
     "SystemSettingBaseSchema",
     "SystemSettingCreateSchema",
     "SystemSettingUpdateSchema",
-    "SystemSettingSchema", # Змінено
+    "SystemSettingSchema",
     # SystemLog schemas
     "SystemLogBaseSchema",
     "SystemLogCreateSchema",
-    "SystemLogSchema", # Змінено
+    "SystemLogSchema",
     # PerformanceMetric schemas
     "PerformanceMetricBaseSchema",
     "PerformanceMetricCreateSchema",
-    "PerformanceMetricSchema", # Змінено
+    "PerformanceMetricSchema",
 ]
 
 logger.debug("Ініціалізація пакету схем Pydantic `system` завершена. Усі системні схеми експортовано.")

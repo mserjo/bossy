@@ -19,7 +19,7 @@ from backend.app.src.models.gamification.user_achievement import UserAchievement
 from backend.app.src.schemas.gamification.achievement import UserAchievementCreateSchema
 # UserAchievementUpdateSchema зазвичай не потрібна, досягнення не змінюються
 from pydantic import BaseModel as PydanticBaseModel  # Для UpdateSchemaType
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
+from backend.app.src.config.logging import get_logger
 # Отримання логера для цього модуля
 logger = get_logger(__name__)
 

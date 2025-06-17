@@ -13,9 +13,7 @@ from uuid import UUID  # user_id тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status # Query видалено
 from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо, якщо сесія інкапсульована
 
-# Повні шляхи імпорту
-from backend.app.src.api.dependencies import get_api_db_session, get_current_active_superuser, get_user_service, \
-    paginator
+from backend.app.src.api.dependencies import get_api_db_session, get_current_active_superuser, get_user_service, paginator
 from backend.app.src.models.auth.user import User as UserModel
 from backend.app.src.schemas.auth.user import (
     UserResponse,
@@ -24,8 +22,9 @@ from backend.app.src.schemas.auth.user import (
 )
 from backend.app.src.core.pagination import PagedResponse, PageParams  # Використовуємо з core.pagination
 from backend.app.src.services.auth.user import UserService
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings  # Для DEBUG тощо
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     dependencies=[Depends(get_current_active_superuser)]  # Всі ендпоінти тут вимагають прав суперкористувача

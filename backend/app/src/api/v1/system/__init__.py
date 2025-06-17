@@ -18,12 +18,11 @@
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
-# import logging # Видалено для використання централізованого логера
-from backend.app.src.config import logger # Централізований логер
-
 # Головний роутер для системних ендпоінтів v1 буде визначено в backend.app.src.api.v1.system.router
 # та імпортовано тут для можливого ре-експорту.
 from backend.app.src.api.v1.system.router import system_router
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 __all__ = [
     "system_router",

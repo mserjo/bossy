@@ -1,11 +1,9 @@
 # backend/app/src/services/notifications/template.py
-# import logging # Замінено на централізований логер
 from typing import List, Optional, Dict, Any, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select # sqlalchemy.future тепер select
 
-# Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.notifications.template import NotificationTemplate
 from backend.app.src.repositories.notifications.template_repository import NotificationTemplateRepository # Імпорт репозиторію
@@ -15,8 +13,10 @@ from backend.app.src.schemas.notifications.template import (
     NotificationTemplateUpdate,
     NotificationTemplateResponse,
 )
-from backend.app.src.config.logging import logger
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
+
 
 # Jinja2 залежність
 try:
@@ -54,7 +54,7 @@ class NotificationTemplateService(BaseDictionaryService[
     'name' - людиночитана назва.
     """
 
-    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService): # Додано cache_service
+    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService):
         """
         Ініціалізує NotificationTemplateService.
 

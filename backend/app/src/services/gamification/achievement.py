@@ -2,12 +2,10 @@
 """
 Сервіс для управління досягненнями користувачів.
 
-# Примітка: Тип ID для UserAchievement (achievement_id) та Badge (badge_id) припускається як int, оскільки моделі не були надані для перевірки.
-"""
-Сервіс для управління досягненнями користувачів.
-
 Відповідає за логіку нагородження користувачів бейджами (досягненнями)
 та отримання інформації про їхні досягнення.
+
+# Примітка: Тип ID для UserAchievement (achievement_id) та Badge (badge_id) припускається як int, оскільки моделі не були надані для перевірки.
 """
 from typing import List, Optional, Dict, Any # Dict, Any залишені для new_achievement_data
 from datetime import datetime, timezone
@@ -28,8 +26,9 @@ from backend.app.src.schemas.gamification.achievement import (
     UserAchievementCreate,
     UserAchievementResponse
 )
-from backend.app.src.config import logger  # Використання спільного логера з конфігу
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 class UserAchievementService(BaseService): # type: ignore видалено

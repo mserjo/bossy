@@ -61,12 +61,7 @@ class RewardBaseSchema(BaseSchema):
         ge=0,  # Кількість не може бути від'ємною
         description="Доступна кількість екземплярів цієї нагороди (NULL для необмеженої)."
     )
-    icon_url: Optional[str] = Field(
-        None,
-        max_length=REWARD_ICON_URL_MAX_LENGTH,
-        description="URL або шлях до іконки нагороди.",
-        examples=["https://example.com/icons/coffee_cup.png"]
-    )
+    icon_file_id: Optional[int] = Field(None, description="ID завантаженого файлу іконки нагороди.")
     # TODO: Розглянути використання Enum RewardState з core.dicts, якщо стани нагород фіксовані.
     state: Optional[str] = Field(
         None,  # Або default="active"
@@ -101,7 +96,7 @@ class RewardUpdateSchema(RewardBaseSchema):
     description: Optional[str] = None
     cost: Optional[Decimal] = Field(None, ge=Decimal("0.00"))
     quantity_available: Optional[int] = Field(None, ge=0)  # Можна встановити в 0, щоб позначити "немає в наявності"
-    icon_url: Optional[str] = Field(None, max_length=REWARD_ICON_URL_MAX_LENGTH)
+    icon_file_id: Optional[int] = Field(None, description="Новий ID завантаженого файлу іконки нагороди.")
     state: Optional[str] = Field(None, max_length=50)
     notes: Optional[str] = None
     # group_id зазвичай не змінюється при оновленні. Якщо це потрібно, його можна додати сюди.
@@ -149,7 +144,7 @@ if __name__ == "__main__":
         "group_id": 1,
         "cost": Decimal("2000.00"),  # Вартість у бонусах
         "quantity_available": 100,
-        "icon_url": "https://example.com/certs/cert200.png",
+        "icon_file_id": 101, # Example file ID
         "state": "active"
     }
     create_reward_instance = RewardCreateSchema(**create_reward_data)
@@ -157,8 +152,9 @@ if __name__ == "__main__":
 
     logger.info("\nRewardUpdateSchema (приклад для оновлення):")
     update_reward_data = {
-        "description": "Сертифікат на покупки в магазині-партнері 'СуперМаркет'.",  # TODO i18n
-        "quantity_available": 50
+        "description": "Сертифікат на покупки в магазині-партнері 'СуперМаркет'.",
+        "quantity_available": 50,
+        "icon_file_id": 102 # Example new file ID
     }
     update_reward_instance = RewardUpdateSchema(**update_reward_data)
     logger.info(update_reward_instance.model_dump_json(indent=2, exclude_none=True))
@@ -171,7 +167,8 @@ if __name__ == "__main__":
         "group_id": 1,  # Або може бути None, якщо нагорода глобальна
         "cost": Decimal("500.00"),
         "quantity_available": 25,
-        "icon_url": "https://example.com/swag/kudos_tshirt.png",
+        # icon_url тут буде заповнено з property моделі, icon_file_id не є частиною ResponseSchema напряму
+        "icon_url": "https://example.com/swag/kudos_tshirt.png", # Це поле залишиться, але тепер воно буде property-based
         "state": "active",
         "created_at": datetime.now(),
         "updated_at": datetime.now()

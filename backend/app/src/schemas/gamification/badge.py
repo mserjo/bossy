@@ -41,10 +41,7 @@ class BadgeBaseSchema(
         None,
         description="Опис умов отримання або значення цього бейджа."
     )
-    icon_url: Optional[AnyHttpUrl] = Field(
-        None,
-        description="URL або шлях до іконки, що представляє бейдж."
-    )
+    icon_file_id: Optional[int] = Field(None, description="ID завантаженого файлу іконки бейджа.")
     group_id: Optional[int] = Field(
         None,
         description="ID групи, до якої належить цей бейдж. NULL, якщо бейдж глобальний/системний."
@@ -76,7 +73,7 @@ class BadgeUpdateSchema(BadgeBaseSchema):
     """
     name: Optional[str] = Field(None, max_length=BADGE_NAME_MAX_LENGTH)
     description: Optional[str] = None
-    icon_url: Optional[AnyHttpUrl] = None
+    icon_file_id: Optional[int] = Field(None, description="Новий ID завантаженого файлу іконки бейджа.")
     group_id: Optional[int] = Field(None,
                                     description="Зміна групи для бейджа (зазвичай не дозволяється або обробляється окремо).")
     state: Optional[str] = Field(None, max_length=50)
@@ -108,7 +105,7 @@ if __name__ == "__main__":
     create_badge_data = {
         "name": "Зірка Спільноти",  # TODO i18n
         "description": "Надається за активну допомогу іншим учасникам.",  # TODO i18n
-        "icon_url": "https://example.com/icons/community_star.png",
+        "icon_file_id": 201, # Example file ID
         "state": "active"
         # group_id може бути None для глобального бейджа
     }
@@ -118,7 +115,7 @@ if __name__ == "__main__":
     logger.info("\nBadgeUpdateSchema (приклад для оновлення):")
     update_badge_data = {
         "description": "Оновлений опис для Зірки Спільноти: надається за 100 корисних відповідей.",  # TODO i18n
-        "icon_url": "https://example.com/icons/community_star_v2.png"
+        "icon_file_id": 202 # Example new file ID
     }
     update_badge_instance = BadgeUpdateSchema(**update_badge_data)
     logger.info(update_badge_instance.model_dump_json(indent=2, exclude_none=True))

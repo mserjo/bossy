@@ -19,14 +19,18 @@ from backend.app.src.config.logging import get_logger
 from backend.app.src.core.dicts import RatingType # Імпортовано RatingType Enum
 logger = get_logger(__name__)
 
+from datetime import timedelta # Moved import to top
+
 # RatingType Enum імпортовано вище.
 
-# TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.
-# from backend.app.src.schemas.auth.user import UserPublicProfileSchema
-# from backend.app.src.schemas.groups.group import GroupBriefSchema
+# Імпорти для конкретних схем
+from backend.app.src.schemas.auth.user import UserPublicProfileSchema
+from backend.app.src.schemas.groups.group import GroupSchema
 
-UserPublicProfileSchema = Any  # Тимчасовий заповнювач
-GroupBriefSchema = Any  # Тимчасовий заповнювач
+
+# Placeholder assignments removed
+# UserPublicProfileSchema = Any
+# GroupBriefSchema = Any
 
 
 class UserGroupRatingBaseSchema(BaseSchema):
@@ -77,9 +81,8 @@ class UserGroupRatingSchema(UserGroupRatingBaseSchema, IDSchemaMixin, Timestampe
     # id, created_at, updated_at успадковані.
     # user_id, group_id, rating_score, period_start_date, period_end_date, rating_type успадковані.
 
-    # TODO: Замінити Any на відповідні схеми.
     user: Optional[UserPublicProfileSchema] = Field(None, description="Публічний профіль користувача.")
-    group: Optional[GroupBriefSchema] = Field(None, description="Коротка інформація про групу.")
+    group: Optional[GroupSchema] = Field(None, description="Коротка інформація про групу.") # Changed from GroupBriefSchema
 
 
 if __name__ == "__main__":
@@ -117,15 +120,15 @@ if __name__ == "__main__":
         "period_end_date": None,
         "created_at": datetime.now() - timedelta(days=30),  # Коли запис було вперше створено
         "updated_at": datetime.now(),  # Коли рейтинг було востаннє оновлено/перераховано
-        # "user": {"id": 101, "name": "Лідер Рейтингу"}, # Приклад UserPublicProfileSchema
-        # "group": {"id": 1, "name": "Головна Ліга"}  # Приклад GroupBriefSchema
+        # Приклади для пов'язаних об'єктів (закоментовано, бо потребують повних даних схем)
+        # "user": {"id": 101, "username": "top_player", "name": "Лідер Рейтингу"},
+        # "group": {"id": 1, "name": "Головна Ліга", "group_type_code": "LEAGUE",
+        #           "created_at": str(datetime.now()), "updated_at": str(datetime.now())}
     }
     rating_response_instance = UserGroupRatingSchema(**rating_response_data)
     logger.info(rating_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    logger.info("\nПримітка: Схеми для пов'язаних об'єктів (UserPublicProfileSchema, GroupBriefSchema)")
-    logger.info("наразі є заповнювачами (Any). Їх потрібно буде імпортувати після їх рефакторингу/визначення.")
+    logger.info("\nПримітка: Схеми для пов'язаних об'єктів тепер імпортовані.")
+    logger.info("Приклади даних для цих полів у `rating_response_data` закоментовані,")
+    logger.info("оскільки потребують повної структури відповідних схем.")
     # Коментар про TODO щодо RatingType тепер неактуальний, оскільки Enum імпортовано.
-
-# Потрібно для timedelta в __main__
-from datetime import timedelta

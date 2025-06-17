@@ -19,8 +19,11 @@ from backend.app.src.models.base import BaseMainModel  # Нагороди маю
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
+from backend.app.src.config import settings # Added import
+
 if TYPE_CHECKING:
     from backend.app.src.models.groups.group import Group
+    from backend.app.src.models.files.file import FileRecord # Added import for FileRecord
     # Потенційно, зв'язок з AccountTransaction, якщо потрібно відстежувати, які транзакції пов'язані з отриманням нагород
     # from backend.app.src.models.bonuses.transaction import AccountTransaction
 
@@ -39,7 +42,9 @@ class Reward(BaseMainModel):
         cost (Mapped[Decimal]): "Вартість" нагороди в одиницях бонусів групи.
         quantity_available (Mapped[Optional[int]]): Кількість доступних екземплярів цієї нагороди.
                                                     NULL означає необмежену кількість.
-        icon_url (Mapped[Optional[str]]): URL або шлях до іконки нагороди.
+    icon_file_id (Mapped[Optional[int]]): ID файлу іконки.
+    icon_file (Mapped[Optional["FileRecord"]]): Зв'язок з файлом іконки.
+    icon_url (property): Повертає повний URL до іконки.
 
         group (Mapped["Group"]): Зв'язок з групою, до якої належить нагорода.
     """
@@ -52,8 +57,11 @@ class Reward(BaseMainModel):
     quantity_available: Mapped[Optional[int]] = mapped_column(
         Integer, nullable=True, comment="Доступна кількість (NULL для необмеженої)"
     )  # Якщо <= 0 і не NULL, то недоступна
-    icon_url: Mapped[Optional[str]] = mapped_column(
-        String(512), nullable=True, comment="URL або шлях до іконки нагороди"
+
+    icon_file_id: Mapped[Optional[int]] = mapped_column(
+        ForeignKey('file_records.id', name='fk_reward_icon_file_id', ondelete='SET NULL'),
+        nullable=True,
+        comment="ID файлу іконки нагороди (FK до file_records.id)"
     )
 
     # Поле 'state' (успадковане) використовується для активності нагороди.
@@ -71,7 +79,29 @@ class Reward(BaseMainModel):
 
     # _repr_fields успадковуються та збираються з BaseMainModel та його міксинів (id, name, state_id, group_id, created_at, updated_at тощо).
     # Додаємо специфічні для Reward поля.
-    _repr_fields = ("cost", "quantity_available", "icon_url")
+    _repr_fields = ("cost", "quantity_available", "icon_file_id")
+
+    icon_file: Mapped[Optional["FileRecord"]] = relationship(
+        foreign_keys=[icon_file_id], lazy="selectin"
+    )
+
+    @property
+    def icon_url(self) -> Optional[str]:
+        if self.icon_file and self.icon_file.file_path:
+            base_url = str(settings.SERVER_HOST).rstrip('/')
+            file_path = str(self.icon_file.file_path)
+
+            if file_path.startswith('/'):
+                return f"{base_url}{file_path}"
+            else:
+                static_url_prefix = str(getattr(settings, 'STATIC_URL', '/static/'))
+                if not static_url_prefix.startswith('/'):
+                    static_url_prefix = '/' + static_url_prefix
+                if not static_url_prefix.endswith('/'):
+                    static_url_prefix += '/'
+
+                return f"{base_url}{static_url_prefix}{file_path.lstrip('/')}"
+        return None
 
 
 if __name__ == "__main__":
@@ -83,7 +113,7 @@ if __name__ == "__main__":
     expected_fields = [
         'id', 'name', 'description', 'state', 'group_id', 'notes',
         'created_at', 'updated_at', 'deleted_at',
-        'cost', 'quantity_available', 'icon_url'
+        'cost', 'quantity_available', 'icon_file_id' # Updated icon_url to icon_file_id
     ]
     for field in expected_fields:
         logger.info(f"  - {field}")

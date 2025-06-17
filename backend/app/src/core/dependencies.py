@@ -44,11 +44,7 @@ from backend.app.src.core.dicts import GroupRole
 
 logger = get_logger(__name__)
 
-# TODO: Replace this dummy _ function with a real i18n translation mechanism.
-def _(text: str) -> str:
-    # In a real application, this would use an i18n library (e.g., gettext, Babel)
-    # For now, it's a placeholder.
-    return text
+from backend.app.src.core.i18n import _ # Import the real translation function
 
 # `OAuth2PasswordBearer` - це клас FastAPI, що допомагає отримувати токени Bearer
 # з заголовка "Authorization".
@@ -82,12 +78,12 @@ async def get_current_user(
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail=_("Не вдалося перевірити облікові дані"), # Wrapped with _()
+        detail=_("dependencies.auth.credentials_check_failed"),
         headers={"WWW-Authenticate": "Bearer"},
     )
     malformed_payload_exception = HTTPException(
         status_code=status.HTTP_400_BAD_REQUEST,
-        detail=_("Пошкоджене або неповне корисне навантаження токена") # Wrapped with _()
+        detail=_("dependencies.auth.malformed_token_payload")
     )
 
     payload = decode_token(token) # decode_token вже логує помилки JWT
@@ -110,7 +106,7 @@ async def get_current_user(
         logger.warning(f"Отримано невірний тип токена: '{token_data.type}'. Очікувався 'access'.")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=_("Недійсний тип токена, очікується токен доступу."), # Wrapped with _()
+            detail=_("dependencies.auth.invalid_token_type"),
             headers={"WWW-Authenticate": "Bearer"},
         )
 
@@ -167,7 +163,7 @@ async def get_current_active_user(
     """
     if not current_user.is_active:
         logger.warning(f"Користувач '{current_user.email}' (ID: {current_user.id}) неактивний.")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_("Неактивний користувач")) # Wrapped with _()
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_("dependencies.auth.inactive_user"))
     logger.debug(f"Користувач '{current_user.email}' (ID: {current_user.id}) активний.")
     return current_user
 
@@ -198,7 +194,7 @@ async def get_current_superuser(
             "не має прав суперкористувача."
         )
         raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail=_("Недостатньо прав (потрібен статус суперкористувача).") # Wrapped with _()
+            status_code=status.HTTP_403_FORBIDDEN, detail=_("dependencies.auth.not_superuser")
         )
     logger.debug(f"Користувач '{current_active_user.email}' (ID: {current_active_user.id}) підтверджений як суперкористувач.")
     return current_active_user
@@ -235,7 +231,7 @@ async def get_current_group_admin(
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail=_("Ви не є адміністратором цієї групи.") # Wrapped with _()
+            detail=_("dependencies.auth.not_group_admin")
         )
 
     logger.info(f"Користувач ID {current_active_user.id} підтверджений як адміністратор групи ID {group_id}.")

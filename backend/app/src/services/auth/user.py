@@ -28,6 +28,7 @@ from backend.app.src.schemas.auth.user import (
 )
 from backend.app.src.core.security import get_password_hash
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 from backend.app.src.config import settings  # Для доступу до DEBUG тощо
 # from backend.app.src.core.dicts import UserState # Removed import
@@ -124,14 +125,14 @@ class UserService(BaseService):
         username_exists_result = await self.db_session.execute(username_exists_stmt)
         if username_exists_result.scalar_one_or_none():
             logger.warning(f"Ім'я користувача '{username}' вже існує.")
-            raise ValueError(f"Ім'я користувача '{username}' вже існує.")  # i18n
+            raise ValueError(_("user.errors.username_exists", username=username))
 
         # Перевірка email
         email_exists_stmt = select(User.id).where(User.email == email.lower())
         email_exists_result = await self.db_session.execute(email_exists_stmt)
         if email_exists_result.scalar_one_or_none():
             logger.warning(f"Email '{email.lower()}' вже зареєстровано.")
-            raise ValueError(f"Email '{email.lower()}' вже зареєстровано.")  # i18n
+            raise ValueError(_("user.errors.email_exists", email=email.lower()))
 
     async def create_user(self, user_create_data: UserCreate,
                           user_type_code: str = "USER",
@@ -151,7 +152,7 @@ class UserService(BaseService):
         user_type_db = user_type_db_result.scalar_one_or_none()
         if not user_type_db:
             logger.error(f"UserType з кодом '{user_type_code}' не знайдено.")
-            raise ValueError(f"Тип користувача '{user_type_code}' не знайдено.")
+            raise ValueError(_("user.errors.user_type_not_found", code=user_type_code))
 
         # Обробка стану користувача
         effective_state_code = user_create_data.state_code if user_create_data.state_code else "PENDING_VERIFICATION"
@@ -160,7 +161,7 @@ class UserService(BaseService):
         status_db = status_db_result.scalar_one_or_none()
         if not status_db:
             logger.error(f"Статус з кодом '{effective_state_code}' не знайдено в довіднику dict_statuses.")
-            raise ValueError(f"Статус користувача '{effective_state_code}' не знайдено.")
+            raise ValueError(_("user.errors.status_not_found", code=effective_state_code))
 
         # Обробка системної ролі користувача
         effective_system_role_code = user_create_data.system_role_code if user_create_data.system_role_code else "USER"
@@ -169,7 +170,7 @@ class UserService(BaseService):
         system_role_db = system_role_db_result.scalar_one_or_none()
         if not system_role_db:
             logger.error(f"Системна роль з кодом '{effective_system_role_code}' не знайдено в довіднику dict_user_roles.")
-            raise ValueError(f"Системна роль користувача '{effective_system_role_code}' не знайдено.")
+            raise ValueError(_("user.errors.system_role_not_found", code=effective_system_role_code))
 
         new_user_data = user_create_data.model_dump(exclude={"password", "state_code", "user_type_code", "system_role_code"})
         new_user_data.update({
@@ -196,8 +197,7 @@ class UserService(BaseService):
                 missing_codes = set(role_codes) - found_role_codes
                 logger.error(
                     f"Не знайдено ролі з кодами: {missing_codes} для нового користувача '{user_create_data.username}'.")
-                raise ValueError( # i18n
-                    f"Не вдалося створити користувача: не знайдено ролі з кодами: {missing_codes}.")
+                raise ValueError(_("user.errors.roles_not_found_on_create", codes=str(missing_codes)))
             new_user_db.roles = user_roles_db
 
         self.db_session.add(new_user_db)
@@ -211,10 +211,10 @@ class UserService(BaseService):
             # ... (попередня логіка обробки IntegrityError залишається)
             err_detail = str(e.orig).lower() if hasattr(e, 'orig') and e.orig is not None else str(e).lower()
             if "users_username_key" in err_detail or "unique_username" in err_detail or "constraint failed: users.username" in err_detail:
-                raise ValueError(f"Ім'я користувача '{user_create_data.username}' вже існує.")  # i18n
+                raise ValueError(_("user.errors.username_exists", username=user_create_data.username))
             if "users_email_key" in err_detail or "unique_email" in err_detail or "constraint failed: users.email" in err_detail:
-                raise ValueError(f"Email '{user_create_data.email}' вже зареєстровано.")  # i18n
-            raise ValueError(f"Не вдалося створити користувача через конфлікт даних: {e}")  # i18n
+                raise ValueError(_("user.errors.email_exists", email=user_create_data.email))
+            raise ValueError(_("user.errors.create_conflict", error_message=str(e)))
 
         logger.info(f"Користувача '{new_user_db.username}' (ID: {new_user_db.id}) успішно створено.")
         return UserResponseWithRoles.model_validate(new_user_db)
@@ -237,7 +237,7 @@ class UserService(BaseService):
             new_email = update_data['email'].lower()
             existing_email_user_stmt = select(User.id).where(User.email == new_email, User.id != user_id)
             if (await self.db_session.execute(existing_email_user_stmt)).scalar_one_or_none():
-                raise ValueError(f"Email '{new_email}' вже зареєстровано іншим користувачем.")
+                raise ValueError(_("user.errors.email_taken_by_other", email=new_email))
             user_db.email = new_email
             user_db.is_verified = False
             user_db.verified_at = None
@@ -252,7 +252,7 @@ class UserService(BaseService):
                 status_db = status_db_result.scalar_one_or_none()
                 if not status_db:
                     logger.error(f"Статус з кодом '{new_state_code}' не знайдено для оновлення користувача ID {user_id}.")
-                    raise ValueError(f"Статус користувача '{new_state_code}' не знайдено.")
+                    raise ValueError(_("user.errors.status_not_found", code=new_state_code))
                 user_db.state_id = status_db.id
                 logger.info(f"state_id для користувача ID '{user_id}' оновлено на {status_db.id} (код: {new_state_code}).")
             else: # new_state_code is None, що означає скидання стану
@@ -267,7 +267,7 @@ class UserService(BaseService):
                 user_type_db = (await self.db_session.execute(user_type_stmt)).scalar_one_or_none()
                 if not user_type_db:
                     logger.error(f"Тип користувача з кодом '{new_user_type_code}' не знайдено для ID {user_id}.")
-                    raise ValueError(f"Тип користувача '{new_user_type_code}' не знайдено.")
+                    raise ValueError(_("user.errors.user_type_not_found", code=new_user_type_code))
                 user_db.user_type_id = user_type_db.id
                 logger.info(f"user_type_id для ID '{user_id}' оновлено на {user_type_db.id} (код: {new_user_type_code}).")
             else:
@@ -282,7 +282,7 @@ class UserService(BaseService):
                 system_role_db = (await self.db_session.execute(system_role_stmt)).scalar_one_or_none()
                 if not system_role_db:
                     logger.error(f"Системна роль з кодом '{new_system_role_code}' не знайдено для ID {user_id}.")
-                    raise ValueError(f"Системна роль '{new_system_role_code}' не знайдено.")
+                    raise ValueError(_("user.errors.system_role_not_found", code=new_system_role_code))
                 user_db.system_role_id = system_role_db.id
                 logger.info(f"system_role_id для ID '{user_id}' оновлено на {system_role_db.id} (код: {new_system_role_code}).")
             else:
@@ -305,7 +305,7 @@ class UserService(BaseService):
                 if field == 'username' and value != user_db.username:
                     existing_username_stmt = select(User.id).where(User.username == value, User.id != user_id)
                     if (await self.db_session.execute(existing_username_stmt)).scalar_one_or_none():
-                        raise ValueError(f"Ім'я користувача '{value}' вже використовується.")
+                        raise ValueError(_("user.errors.username_taken_by_other", username=value))
 
                 if field == 'is_verified' and current_user_is_admin:
                     user_db.is_verified = value
@@ -365,7 +365,7 @@ class UserService(BaseService):
                 found_codes = {r.code for r in roles_to_process_db}
                 missing_codes = set(role_codes) - found_codes
                 logger.error(f"Не знайдено ролі з кодами: {missing_codes} для ID '{user_id}'.")
-                raise ValueError(f"Не знайдено ролі: {missing_codes}.")  # i18n
+                raise ValueError(_("user.errors.roles_not_found", codes=str(missing_codes)))
 
             current_role_ids = {role.id for role in user_db.roles}
             if action == "assign":

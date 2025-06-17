@@ -1,9 +1,888 @@
 {
-  "common.greeting": "Привіт!",
-  "common.thank_you": "Дякуємо!",
-  "error.general": "Сталася неочікувана помилка. Будь ласка, спробуйте пізніше.",
-  "error.not_found": "Запитаний ресурс не знайдено.",
-  "success.general": "Операцію успішно завершено.",
-  "success.created": "Ресурс успішно створено.",
-  "validation.field_required": "Це поле є обов'язковим."
+  "exceptions": {
+    "record_not_found": "Сутність '{entity_name}' з ідентифікатором '{identifier}' не знайдено.",
+    "duplicate_record": "Сутність '{entity_name}' з унікальним полем '{identifier}' вже існує.",
+    "auth": {
+      "default": "Помилка автентифікації.",
+      "insufficient_permissions": "Недостатньо прав для виконання цієї дії."
+    },
+    "validation": {
+      "default": "Помилка валідації вхідних даних."
+    },
+    "external_service": {
+      "default_error": "Помилка взаємодії із зовнішнім сервісом.",
+      "service_prefix": "(Сервіс: {service_name})"
+    },
+    "rate_limit_exceeded": "Ліміт запитів перевищено. Будь ласка, спробуйте пізніше.",
+    "file_processing": {
+      "default_error": "Помилка обробки файлу."
+    },
+    "account": {
+      "insufficient_funds": "Недостатньо коштів на рахунку."
+    }
+  },
+  "dependencies": {
+    "auth": {
+      "credentials_check_failed": "Не вдалося перевірити облікові дані.",
+      "malformed_token_payload": "Пошкоджене або неповне корисне навантаження токена.",
+      "invalid_token_type": "Недійсний тип токена, очікується токен доступу.",
+      "inactive_user": "Неактивний користувач.",
+      "not_superuser": "Недостатньо прав (потрібен статус суперкористувача).",
+      "not_group_admin": "Ви не є адміністратором цієї групи."
+    }
+  },
+  "user": {
+    "errors": {
+      "username_exists": "Ім'я користувача '{username}' вже існує.",
+      "email_exists": "Email '{email}' вже зареєстровано.",
+      "user_type_not_found": "Тип користувача з кодом '{code}' не знайдено.",
+      "status_not_found": "Статус користувача з кодом '{code}' не знайдено.",
+      "system_role_not_found": "Системну роль з кодом '{code}' не знайдено.",
+      "roles_not_found_on_create": "Не вдалося створити користувача: ролі з кодами не знайдено: {codes}.",
+      "create_conflict": "Не вдалося створити користувача через конфлікт даних: {error_message}",
+      "email_taken_by_other": "Email '{email}' вже зареєстровано іншим користувачем.",
+      "update_conflict": "Не вдалося оновити користувача через конфлікт даних: {error_message}",
+      "roles_not_found": "Ролі не знайдено: {codes}.",
+      "username_taken_by_other": "Ім'я користувача '{username}' вже використовується іншим користувачем."
+    },
+    "fields": {
+      "username": {
+        "description": "Унікальне ім'я користувача (логін).",
+        "description_update": "Нове унікальне ім'я користувача (логін).",
+        "description_public": "Унікальне ім'я користувача."
+      },
+      "email": {
+        "description": "Електронна пошта користувача (унікальна).",
+        "description_update": "Нова електронна пошта користувача."
+      },
+      "first_name": {
+        "description": "Ім'я користувача.",
+        "description_update": "Нове ім'я користувача."
+      },
+      "last_name": {
+        "description": "Прізвище користувача.",
+        "description_update": "Нове прізвище користувача."
+      },
+      "middle_name": {
+        "description": "По батькові користувача (необов'язково)."
+      },
+      "phone_number": {
+        "description": "Номер телефону користувача (необов'язково, унікальний, якщо вказано)."
+      },
+      "name": {
+        "description": "Відображуване ім'я користувача (може бути ПІБ або нікнейм)."
+      },
+      "description": {
+        "description": "Додатковий опис або біографія користувача."
+      },
+      "notes": {
+        "description": "Приватні нотатки про користувача."
+      },
+      "password": {
+        "description": "Пароль користувача (мін. 8 символів).",
+        "description_update": "Новий пароль користувача (якщо змінюється, мін. 8 символів)."
+      },
+      "user_type_code": {
+        "description": "Код типу користувача з довідника (напр., 'REGULAR_USER').",
+        "description_update": "Новий код типу користувача з довідника."
+      },
+      "system_role_code": {
+        "description": "Код системної ролі користувача з довідника (напр., 'USER').",
+        "description_update": "Новий код системної ролі користувача з довідника."
+      },
+      "state_code": {
+        "description": "Код стану користувача з довідника dict_statuses.",
+        "description_update": "Новий код стану користувача з довідника dict_statuses."
+      },
+      "is_active": {
+        "description": "Статус активності облікового запису.",
+        "description_response": "Чи активний обліковий запис користувача."
+      },
+      "is_superuser": {
+        "description": "Статус суперкористувача.",
+        "description_response": "Чи має користувач права суперкористувача."
+      },
+      "last_login_at": {
+        "description": "Час останнього входу користувача в систему."
+      },
+      "state_object": {
+        "description": "Об'єкт стану користувача."
+      },
+      "user_type_object": {
+        "description": "Об'єкт типу користувача."
+      },
+      "system_role_object": {
+        "description": "Об'єкт системної ролі користувача."
+      },
+      "avatar_url": {
+        "description": "URL аватара користувача."
+      }
+    }
+  },
+  "group": {
+    "errors": {
+      "creator_not_found": "Користувача-творця з ID '{creator_id}' не знайдено.",
+      "group_type_not_found": "Тип групи з ID '{group_type_id}' не знайдено.",
+      "icon_file_not_found": "Файл іконки з ID '{icon_file_id}' не знайдено.",
+      "default_admin_role_not_found": "Роль адміністратора за замовчуванням '{role_code}' не знайдено в базі даних.",
+      "setup_failed_due_to_role": "Налаштування групи не вдалося через відсутність ролі адміністратора за замовчуванням.",
+      "critical_create_failed": "Критична помилка: не вдалося отримати створену групу ID {group_id} після коміту.",
+      "create_conflict": "Не вдалося створити групу через конфлікт даних: {error_message}",
+      "update_conflict": "Не вдалося оновити групу через конфлікт даних: {error_message}",
+      "delete_conflict_in_use": "Група '{group_name}' використовується і не може бути видалена."
+    },
+    "reports": {
+      "activity_report_not_implemented": "Генерація звіту про активність ще не реалізована."
+    },
+    "fields": {
+        "name": {"description": "Назва групи."},
+        "description": {"description": "Детальний опис групи (необов'язково)."},
+        "group_type_code": {"description": "Код типу групи з довідника dict_group_types (наприклад, 'FAMILY', 'DEPARTMENT')."},
+        "state": {"description": "Стан групи (наприклад, 'active', 'archived', 'private'). Необов'язково."},
+        "notes": {"description": "Додаткові нотатки щодо групи (необов'язково)."}
+    },
+    "create": {
+        "fields": {
+            "owner_id": {"description": "ID користувача, який створює та стає власником групи. Встановлюється сервісом."}
+        }
+    },
+    "update": {
+        "fields": {
+            "name": {"description": "Нова назва групи."},
+            "description": {"description": "Новий опис групи."},
+            "group_type_code": {"description": "Новий код типу групи."},
+            "state": {"description": "Новий стан групи."},
+            "notes": {"description": "Нові нотатки щодо групи."},
+            "owner_id": {"description": "Новий ID власника групи."}
+        }
+    },
+    "response": {
+        "fields": {
+            "owner": {"description": "Публічний профіль власника групи."},
+            "group_type": {"description": "Об'єкт типу групи."},
+            "members_count": {"description": "Кількість учасників у групі (обчислюване поле)."}
+        }
+    },
+    "detail_response": {
+        "fields": {
+            "members": {"description": "Список публічних профілів учасників групи."},
+            "settings": {"description": "Налаштування групи."}
+        }
+    },
+    "settings": {
+        "fields": {
+            "currency_name": {"description": "Назва внутрішньої валюти/бонусів групи (наприклад, 'бали', 'очки', 'зірочки')."},
+            "allow_decimal_bonuses": {"description": "Чи дозволені дробові значення для бонусів у групі."},
+            "max_debt_amount": {"description": "Максимально допустима сума 'боргу' (від'ємного балансу) для учасника. NULL означає відсутність ліміту."},
+            "task_completion_requires_review": {"description": "Чи потребує виконання завдання перевірки адміністратором перед нарахуванням бонусів."},
+            "allow_task_reviews": {"description": "Чи дозволено користувачам залишати відгуки/рейтинги до завдань у групі."},
+            "allow_gamification_levels": {"description": "Чи активна система рівнів гейміфікації в групі."},
+            "allow_gamification_badges": {"description": "Чи активна система бейджів/досягнень гейміфікації в групі."},
+            "allow_gamification_ratings": {"description": "Чи активна система рейтингів користувачів гейміфікації в групі."}
+        },
+        "create": {
+            "fields": {
+                "group_id": {"description": "Ідентифікатор групи, для якої створюються ці налаштування."}
+            }
+        },
+        "update": {
+            "fields": {
+                "currency_name": {"description": "Нова назва валюти бонусів."}
+            }
+        },
+        "response": {
+            "fields": {
+                "group_id": {"description": "Ідентифікатор групи, до якої належать ці налаштування."}
+            }
+        }
+    },
+    "membership": {
+        "fields": {
+            "user_id": {"description": "Ідентифікатор користувача."},
+            "group_id": {"description": "Ідентифікатор групи."},
+            "role": {"description": "Роль користувача в групі."}
+        },
+        "create": {
+            "fields": {
+                "user_id": {"description": "Ідентифікатор користувача, якого додають до групи."},
+                "role": {"description": "Роль, що призначається користувачеві в групі."}
+            }
+        },
+        "update": {
+            "fields": {
+                "role": {"description": "Нова роль користувача в групі."}
+            }
+        },
+        "response": {
+            "fields": {
+                "user": {"description": "Публічний профіль користувача, що є членом групи."}
+            }
+        }
+    },
+    "invitation": {
+        "fields": {
+            "email": {"description": "Електронна пошта запрошеного користувача (якщо запрошення по email)."},
+            "phone_number": {"description": "Номер телефону запрошеного (якщо запрошення по SMS)."},
+            "role_to_assign": {"description": "Роль, яка буде призначена користувачеві при прийнятті запрошення."}
+        },
+        "create": {
+            "fields": {
+                "expires_at": {"description": "Час закінчення терміну дії запрошення (необов'язково, може встановлюватися сервером)."}
+            }
+        },
+        "update": {
+            "fields": {
+                "status": {"description": "Новий статус запрошення."}
+            }
+        },
+        "response": {
+            "fields": {
+                "group_id": {"description": "Ідентифікатор групи, до якої створено запрошення."},
+                "invitation_code": {"description": "Унікальний код запрошення."},
+                "expires_at": {"description": "Час закінчення терміну дії запрошення."},
+                "status": {"description": "Поточний статус запрошення."},
+                "created_by_user_id": {"description": "Ідентифікатор користувача, який створив запрошення."}
+            }
+        },
+        "accept": {
+            "fields": {
+                "invitation_code": {"description": "Унікальний код запрошення для приєднання до групи."}
+            }
+        }
+    }
+  },
+  "dictionaries": {
+    "errors": {
+      "create_conflict": "Не вдалося створити {model_name}: конфлікт даних. Перевірте унікальність полів.",
+      "update_conflict": "Не вдалося оновити {model_name}: конфлікт даних.",
+      "delete_in_use": "{model_name} ID '{item_id}' використовується і не може бути видалений."
+    },
+    "base": {
+      "fields": {
+        "code": {"description": "Унікальний текстовий код запису довідника."},
+        "name": {"description": "Назва запису довідника."},
+        "description": {"description": "Детальний опис запису довідника (необов'язково)."},
+        "state": {"description": "Стан запису довідника (наприклад, 'active', 'deprecated', необов'язково)."},
+        "notes": {"description": "Додаткові нотатки щодо запису довідника (необов'язково)."}
+      },
+      "update_fields": {
+        "name": {"description": "Нова назва запису довідника."},
+        "code": {"description": "Новий унікальний текстовий код запису довідника."},
+        "description": {"description": "Новий детальний опис запису довідника."},
+        "state": {"description": "Новий стан запису довідника."},
+        "notes": {"description": "Нові додаткові нотатки щодо запису довідника."}
+      }
+    },
+    "calendars": {
+        "fields": {
+            "is_active": {"description": "Статус активності провайдера."},
+            "credentials_schema": {"description": "JSON схема необхідних облікових даних для цього провайдера (наприклад, для OAuth)."},
+            "sync_frequency_minutes": {"description": "Рекомендована частота синхронізації в хвилинах."}
+        }
+    },
+    "messengers": {},
+    "bonus_types": {},
+    "group_types": {},
+    "task_types": {}
+  },
+  "task": {
+    "errors": {
+        "not_found_by_id": "Завдання з ID '{task_id}' не знайдено."
+    },
+    "fields": {
+      "name": {"description": "Назва або заголовок завдання/події."},
+      "description": {"description": "Детальний опис завдання/події."},
+      "task_type_code": {"description": "Код типу завдання з довідника (наприклад, 'REGULAR_TASK', 'EVENT')."},
+      "state": {"description": "Стан завдання. Використовуйте значення з TaskStatus Enum."},
+      "due_date": {"description": "Термін виконання завдання (кінцева дата та час)."},
+      "is_recurring": {"description": "Прапорець: чи є завдання рекурентним."},
+      "recurrence_pattern": {"description": "Шаблон повторення (наприклад, RRULE або cron-вираз)."},
+      "recurrence_start_date": {"description": "Дата початку повторення."},
+      "recurrence_end_date": {"description": "Дата завершення повторення (якщо є)."},
+      "reminder_config": {"description": "Конфігурація нагадувань (JSON, наприклад, {'before_due': '1d', 'repeat': 'every_4h'})."},
+      "is_mandatory": {"description": "Прапорець: чи є завдання обов'язковим для виконання."},
+      "parent_task_id": {"description": "ID батьківського завдання (для створення підзавдання)."},
+      "points_reward": {"description": "Кількість балів за успішне виконання завдання (якщо застосовно, не може бути від'ємним)."},
+      "penalty_amount": {"description": "Сума штрафу за невиконання або прострочення (якщо застосовно, не може бути від'ємним)."},
+      "notes": {"description": "Додаткові нотатки до завдання."},
+      "event_start_time": {"description": "Час початку події (якщо завдання є подією)."},
+      "event_end_time": {"description": "Час закінчення події (якщо завдання є подією)."},
+      "event_location": {"description": "Місце проведення події (якщо застосовно)."}
+    },
+    "update_fields": {
+        "name": {"description": "Нова назва завдання."},
+        "is_recurring_template": {"description": "Оновити прапорець: чи є це шаблоном повторюваних завдань."}
+    },
+    "response": {
+        "fields": {
+            "status_code": {"description": "Код поточного статусу завдання (з довідника dict_statuses)."},
+            "is_recurring_template": {"description": "Чи є це завдання шаблоном для повторюваних завдань."},
+            "last_instance_created_at": {"description": "Час створення останнього екземпляру (для шаблонів)."},
+            "next_occurrence_at": {"description": "Розрахунковий час наступного виконання (для шаблонів)."},
+            "last_reminder_sent_at": {"description": "Час останнього надісланого нагадування."},
+            "task_type": {"description": "Об'єкт типу завдання."},
+            "status": {"description": "Об'єкт статусу завдання (з довідника)."},
+            "parent_task": {"description": "Коротка інформація про батьківське завдання."},
+            "sub_tasks_count": {"description": "Кількість підзавдань."},
+            "assignments_count": {"description": "Кількість призначень цього завдання."},
+            "completions_count": {"description": "Кількість виконань цього завдання."}
+        }
+    },
+    "detail_response": {
+        "fields": {
+            "sub_tasks": {"description": "Список підзавдань."},
+            "assignments": {"description": "Список призначень завдання."},
+            "completions": {"description": "Список виконань завдання."},
+            "reviews": {"description": "Список відгуків на завдання."},
+            "bonus_rules": {"description": "Список правил нарахування бонусів, пов'язаних із завданням."}
+        }
+    }
+  },
+  "event": {
+      "fields": {
+          "name": {"description": "Назва або заголовок події."},
+          "description": {"description": "Детальний опис події."},
+          "start_time": {"description": "Дата та час початку події (UTC)."},
+          "end_time": {"description": "Необов'язкові дата та час закінчення події (UTC)."},
+          "location": {"description": "Фізичне або віртуальне місцезнаходження події."},
+          "state": {"description": "Стан події (наприклад, 'upcoming', 'ongoing', 'past', 'cancelled')."},
+          "notes": {"description": "Внутрішні нотатки для події."}
+      },
+      "create": {
+          "fields": {"group_id": {"description": "Ідентифікатор групи, до якої належить ця подія."}}
+      },
+      "response": {
+          "fields": {
+              "group": {"description": "Базова інформація про групу, до якої належить ця подія."},
+              "created_by_user_id": {"description": "ID користувача, який створив подію."},
+              "created_by": {"description": "Профіль користувача, який створив подію."},
+              "assignments": {"description": "Список призначень, пов'язаних з подією."},
+              "completions": {"description": "Список виконань, пов'язаних з подією."}
+          }
+      }
+  },
+  "task_assignment": {
+      "fields": {
+          "task_id": {"description": "Ідентифікатор завдання."},
+          "user_id": {"description": "Ідентифікатор користувача, якому призначено завдання."},
+          "status": {"description": "Статус призначення."}
+      },
+      "create": {
+          "fields": {
+              "user_id": {"description": "Ідентифікатор користувача, якому призначається завдання."},
+              "status": {"description": "Статус призначення."}
+          }
+      },
+      "update": {
+          "fields": {"status": {"description": "Новий статус призначення."}}
+      },
+      "response": {
+          "fields": {"user": {"description": "Публічний профіль користувача, якому призначено завдання."}}
+      }
+  },
+  "task_completion": {
+      "fields": {
+          "completed_at": {"description": "Фактичний час завершення завдання користувачем (або час подання на перевірку)."},
+          "status": {"description": "Статус виконання завдання."},
+          "notes": {"description": "Нотатки користувача щодо виконання завдання."}
+      },
+      "update": {
+          "fields": {
+              "verified_at": {"description": "Час перевірки виконання адміністратором."},
+              "status": {"description": "Новий статус виконання."},
+              "notes": {"description": "Додаткові нотатки (наприклад, від адміністратора при перевірці)."}
+          }
+      },
+      "response": {
+          "fields": {
+              "task_id": {"description": "Ідентифікатор виконаного завдання."},
+              "user_id": {"description": "Ідентифікатор користувача, який виконав завдання."},
+              "verified_at": {"description": "Час перевірки виконання (якщо було перевірено)."},
+              "user": {"description": "Публічний профіль користувача, який виконав завдання."},
+              "verifier": {"description": "Публічний профіль користувача (адміністратора), який перевірив виконання."}
+          }
+      }
+  },
+  "task_review": {
+      "fields": {
+          "rating": {"description": "Числовий рейтинг завдання (від 1 до 5, необов'язково)."},
+          "comment": {"description": "Текстовий коментар до відгуку (необов'язково)."}
+      },
+      "response": {
+          "fields": {
+              "task_id": {"description": "Ідентифікатор завдання, до якого залишено відгук."},
+              "user_id": {"description": "Ідентифікатор користувача, який залишив відгук."},
+              "user": {"description": "Публічний профіль користувача, який залишив відгук."}
+          }
+      }
+  },
+  "bonus_rule": {
+    "errors": {
+      "name_exists_in_scope": "Правило бонусів з назвою '{name}' вже існує в {scope}.",
+      "create_conflict": "Не вдалося створити правило бонусів через конфлікт даних: {error_message}",
+      "update_conflict": "Не вдалося оновити правило бонусів через конфлікт даних: {error_message}",
+      "task_type_not_found_by_id": "Тип завдання з ID '{task_type_id}' не знайдено.",
+      "task_not_found_by_id": "Завдання з ID '{task_id}' не знайдено."
+    },
+    "fields": {
+        "name": {"description": "Назва правила бонусів."},
+        "description": {"description": "Детальний опис правила та умов його спрацювання."},
+        "task_id": {"description": "ID завдання, до якого прив'язане правило (якщо є)."},
+        "event_id": {"description": "ID події, до якої прив'язане правило (якщо є)."},
+        "bonus_type_code": {"description": "Код типу бонусу з довідника (наприклад, 'REWARD', 'PENALTY')."},
+        "amount": {"description": "Сума бонусу або штрафу. Позитивна для нарахування, від'ємна для списання (або залежить від типу бонусу)."},
+        "condition_description": {"description": "Текстовий опис додаткових умов спрацювання правила."},
+        "state": {"description": "Стан правила (наприклад, 'active', 'inactive', 'draft')."}
+    },
+    "response": {
+        "fields": {
+            "bonus_type": {"description": "Об'єкт типу бонусу."},
+            "task": {"description": "Пов'язаний об'єкт завдання (коротка інформація)."},
+            "event": {"description": "Пов'язаний об'єкт події (якщо використовується event_id)."}
+        }
+    }
+  },
+  "account": {
+    "errors": {
+        "create_conflict": "Не вдалося створити рахунок для {context_message} через конфлікт даних.",
+        "not_found_by_id": "Рахунок користувача з ID '{account_id}' не знайдено.",
+        "not_found_for_context": "Рахунок для {context_message} не знайдено."
+    },
+    "fields": {
+        "user_id": {"description": "Ідентифікатор користувача, якому належить рахунок."},
+        "group_id": {"description": "Ідентифікатор групи, в межах якої існує цей рахунок."},
+        "balance": {"description": "Поточний баланс на рахунку."},
+        "currency": {"description": "Валюта або одиниця виміру бонусів на рахунку (наприклад, 'бали', 'кредити')."}
+    },
+    "update": {
+        "fields": {"balance": {"description": "Нове значення балансу для адміністративного коригування."}}
+    },
+    "response": {
+        "fields": {
+            "user": {"description": "Публічний профіль користувача, власника рахунку."},
+            "group": {"description": "Коротка інформація про групу, до якої належить рахунок."}
+        }
+    },
+    "history_response": {
+        "fields": {"transactions": {"description": "Список транзакцій по цьому рахунку."}}
+    }
+  },
+  "transaction": {
+    "errors": {
+        "create": {
+            "missing_account_identifier": "Має бути надано account_id в даних транзакції або user_id_for_account_lookup.",
+            "account_identification_failed": "Рахунок користувача не вдалося остаточно ідентифікувати або створити.",
+            "conflict": "Не вдалося створити транзакцію: конфлікт даних.",
+            "db_error": "Помилка бази даних під час обробки транзакції."
+        }
+    },
+    "fields": {
+        "account_id": {"description": "Ідентифікатор рахунку користувача. Якщо None, буде визначено через user_id_for_account_lookup."},
+        "transaction_type": {"description": "Тип транзакції."},
+        "amount": {"description": "Сума транзакції. Для списань може бути від'ємною, або завжди позитивною, а напрямок визначається типом."},
+        "description": {"description": "Опис або призначення транзакції."},
+        "related_task_completion_id": {"description": "ID пов'язаного виконання завдання (якщо транзакція є результатом завдання)."},
+        "related_reward_id": {"description": "ID пов'язаної отриманої нагороди (якщо транзакція є покупкою нагороди)."}
+    },
+    "create": {
+        "fields": {"created_by_user_id": {"description": "ID користувача (адміністратора), який ініціював ручну транзакцію (необов'язково)."}}
+    },
+    "response": {
+        "fields": {
+            "account_id": {"description": "Ідентифікатор рахунку користувача."},
+            "created_by_user_id": {"description": "ID користувача, який створив транзакцію (якщо є)."},
+            "created_by": {"description": "Інформація про користувача, який створив транзакцію (якщо є)."}
+        }
+    }
+  },
+  "reward": {
+    "errors": {
+        "name_exists_in_scope": "Нагорода з назвою '{name}' вже існує в {scope}.",
+        "create_conflict": "Не вдалося створити нагороду: конфлікт даних.",
+        "update_conflict": "Не вдалося оновити нагороду: конфлікт даних.",
+        "unavailable": {
+            "not_found": "Нагороду не знайдено.",
+            "inactive": "Нагорода неактивна.",
+            "not_yet_available": "Нагорода буде доступна з {date}.",
+            "expired": "Термін дії нагороди закінчився {date}.",
+            "insufficient_stock": "Недостатньо запасів для '{name}'. Доступно: {available_stock}."
+        },
+        "redeem": {
+            "unavailable_in_group_context": "Ця нагорода недоступна у вашому поточному контексті групи.",
+            "quantity_must_be_positive": "Кількість для отримання має бути позитивною.",
+            "user_limit_exceeded": "Перевищено ліміт отримання на користувача ({limit}). Вже отримано: {redeemed_count}.",
+            "internal_server_error": "Внутрішня помилка сервера при отриманні нагороди."
+        }
+    },
+    "transaction_description_redeemed": "Отримано {quantity}x '{name}'",
+    "fields": {
+        "name": {"description": "Назва нагороди."},
+        "description": {"description": "Детальний опис нагороди."},
+        "cost": {"description": "Вартість нагороди в одиницях бонусів групи."},
+        "quantity_available": {"description": "Доступна кількість цієї нагороди (NULL для необмеженої)."},
+        "icon_file_id": {"description": "ID завантаженого файлу іконки нагороди."},
+        "state": {"description": "Стан нагороди (наприклад, 'active', 'archived', 'out_of_stock')."},
+        "notes": {"description": "Додаткові нотатки щодо нагороди."}
+    },
+    "create": {
+        "fields": {"group_id": {"description": "Ідентифікатор групи, до якої належить ця нагорода."}}
+    },
+    "response": {
+        "fields": {
+            "cost": {"description": "Вартість нагороди в бонусах."},
+            "quantity_available": {"description": "Доступна кількість (NULL для необмеженої)."},
+            "icon_url": {"description": "URL іконки нагороди."}
+        }
+    },
+    "redeem_request": {
+        "fields": {
+            "reward_id": {"description": "Ідентифікатор нагороди, яку користувач хоче отримати."},
+            "quantity": {"description": "Кількість екземплярів нагороди для отримання (за замовчуванням 1)."}
+        }
+    }
+  },
+  "gamification": {
+    "level": {
+        "errors": {
+            "name_exists_in_scope": "{model_name} з назвою '{name}' вже існує в {scope}.",
+            "min_points_exists_in_scope": "{model_name} з необхідними балами '{points}' вже існує в {scope}.",
+            "icon_file_not_found": "Файл іконки з ID '{file_id}' не знайдено.",
+            "critical_create_failed": "Не вдалося отримати створений рівень.",
+            "create_conflict": "Не вдалося створити {model_name}: конфлікт даних.",
+            "critical_update_failed": "Не вдалося отримати оновлений рівень.",
+            "update_conflict": "Не вдалося оновити {model_name}: конфлікт даних."
+        },
+        "fields": {
+            "name": {"description": "Назва рівня гейміфікації."},
+            "description": {"description": "Опис умов або переваг цього рівня."},
+            "required_points": {"description": "Кількість балів, необхідна для досягнення цього рівня."},
+            "level_number": {"description": "Порядковий номер рівня (наприклад, 1, 2, 3). Використовується для сортування та визначення прогресу."},
+            "icon_url": {"description": "URL або шлях до іконки, що представляє рівень."},
+            "group_id": {"description": "ID групи, до якої належить цей рівень. NULL, якщо рівень глобальний/системний."},
+            "state": {"description": "Стан рівня (наприклад, 'active', 'inactive')."},
+            "notes": {"description": "Додаткові нотатки щодо рівня."}
+        },
+        "response": {
+            "fields": {"group": {"description": "Коротка інформація про групу, до якої належить рівень (якщо є)."}}
+        }
+    },
+    "user_level": {
+        "errors": {
+            "critical_update_failed": "Критична помилка: не вдалося отримати запис рівня користувача після оновлення.",
+            "update_create_conflict": "Не вдалося оновити/створити рівень користувача через конфлікт даних: {error_message}"
+        },
+        "fields": {
+            "user_id": {"description": "Ідентифікатор користувача, який досяг рівня."},
+            "level_id": {"description": "Ідентифікатор досягнутого рівня гейміфікації."},
+            "group_id": {"description": "Ідентифікатор групи, в межах якої досягнуто рівень (NULL для глобальних рівнів)."}
+        },
+        "response": {
+            "fields": {
+                "user": {"description": "Публічний профіль користувача."},
+                "level": {"description": "Інформація про досягнутий рівень."},
+                "group": {"description": "Коротка інформація про групу, в якій досягнуто рівень."}
+            }
+        }
+    },
+    "badge": {
+        "errors": {
+            "name_exists_in_scope": "{model_name} з назвою '{name}' вже існує в {scope}.",
+            "icon_file_not_found": "Файл іконки з ID '{file_id}' не знайдено.",
+            "critical_create_failed": "Не вдалося отримати створений бейдж.",
+            "create_conflict": "Не вдалося створити {model_name}: конфлікт даних.",
+            "critical_update_failed": "Не вдалося отримати оновлений бейдж.",
+            "update_conflict": "Не вдалося оновити {model_name}: конфлікт даних."
+        },
+        "fields": {
+            "name": {"description": "Назва бейджа гейміфікації."},
+            "description": {"description": "Опис умов отримання або значення цього бейджа."},
+            "icon_file_id": {"description": "ID завантаженого файлу іконки бейджа."},
+            "group_id": {"description": "ID групи, до якої належить цей бейдж. NULL, якщо бейдж глобальний/системний."},
+            "state": {"description": "Стан бейджа (наприклад, 'active', 'archived')."},
+            "notes": {"description": "Додаткові нотатки щодо бейджа."}
+        },
+        "response": {
+            "fields": {
+                "icon_url": {"description": "URL іконки бейджа."},
+                "group": {"description": "Коротка інформація про групу, до якої належить бейдж (якщо є)."}
+            }
+        }
+    },
+    "achievement": {
+        "errors": {
+            "not_found_by_id": "Бейдж з ID '{badge_id}' не знайдено.",
+            "badge_not_repeatable_and_awarded": "Бейдж '{badge_name}' (ID: {badge_id}) вже було надано цьому користувачеві в даному контексті і він не є повторюваним.",
+            "award_conflict": "Не вдалося нагородити досягненням через конфлікт даних: {error_message}",
+            "critical_award_failed": "Критична помилка: не вдалося отримати запис досягнення після збереження."
+        },
+        "fields": {
+            "user_id": {"description": "Ідентифікатор користувача, який отримав досягнення."},
+            "badge_id": {"description": "Ідентифікатор отриманого бейджа."},
+            "group_id": {"description": "ID групи, в контексті якої отримано досягнення (якщо бейдж груповий)."}
+        },
+        "response": {
+            "fields": {
+                "user": {"description": "Публічний профіль користувача."},
+                "badge": {"description": "Інформація про отриманий бейдж."},
+                "group": {"description": "Коротка інформація про групу, в якій отримано досягнення (якщо є)."}
+            }
+        }
+    },
+    "rating": {
+        "errors": {
+            "critical_update_create_failed": "Критична помилка: не вдалося оновити або створити запис рейтингу.",
+            "update_create_conflict": "Не вдалося оновити/створити рейтинг через конфлікт даних: {error_message}",
+            "critical_get_after_save_failed": "Критична помилка: Не вдалося отримати рейтинг після збереження."
+        },
+        "fields": {
+            "user_id": {"description": "Ідентифікатор користувача."},
+            "group_id": {"description": "Ідентифікатор групи, в якій розраховано рейтинг."},
+            "rating_score": {"description": "Розрахований рейтинг або кількість балів користувача."},
+            "period_start_date": {"description": "Дата початку періоду, за який розраховано рейтинг (якщо застосовно)."},
+            "period_end_date": {"description": "Дата кінця періоду, за який розраховано рейтинг (якщо застосовно)."},
+            "rating_type": {"description": "Тип рейтингу (наприклад, 'monthly', 'overall', 'weekly')."}
+        },
+        "response": {
+            "fields": {
+                "user": {"description": "Публічний профіль користувача."},
+                "group": {"description": "Коротка інформація про групу."}
+            }
+        }
+    }
+  },
+  "notification": {
+    "errors": {
+        "template": {
+            "not_found_by_id": "Шаблон сповіщення з ID '{template_id}' не знайдено.",
+            "not_found_by_name": "Шаблон сповіщення '{template_name}' не знайдено.",
+            "render_failed": "Не вдалося відрендерити шаблон сповіщення '{template_name}': {error_message}",
+            "render_unexpected_error": "Неочікувана помилка рендерингу шаблону '{template_name}'.",
+            "render_syntax_error": "Синтаксична помилка в шаблоні '{template_name}': {error_message} (рядок {line_number})",
+            "render_undefined_variable": "Відсутня змінна в контексті для шаблону '{template_name}': {error_message}",
+            "render_fallback": {
+                "body": "Помилка відображення сповіщення '{template_name}'. Будь ласка, зв'яжіться з підтримкою. Деталі: {error_details}",
+                "subject": "Помилка сповіщення: {template_name}"
+            }
+        },
+        "critical_create_failed_relations": "Критична помилка: не вдалося отримати щойно створене сповіщення зі зв'язками.",
+        "create_conflict": "Не вдалося створити сповіщення через конфлікт даних: {error_message}",
+        "delete_unauthorized": "Користувач ID '{user_id}' не авторизований для видалення сповіщення ID '{notification_id}' (власник: {owner_id})."
+    },
+    "delivery": {
+        "errors": {
+            "no_channel_or_contact": "Не знайдено каналу або контактної інформації для доставки.",
+            "retry_missing_data": "Відсутні дані для повтору.",
+            "retry_sender_not_found": "Відправник для каналу '{channel}' не знайдено для повтору."
+        }
+    },
+    "fields": {
+        "user_id": {"description": "Ідентифікатор користувача-отримувача."},
+        "template_id": {"description": "ID шаблону, на основі якого створено сповіщення (якщо є)."},
+        "title": {"description": "Заголовок сповіщення."},
+        "message": {"description": "Тіло сповіщення (відрендерений текст)."},
+        "notification_type": {"description": "Тип сповіщення."},
+        "related_entity_type": {"description": "Тип пов'язаної сутності."},
+        "related_entity_id": {"description": "ID пов'язаної сутності."},
+        "data_payload": {"description": "Додаткові структуровані дані для сповіщення (наприклад, для побудови посилань на клієнті)."}
+    },
+    "update": {
+        "fields": {"is_read": {"description": "Новий статус прочитання сповіщення."}}
+    },
+    "response": {
+        "fields": {
+            "is_read": {"description": "Статус прочитання сповіщення (True, якщо прочитано)."},
+            "read_at": {"description": "Час, коли сповіщення було позначено як прочитане."},
+            "user": {"description": "Інформація про користувача-отримувача (зазвичай не включається, оскільки запит іде від імені цього користувача)."},
+            "template": {"description": "Інформація про використаний шаблон сповіщення (якщо був)."},
+            "delivery_attempts": {"description": "Історія спроб доставки цього сповіщення."}
+        }
+    },
+    "template": {
+        "fields": {
+            "subject_template": {"description": "Шаблон теми сповіщення. Може містити плейсхолдери (наприклад, {{user_name}})."},
+            "body_template": {"description": "Шаблон тіла сповіщення. Може містити плейсхолдери та HTML/Markdown/текст залежно від типу."},
+            "template_type": {"description": "Тип/канал шаблону."}
+        }
+    },
+    "delivery_attempt": {
+        "fields": {
+            "notification_id": {"description": "Ідентифікатор сповіщення, яке намагалися доставити."},
+            "channel": {"description": "Канал доставки."},
+            "status": {"description": "Статус спроби доставки."},
+            "error_message": {"description": "Повідомлення про помилку, якщо доставка не вдалася."},
+            "external_message_id": {"description": "Зовнішній ID повідомлення від провайдера доставки (наприклад, SES Message ID, Twilio SID)."}
+        }
+    }
+  },
+  "integrations": {
+    "calendar": {
+        "event": {
+            "fields": {
+                "id": {"description": "Унікальний ID події від провайдера."},
+                "title": {"description": "Назва або короткий опис події."},
+                "start_time": {"description": "Час початку події (з інформацією про часовий пояс)."},
+                "end_time": {"description": "Час закінчення події (з інформацією про часовий пояс)."},
+                "description": {"description": "Детальний опис події."},
+                "location": {"description": "Місце проведення події."},
+                "is_all_day": {"description": "True, якщо подія триває весь день."},
+                "attendees": {"description": "Список email-адрес учасників."},
+                "meeting_link": {"description": "Посилання на онлайн-зустріч (наприклад, Google Meet, Teams)."}
+            }
+        },
+        "info": {
+            "fields": {
+                "id": {"description": "Унікальний ID календаря від провайдера."},
+                "name": {"description": "Відображуване ім'я календаря (наприклад, 'Основний', 'Робота')."},
+                "is_primary": {"description": "True, якщо це основний календар користувача на платформі."},
+                "can_edit": {"description": "True, якщо застосунок має права на запис до цього календаря."}
+            }
+        }
+    },
+    "google_calendar": {
+        "connect": {
+            "success_simulation": "Google Calendar успішно підключено (симуляція).",
+            "error_save_tokens_simulation": "Не вдалося зберегти токени (симуляція)."
+        }
+    },
+    "outlook_calendar": {
+        "connect": {
+            "success_simulation": "Outlook Calendar успішно підключено (симуляція).",
+            "error_save_tokens_simulation": "Не вдалося зберегти токени (симуляція)."
+        }
+    },
+    "messenger": {
+        "errors": {
+            "message_text_empty": "Текст повідомлення або блоки не можуть бути порожніми.",
+            "client_not_configured": "Клієнт {service_name} не налаштовано."
+        },
+        "user_profile": {
+            "fields": {
+                "id": {"description": "ID користувача, специфічний для платформи (наприклад, Telegram chat_id, Slack user_id)."},
+                "username": {"description": "Ім'я користувача (username) на платформі, якщо є."},
+                "full_name": {"description": "Повне ім'я користувача на платформі, якщо є."}
+            }
+        },
+        "message": {
+            "fields": {"text": {"description": "Текстовий вміст повідомлення."}}
+        },
+        "send_command": {
+            "fields": {
+                "recipient_platform_id": {"description": "ID отримувача, специфічний для платформи (ID користувача або каналу)."},
+                "message": {"description": "Об'єкт повідомлення для надсилання."}
+            }
+        },
+        "send_response": {
+            "fields": {
+                "status": {"description": "Статус надсилання ('success', 'failed', 'pending')."},
+                "platform_message_id": {"description": "ID повідомлення на зовнішній платформі, якщо є."},
+                "error_message": {"description": "Повідомлення про помилку, якщо статус 'failed'."}
+            }
+        }
+    }
+  },
+  "system": {
+    "settings": {
+        "fields": {
+            "key": {"description": "Унікальний програмний ключ налаштування."},
+            "name": {"description": "Людиночитана назва налаштування (для відображення в UI)."},
+            "description": {"description": "Детальний опис призначення та використання налаштування."},
+            "value_type": {"description": "Тип значення налаштування."},
+            "is_editable": {"description": "Чи може суперкористувач редагувати це налаштування через UI/API."},
+            "is_sensitive": {"description": "Чи є значення налаштування чутливим (наприклад, API ключ) і потребує маскування."}
+        },
+        "create": {
+            "fields": {"value": {"description": "Значення налаштування. Тип залежить від 'value_type' (наприклад, str, int, bool, dict)."}}
+        },
+        "update": {
+            "fields": {
+                "value": {"description": "Нове значення налаштування. Тип має відповідати 'value_type'."},
+                "name": {"description": "Нова людиночитана назва налаштування."},
+                "description": {"description": "Новий опис налаштування."},
+                "is_editable": {"description": "Новий статус можливості редагування."},
+                "is_sensitive": {"description": "Новий статус чутливості значення."}
+            }
+        },
+        "response": {
+            "fields": {"value": {"description": "Значення налаштування. Увага: чутливі значення можуть бути замасковані або відсутні."}}
+        }
+    },
+    "monitoring": {
+        "log": {
+            "fields": {
+                "timestamp": {"description": "Час виникнення події логу."},
+                "level": {"description": "Рівень логу."},
+                "message": {"description": "Основне повідомлення логу."},
+                "source": {"description": "Джерело події (наприклад, назва сервісу, модуля, функції)."},
+                "details": {"description": "Додаткові структуровані деталі у форматі JSON."},
+                "user_id": {"description": "ID користувача, пов'язаного з подією логу (якщо є)."}
+            },
+            "response": {
+                "fields": {"user": {"description": "Інформація про користувача, пов'язаного з логом (якщо є)."}}
+            }
+        },
+        "metric": {
+            "fields": {
+                "timestamp": {"description": "Час запису метрики."},
+                "metric_name": {"description": "Назва метрики (наприклад, 'api_response_time', 'db_query_duration')."},
+                "value": {"description": "Значення метрики."},
+                "unit": {"description": "Одиниця виміру метрики (наприклад, 'ms', 's', 'count', 'MB')."},
+                "tags": {"description": "Теги/мітки для групування або фільтрації метрик (ключ-значення JSON)."}
+            }
+        }
+    }
+  },
+  "file_record": {
+    "errors": {
+        "uploader_not_found": "Користувача-завантажувача з ID '{user_id}' не знайдено.",
+        "path_exists": "Запис файлу зі шляхом зберігання '{path}' вже існує (ID: {existing_id}).",
+        "critical_create_failed": "Помилка створення запису файлу: не вдалося отримати після збереження.",
+        "create_conflict": "Не вдалося створити запис файлу через конфлікт даних.",
+        "delete_in_use": "Запис файлу '{file_name}' використовується і не може бути видалений.",
+        "not_found_by_id": "Запис файлу з ID '{file_id}' не знайдено."
+    }
+  },
+  "file_upload": {
+    "errors": {
+        "critical_storage_setup_failed": "Критична помилка: не вдалося налаштувати директорії сховища файлів. {error_message}",
+        "invalid_file_name": "Надано недійсне ім'я файлу.",
+        "initiate": {
+            "size_must_be_positive": "Розмір файлу має бути більше нуля.",
+            "size_exceeds_limit": "Розмір файлу {size} байт перевищує максимум у {limit} байт.",
+            "mime_type_not_allowed": "Тип файлу '{mime_type}' не дозволено для завантаження."
+        },
+        "upload_chunk": {
+            "prepare_failed": "Помилка підготовки до завантаження для ID {upload_id}.",
+            "save_failed": "Не вдалося зберегти завантажені дані файлу для ID {upload_id}."
+        },
+        "complete": {
+            "invalid_file_name": "Надано недійсне ім'я файлу для завершення.",
+            "data_not_found": "Завантажені дані файлу не знайдено для сесії {upload_id}.",
+            "save_failed": "Не вдалося завершити збереження файлу.",
+            "file_record_creation_failed_internal": "Внутрішня помилка: FileRecordService.create_file_record повернув None."
+        }
+    },
+    "initiate": {
+        "success_message": "Завантаження ініційовано. Надсилайте дані файлу."
+    },
+    "upload_chunk": {
+        "last_chunk_received": "Дані файлу отримано. Готово до завершення.",
+        "chunk_received": "Частину {chunk_number} отримано. Очікується наступна."
+    },
+    "complete": {
+        "success_message": "Файл '{file_name}' успішно завантажено."
+    }
+  },
+  "user_avatar": {
+    "errors": {
+        "set": {
+            "invalid_image_file": "Файл '{file_name}' не є дійсним зображенням для аватара.",
+            "repository_error": "Помилка встановлення аватара на рівні репозиторію.",
+            "retrieve_after_save_failed": "Помилка встановлення аватара: не вдалося отримати запис після збереження.",
+            "conflict": "Не вдалося встановити аватар через конфлікт даних: {error_message}"
+        },
+        "deactivate": {
+            "permission_denied": "Ви не маєте дозволу на деактивацію цього аватара."
+        }
+    }
+  }
 }

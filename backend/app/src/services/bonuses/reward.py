@@ -32,6 +32,7 @@ from backend.app.src.schemas.bonuses.reward import (
 # AccountTransactionCreate не використовується напряму цим сервісом
 from backend.app.src.services.bonuses.account import UserAccountService
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 from backend.app.src.config import settings
 from backend.app.src.core.exceptions import RewardUnavailableError, RedemptionConditionError # Імпорт перенесених винятків
@@ -83,18 +84,24 @@ class RewardService(BaseService):
         logger.debug(f"Спроба створення нової винагороди '{reward_data.name}' користувачем ID: {creator_user_id}")
 
         if reward_data.group_id and not await self.db_session.get(Group, reward_data.group_id):
-            raise ValueError(f"Групу з ID '{reward_data.group_id}' не знайдено.")  # i18n
+            raise ValueError(_("group.errors.not_found_by_id", id=reward_data.group_id))
 
         stmt_name_check = select(Reward.id).where(Reward.name == reward_data.name)
-        scope_log_msg = "глобальній області"  # i18n
+        scope_log_msg_key = "global_scope"
+        scope_params = {}
         if reward_data.group_id:
             stmt_name_check = stmt_name_check.where(Reward.group_id == reward_data.group_id)
-            scope_log_msg = f"групі ID '{reward_data.group_id}'"  # i18n
+            scope_log_msg_key = "in_group_scope"
+            scope_params = {"group_id": reward_data.group_id}
         else:
             stmt_name_check = stmt_name_check.where(Reward.group_id.is_(None))
 
+        translated_scope_log_msg = _(scope_log_msg_key, **scope_params)
+
         if (await self.db_session.execute(stmt_name_check)).scalar_one_or_none():
-            raise ValueError(f"Винагорода з ім'ям '{reward_data.name}' вже існує в {scope_log_msg}.")  # i18n
+            # Log can use more detailed, non-translated scope if needed for internal debugging
+            logger.warning(f"Винагорода з ім'ям '{reward_data.name}' вже існує в {translated_scope_log_msg} (raw scope for log: group_id={reward_data.group_id}).")
+            raise ValueError(_("reward.errors.name_exists_in_scope", name=reward_data.name, scope=translated_scope_log_msg))
 
         new_reward_db = Reward(
             **reward_data.model_dump(),  # Pydantic v2
@@ -111,7 +118,7 @@ class RewardService(BaseService):
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності '{reward_data.name}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося створити винагороду: конфлікт даних.")  # i18n
+            raise ValueError(_("reward.errors.create_conflict", error_message=str(e)))
         except Exception as e:
             await self.rollback()
             logger.error(f"Неочікувана помилка '{reward_data.name}': {e}", exc_info=settings.DEBUG)
@@ -134,21 +141,26 @@ class RewardService(BaseService):
 
         if 'group_id' in update_data and reward_db.group_id != update_data['group_id']:
             if update_data['group_id'] and not await self.db_session.get(Group, update_data['group_id']):
-                raise ValueError(f"Нова група ID '{update_data['group_id']}' не знайдена.")  # i18n
+                raise ValueError(_("group.errors.not_found_by_id", id=update_data['group_id']))
 
         new_name = update_data.get('name', reward_db.name)
         new_group_id = update_data['group_id'] if 'group_id' in update_data else reward_db.group_id
         if ('name' in update_data and new_name != reward_db.name) or \
                 ('group_id' in update_data and new_group_id != reward_db.group_id):
             stmt_name_check = select(Reward.id).where(Reward.name == new_name, Reward.id != reward_id)
-            scope_log_msg = "глобальній області"  # i18n
+
+            scope_log_msg_key = "global_scope"
+            scope_params = {}
             if new_group_id is not None:
                 stmt_name_check = stmt_name_check.where(Reward.group_id == new_group_id)
-                scope_log_msg = f"групі ID '{new_group_id}'"  # i18n
+                scope_log_msg_key = "in_group_scope"
+                scope_params = {"group_id": new_group_id}
             else:
                 stmt_name_check = stmt_name_check.where(Reward.group_id.is_(None))
+
+            translated_scope_log_msg = _(scope_log_msg_key, **scope_params)
             if (await self.db_session.execute(stmt_name_check)).scalar_one_or_none():
-                raise ValueError(f"Інша винагорода '{new_name}' вже існує в {scope_log_msg}.")  # i18n
+                raise ValueError(_("reward.errors.name_exists_in_scope", name=new_name, scope=translated_scope_log_msg))
 
         for field, value in update_data.items():
             setattr(reward_db, field, value)
@@ -165,7 +177,7 @@ class RewardService(BaseService):
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності ID '{reward_id}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося оновити винагороду: конфлікт даних.")  # i18n
+            raise ValueError(_("reward.errors.update_conflict", error_message=str(e)))
         except Exception as e:
             await self.rollback()
             logger.error(f"Помилка оновлення ID '{reward_id}': {e}", exc_info=settings.DEBUG)
@@ -242,17 +254,16 @@ class RewardService(BaseService):
         current_time = datetime.now(timezone.utc)
 
         # Перевірка доступності винагороди
-        if not reward_db: raise RewardUnavailableError("Винагороду не знайдено.")  # i18n
-        if not reward_db.is_active: raise RewardUnavailableError("Винагорода неактивна.")  # i18n
+        if not reward_db: raise RewardUnavailableError(_("reward.errors.unavailable.not_found"))
+        if not reward_db.is_active: raise RewardUnavailableError(_("reward.errors.unavailable.inactive"))
         if reward_db.valid_from and reward_db.valid_from > current_time:
-            raise RewardUnavailableError(f"Винагорода буде доступна з {reward_db.valid_from.isoformat()}.")  # i18n
+            raise RewardUnavailableError(_("reward.errors.unavailable.not_yet_available", date=reward_db.valid_from.isoformat()))
         if reward_db.valid_until and reward_db.valid_until < current_time:
-            raise RewardUnavailableError(
-                f"Термін дії винагороди закінчився {reward_db.valid_until.isoformat()}.")  # i18n
+            raise RewardUnavailableError(_("reward.errors.unavailable.expired", date=reward_db.valid_until.isoformat()))
 
         # Перевірка контексту групи
         if reward_db.group_id is not None and reward_db.group_id != group_id_context:
-            raise RedemptionConditionError("Ця винагорода недоступна у вашому поточному контексті групи.")  # i18n
+            raise RedemptionConditionError(_("reward.errors.redeem.unavailable_in_group_context"))
 
         # Визначення рахунку для списання: груповий (якщо винагорода групова) або глобальний
         account_to_use_group_id = reward_db.group_id  # Якщо винагорода групова, то і рахунок груповий
@@ -266,11 +277,11 @@ class RewardService(BaseService):
                                                                                  group_id=account_to_use_group_id)
 
         quantity_to_redeem = redeem_data.quantity
-        if quantity_to_redeem <= 0: raise ValueError("Кількість для отримання має бути позитивною.")  # i18n
+        if quantity_to_redeem <= 0: raise ValueError(_("reward.errors.redeem.quantity_must_be_positive"))
 
         if reward_db.stock_available is not None and reward_db.stock_available < quantity_to_redeem:
             raise RewardUnavailableError(
-                f"Недостатньо запасів для '{reward_db.name}'. Доступно: {reward_db.stock_available}.")  # i18n
+                _("reward.errors.unavailable.insufficient_stock", name=reward_db.name, available_stock=reward_db.stock_available))
 
         if reward_db.max_per_user is not None:
             stmt = select(func.sum(UserRewardRedemption.quantity)).where(
@@ -281,12 +292,12 @@ class RewardService(BaseService):
             already_redeemed_count = (await self.db_session.execute(stmt)).scalar_one_or_none() or 0
             if (already_redeemed_count + quantity_to_redeem) > reward_db.max_per_user:
                 raise RedemptionConditionError(
-                    f"Перевищено ліміт отримання на користувача ({reward_db.max_per_user}). Вже отримано: {already_redeemed_count}.")  # i18n
+                    _("reward.errors.redeem.user_limit_exceeded", limit=reward_db.max_per_user, redeemed_count=already_redeemed_count))
 
         total_cost = Decimal(reward_db.points_cost) * quantity_to_redeem
         if Decimal(user_account_orm.balance) < total_cost:  # Баланс з ORM моделі
-            raise self.account_service.InsufficientFundsError(
-                current_balance=user_account_orm.balance)  # Використовуємо кастомну помилку з account_service
+            # The InsufficientFundsError itself is already internationalized at its definition
+            raise InsufficientFundsError(current_balance=user_account_orm.balance)
 
         try:
             # Списання балів через adjust_account_balance, який створює транзакцію
@@ -294,9 +305,9 @@ class RewardService(BaseService):
                 user_id=user_id,
                 group_id=account_to_use_group_id,  # Рахунок, з якого списуємо
                 amount=-total_cost,
-                transaction_type=TransactionType.REWARD_REDEMPTION, # Використання Enum
-                description=f"Отримано {quantity_to_redeem}x '{reward_db.name}'",  # i18n
-                related_entity_id=reward_id, # reward_id тепер int, adjust_account_balance очікує int
+                transaction_type=TransactionType.REWARD_REDEMPTION,
+                description=_("reward.transaction_description_redeemed", quantity=quantity_to_redeem, name=reward_db.name),
+                related_entity_id=reward_id,
                 commit_session=False  # Важливо! Комміт буде в кінці redeem_reward
             )
 
@@ -329,8 +340,8 @@ class RewardService(BaseService):
             logger.error(f"Неочікувана помилка '{user_id}', винагорода ID '{reward_id}': {e}", exc_info=settings.DEBUG)
             # Перетворюємо на специфічну помилку або ре-рейзимо оригінальну, якщо вона вже підходяща
             if not isinstance(e, (RewardUnavailableError, RedemptionConditionError,
-                                  self.account_service.InsufficientFundsError, ValueError)):
-                raise RuntimeError(f"Внутрішня помилка сервера при отриманні винагороди.")  # i18n
+                                  InsufficientFundsError, ValueError)): # Updated to use direct import
+                raise RuntimeError(_("reward.errors.redeem.internal_server_error"))
             raise
 
 

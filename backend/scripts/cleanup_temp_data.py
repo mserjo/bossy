@@ -17,19 +17,29 @@ import glob
 from datetime import datetime, timedelta, timezone
 from typing import List
 
-# Налаштування базового логування для скрипта
-# Використовуємо стандартний логер, оскільки цей скрипт є утилітою командного рядка
-# і може не мати доступу до конфігурації логування основного додатку.
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-logger = logging.getLogger(__name__)
-
-# Додавання шляху до батьківської директорії (backend), щоб дозволити імпорт з backend.app.src.*
-# Це корисно, якщо, наприклад, DEFAULT_TARGET_DIRECTORIES потрібно брати з backend.app.src.core.settings
+# --- Налаштування шляхів для імпорту модулів додатку ---
+# Додавання шляху до батьківської директорії (backend)
 SCRIPT_DIR = os.path.dirname(os.path.abspath(__file__))
 BACKEND_DIR = os.path.dirname(SCRIPT_DIR)  # Директорія 'backend'
 if BACKEND_DIR not in sys.path:
-    sys.path.append(BACKEND_DIR)
-    logger.debug(f"Додано '{BACKEND_DIR}' до sys.path для можливого імпорту модулів додатку.")
+    # Важливо додати шлях *перед* спробою імпорту з backend.app.src
+    sys.path.insert(0, BACKEND_DIR) # Використовуємо insert для пріоритету
+
+# --- Налаштування логування ---
+# Намагаємося імпортувати логер додатку. Якщо не вийде, використовуємо стандартний.
+try:
+    from backend.app.src.config.logging import get_logger
+    logger = get_logger(__name__)
+    logger.info("Використовується логер додатку для скрипта cleanup_temp_data.")
+except ImportError:
+    logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    logger = logging.getLogger(__name__)
+    logger.info("Логер додатку не знайдено (ImportError), використовується базовий логер для cleanup_temp_data.")
+
+# Логуємо інформацію про доданий шлях вже після ініціалізації логера
+# (Хоча сам факт додавання шляху був вище)
+# logger.debug(f"Перевірка sys.path: '{BACKEND_DIR}' має бути в sys.path для можливого імпорту модулів додатку.")
+
 
 # TODO: Розглянути можливість завантаження цих значень з конфігураційного файлу додатка,
 #       якщо скрипт буде тісно інтегрований з основним додатком.

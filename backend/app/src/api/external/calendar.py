@@ -16,9 +16,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from backend.app.src.api.dependencies import get_api_db_session  # Залежність для сесії БД
 from backend.app.src.services.integrations.google_calendar_service import GoogleCalendarService
 from backend.app.src.services.integrations.outlook_calendar_service import OutlookCalendarService
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config.logging import get_logger
 from backend.app.src.config import settings  # Для доступу до VALIDATION_TOKENS або Client State Secrets
 
+logger = get_logger(__name__)  # Централізований логер
 router = APIRouter()
 
 

@@ -19,7 +19,9 @@ import time  # Для перевірки timestamp в Slack запитах
 
 from backend.app.src.api.dependencies import get_api_db_session  # Залежність для сесії БД
 from backend.app.src.config import settings as global_settings  # Для секретів (Slack signing secret, Viber auth token тощо)
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config.logging import get_logger
+
+logger = get_logger(__name__) # Централізований логер
 
 # TODO: Імпортувати та ін'єктувати відповідні сервіси інтеграцій, коли вони будуть реалізовані
 # from backend.app.src.services.integrations import (

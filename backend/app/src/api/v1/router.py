@@ -18,7 +18,8 @@ from fastapi import APIRouter
 
 # --- Імпорт логера ---
 # Використовуємо централізований логер додатка.
-from backend.app.src.config.logging import logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # --- Імпорт під-маршрутизаторів для API v1 ---
 # Кожен з цих імпортів має вказувати на змінну типу APIRouter,

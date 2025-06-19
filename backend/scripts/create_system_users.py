@@ -35,13 +35,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Dict, Any, Optional  # Для типізації
 
 try:
-    from backend.app.src.config.logging import logger
-
+    from backend.app.src.config.logging import get_logger # Змінено імпорт
+    logger = get_logger(__name__) # Отримуємо логер для цього скрипта
     logger.info("Використовується логер додатку для скрипта create_system_users.")  # i18n
 except ImportError:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
-    logger.info("Логер додатку не знайдено, використовується базовий логер для create_system_users.")  # i18n
+    logger.info("Логер додатку не знайдено (ImportError), використовується базовий логер для create_system_users.")  # i18n
 
 from backend.app.src.core.database import get_db_session  # Для отримання сесії БД
 from backend.app.src.services.auth.user_service import UserService
@@ -285,11 +285,4 @@ if __name__ == "__main__":
     # 3. Довідники UserRole та UserType мають містити відповідні коди (SUPERUSER, ADMIN, BOT).
     # 4. Змінні середовища для паролів (ODIN_USER_PASSWORD, SHADOW_USER_PASSWORD, ROOT_USER_PASSWORD)
     #    можуть бути встановлені для використання визначених паролів. Якщо ні - будуть згенеровані випадкові.
-    main()
-
-if __name__ == "__main__":
-    # Для запуску: python backend/scripts/create_system_users.py
-    # Переконайтеся, що DATABASE_URL, а також ролі та типи користувачів в довідниках існують.
-    # Паролі для ODIN_USER_PASSWORD та SHADOW_USER_PASSWORD можна задати в .env.
-    # Якщо вони не задані, скрипт згенерує випадкові паролі та виведе їх в лог.
     main()

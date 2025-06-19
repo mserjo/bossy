@@ -151,6 +151,10 @@ class Settings(BaseSettings):
             return str(RedisDsn(f"{scheme}://:{values.get('REDIS_PASSWORD')}@{values.get('REDIS_HOST')}:{values.get('REDIS_PORT')}/{values.get('REDIS_DB')}"))
         return str(RedisDsn(f"{scheme}://{values.get('REDIS_HOST')}:{values.get('REDIS_PORT')}/{values.get('REDIS_DB')}"))
 
+    # --- Налаштування використання Redis та Celery ---
+    USE_REDIS: bool = True  # Чи використовувати Redis (для кешування, черг тощо)
+    USE_CELERY: bool = False # Чи використовувати Celery для фонових завдань (за замовчуванням False)
+
     # --- Налаштування JWT автентифікації ---
     # ВАЖЛИВО: Секретний ключ для генерації JWT токенів.
     # ПОТРІБНО ЗГЕНЕРУВАТИ НАДІЙНИЙ КЛЮЧ ТА ЗБЕРІГАТИ ЙОГО В БЕЗПЕЦІ!

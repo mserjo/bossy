@@ -72,7 +72,7 @@ class Settings(BaseSettings):
     """
 
     # --- Загальні налаштування програми ---
-    PROJECT_NAME: str = "BackendApp"
+    PROJECT_NAME: str = "Kudos Backend"
     DEBUG: bool = False  # Режим налагодження. Впливає на логування, показ помилок тощо.
     ENVIRONMENT: str = "development" # Середовище виконання (наприклад, development, staging, production)
     API_V1_STR: str = "/api/v1" # Префікс для API версії 1
@@ -87,8 +87,8 @@ class Settings(BaseSettings):
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "password"
-    POSTGRES_DB: str = "app_db"
+    POSTGRES_PASSWORD: str = "112233"
+    POSTGRES_DB: str = "bossy"
     # Асинхронний URL для підключення до бази даних (автоматично збирається)
     DATABASE_URL: Optional[PostgresDsn] = None
     # Синхронний URL для Alembic (офлайн режим) та інших синхронних операцій

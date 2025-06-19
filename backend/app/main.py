@@ -51,14 +51,23 @@ async def lifespan(current_app: FastAPI):
     setup_logging() # Застосовуємо конфігурацію логування
     logger.info(f"Запуск програми '{settings.PROJECT_NAME}' в середовищі '{settings.ENVIRONMENT}' з рівнем логування '{settings.LOGGING_LEVEL}'.")
 
-    # 2. Ініціалізація та перевірка з'єднання з Redis
-    try:
-        await get_redis_client() # Ініціалізує та перевіряє з'єднання
-        logger.info("Клієнт Redis успішно ініціалізовано та підключено.")
-    except Exception as e:
-        logger.error(f"Не вдалося ініціалізувати або підключитися до Redis під час запуску: {e}", exc_info=True)
-        # Залежно від критичності Redis, тут можна або продовжити роботу, або завершити програму.
-        # Наприклад: raise RuntimeError("Не вдалося підключитися до Redis, запуск програми скасовано.") from e
+    # 2. Ініціалізація та перевірка з'єднання з Redis (якщо увімкнено)
+    if settings.USE_REDIS:
+        try:
+            await get_redis_client() # Ініціалізує та перевіряє з'єднання
+            logger.info("Клієнт Redis успішно ініціалізовано та підключено (USE_REDIS=True).")
+        except Exception as e:
+            logger.error(f"Не вдалося ініціалізувати або підключитися до Redis під час запуску: {e}", exc_info=True)
+            # Залежно від критичності Redis, тут можна або продовжити роботу, або завершити програму.
+            # Наприклад: raise RuntimeError("Не вдалося підключитися до Redis, запуск програми скасовано.") from e
+    else:
+        logger.info("Використання Redis вимкнено (USE_REDIS=False). Пропуск ініціалізації клієнта Redis.")
+
+    # Логування стану використання Celery
+    if settings.USE_CELERY:
+        logger.info("Використання Celery увімкнено (USE_CELERY=True). Очікується, що Celery налаштовано та запущено окремо.")
+    else:
+        logger.info("Використання Celery вимкнено (USE_CELERY=False). Фонові завдання через Celery не будуть оброблятися.")
 
     # 3. Створення таблиць бази даних (ТІЛЬКИ для розробки/тестування, якщо не використовуються міграції Alembic)
     # УВАГА: У продакшен-середовищі для управління схемою БД слід використовувати Alembic.
@@ -80,9 +89,12 @@ async def lifespan(current_app: FastAPI):
     # --- Shutdown ---
     logger.info("Початок процесу завершення роботи програми Kudos...")
 
-    # 1. Закриття з'єднання з Redis
-    await close_redis_client()
-    logger.info("З'єднання з Redis закрито.")
+    # 1. Закриття з'єднання з Redis (якщо використовувався)
+    if settings.USE_REDIS:
+        await close_redis_client()
+        logger.info("З'єднання з Redis закрито (USE_REDIS=True).")
+    else:
+        logger.info("Використання Redis було вимкнено (USE_REDIS=False). Пропуск закриття з'єднання з Redis.")
 
     logger.info("Програма Kudos успішно завершила роботу.")
 

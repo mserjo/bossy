@@ -251,26 +251,25 @@ async def get_cache_service() -> BaseCacheService:
     global _cache_service_instance
 
     if _cache_service_instance is None:
-        # TODO: Розглянути можливість вибору реалізації кешу (Redis/InMemory) через налаштування settings.CACHE_TYPE
-        # Поки що використовуємо RedisCacheService, якщо доступний, інакше InMemoryCacheService.
         logger.info("Створення нового екземпляра CacheService.")
-        if settings.REDIS_HOST and settings.REDIS_PORT: # Припускаємо, що ці налаштування є
+        if settings.USE_REDIS and settings.REDIS_HOST and settings.REDIS_PORT:
             try:
-                # Спроба ініціалізувати RedisCacheService
-                # RedisCacheService сам обробляє підключення до пулу
                 _cache_service_instance = RedisCacheService()
-                # Можна додати перевірку з'єднання тут, якщо потрібно
-                # await _cache_service_instance._get_client() # Тест з'єднання
-                logger.info("Використовується RedisCacheService.")
+                # Можна додати перевірку з'єднання тут, якщо потрібно, хоча RedisCacheService може робити це "ліниво"
+                # await _cache_service_instance._get_client() # Приклад перевірки
+                logger.info("Використовується RedisCacheService (USE_REDIS=True та налаштування Redis присутні).")
             except Exception as e:
                 logger.error(f"Помилка ініціалізації RedisCacheService: {e}. Перехід на InMemoryCacheService.")
                 _cache_service_instance = InMemoryCacheService()
-                logger.info("Використовується InMemoryCacheService як запасний варіант.")
+                logger.info("Використовується InMemoryCacheService як запасний варіант після невдалої ініціалізації Redis.")
         else:
+            if not settings.USE_REDIS:
+                logger.info("Використання Redis вимкнено (USE_REDIS=False). Використовується InMemoryCacheService.")
+            else: # USE_REDIS is True, але REDIS_HOST або REDIS_PORT не налаштовані
+                logger.info("Конфігурація Redis (REDIS_HOST/REDIS_PORT) не знайдена, хоча USE_REDIS=True. Використовується InMemoryCacheService.")
             _cache_service_instance = InMemoryCacheService()
-            logger.info("Конфігурація Redis не знайдена. Використовується InMemoryCacheService.")
 
-    if _cache_service_instance is None: # Якщо ініціалізація все ще не вдалася
+    if _cache_service_instance is None: # Якщо ініціалізація все ще не вдалася (малоймовірно після змін)
         logger.error("Не вдалося створити жоден екземпляр CacheService!")
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Сервіс кешування недоступний.")
 

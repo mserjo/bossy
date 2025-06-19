@@ -26,8 +26,9 @@ from sqlalchemy.orm import DeclarativeBase, sessionmaker
 
 # Абсолютний імпорт налаштувань та логера
 from backend.app.src.config.settings import settings as app_settings # Перейменовано для уникнення конфлікту
-from backend.app.src.config.logging_config import logger
+from backend.app.src.config.logging import get_logger
 
+logger = get_logger(__name__)
 
 # --- Налаштування SQLAlchemy Engine ---
 # `engine` є центральним об'єктом доступу до бази даних для SQLAlchemy.

@@ -21,12 +21,13 @@ if BACKEND_DIR not in sys.path:
 # --- Імпорт компонентів додатку ---
 # Намагаємося імпортувати логер та FastAPI додаток.
 try:
-    from backend.app.src.config.logging import logger
+    from backend.app.src.config.logging import get_logger # Змінено імпорт
+    logger = get_logger(__name__) # Отримуємо логер для цього скрипта
     logger.info("Використовується логер додатку для скрипта generate_openapi_spec.") # i18n
 except ImportError:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
-    logger.info("Логер додатку не знайдено, використовується базовий логер для generate_openapi_spec.") # i18n
+    logger.info("Логер додатку не знайдено (ImportError), використовується базовий логер для generate_openapi_spec.") # i18n
 
 try:
     from backend.app.main import app # Імпорт FastAPI app інстансу

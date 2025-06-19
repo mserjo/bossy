@@ -28,15 +28,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Намагаємося імпортувати логер додатку. Якщо не вийде, використовуємо стандартний.
 try:
-    from backend.app.src.config.logging import logger
-
-    logger.info("Використовується логер додатку.")  # i18n
+    from backend.app.src.config.logging import get_logger # Змінено імпорт
+    logger = get_logger(__name__) # Отримуємо логер для цього скрипта
+    logger.info("Використовується логер додатку для скрипта create_superuser.") # i18n, додано уточнення
 except ImportError:
     # Якщо логер додатку не доступний (наприклад, скрипт запускається у зовсім іншому середовищі),
     # налаштовуємо базовий логер для цього скрипта.
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)  # Логер для цього модуля
-    logger.info("Логер додатку не знайдено, використовується базовий логер для скрипта.")  # i18n
+    logger.info("Логер додатку не знайдено (ImportError), використовується базовий логер для скрипта create_superuser.") # i18n, додано уточнення
 
 # Використовуємо get_db_session для отримання сесії в контексті скрипта
 from backend.app.src.core.database import get_db_session

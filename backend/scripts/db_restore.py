@@ -24,13 +24,13 @@ if BACKEND_DIR not in sys.path:
 
 # --- Імпорт компонентів додатку ---
 try:
-    from backend.app.src.config.logging import logger
-
+    from backend.app.src.config.logging import get_logger # Змінено імпорт
+    logger = get_logger(__name__) # Отримуємо логер для цього скрипта
     logger.info("Використовується логер додатку для скрипта db_restore.")  # i18n
 except ImportError:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
-    logger.info("Логер додатку не знайдено, використовується базовий логер для db_restore.")  # i18n
+    logger.info("Логер додатку не знайдено (ImportError), використовується базовий логер для db_restore.")  # i18n
 
 try:
     from backend.app.src.core.config import settings as app_settings

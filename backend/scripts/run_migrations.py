@@ -23,16 +23,18 @@ if BACKEND_DIR not in sys.path:
 
 # --- Налаштування логування ---
 try:
-    from backend.app.src.config.logging import logger
-
+    from backend.app.src.config.logging import get_logger # Змінено імпорт
+    logger = get_logger(__name__) # Отримуємо логер для цього скрипта
     logger.info("Використовується логер додатку для скрипта run_migrations.")  # i18n
 except ImportError:
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
     logger = logging.getLogger(__name__)
-    logger.info("Логер додатку не знайдено, використовується базовий логер для run_migrations.")  # i18n
+    logger.info("Логер додатку не знайдено (ImportError), використовується базовий логер для run_migrations.")  # i18n
 
-if BACKEND_DIR not in sys.path:  # Логуємо, якщо шлях було додано раніше
-    logger.info(f"Додано '{BACKEND_DIR}' до sys.path для Alembic.")  # i18n
+# Логування про додавання шляху після ініціалізації логера
+# if BACKEND_DIR not in sys.path: # Ця умова вже не актуальна
+# logger.info(f"Перевірка sys.path: '{BACKEND_DIR}' вже має бути в sys.path для Alembic.")
+
 
 # --- Імпорт Alembic ---
 try:

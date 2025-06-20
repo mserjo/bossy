@@ -1,66 +1,100 @@
-# backend/app/src/services/dictionaries/task_types.py
-from sqlalchemy.ext.asyncio import AsyncSession
+# backend/app/src/models/dictionaries/task_types.py
+# -*- coding: utf-8 -*-
+"""Модель SQLAlchemy для довідника "Типи завдань".
 
-from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
-from backend.app.src.models.dictionaries.task_types import TaskType # Модель SQLAlchemy
-from backend.app.src.repositories.dictionaries.task_type_repository import TaskTypeRepository # Імпорт репозиторію
-from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
-from backend.app.src.schemas.dictionaries.task_types import ( # Схеми Pydantic
-    TaskTypeCreateSchema, # Виправлено
-    TaskTypeUpdateSchema, # Виправлено
-    TaskTypeResponseSchema, # Виправлено
-)
+Цей модуль визначає модель `TaskType`, яка представляє записи в довіднику
+типів завдань. Ці типи використовуються для класифікації завдань в системі,
+наприклад: "Звичайне завдання", "Складне завдання", "Подія", "Штраф".
+Типи завдань можуть впливати на логіку їх обробки, нарахування балів,Add commentMore actions
+доступність для певних груп користувачів тощо.
+
+Модель успадковує `BaseDictionary`, що надає їй стандартний набір полів
+(id, name, description, code, часові мітки, тощо).
+"""
+
+# Абсолютний імпорт базової моделі для довідників
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
+# Можливі додаткові імпорти SQLAlchemy, якщо будуть специфічні поля:
+# from sqlalchemy.orm import Mapped, mapped_column
+# from sqlalchemy import Boolean, Integer
 
-class TaskTypeService(BaseDictionaryService[TaskType, TaskTypeRepository, TaskTypeCreateSchema, TaskTypeUpdateSchema, TaskTypeResponseSchema]):
+
+class TaskType(BaseDictionary):
+    """Модель SQLAlchemy для довідника "Типи завдань".
+    Представляє різні типи завдань, що можуть існувати в системіAdd commentMore actions
+    (наприклад, "REGULAR_TASK", "COMPLEX_TASK", "EVENT", "FINE").
+
+    Атрибути:
+        __tablename__ (str): Назва таблиці в базі даних: `task_types`.
+        __table_args__ (dict): Додаткові параметри таблиці, включаючи коментар.
+
+    Успадковані атрибути з `BaseDictionary`:
+        id (Mapped[uuid.UUID]): Унікальний ідентифікатор.
+        name (Mapped[str]): Людиночитана назва типу завдання.
+        description (Mappped[Optional[str]]): Опис типу завдання.
+        code (Mapped[str]): Унікальний текстовий код типу завдання.
+        icon (Mapped[Optional[str]]): Іконка.
+        color (Mapped[Optional[str]]): Колір.
+        та інші поля з `BaseMainModel`.
     """
-    Сервіс для управління елементами довідника "Типи Завдань".
-    Типи завдань визначають різні категорії завдань у системі, наприклад,
-    'ЗАГАЛЬНЕ_ЗАВДАННЯ', 'ВІДВІДУВАННЯ_ЗУСТРІЧІ', 'ПОДАЧА_ЗВІТУ'.
-    Кожен тип завдання може мати поле `default_points` для визначення балів за замовчуванням.
-    Успадковує загальні CRUD-операції від BaseDictionaryService.
-    """
+    __tablename__ = "task_types"
 
-    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService):
-        """
-        Ініціалізує сервіс TaskTypeService.
+    __table_args__ = ({'comment': 'Довідник типів завдань (наприклад, звичайне, складне, подія, штраф).'},)
 
-        :param db_session: Асинхронна сесія бази даних SQLAlchemy.
-        :param cache_service: Екземпляр сервісу кешування.
-        """
-        task_type_repo = TaskTypeRepository(model=TaskType)
-        super().__init__(
-            db_session,
-            repository=task_type_repo,
-            cache_service=cache_service,
-            response_schema=TaskTypeResponseSchema # Виправлено
-        )
-        # _model_name ініціалізується в BaseDictionaryService з repository.model.__name__
-        logger.info(f"TaskTypeService ініціалізовано для моделі: {self._model_name}")
+    # Якщо для типів завдань потрібні специфічні додаткові поля, їх можна визначити тут.
+    # Наприклад:
+    # default_points: Mapped[Optional[int]] = mapped_column(
+    #     Integer,
+    #     nullable=True,
+    #     comment="Кількість балів за замовчуванням для цього типу завдання."
+    # )
+    # is_penalty: Mapped[bool] = mapped_column(
+    #     Boolean,
+    #     default=False,
+    #     nullable=False,
+    #     comment="Чи є цей тип завдання штрафом (призводить до списання балів)."
+    # )
 
-    # --- Кастомні методи для TaskTypeService (якщо потрібні) ---
-    # Наприклад, якщо потрібно отримати типи завдань, які можуть мати бали за замовчуванням:
-    #
-    # async def get_task_types_with_default_points(self) -> List[TaskTypeResponse]:
-    #     """
-    #     Отримує типи завдань, для яких визначено бали за замовчуванням (default_points > 0).
-    #     Припускає наявність поля 'default_points' в моделі TaskType.
-    #     """
-    #     logger.debug(f"Отримання типів завдань з балами за замовчуванням ({self._model_name}).")
-    #     if not hasattr(self.model, 'default_points'):
-    #         logger.warning(f"Модель {self._model_name} не має атрибута 'default_points'. Повернення порожнього списку.")
-    #         return []
-    #
-    #     stmt = select(self.model).where(self.model.default_points > 0).order_by(self.model.name) # type: ignore
-    #     items_db = (await self.db_session.execute(stmt)).scalars().all()
-    #
-    #     response_list = [self.response_schema.model_validate(item) for item in items_db]
-    #     logger.info(f"Отримано {len(response_list)} типів завдань з балами за замовчуванням.")
-    #     return response_list
-    #
-    # Примітка: Поля 'code', 'name', 'description', 'default_points' обробляються базовим сервісом,
-    # якщо вони присутні в відповідних Pydantic схемах (Create, Update).
+    # _repr_fields визначаються в BaseDictionary та його батьківських класах.
+    # На цьому рівні немає додаткових полів для __repr__.
+    _repr_fields: tuple[str, ...] = ()
 
-logger.debug(f"{TaskTypeService.__name__} (сервіс типів завдань) успішно визначено.")
+
+if __name__ == "__main__":
+    # Демонстраційний блок для моделі TaskType.
+    logger.info("--- Модель Довідника: TaskType ---")
+    logger.info("Назва таблиці: %s", TaskType.__tablename__)
+    logger.info("Коментар до таблиці: %s", getattr(TaskType, '__table_args__', ({},))[0].get('comment', ''))
+
+    logger.info("\nОчікувані поля (успадковані та власні):")
+    expected_fields = [
+        'id', 'name', 'description', 'code', 'icon', 'color',
+        'created_at', 'updated_at', 'deleted_at', 'is_deleted',
+        'state_id', 'group_id', 'notes'
+        # 'default_points', 'is_penalty' # Якщо були б додані
+    ]
+    for field in expected_fields:
+        logger.info("  - %s", field)
+
+    # Приклад створення екземпляра (без взаємодії з БД)
+    from datetime import datetime, timezone
+
+    example_task_type = TaskType(
+        id=1, # id тепер Integer
+        name="Звичайне завдання", # TODO i18n: "Звичайне завдання"
+        description="Стандартний тип завдання з базовими параметрами та нарахуванням балів.", # TODO i18n
+        code="REGULAR_TASK",  # Може відповідати значенням з core.dicts.TaskType Enum
+        state_id=1 # Приклад ID активного стану
+        # default_points=10, # Якщо б поле було додано
+        # is_penalty=False   # Якщо б поле було додано
+    )
+    example_task_type.created_at = datetime.now(timezone.utc) # Імітація
+
+    logger.info("\nПриклад екземпляра TaskType (без сесії):\n  %s", example_task_type)
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <TaskType(id=..., name='Звичайне завдання', code='REGULAR_TASK', state_id=1, created_at=...)>
+
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

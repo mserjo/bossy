@@ -69,7 +69,7 @@ class Reward(BaseMainModel):
     # --- Зв'язки (Relationships) ---
     # group_id успадковано з BaseMainModel (через GroupAffiliationMixin)
     group: Mapped["Group"] = relationship(
-        foreign_keys=[BaseMainModel.group_id],  # Явно вказуємо foreign_keys
+        foreign_keys=["Reward.group_id"],  # Явно вказуємо foreign_keys, використовуючи ім'я поточного класу
         back_populates="rewards",
         lazy="selectin"
     )

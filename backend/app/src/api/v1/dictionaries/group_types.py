@@ -17,7 +17,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.src.api.dependencies import get_api_db_session, get_current_active_superuser, get_current_active_user, paginator
 from backend.app.src.models.auth.user import User as UserModel
-from backend.app.src.schemas.dictionaries.group_types import GroupTypeCreate, GroupTypeUpdate, GroupTypeResponse
+from backend.app.src.schemas.dictionaries.group_types import (
+    GroupTypeCreateSchema as GroupTypeCreate,
+    GroupTypeUpdateSchema as GroupTypeUpdate,
+    GroupTypeResponseSchema as GroupTypeResponse
+)
 from backend.app.src.services.dictionaries.group_types import GroupTypeService
 # from backend.app.src.repositories.dictionaries import GroupTypeRepository # Видалено
 from backend.app.src.core.pagination import PagedResponse, PageParams

@@ -6,9 +6,9 @@ from backend.app.src.models.dictionaries.group_types import GroupType # Моде
 from backend.app.src.repositories.dictionaries.group_type_repository import GroupTypeRepository # Імпорт репозиторію
 from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.group_types import ( # Схеми Pydantic
-    GroupTypeCreate,
-    GroupTypeUpdate,
-    GroupTypeResponse,
+    GroupTypeCreateSchema as GroupTypeCreate, # Змінено для відповідності файлу схем
+    GroupTypeUpdateSchema as GroupTypeUpdate, # Змінено для відповідності файлу схем
+    GroupTypeResponseSchema as GroupTypeResponse, # Змінено для відповідності файлу схем
 )
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)

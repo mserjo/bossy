@@ -5,11 +5,15 @@
 """
 from fastapi import APIRouter
 
+from . import delivery, notifications, templates
+
 notifications_router = APIRouter()
 
-# Тут будуть ендпоінти для перегляду сповіщень,
-# налаштування переваг сповіщень, відправки (якщо потрібно) тощо.
+# Підключення маршрутизаторів з окремих файлів
+notifications_router.include_router(notifications.router, prefix="/user", tags=["V1 Сповіщення - Користувацькі"]) # Assuming 'notifications.py' handles user-facing notifications
+notifications_router.include_router(templates.router, prefix="/templates", tags=["V1 Сповіщення - Шаблони"])
+notifications_router.include_router(delivery.router, prefix="/delivery-status", tags=["V1 Сповіщення - Статус доставки"])
 
-@notifications_router.get("/ping", tags=["V1 Сповіщення"])
-async def ping_notifications():
-    return {"message": "Notifications router is active!"}
+@notifications_router.get("/ping_notifications_main", tags=["V1 Сповіщення - Health Check"])
+async def ping_notifications_main():
+    return {"message": "Main Notifications router is active and includes sub-routers!"}

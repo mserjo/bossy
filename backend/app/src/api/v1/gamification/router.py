@@ -5,11 +5,16 @@
 """
 from fastapi import APIRouter
 
+from . import achievements, badges, levels, ratings
+
 gamification_router = APIRouter()
 
-# Тут будуть ендпоінти для рівнів, бейджів, рейтингів,
-# досягнень користувачів тощо.
+# Підключення маршрутизаторів з окремих файлів
+gamification_router.include_router(levels.router, prefix="/levels", tags=["V1 Гейміфікація - Рівні"])
+gamification_router.include_router(badges.router, prefix="/badges", tags=["V1 Гейміфікація - Бейджі"])
+gamification_router.include_router(achievements.router, prefix="/achievements", tags=["V1 Гейміфікація - Досягнення"])
+gamification_router.include_router(ratings.router, prefix="/ratings", tags=["V1 Гейміфікація - Рейтинги"])
 
-@gamification_router.get("/ping", tags=["V1 Гейміфікація"])
-async def ping_gamification():
-    return {"message": "Gamification router is active!"}
+@gamification_router.get("/ping_gamification_main", tags=["V1 Гейміфікація - Health Check"])
+async def ping_gamification_main():
+    return {"message": "Main Gamification router is active and includes sub-routers!"}

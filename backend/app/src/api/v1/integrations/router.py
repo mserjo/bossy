@@ -5,11 +5,14 @@
 """
 from fastapi import APIRouter
 
+from . import calendars, messengers
+
 integrations_router = APIRouter()
 
-# Тут будуть ендпоінти для налаштування інтеграцій
-# (наприклад, з календарями, месенджерами).
+# Підключення маршрутизаторів з окремих файлів
+integrations_router.include_router(calendars.router, prefix="/calendars", tags=["V1 Інтеграції - Календарі"])
+integrations_router.include_router(messengers.router, prefix="/messengers", tags=["V1 Інтеграції - Месенджери"])
 
-@integrations_router.get("/ping", tags=["V1 Інтеграції"])
-async def ping_integrations():
-    return {"message": "Integrations router is active!"}
+@integrations_router.get("/ping_integrations_main", tags=["V1 Інтеграції - Health Check"])
+async def ping_integrations_main():
+    return {"message": "Main Integrations router is active and includes sub-routers!"}

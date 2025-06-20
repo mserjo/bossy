@@ -5,11 +5,16 @@
 """
 from fastapi import APIRouter
 
+from . import accounts, bonus_rules, rewards, transactions
+
 bonuses_router = APIRouter()
 
-# Тут будуть ендпоінти для управління правилами нарахування бонусів,
-# перегляду рахунків користувачів, отримання винагород тощо.
+# Підключення маршрутизаторів з окремих файлів
+bonuses_router.include_router(accounts.router, prefix="/accounts", tags=["V1 Бонуси - Рахунки"])
+bonuses_router.include_router(bonus_rules.router, prefix="/rules", tags=["V1 Бонуси - Правила"])
+bonuses_router.include_router(rewards.router, prefix="/rewards", tags=["V1 Бонуси - Винагороди"])
+bonuses_router.include_router(transactions.router, prefix="/transactions", tags=["V1 Бонуси - Транзакції"])
 
-@bonuses_router.get("/ping", tags=["V1 Бонуси та Винагороди"])
-async def ping_bonuses():
-    return {"message": "Bonuses router is active!"}
+@bonuses_router.get("/ping_bonuses_main", tags=["V1 Бонуси та Винагороди - Health Check"])
+async def ping_bonuses_main():
+    return {"message": "Main Bonuses router is active and includes sub-routers!"}

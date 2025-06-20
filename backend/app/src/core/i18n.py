@@ -236,5 +236,3 @@ if __name__ == "__main__":
     # ContextVar should be back to 'uk' (its default)
     print(f"\n--- Switched back to DEFAULT_LANGUAGE (ContextVar default): {current_request_language.get()} ---")
     print(f"Greeting (uk again): {_('test.greeting', name='Україна')}")
-
-```

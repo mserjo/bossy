@@ -19,11 +19,8 @@
 # Припускаємо, що `settings.py` визначає об'єкт `app_settings` (або `settings`),
 # а `logging_config.py` надає налаштований логер `logger`.
 
-from backend.app.src.config.settings import get_settings
-from backend.app.src.config.logging_config import setup_logging
-
-# Отримуємо екземпляр налаштувань, щоб він був доступний як `config.settings`
-settings = get_settings()
+from backend.app.src.config.settings import settings
+from backend.app.src.config.logging import setup_logging
 
 # Налаштовуємо та отримуємо екземпляр логера
 logger = setup_logging()
@@ -33,7 +30,7 @@ logger = setup_logging()
 __all__ = [
     "settings",
     "logger",
-    "get_settings", # Також експортуємо фабричну функцію для налаштувань
+    "settings",
     "setup_logging",# Також експортуємо функцію налаштування логування
 ]
 

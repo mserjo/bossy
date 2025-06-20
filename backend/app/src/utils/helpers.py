@@ -10,7 +10,7 @@
 import logging  # Для локального використання в __main__
 from datetime import datetime, timezone
 
-from backend.app.src.config.logging_config import setup_logging
+from backend.app.src.config.logging import setup_logging
 logger = setup_logging()
 
 

@@ -15,7 +15,7 @@ import secrets
 import string
 from typing import List, Optional
 
-from backend.app.src.config.logging_config import setup_logging
+from backend.app.src.config.logging import setup_logging
 logger = setup_logging()
 
 # Спроба імпортувати бібліотеку python-slugify.

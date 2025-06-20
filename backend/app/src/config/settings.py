@@ -31,8 +31,7 @@ from dotenv import load_dotenv
 from pydantic import (AnyHttpUrl, EmailStr, PostgresDsn, RedisDsn,
                         ValidationInfo, field_validator)
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from backend.app.src.config.logging import get_logger
-logger = get_logger(__name__)
+# Імпорт get_logger та logger видалено звідси, буде імпортуватися локально за потребою
 
 # --- Визначення шляху до файлу .env ---
 # Пріоритет: спочатку шукаємо .env у директорії `backend/`, потім у корені проекту.
@@ -58,10 +57,10 @@ else:
 # `override=True` означає, що змінні з .env файлу перезапишуть системні змінні середовища.
 # Це зручно для локальної розробки. Для продакшену часто `override=False` або .env не використовується.
 if DOTENV_PATH:
-    logger.info("Завантаження змінних середовища з файлу: %s (override=True)", DOTENV_PATH)
+    # logger.info("Завантаження змінних середовища з файлу: %s (override=True)", DOTENV_PATH)
     load_dotenv(dotenv_path=DOTENV_PATH, override=True)
-else:
-    logger.info("Файл .env не знайдено. Налаштування будуть завантажені тільки зі змінних середовища.")
+# else:
+#     logger.info("Файл .env не знайдено. Налаштування будуть завантажені тільки зі змінних середовища.")
 
 
 class Settings(BaseSettings):
@@ -72,7 +71,7 @@ class Settings(BaseSettings):
     """
 
     # --- Загальні налаштування програми ---
-    PROJECT_NAME: str = "Kudos Backend"
+    PROJECT_NAME: str = "BackendApp"
     DEBUG: bool = False  # Режим налагодження. Впливає на логування, показ помилок тощо.
     ENVIRONMENT: str = "development" # Середовище виконання (наприклад, development, staging, production)
     API_V1_STR: str = "/api/v1" # Префікс для API версії 1
@@ -87,8 +86,8 @@ class Settings(BaseSettings):
     POSTGRES_SERVER: str = "localhost"
     POSTGRES_PORT: int = 5432
     POSTGRES_USER: str = "postgres"
-    POSTGRES_PASSWORD: str = "112233"
-    POSTGRES_DB: str = "bossy"
+    POSTGRES_PASSWORD: str = "password"
+    POSTGRES_DB: str = "app_db"
     # Асинхронний URL для підключення до бази даних (автоматично збирається)
     DATABASE_URL: Optional[PostgresDsn] = None
     # Синхронний URL для Alembic (офлайн режим) та інших синхронних операцій
@@ -190,7 +189,10 @@ class Settings(BaseSettings):
                 try:
                     return json.loads(v)
                 except json.JSONDecodeError:
-                    logger.warning(
+                    # Локальний імпорт та ініціалізація логера
+                    from backend.app.src.config.logging import get_logger
+                    val_logger = get_logger(__name__) # Можна використовувати інше ім'я, щоб не було конфлікту, якщо logger вже десь є
+                    val_logger.warning(
                         "Не вдалося розпарсити BACKEND_CORS_ORIGINS як JSON-рядок: '%s'. "
                         "Спробуємо розділити за комами.", v
                     )
@@ -254,22 +256,31 @@ settings = Settings()
 
 # Створення директорій для логів та завантажених файлів, якщо їх не існує
 # та якщо відповідні опції увімкнені.
-if settings.LOG_TO_FILE:
-    settings.LOG_DIR.mkdir(parents=True, exist_ok=True)
-    logger.info("Директорію для логів перевірено/створено: %s", settings.LOG_DIR.resolve())
 
-# Директорія для завантажених файлів створюється завжди, оскільки вона може знадобитися.
-settings.UPLOADED_FILES_DIR.mkdir(parents=True, exist_ok=True)
-logger.info("Директорію для завантажених файлів перевірено/створено: %s", settings.UPLOADED_FILES_DIR.resolve())
+# Локальний логер для цієї частини
+def _log_dir_creation():
+    from backend.app.src.config.logging import get_logger
+    dir_logger = get_logger(__name__ + ".dir_creation")
+    if settings.LOG_TO_FILE:
+        settings.LOG_DIR.mkdir(parents=True, exist_ok=True)
+        dir_logger.info("Директорію для логів перевірено/створено: %s", settings.LOG_DIR.resolve())
 
+    # Директорія для завантажених файлів створюється завжди, оскільки вона може знадобитися.
+    settings.UPLOADED_FILES_DIR.mkdir(parents=True, exist_ok=True)
+    dir_logger.info("Директорію для завантажених файлів перевірено/створено: %s", settings.UPLOADED_FILES_DIR.resolve())
+
+_log_dir_creation()
 
 # Блок для демонстрації завантажених налаштувань при прямому запуску файлу.
 if __name__ == "__main__":
-    logger.info("Використовується .env файл: %s", DOTENV_PATH if DOTENV_PATH else "Не знайдено або не використовується")
+    # Локальний імпорт та ініціалізація логера для __main__ блоку
+    from backend.app.src.config.logging import get_logger
+    main_logger = get_logger(__name__ + ".__main__")
+    main_logger.info("Використовується .env файл: %s", DOTENV_PATH if DOTENV_PATH else "Не знайдено або не використовується")
     if DOTENV_PATH:
-        logger.info("Чи існує .env файл за вказаним шляхом: %s", DOTENV_PATH.exists())
+        main_logger.info("Чи існує .env файл за вказаним шляхом: %s", DOTENV_PATH.exists())
 
-    logger.info("--- Завантажені налаштування програми (`settings`) ---")
+    main_logger.info("--- Завантажені налаштування програми (`settings`) ---")
     # Виводимо значення, приховуючи чутливі дані, такі як паролі та секретні ключі.
     for key, value in settings.model_dump().items():
         is_sensitive = any(
@@ -291,10 +302,10 @@ if __name__ == "__main__":
         else: # Default for non-sensitive or already handled sensitive values
             display_value = value
 
-        logger.info("%s: %s", key, display_value)
+        main_logger.info("%s: %s", key, display_value)
 
-    logger.info("Повний шлях до директорії проекту (PROJECT_ROOT_DIR): %s", settings.PROJECT_ROOT_DIR.resolve())
-    logger.info("Повний шлях до директорії вихідного коду додатка (APP_SOURCE_ROOT_DIR): %s", settings.APP_SOURCE_ROOT_DIR.resolve())
-    logger.info("Повний шлях до директорії статичних файлів (STATIC_FILES_DIR): %s", settings.STATIC_FILES_DIR.resolve())
-    logger.info("Повний шлях до директорії завантажених файлів (UPLOADED_FILES_DIR): %s", settings.UPLOADED_FILES_DIR.resolve())
-    logger.info("Повний шлях до директорії логів (LOG_DIR, якщо LOG_TO_FILE=True): %s", settings.LOG_DIR.resolve() if settings.LOG_TO_FILE else "Не використовується")
+    main_logger.info("Повний шлях до директорії проекту (PROJECT_ROOT_DIR): %s", settings.PROJECT_ROOT_DIR.resolve())
+    main_logger.info("Повний шлях до директорії вихідного коду додатка (APP_SOURCE_ROOT_DIR): %s", settings.APP_SOURCE_ROOT_DIR.resolve())
+    main_logger.info("Повний шлях до директорії статичних файлів (STATIC_FILES_DIR): %s", settings.STATIC_FILES_DIR.resolve())
+    main_logger.info("Повний шлях до директорії завантажених файлів (UPLOADED_FILES_DIR): %s", settings.UPLOADED_FILES_DIR.resolve())
+    main_logger.info("Повний шлях до директорії логів (LOG_DIR, якщо LOG_TO_FILE=True): %s", settings.LOG_DIR.resolve() if settings.LOG_TO_FILE else "Не використовується")

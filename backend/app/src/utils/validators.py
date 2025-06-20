@@ -12,7 +12,7 @@ import logging  # Для локального використання в __main
 import re
 from typing import Optional
 
-from backend.app.src.config.logging_config import setup_logging
+from backend.app.src.config.logging import setup_logging
 logger = setup_logging()
 
 # Визначення набору спеціальних символів для перевірки пароля.

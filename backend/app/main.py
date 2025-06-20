@@ -27,8 +27,8 @@ from backend.app.src.config.redis import get_redis_client, close_redis_client
 from backend.app.src.core.exceptions import AppException
 
 # TODO: Імпортувати головний маршрутизатор API, коли він буде створений
-# from backend.app.src.api.v1.api_router import api_router as api_v1_router
-# from backend.app.src.api.admin.admin_router import admin_router # Приклад для адмін-панелі
+from backend.app.src.api.v1.api_router import api_router as api_v1_router
+from backend.app.src.api.admin.admin_router import admin_router # Приклад для адмін-панелі
 
 # Ініціалізація логера для цього модуля
 # Важливо: setup_logging() має бути викликана до першого використання get_logger()

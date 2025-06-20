@@ -3,13 +3,13 @@
 """
 Головний агрегований маршрутизатор для API версії 1 (v1).
 
-Цей модуль визначає `v1_api_router` (екземпляр `APIRouter`), який об'єднує
+Цей модуль визначає `v1_router` (екземпляр `APIRouter`), який об'єднує
 всі окремі маршрутизатори для різних функціональних блоків API v1.
 Кожен функціональний блок (наприклад, автентифікація, користувачі, групи)
 має свій власний під-маршрутизатор, який імпортується та підключається тут
 з відповідним префіксом та тегами для документації OpenAPI.
 
-`v1_api_router` потім підключається до кореневого маршрутизатора додатка.
+`v1_router` потім підключається до кореневого маршрутизатора додатка.
 
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
@@ -65,7 +65,7 @@ ROUTERS_CONFIG = [
 
 for config in ROUTERS_CONFIG:
     try:
-        v1_router.include_router(config["router"], prefix=config["prefix"], tags=config["tags"]) # Змінено v1_api_router на v1_router
+        v1_router.include_router(config["router"], prefix=config["prefix"], tags=config["tags"])
         # i18n: Log message - Router connected successfully
         logger.info(_("Маршрутизатор v1.{name} успішно підключено з префіксом '{prefix}'.").format(name=config['name'], prefix=config['prefix']))
     except Exception as e:
@@ -79,7 +79,7 @@ for config in ROUTERS_CONFIG:
         )
 
 # --- Базовий ендпоінт для перевірки доступності API v1 ---
-@v1_router.get( # Змінено v1_api_router на v1_router
+@v1_router.get(
     "/ping",
     summary="Перевірка доступності API v1",
     description="Простий ендпоінт для перевірки, чи головний маршрутизатор API v1 (`v1_router`) активний та відповідає.",
@@ -97,7 +97,7 @@ async def ping_v1_api():
     }
 
 # i18n: Log message - V1 API router configured
-logger.info(_("Головний маршрутизатор API v1 (`v1_router`) налаштовано та агреговано всі під-маршрутизатори.")) # Змінено v1_api_router на v1_router
+logger.info(_("Головний маршрутизатор API v1 (`v1_router`) налаштовано та агреговано всі під-маршрутизатори."))
 
 # Змінна, що експортується для підключення до основного FastAPI додатку
 # (зазвичай в backend/app/main.py або backend/app/src/api/router.py)

@@ -23,7 +23,7 @@ from backend.app.src.utils.hash import get_password_hash, verify_password
 from backend.app.src.utils.helpers import get_current_utc_timestamp
 from backend.app.src.utils.security import generate_secure_random_string
 from backend.app.src.utils.validators import is_strong_password, is_valid_phone_number
-from backend.app.src.config.logging_config import setup_logging
+from backend.app.src.config.logging import setup_logging
 logger = setup_logging()
 
 

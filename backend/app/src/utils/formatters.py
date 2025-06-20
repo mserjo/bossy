@@ -11,7 +11,7 @@ from datetime import datetime, date, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Union, Optional
 
-from backend.app.src.config.logging_config import setup_logging
+from backend.app.src.config.logging import setup_logging
 logger = setup_logging()
 
 

@@ -35,7 +35,7 @@ if BACKEND_DIR not in sys.path:  # Логуємо, якщо шлях було д
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 
-from backend.app.src.core.database import get_db_session  # Для отримання сесії БД
+from backend.app.src.config.database import get_db_session  # Для отримання сесії БД
 # Головний сервіс для ініціалізації даних
 from backend.app.src.services.system.initial_data_service import InitialDataService
 

@@ -7,6 +7,7 @@
 типів груп (наприклад, "Сім'я", "Відділ", "Організація"
 відповідно до `core.dicts.GroupType` або технічного завдання).
 """
+# Видалено рядок: from backend.app.src.models.dictionaries.group_types import GroupType
 
 # Абсолютний імпорт базової моделі для довідників
 from backend.app.src.models.dictionaries.base_dict import BaseDictionary

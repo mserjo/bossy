@@ -8,7 +8,7 @@
 Модель також підтримує рекурентні завдання та ієрархію підзавдань.
 """
 import datetime as dt # Alias to distinguish from sqlalchemy.DateTime
-from typing import TYPE_CHECKING, List, Optional, Dict # Added Dict for JSON type hint
+from typing import TYPE_CHECKING, List, Optional, Dict, Any # Added Dict for JSON type hint, Added Any
 from decimal import Decimal  # Для полів балів/штрафів
 
 from sqlalchemy import String, ForeignKey, Text, Numeric, Boolean, Date # Added Date
@@ -87,7 +87,7 @@ class Task(BaseMainModel):
     #     index=True,
     #     comment="ID статусу завдання з довідника dict_statuses"
     # ) # ВИДАЛЕНО
-    due_date: Mapped[Optional[datetime]] = mapped_column(
+    due_date: Mapped[Optional[dt.datetime]] = mapped_column(
         nullable=True, comment="Термін виконання завдання (кінцева дата)"
     )
 
@@ -143,10 +143,10 @@ class Task(BaseMainModel):
     )
 
     # --- Поля, специфічні для Подій (якщо Task використовується і для подій) ---
-    event_start_time: Mapped[Optional[datetime]] = mapped_column(
+    event_start_time: Mapped[Optional[dt.datetime]] = mapped_column(
         nullable=True, comment="Час початку події (якщо завдання є подією)"
     )
-    event_end_time: Mapped[Optional[datetime]] = mapped_column(
+    event_end_time: Mapped[Optional[dt.datetime]] = mapped_column(
         nullable=True, comment="Час закінчення події (якщо завдання є подією)"
     )
     event_location: Mapped[Optional[str]] = mapped_column(

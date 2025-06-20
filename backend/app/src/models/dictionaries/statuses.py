@@ -13,6 +13,7 @@
 `code` (унікальний текстовий код статусу), а також часові мітки,
 можливість м'якого видалення та інші поля з `BaseMainModel`.
 """
+# Видалено рядок: from backend.app.src.models.dictionaries.statuses import Status
 
 # Імпорт базової моделі для довідників
 from backend.app.src.models.dictionaries.base_dict import BaseDictionary

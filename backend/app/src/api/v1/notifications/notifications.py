@@ -20,7 +20,7 @@ import uuid  # Для використання UUID як ID сповіщень, 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path, Body
 
 # --- Імпорт компонентів додатку ---
-from backend.app.src.core.database import get_db_session  # Залежність для сесії БД
+from backend.app.src.config.database import get_db_session  # Залежність для сесії БД
 from backend.app.src.api.dependencies import get_current_active_user, \
     get_current_active_superuser  # Залежності для користувачів
 from backend.app.src.models.auth import User as UserModel  # Модель користувача SQLAlchemy

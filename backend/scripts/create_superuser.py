@@ -39,7 +39,7 @@ except ImportError:
     logger.info("Логер додатку не знайдено (ImportError), використовується базовий логер для скрипта create_superuser.") # i18n, додано уточнення
 
 # Використовуємо get_db_session для отримання сесії в контексті скрипта
-from backend.app.src.core.database import get_db_session
+from backend.app.src.config.database import get_db_session
 from backend.app.src.services.auth.user_service import UserService
 from backend.app.src.schemas.auth.user_schemas import UserCreateSuperuserSchema
 from backend.app.src.models.auth import User as UserModel

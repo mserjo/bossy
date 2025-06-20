@@ -33,7 +33,7 @@
 
 # Імпорт та експорт базових класів моделей для легкого доступу з будь-якої точки програми.
 # Використовуємо абсолютні імпорти для ясності та надійності.
-from backend.app.src.models.base import Base, BaseModel, BaseMainModel
+from backend.app.src.models.base import Base, BaseMainModel
 from backend.app.src.models import mixins # Імпортуємо модуль mixins
 
 # Імпорт підпакетів моделей. Це робить їх доступними як атрибути пакету `models`.
@@ -55,7 +55,6 @@ logger = get_logger(__name__)
 __all__ = [
     # Базові класи
     "Base",
-    "BaseModel",
     "BaseMainModel",
     # Модуль міксинів
     "mixins",

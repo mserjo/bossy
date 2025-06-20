@@ -4,9 +4,8 @@ from starlette.requests import Request
 from starlette.responses import Response
 from typing import List, Optional, Callable, Awaitable # Додано Callable, Awaitable
 
-from backend.app.src.config.logging import get_logger
 from backend.app.src.core.i18n import current_request_language
-
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 SUPPORTED_LANGUAGES: List[str] = ["uk", "en"]

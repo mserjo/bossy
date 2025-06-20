@@ -6,15 +6,15 @@ from backend.app.src.models.dictionaries.statuses import Status # Модель S
 from backend.app.src.repositories.dictionaries.status_repository import StatusRepository # Імпорт репозиторію
 from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.statuses import ( # Схеми Pydantic
-    StatusCreate,
-    StatusUpdate,
-    StatusResponse,
+    StatusCreateSchema, # Виправлено
+    StatusUpdateSchema, # Виправлено
+    StatusResponseSchema, # Виправлено
 )
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 
-class StatusService(BaseDictionaryService[Status, StatusRepository, StatusCreate, StatusUpdate, StatusResponse]):
+class StatusService(BaseDictionaryService[Status, StatusRepository, StatusCreateSchema, StatusUpdateSchema, StatusResponseSchema]):
     """
     Сервіс для управління елементами довідника "Статуси".
     Статуси є загальними для системи і можуть застосовуватися до різних сутностей

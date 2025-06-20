@@ -43,7 +43,7 @@ except ImportError:
     logger = logging.getLogger(__name__)
     logger.info("Логер додатку не знайдено (ImportError), використовується базовий логер для create_system_users.")  # i18n
 
-from backend.app.src.core.database import get_db_session  # Для отримання сесії БД
+from backend.app.src.config.database import get_db_session  # Для отримання сесії БД
 from backend.app.src.services.auth.user_service import UserService
 from backend.app.src.schemas.auth.user_schemas import UserCreateSuperuserSchema, \
     UserCreateSchema  # Використовуємо обидві схеми

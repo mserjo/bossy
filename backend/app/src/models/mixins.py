@@ -152,13 +152,13 @@ class StateMixin:
         """ID стану/статусу сутності (зовнішній ключ до таблиці dict_statuses)."""
         # Використання %(table_name)s дозволяє Alembic автоматично підставляти
         # ім'я таблиці при генерації міграцій для ForeignKey.
-        fk_name = f"fk_{cls.__tablename__}_state_id" # Використовуємо f-string, оскільки %(table_name)s тут не працює напряму
+        # fk_name = f"fk_{cls.__tablename__}_state_id" # Видалено для уникнення AttributeError в абстрактних класах
                                                   # В Alembic env.py можна налаштувати convention для імен FK.
                                                   # Для простоти тут можна використовувати f-string,
                                                   # але стандартна конвенція Alembic з %(table_name)s краща,
                                                   # якщо налаштована в env.py -> context.configure(naming_convention=...)
         return mapped_column(
-            ForeignKey("dict_statuses.id", name=fk_name, use_alter=True), # Явне ім'я FK та use_alter, змінено на dict_statuses
+            ForeignKey("dict_statuses.id", use_alter=True), # Явне ім'я FK та use_alter, змінено на dict_statuses. Ім'я FK видалено.
             nullable=True, # Залежить від бізнес-логіки, чи може стан бути відсутнім
             index=True,
             comment="ID стану/статусу сутності (FK до таблиці dict_statuses)"
@@ -190,9 +190,9 @@ class GroupAffiliationMixin:
     @declared_attr
     def group_id(cls) -> Mapped[Optional[int]]:
         """ID групи, до якої належить ця сутність (необов'язково, FK до таблиці груп)."""
-        fk_name = f"fk_{cls.__tablename__}_group_id" # Див. коментар у StateMixin щодо іменування FK
+        # fk_name = f"fk_{cls.__tablename__}_group_id" # Видалено для уникнення AttributeError в абстрактних класах
         return mapped_column(
-            ForeignKey("groups.id", name=fk_name, ondelete="SET NULL", use_alter=True), # Явне ім'я FK та use_alter
+            ForeignKey("groups.id", ondelete="SET NULL", use_alter=True), # Явне ім'я FK та use_alter. Ім'я FK видалено.
             nullable=True,
             index=True,
             comment="ID групи, до якої належить сутність (FK до таблиці груп)"

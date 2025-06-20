@@ -13,7 +13,7 @@ from decimal import Decimal  # Для обробки типу Decimal
 import redis.asyncio as aioredis  # Використання асинхронних можливостей redis-py
 
 from backend.app.src.services.cache.base_cache import BaseCacheService
-from backend.app.src.config.redis import get_redis_pool  # Функція для отримання пулу з'єднань Redis
+from backend.app.src.config.redis import get_redis_client  # Змінено на get_redis_client
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
@@ -108,23 +108,6 @@ class RedisCacheService(BaseCacheService):
         # Краще покладатися на _get_client для ініціалізації при потребі.
         logger.info("RedisCacheService створено, клієнт буде ініціалізовано при першому використанні.")
 
-    def _initialize_client(self):
-        """Ініціалізує Redis клієнт, використовуючи глобальний пул з'єднань."""
-        if self._redis_client:  # Запобігання повторній ініціалізації, якщо вже є клієнт
-            return
-        try:
-            redis_pool = get_redis_pool()  # Отримання пулу з'єднань
-            if redis_pool:
-                self._redis_client = aioredis.Redis(connection_pool=redis_pool)
-                logger.info("RedisCacheService клієнт успішно ініціалізовано з використанням пулу з'єднань.")
-            else:
-                # Цей лог може бути надто гучним, якщо get_redis_pool сам логує помилку.
-                logger.error("Не вдалося отримати пул з'єднань Redis. RedisCacheService не функціонуватиме.")
-                self._redis_client = None
-        except Exception as e:
-            logger.error(f"Помилка під час ініціалізації Redis клієнта: {e}", exc_info=True)
-            self._redis_client = None
-
     async def _get_client(self) -> aioredis.Redis:
         """
         Забезпечує наявність активного Redis клієнта.
@@ -132,8 +115,19 @@ class RedisCacheService(BaseCacheService):
         :raises ConnectionError: Якщо клієнт не вдалося ініціалізувати.
         """
         if self._redis_client is None:
-            logger.info("Redis клієнт не ініціалізований. Спроба ініціалізації...")
-            self._initialize_client()  # Синхронний виклик для налаштування _redis_client
+            logger.info("Redis клієнт не ініціалізований. Спроба ініціалізації через get_redis_client...")
+            try:
+                # get_redis_client є асинхронною функцією
+                self._redis_client = await get_redis_client()
+                logger.info("RedisCacheService: клієнт успішно отримано/ініціалізовано.")
+            except ConnectionError as e:
+                logger.error(f"RedisCacheService: не вдалося ініціалізувати клієнта Redis через get_redis_client: {e}")
+                # Можна залишити self._redis_client як None, помилка буде кинута нижче
+                # або кинути помилку тут же
+                raise  # Перекидаємо помилку ConnectionError з get_redis_client
+            except Exception as e:
+                logger.error(f"RedisCacheService: неочікувана помилка при ініціалізації клієнта Redis: {e}", exc_info=True)
+                self._redis_client = None # Залишаємо None, щоб наступний блок кинув помилку
 
         if self._redis_client is None:
             # i18n

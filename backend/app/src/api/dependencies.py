@@ -11,7 +11,7 @@ from typing import AsyncGenerator, Optional, Any, Dict  # AsyncGenerator для 
 from fastapi import Depends, HTTPException, status, Path, Query
 from fastapi.security import OAuth2PasswordBearer
 from backend.app.src.config.settings import settings
-from backend.app.src.core.database import get_db_session  # Припускаємо, що ця функція існує
+from backend.app.src.config.database import get_db_session  # Припускаємо, що ця функція існує
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.src.services import (  # Імпортуємо реальні сервіси

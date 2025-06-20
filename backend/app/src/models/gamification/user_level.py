@@ -6,7 +6,7 @@
 користувачем певного рівня гейміфікації в межах конкретної групи.
 """
 from datetime import datetime, timezone  # timezone для __main__
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from sqlalchemy import ForeignKey, UniqueConstraint, Index, func
 from sqlalchemy.orm import Mapped, mapped_column, relationship

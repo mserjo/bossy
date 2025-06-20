@@ -7,16 +7,16 @@ from backend.app.src.models.dictionaries.user_types import UserType # Модел
 from backend.app.src.repositories.dictionaries.user_type_repository import UserTypeRepository # Імпорт репозиторію
 from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.user_types import ( # Схеми Pydantic
-    UserTypeCreate,
-    UserTypeUpdate,
-    UserTypeResponse,
+    UserTypeCreateSchema, # Виправлено
+    UserTypeUpdateSchema, # Виправлено
+    UserTypeResponseSchema, # Виправлено
 )
 from backend.app.src.config import settings # Для доступу до налаштувань системи (наприклад, коду типу користувача за замовчуванням)
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 
-class UserTypeService(BaseDictionaryService[UserType, UserTypeRepository, UserTypeCreate, UserTypeUpdate, UserTypeResponse]):
+class UserTypeService(BaseDictionaryService[UserType, UserTypeRepository, UserTypeCreateSchema, UserTypeUpdateSchema, UserTypeResponseSchema]):
     """
     Сервіс для управління елементами довідника "Типи Користувачів".
     Типи користувачів визначають різні категорії користувачів у системі

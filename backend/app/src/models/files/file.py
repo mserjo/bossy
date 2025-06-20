@@ -74,7 +74,7 @@ class FileRecord(Base, TimestampedMixin):
         SQLEnum(FileType), nullable=True, index=True, comment="Призначення файлу (avatar, task_attachment тощо)"
     )
 
-    metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(
+    file_metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(
         JSON, nullable=True, comment="Додаткові метадані файлу (наприклад, розміри зображення)"
     )
 

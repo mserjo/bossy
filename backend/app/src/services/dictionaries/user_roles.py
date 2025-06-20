@@ -6,15 +6,15 @@ from backend.app.src.models.dictionaries.user_roles import UserRole # Модел
 from backend.app.src.repositories.dictionaries.user_role_repository import UserRoleRepository # Імпорт репозиторію
 from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.user_roles import ( # Схеми Pydantic
-    UserRoleCreate,
-    UserRoleUpdate,
-    UserRoleResponse,
+    UserRoleCreateSchema, # Виправлено
+    UserRoleUpdateSchema, # Виправлено
+    UserRoleResponseSchema, # Виправлено
 )
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 
-class UserRoleService(BaseDictionaryService[UserRole, UserRoleRepository, UserRoleCreate, UserRoleUpdate, UserRoleResponse]):
+class UserRoleService(BaseDictionaryService[UserRole, UserRoleRepository, UserRoleCreateSchema, UserRoleUpdateSchema, UserRoleResponseSchema]):
     """
     Сервіс для управління елементами довідника "Ролі Користувачів".
     Ролі визначають набір прав та обов'язків користувачів у системі

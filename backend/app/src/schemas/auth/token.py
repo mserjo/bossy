@@ -1,4 +1,5 @@
 # backend/app/src/schemas/auth/token.py
+from backend.app.src.core.i18n import _
 """
 Pydantic схеми для JWT токенів.
 

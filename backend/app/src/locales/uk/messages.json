@@ -19,16 +19,66 @@
     },
     "account": {
       "insufficient_funds": "Недостатньо коштів на рахунку."
-    }
+    },
+    "generic_error_500": "Виникла непередбачена внутрішня помилка сервера. Будь ласка, спробуйте пізніше."
   },
   "dependencies": {
     "auth": {
-      "credentials_check_failed": "Не вдалося перевірити облікові дані.",
-      "malformed_token_payload": "Пошкоджене або неповне корисне навантаження токена.",
+      "credentials_check_failed": "Не вдалося валідувати облікові дані.",
+      "malformed_token_payload": "Некоректний формат токена.",
       "invalid_token_type": "Недійсний тип токена, очікується токен доступу.",
       "inactive_user": "Неактивний користувач.",
       "not_superuser": "Недостатньо прав (потрібен статус суперкористувача).",
-      "not_group_admin": "Ви не є адміністратором цієї групи."
+      "not_group_admin": "Ви не є адміністратором цієї групи.",
+      "invalid_user_id_in_token": "Некоректний формат ідентифікатора користувача в токені.",
+      "user_associated_with_token_not_found": "Користувача, пов'язаного з токеном, не знайдено.",
+      "inactive_user_account": "Обліковий запис користувача неактивний.",
+      "not_superuser_detail": "Недостатньо прав: потрібні права суперкористувача.",
+      "not_active_member_or_no_role_in_group": "Ви не є активним членом цієї групи або не маєте призначеної ролі.",
+      "not_group_admin_insufficient_rights": "Недостатньо прав: потрібні права адміністратора цієї групи."
+    },
+    "log": {
+      "invalid_token_or_sub_missing": "Невалідний токен або відсутній 'sub'. Токен: {token_start}...",
+      "token_payload_validation_error": "Помилка валідації TokenPayload: {error}. Payload: {payload_dict}",
+      "token_payload_success": "Payload токена успішно отримано для sub: {sub}",
+      "sub_missing_in_token_payload": "Відсутній 'sub' (user_id) в payload токена.",
+      "sub_conversion_to_int_failed": "Не вдалося конвертувати 'sub' з токена ('{sub_value}') в int.",
+      "user_from_token_not_found_in_db": "Користувача з id '{user_id}' (з токена) не знайдено в БД.",
+      "user_retrieved_from_db": "Користувача '{username}' (id: {user_id}) отримано з БД.",
+      "inactive_user_access_attempt": "Спроба доступу неактивним користувачем '{username}' (id: {user_id}).",
+      "user_is_active": "Користувач '{username}' активний.",
+      "superuser_action_attempt_by_non_superuser": "Користувач '{user_email}' (ID: {user_id}) намагався виконати дію, доступну лише суперкористувачу.",
+      "superuser_action_attempt_by_non_superuser_detail": "Користувач '{username}' (id: {user_id}) не є суперюзером. Доступ заборонено.",
+      "superuser_confirmed": "Суперкористувач {user_email} (ID: {user_id}) підтверджений.",
+      "superuser_auth_success": "Користувач '{username}' успішно авторизований як суперюзер.",
+      "group_admin_check_start": "Перевірка прав адміна групи для користувача '{username}' (ID: {user_id}) в групі ID: {group_id}",
+      "group_admin_superuser_access": "Користувач '{user_email}' є суперкористувачем, надано адміністративний доступ до групи ID {group_id}.",
+      "group_admin_superuser_override_log": "Користувач '{username}' є суперюзером, доступ дозволено.",
+      "group_admin_not_admin": "Користувач '{user_email}' (ID: {user_id}) не є адміністратором групи ID {group_id}.",
+      "group_admin_not_active_member_or_no_role": "Користувач '{username}' не є активним членом або не має ролі в групі ID '{group_id}'.",
+      "group_admin_not_admin_role": "Користувач '{username}' (ID: {user_id}) не є адміністратором групи ID '{group_id}' (роль: {role_code}). Доступ заборонено.",
+      "group_admin_confirmed": "Користувач '{user_email}' підтверджений як адміністратор групи ID {group_id}.",
+      "group_admin_auth_success": "Користувач '{username}' авторизований як адміністратор групи ID '{group_id}'.",
+      "no_token_data": "немає даних токена",
+      "cache_service_new_instance": "Створення нового екземпляра CacheService.",
+      "cache_service_redis_used": "Використовується RedisCacheService (USE_REDIS=True та налаштування Redis присутні).",
+      "cache_service_redis_init_error": "Помилка ініціалізації RedisCacheService: {error}. Перехід на InMemoryCacheService.",
+      "cache_service_inmemory_fallback_after_redis_error": "Використовується InMemoryCacheService як запасний варіант після невдалої ініціалізації Redis.",
+      "cache_service_redis_disabled": "Використання Redis вимкнено (USE_REDIS=False). Використовується InMemoryCacheService.",
+      "cache_service_redis_misconfigured": "Конфігурація Redis (REDIS_HOST/REDIS_PORT) не знайдена, хоча USE_REDIS=True. Використовується InMemoryCacheService.",
+      "cache_service_instance_creation_failed": "Не вдалося створити жоден екземпляр CacheService!",
+      "module_loaded_and_configured": "Модуль залежностей 'api.dependencies' завантажено та налаштовано з реальними сервісами."
+    },
+    "descriptions": {
+      "group_id_for_admin_check": "ID групи для перевірки прав адміністратора",
+      "group_id_for_admin_check_path": "ID групи для перевірки прав адміністратора",
+      "pagination_skip": "Кількість елементів для пропуску (для пагінації)",
+      "pagination_skip_desc": "Кількість елементів для пропуску (для пагінації)",
+      "pagination_limit": "Максимальна кількість елементів для повернення (для пагінації)",
+      "pagination_limit_desc": "Максимальна кількість елементів для повернення (для пагінації)"
+    },
+    "errors": {
+        "cache_service_unavailable": "Сервіс кешування недоступний."
     }
   },
   "user": {
@@ -1008,5 +1058,502 @@
     }
   },
   "global_scope": "глобальній області",
-  "in_group_scope":"групі ID '{group_id}'"
+  "in_group_scope":"групі ID '{group_id}'",
+  "main": {
+    "welcome_message": "Ласкаво просимо до API '{project_name}'!"
+  },
+  "redis": {
+    "error": {
+      "url_not_configured_log": "REDIS_URL не налаштовано. Неможливо ініціалізувати клієнт Redis.",
+      "url_not_configured_user": "URL для підключення до Redis (REDIS_URL) не налаштовано в конфігурації.",
+      "connect_failed_log": "Помилка підключення до Redis ({url}): {error}",
+      "connect_failed_user": "Не вдалося підключитися до Redis ({url}) або виконати PING: {error}",
+      "close_connection_failed": "Помилка під час закриття з'єднання з Redis: {error}"
+    },
+    "info": {
+      "connecting_attempt": "Спроба підключення до Redis за адресою: %s",
+      "connect_ping_success": "Успішно підключено до Redis та отримано відповідь на PING: %s",
+      "closing_connection": "Закриття з'єднання з Redis...",
+      "connection_closed_success": "З'єднання з Redis успішно закрито.",
+      "close_attempt_not_initialized": "Спроба закрити з'єднання з Redis, але клієнт не був ініціалізований."
+    },
+    "debug": {
+      "client_provided_for_request": "Надано клієнт Redis ({client_id}) для обробника запиту.",
+      "client_usage_finished_for_request": "Завершено використання клієнта Redis ({client_id}) для поточного запиту."
+    },
+    "test": {
+      "starting_module_test": "=== Запуск тестування модуля Redis ===",
+      "client_obtained_success": "Клієнт Redis успішно отримано: {client_obj}",
+      "example_value": "Привіт від Kudos з Redis! Перевірка UTF-8: українські літери.",
+      "key_set_success": "Тестовий ключ '{key}' успішно встановлено зі значенням '{value}'.",
+      "value_retrieved_success": "Отримане значення з Redis для ключа '{key}': '{value}'",
+      "assertion_value_mismatch": "Отримане значення '{retrieved}' не співпадає з очікуваним '{expected}'.",
+      "key_deleted_success": "Тестовий ключ '{key}' успішно видалено.",
+      "assertion_key_exists_after_delete": "Ключ все ще існує після видалення.",
+      "operations_successful": "Тестування операцій Redis пройшло успішно.",
+      "connection_error": "Помилка з'єднання під час тестування Redis: {error}",
+      "unexpected_error": "Неочікувана помилка під час тестування Redis: {error}",
+      "finishing_test_closing_connection": "Завершення тестування модуля Redis, спроба закрити з'єднання...",
+      "assertion_global_client_not_reset": "Глобальний _redis_client не було скинуто після close_redis_client.",
+      "finished": "Тестування Redis завершено."
+    }
+  },
+  "constants": {
+    "default_group_name": "Моя група"
+  },
+  "permissions": {
+    "errors": {
+      "generic_permission_denied": "Помилка дозволу.",
+      "not_authenticated": "Необхідна автентифікація.",
+      "access_denied": "Доступ заборонено.",
+      "not_implemented_dev_message": "Метод has_permission не реалізований у підкласі.",
+      "insufficient_rights": "У вас недостатньо прав для виконання цієї дії.",
+      "auth_required_for_action": "Для цієї дії необхідна автентифікація.",
+      "superuser_required_for_action": "Ця дія доступна тільки суперкористувачам.",
+      "group_admin_required_for_action": "Ви повинні бути адміністратором групи для виконання цієї дії.",
+      "group_id_config_error_dev": "Помилка конфігурації: group_id не надано для IsGroupAdmin.",
+      "allow_all_should_not_deny": "Дозвіл AllowAll не повинен викликати відмову.",
+      "access_denied_default_message_for_dependency": "Доступ заборонено.",
+      "permission_config_error_dev_message": "Помилка конфігурації перевірки дозволів.",
+      "invalid_group_id_format_user_message": "Недійсний формат ID групи у шляху.",
+      "require_roles_user_not_authed": "Доступ заборонено: користувача не автентифіковано.",
+      "require_roles_user_config_error": "Помилка конфігурації ролей користувача.",
+      "specific_system_roles_required": "Для цієї дії потрібна одна з наступних системних ролей: {roles}.",
+      "group_id_not_provided": "Ідентифікатор групи не було надано в запиті.",
+      "group_id_invalid": "Наданий ідентифікатор групи '{group_id_str}' не є валідним.",
+      "group_member_required": "Ви повинні бути учасником групи для виконання цієї дії.",
+      "object_owner_required": "Ви не є власником цього об'єкта.",
+      "object_owner_model_undefined_dev": "Клас IsObjectOwner потребує визначення атрибуту 'model'.",
+      "object_id_not_provided": "Ідентифікатор об'єкта '{id_param_name}' не було надано.",
+      "object_id_invalid_format": "Наданий ідентифікатор об'єкта '{object_id_str}' не є валідним.",
+      "object_owner_config_error_dev": "Помилка конфігурації перевірки власності об'єкта.",
+      "combined_or_failed": "Доступ заборонено: не виконано жодну з необхідних умов.",
+      "combined_and_failed_condition": "Доступ заборонено: не виконано одну з необхідних умов."
+    },
+    "log": {
+      "access_denied_user_perm_path": "Користувачу '{user_identifier}' відмовлено в доступі через перевірку '{permission_name}' до шляху '{path}'",
+      "is_authenticated_check": "IsAuthenticated: Користувач '{user_email}', активний: {is_active}. Дозвіл: {is_permitted}",
+      "anonymous_user_log": "Анонімний",
+      "is_superuser_check": "IsSuperuser: Користувач '{user_email}', суперкористувач: {is_superuser}. Дозвіл: {is_permitted}",
+      "system_user_check_no_id": "Перевірка IsSystemUser: користувач не має атрибута 'id' або він None.",
+      "system_user_no_role_or_not_found": "Користувач ID {user_id} не має системної ролі або не знайдений для перевірки IsSystemUser (потрібні: {required_roles}).",
+      "system_user_check_role": "Перевірка IsSystemUser: користувач ID {user_id} має системну роль '{user_role}', потрібні: {required_roles}.",
+      "is_group_admin_inactive_user": "IsGroupAdmin: Спроба перевірки для неактивного або неавтентифікованого користувача.",
+      "is_group_admin_no_group_id_config_error": "IsGroupAdmin: group_id не було надано для перевірки дозволу. Це помилка конфігурації шляху або залежності.",
+      "is_group_admin_check": "IsGroupAdmin: Перевірка користувача '{user_email}' (ID: {user_id}) для групи ID: {group_id}.",
+      "is_group_admin_superuser_override": "IsGroupAdmin: Користувач '{user_email}' є суперкористувачем. Надано доступ до групи {group_id} (обхід).",
+      "is_group_admin_access_granted": "IsGroupAdmin: Користувач '{user_email}' (ID: {user_id}) є адміністратором групи {group_id}. Дозвіл надано.",
+      "is_group_admin_access_denied": "IsGroupAdmin: Користувач '{user_email}' (ID: {user_id}) не є адміністратором групи {group_id}. Дозвіл відхилено.",
+      "group_id_missing_path": "IsGroupAdmin: 'group_id' не знайдено в параметрах шляху для URL: {url_path}",
+      "group_id_invalid_format": "IsGroupAdmin: 'group_id' ('{group_id_str}') не є валідним числом для URL: {url_path}",
+      "group_member_id_missing": "IsGroupMember: 'group_id' не знайдено в параметрах шляху для URL: {url_path}",
+      "group_member_id_invalid": "IsGroupMember: 'group_id' ('{group_id_str}') не є валідним числом для URL: {url_path}",
+      "group_member_superuser_access": "IsGroupMember: Користувач ID {user_id} є суперкористувачем, доступ до групи ID {group_id} дозволено.",
+      "group_member_not_member": "IsGroupMember: Користувач ID {user_id} не є членом групи ID {group_id}.",
+      "group_member_access_granted": "IsGroupMember: Користувач ID {user_id} є членом групи ID {group_id}. Доступ дозволено.",
+      "object_owner_id_param_missing": "IsObjectOwner: Параметр ID '{id_param_name}' не знайдено в шляху для моделі '{model_name}', URL: {url_path}",
+      "object_owner_id_param_invalid": "IsObjectOwner: Параметр ID '{id_param_name}' ('{object_id_str}') не є валідним числом для моделі '{model_name}', URL: {url_path}",
+      "object_owner_superuser_access": "IsObjectOwner: Користувач ID {user_id} є суперкористувачем, доступ до об'єкта {model_name} ID {object_id} дозволено.",
+      "object_owner_not_found": "IsObjectOwner: Об'єкт {model_name} ID {object_id} не знайдено. Користувач ID {user_id}.",
+      "object_owner_field_missing_config_error": "IsObjectOwner: Модель '{model_name}' не має поля '{user_field_name}' або воно None для об'єкта ID {object_id}. Помилка конфігурації дозволу.",
+      "object_owner_access_granted": "IsObjectOwner: Користувач ID {user_id} є власником об'єкта {model_name} ID {object_id}. Доступ дозволено.",
+      "object_owner_not_owner": "IsObjectOwner: Користувач ID {user_id} не є власником (власник ID {owner_id}) об'єкта {model_name} ID {object_id}.",
+      "allow_all_access_granted": "AllowAll: Дозвіл надано для користувача '{user_email}'.",
+      "permission_dependency_superuser_override": "Дозвіл автоматично надано суперкористувачу '{user_email}'.",
+      "permission_dependency_invalid_group_id_format": "Недійсний формат group_id у шляху: '{group_id_str}'.",
+      "permission_dependency_no_results_config_error": "Список дозволів для перевірки був порожній або не вдалося отримати результати.",
+      "permission_dependency_access_denied_user": "Користувачу '{user_email}' відмовлено в доступі. Результати перевірок: {results} (вимагалося {require_all_str}).",
+      "all_log": "всі",
+      "any_log": "будь-який",
+      "permission_dependency_access_granted_user": "Користувачу '{user_email}' надано доступ. Результати перевірок: {results}.",
+      "combined_or_permission_exception": "Дозвіл {permission_name} викликав виняток: {error_detail}",
+      "require_roles_user_not_found": "@require_roles: Користувача не знайдено в аргументах функції. Доступ заборонено.",
+      "require_roles_user_no_roles_attr": "@require_roles: Об'єкт користувача '{user_email}' не має атрибута 'roles'.",
+      "require_roles_access_granted_placeholder": "@require_roles: Користувач '{user_email}' має доступ (плейсхолдер).",
+      "test_logging_setup_success": "Логування налаштовано для тестування permissions.py.",
+      "test_logging_setup_failed_fallback": "Не вдалося імпортувати setup_logging. Використовується базова конфігурація логування."
+    },
+    "test": {
+        "module_demonstration_header": "--- Демонстрація Модуля Дозволів ---",
+        "module_description": "Цей модуль визначає класи дозволів та фабрику залежностей для FastAPI.",
+        "test_group_name": "Тестова Група",
+        "granted_log": "НАДАНО",
+        "denied_log": "ВІДМОВЛЕНО",
+        "log_invalid_group_id_format_in_test": "Тест {perm_name}: Некоректний group_id '{group_id_str}' для користувача '{user_email}'.",
+        "log_permission_check_result": "Тест {perm_name}: Користувач '{user_email}', шлях '{path}', kwargs {kwargs_str}. Дозвіл: {result_status}",
+        "log_permission_check_error": "Тест {perm_name}: Помилка під час перевірки для користувача '{user_email}': {error_str}",
+        "log_test_result_allowed": "Тест для {permission_name} з користувачем '{user_email}': Дозволено = {is_allowed}. Повідомлення (якщо False): '{message}'",
+        "log_test_result_exception": "Тест для {permission_name} з користувачем '{user_email}': Виняток = {exception_name}, Деталі = '{detail}'",
+        "log_unexpected_error": "Неочікувана помилка під час тестування {permission_name}: {error}",
+        "starting_tests": "\n--- Тестування дозволів ---",
+        "log_admin_action_success": "Користувач '{user_email}' успішно виконав дію, що вимагає ролі адміністратора або суперкористувача.",
+        "log_member_action_success": "Користувач '{user_email}' успішно виконав дію, що вимагає ролі учасника.",
+        "permission_classes_test_header": "\n--- Тестування Класів Дозволів ---",
+        "testing_is_authenticated_header": "\nТестування IsAuthenticated:",
+        "testing_is_superuser_header": "\nТестування IsSuperuser:",
+        "testing_is_group_admin_header": "\nТестування IsGroupAdmin (реальна логіка):",
+        "testing_allow_all_header": "\nТестування AllowAll:",
+        "testing_require_roles_decorator_header": "\n--- Тестування Декоратора @require_roles (концептуальне) ---",
+        "decorator_direct_call_note": "Примітка: Декоратор тестується з прямими викликами, передаючи 'user'.",
+        "log_decorator_test_error": "Тест @require_roles ({user_email} для {function_name}): {error_detail}",
+        "log_decorator_test_expected_denial": "Тест @require_roles ({user_email} для {function_name}): {error_detail} (ОЧІКУВАНА ВІДМОВА)",
+        "demonstration_finished_check_logs": "\nДемонстрація завершена. Перевірте вивід логів для деталей.",
+        "reminder_permission_dependency_usage": "Пам'ятайте, що PermissionDependency та класи дозволів зазвичай використовуються в Depends() в ендпоінтах FastAPI."
+    },
+    "anonymous_user": "Анонім"
+  },
+  "utils": {
+    "timedelta": {
+      "negative_duration": "(від'ємна тривалість)",
+      "zero_seconds_alt": "0 секунд",
+      "day": {
+        "one": "день",
+        "few": "дні",
+        "many": "днів"
+      },
+      "hour": {
+        "one": "година",
+        "few": "години",
+        "many": "годин"
+      },
+      "minute": {
+        "one": "хвилина",
+        "few": "хвилини",
+        "many": "хвилин"
+      },
+      "second": {
+        "one": "секунда",
+        "few": "секунди",
+        "many": "секунд"
+      }
+    },
+    "errors": {
+      "chunk_size_positive": "Розмір частини (chunk_size) повинен бути додатним цілим числом."
+    },
+    "email": {
+        "smtp_disabled_log": "SMTP_ENABLED=False. Відправка email для '{recipient}' з темою '{subject}' пропущена (симуляція).",
+        "simulated_body_log_debug": "Тіло HTML листа (симуляція):\n{body_html}",
+        "sending_disabled_simulated_user_message": "Відправка email вимкнена конфігурацією. Симуляція відправки.",
+        "smtp_misconfigured_log": "Не всі обов'язкові SMTP налаштування (HOST, PORT, EMAILS_FROM_EMAIL) вказані. Відправка email для '{recipient}' неможлива.",
+        "smtp_misconfigured_user_error": "SMTP налаштування неповні. Неможливо відправити email.",
+        "sending_attempt_log": "Спроба відправки email на '{recipient}' з темою '{subject}'",
+        "send_success_log": "Email успішно відправлено на '{recipient}'",
+        "send_success_user_message": "Email успішно відправлено.",
+        "send_error_log": "Помилка під час відправки email на '{recipient}': {error}",
+        "send_error_user_message": "Не вдалося відправити email на {recipient}. Помилка: {error}"
+    }
+  },
+  "validators": {
+    "field_cannot_be_empty_log": "Поле '{field_name}' не може бути порожнім.",
+    "field_required_no_spaces": "Це поле є обов'язковим і не може містити лише пробіли.",
+    "field_length_exceeds_max_log": "Довжина поля '{field_name}' перевищує максимально допустиму ({max_len} символів).",
+    "max_length_is_provided_len": "Максимальна довжина становить {max_len} символів. Надано {current_len}.",
+    "field_length_less_than_min_log": "Довжина поля '{field_name}' менша за мінімально допустиму ({min_len} символів).",
+    "min_length_is_provided_len": "Мінімальна довжина становить {min_len} символів. Надано {current_len}.",
+    "field_contains_invalid_chars_log": "Поле '{field_name}' містить недійсні символи.",
+    "value_does_not_match_format": "Значення не відповідає дозволеному формату.",
+    "fieldnames": {
+      "username": "ім'я користувача",
+      "password": "пароль",
+      "default_numeric_field": "Числове поле"
+    },
+    "username_format_requirements": "Ім'я користувача повинно містити від 3 до 20 символів і може складатися лише з латинських літер, цифр, знаків підкреслення (_) та дефісів (-).",
+    "password_strength_requirements": "Пароль повинен мати довжину від 8 до 128 символів і містити принаймні одну велику літеру, одну малу літеру, одну цифру та один спеціальний символ (@$!%*?&_).",
+    "phone": {
+      "cannot_be_empty_log": "Номер телефону не може бути порожнім.",
+      "please_enter_number": "Введіть, будь ласка, номер телефону.",
+      "invalid_number_log": "Вказаний номер телефону не є дійсним.",
+      "invalid_format_or_nonexistent": "Номер телефону не відповідає дійсному формату або не існує.",
+      "validation_success_log": "Номер телефону '{phone_number}' (регіон: {region}) успішно валідовано та відформатовано як {formatted_number}.",
+      "library_not_installed_log": "Бібліотека 'phonenumbers' не встановлена. Валідація номера телефону неможлива.",
+      "service_unavailable_no_library_log": "Сервіс валідації номерів телефонів тимчасово недоступний (відсутня бібліотека).",
+      "check_failed_no_library_user": "Не вдалося перевірити номер телефону через відсутність необхідної бібліотеки.",
+      "parse_error_log": "Помилка парсингу номера телефону '{phone_number}': {error}",
+      "could_not_parse_user_message": "Не вдалося розпізнати номер телефону: {error_details}",
+      "parse_errors": {
+        "invalid_country_code": "Недійсний код країни.",
+        "not_a_number": "Рядок містить нецифрові символи там, де очікувались цифри.",
+        "too_short_after_idd": "Номер занадто короткий після міжнародного префіксу.",
+        "too_short_nsn": "Номер занадто короткий.",
+        "too_long": "Номер занадто довгий.",
+        "default_format_error": "Некоректний формат номера телефону."
+      }
+    },
+    "field_must_be_number_log": "Поле '{field_name}' повинно бути числом.",
+    "value_must_be_numeric": "Значення має бути числовим.",
+    "field_must_be_positive_log": "Поле '{field_name}' має бути додатним числом (більше нуля).",
+    "value_must_be_greater_than_zero": "Значення повинно бути більше нуля.",
+    "value_less_than_min_log": "Значення поля '{field_name}' ({value}) менше за мінімально допустиме ({min_val}).",
+    "value_must_be_not_less_than": "Значення повинно бути не менше {min_val}.",
+    "value_exceeds_max_log": "Значення поля '{field_name}' ({value}) перевищує максимально допустиме ({max_val}).",
+    "value_must_be_not_greater_than": "Значення повинно бути не більше {max_val}.",
+    "list_cannot_be_empty_log": "Список '{field_name}' не може бути порожнім.",
+    "list_must_contain_elements": "Список повинен містити принаймні один елемент."
+  },
+  "api_exceptions": {
+    "unknown_location": "невідомо",
+    "not_applicable_short": "Н/Д",
+    "validation": {
+      "response_message_generic": "Помилка валідації вхідних даних. Перевірте надані параметри.",
+      "log_message_details": "Помилка валідації запиту: {method} {path}. Деталі: {error_details}. Клієнт: {client_host}",
+      "error_type_name": "VALIDATION_ERROR"
+    },
+    "http": {
+      "log_message_details": "HTTP виняток: Статус={status_code}, Деталі='{detail}' для {method} {path}. Заголовки: {headers}. Клієнт: {client_host}",
+      "default_error_type_name": "HTTP_EXCEPTION",
+      "error_type_401_name": "AUTHENTICATION_ERROR",
+      "error_type_403_name": "AUTHORIZATION_ERROR",
+      "error_type_404_name": "NOT_FOUND_ERROR"
+    },
+    "generic": {
+      "unhandled_exception_log": "Необроблений виняток: {method} {path}. Помилка: {error_message}",
+      "error_type_500_name": "INTERNAL_SERVER_ERROR",
+      "user_message_500": "Виникла непередбачена помилка на сервері. Будь ласка, спробуйте пізніше."
+    },
+    "custom_app": {
+        "log_details": "Кастомний виняток '{error_code}': {detail} для {method} {path}. Дані: {data}"
+    },
+    "log": {
+        "handler_registered_request_validation_error": "Зареєстровано обробник для RequestValidationError.",
+        "handler_registered_http_exception": "Зареєстровано обробник для HTTPException.",
+        "handler_registered_generic_exception": "Зареєстровано загальний обробник для Exception (500 Internal Server Error).",
+        "handler_registered_custom_app_exception": "Зареєстровано обробник для CustomAppException.",
+        "all_handlers_registered_successfully": "Кастомні обробники винятків API успішно зареєстровано.",
+        "module_loaded_info": "Модуль 'api.exceptions' завантажено. Визначено обробники для RequestValidationError, HTTPException та загальний Exception."
+    },
+    "pydantic": {
+        "default_client_detail": "Помилка валідації вхідних даних.",
+        "invalid_value_generic": "невірне значення",
+        "error_in_field_with_message": "Помилка у полі '{field_path}': {error_msg}",
+        "and_other_errors_suffix": " (та інші...)",
+        "error_type_name": "PYDANTIC_VALIDATION_ERROR"
+    }
+  },
+  "api_router": {
+    "responses": {
+      "400": "Некоректний запит від клієнта",
+      "401": "Не авторизовано (токен не надано, невалідний або прострочений)",
+      "403": "Заборонено (недостатньо прав для виконання операції)",
+      "404": "Ресурс не знайдено",
+      "422": "Помилка валідації даних",
+      "500": "Внутрішня помилка сервера"
+    },
+    "tags": {
+      "api_v1": "API v1",
+      "external_api": "Зовнішні API (Вебхуки)",
+      "api_status": "Стан API"
+    },
+    "log": {
+      "v1_router_included_successfully": "Роутер для API v1 успішно підключено до api_router.",
+      "v1_router_include_failed": "Не вдалося підключити v1_router з api.v1: {error}. API v1 може бути недоступне.",
+      "external_router_included_successfully": "Роутер для зовнішніх API (вебхуків) успішно підключено до api_router.",
+      "external_router_include_failed": "Не вдалося підключити external_api_router з api.external: {error}. Зовнішні API (вебхуки) можуть бути недоступні.",
+      "ping_endpoint_called": "API ping ендпоінт викликано.",
+      "main_router_configured": "Головний API роутер (`api_router`) налаштовано з базовим ping ендпоінтом та підключеними версійними роутерами."
+    },
+    "ping": {
+      "summary": "Перевірка доступності агрегатора API",
+      "response_description": "Успішна відповідь від ping ендпоінта",
+      "status_message": "Агрегатор API активний!",
+      "pong_message": "Pong!"
+    }
+  },
+  "api_external_router": {
+    "tags": {
+      "webhooks_general": "Зовнішні Вебхуки - Загальні",
+      "webhooks_calendar": "Зовнішні Вебхуки - Календарі",
+      "webhooks_messenger": "Зовнішні Вебхуки - Месенджери"
+    },
+    "log": {
+      "webhook_router_included": "Роутер webhook_router підключено до external_api_router з префіксом /webhooks.",
+      "calendar_webhook_router_included": "Роутер calendar_webhook_router підключено до external_api_router з префіксом /calendar.",
+      "messenger_webhook_router_included": "Роутер messenger_webhook_router підключено до external_api_router з префіксом /messenger.",
+      "router_configured_and_ready": "Роутер для зовнішніх API (`external_api_router`) зібрано та готовий до підключення."
+    }
+  },
+  "api_external_calendar": {
+    "log": {
+      "router_init": "Ініціалізація роутера для вебхуків календарних сервісів.",
+      "google_webhook_received_details": "Отримано вебхук від Google Calendar. Заголовки: X-Goog-Channel-ID={channel_id}, X-Goog-Resource-ID={resource_id}, X-Goog-Resource-State={resource_state}, X-Goog-Message-Number={message_number}, X-Goog-Channel-Token (наявність): {token_present}",
+      "google_invalid_token": "Невалідний або відсутній X-Goog-Channel-Token для каналу {channel_id}",
+      "google_sync_message_received": "Це повідомлення про синхронізацію каналу Google Calendar (sync).",
+      "google_resource_changed": "Ресурс {resource_id} змінив стан на '{state}'. Потрібна синхронізація.",
+      "google_unknown_resource_state": "Отримано невідомий стан ресурсу '{state}' від Google Calendar.",
+      "google_event_webhook_stub": "[ЗАГЛУШКА] Вебхук про подію Google Calendar ({resource_state}) отримано. Потрібна подальша обробка.",
+      "outlook_validation_request": "Отримано запит на валідацію підписки Microsoft Graph. ValidationToken: {token_start}...",
+      "outlook_webhook_payload_received": "Отримано вебхук від Outlook Calendar. Тіло: {payload}",
+      "outlook_validation_token_from_query": "Отримано validationToken з query параметра для Outlook: {token}",
+      "outlook_json_parse_error_or_no_token": "Помилка розбору JSON з Outlook вебхука або відсутній validationToken в query: {error}",
+      "outlook_validation_token_from_payload": "Отримано validationToken для Outlook: {token}",
+      "outlook_invalid_client_state": "Невідповідність clientState у вебхуку Outlook. Можлива підробка.",
+      "outlook_event_webhook_stub": "[ЗАГЛУШКА] Вебхук про подію Outlook Calendar отримано. Потрібна подальша обробка. Надсилання 202 Accepted.",
+      "outlook_webhook_processing_error": "Помилка обробки вебхука Outlook Calendar: {error}",
+      "router_defined": "Роутер для вебхуків календарних сервісів (`/external/calendar`) визначено.",
+      "router_configured": "Роутер для вебхуків календарних сервісів налаштовано."
+    },
+    "google": {
+      "summary": "Вебхук для Google Calendar API Push Notifications",
+      "response_description": "Відповідь, що підтверджує отримання сповіщення від Google Calendar.",
+      "description": "Цей ендпоінт приймає push-сповіщення від Google Calendar API.\nПотребує валідації запиту (наприклад, перевірка `X-Goog-Channel-Token`, `X-Goog-Resource-State`).",
+      "summary_v2": "Вебхук для Google Calendar API Push Notifications",
+      "description_v2": "Приймає сповіщення від Google Calendar API (Push Notifications).\nПотребує валідації запиту (наприклад, перевірка `X-Goog-Channel-Token`, `X-Goog-Resource-State`).",
+      "response_desc_v2": "Відповідь, що підтверджує отримання сповіщення.",
+      "response_sync_processed": "Вебхук синхронізації Google Calendar оброблено.",
+      "response_event_stub_processed": "Вебхук Google Calendar оброблено (заглушка)."
+    },
+    "outlook": {
+      "summary": "Вебхук для Outlook Calendar API (Microsoft Graph)",
+      "response_description": "Відповідь, що підтверджує отримання сповіщення від Microsoft Graph.",
+      "description": "Цей ендпоінт приймає сповіщення (notifications) від Microsoft Graph API\nдля підписок на зміни в календарі Outlook.\nПотребує валідації `clientState` в сповіщеннях, якщо використовується.",
+      "summary_v2": "Вебхук для Outlook Calendar API (Microsoft Graph)",
+      "description_v2": "Приймає сповіщення від Outlook Calendar API через Microsoft Graph Webhooks.\nОбробляє запит валідації (`validationToken`) та сповіщення про зміни.\nПотребує валідації `clientState` в сповіщеннях, якщо використовується.",
+      "response_desc_v2": "Відповідь, що підтверджує отримання або валідацію.",
+      "status_error_processing_accepted": "Помилка обробки сповіщення Outlook Calendar, але запит прийнято.",
+      "status_received_processing": "Сповіщення від Outlook Calendar отримано та взято в обробку."
+    },
+    "errors": {
+      "google_invalid_channel_token": "Невалідний токен каналу Google Calendar.",
+      "outlook_json_parse_or_no_token": "Не вдалося розпарсити JSON тіло запиту або відсутній validationToken.",
+      "outlook_invalid_client_state": "Невалідний clientState у сповіщенні Outlook."
+    }
+  },
+  "common": {
+    "yes": "Так",
+    "no": "Ні"
+  },
+  "api_external_messenger": {
+    "log": {
+      "router_init": "Ініціалізація роутера для вебхуків месенджерів.",
+      "telegram_invalid_secret_token": "Невалідний секретний токен для Telegram вебхука: {token}",
+      "telegram_webhook_received_payload": "Отримано вебхук від Telegram: {payload}",
+      "viber_webhook_received_signature": "Отримано вебхук від Viber. Signature: {signature}",
+      "viber_auth_token_not_configured": "VIBER_AUTH_TOKEN не налаштований. Неможливо валідувати підпис Viber.",
+      "viber_invalid_signature_details": "Невалідний підпис Viber. Очікуваний: {expected}, Отриманий: {received}",
+      "viber_signature_valid_stub": "Підпис Viber валідний (або перевірку не виконано - ЗАГЛУШКА).",
+      "viber_payload_data": "Viber payload: {payload}",
+      "viber_json_parse_error_detail": "Помилка розбору JSON з Viber вебхука: {error}",
+      "slack_webhook_received_sig_time": "Отримано вебхук від Slack. Signature: {signature}, Timestamp: {timestamp}",
+      "slack_missing_validation_data": "Відсутні необхідні дані для валідації Slack запиту (токен або заголовки).",
+      "slack_request_outdated": "Запит Slack застарілий (перевірка timestamp).",
+      "slack_invalid_signature_details": "Невалідний підпис Slack. Очікуваний: {expected}, Отриманий: {received}",
+      "slack_signature_valid_stub": "Підпис Slack валідний (або перевірку не виконано - ЗАГЛУШКА).",
+      "slack_json_parse_error_detail": "Помилка розбору JSON з Slack вебхука: {error}",
+      "slack_form_data_parse_error_detail": "Помилка розбору Form-data з Slack вебхука: {error}",
+      "slack_unsupported_content_type": "Непідтримуваний Content-Type від Slack: {content_type}. Тіло: {body_preview}",
+      "slack_payload_content_type": "Slack payload ({content_type}): {payload}",
+      "slack_url_verification_challenge": "Обробка Slack URL verification challenge: {challenge}",
+      "teams_webhook_received_payload": "Отримано вебхук від Microsoft Teams: {payload}",
+      "teams_auth_header_presence": "Teams Authorization header (наявність): {present}",
+      "teams_invalid_auth_token_detail": "Невалідний Authorization токен для Teams вебхука.",
+      "teams_auth_token_valid_stub": "Токен авторизації Teams валідний (або перевірку не виконано - ЗАГЛУШКА).",
+      "router_defined": "Роутер для вебхуків месенджерів (`/external/messenger`) визначено.",
+      "router_configured": "Роутер для вебхуків месенджерів налаштовано."
+    },
+    "telegram": {
+      "summary_v2": "Вебхук для Telegram Bot API",
+      "description_v2": "Приймає оновлення від Telegram Bot API.\nБезпека зазвичай забезпечується через секретний токен, доданий до URL вебхука\nпри його реєстрації в Telegram. Цей ендпоінт має перевіряти цей токен.",
+      "response_desc_v2": "Відповідь серверу Telegram.",
+      "path_secret_token_title": "Секретний токен Telegram вебхука",
+      "response_message_stub": "Вебхук Telegram отримано та поставлено в обробку (заглушка).",
+      "status_processing_error_accepted": "Помилка обробки оновлення Telegram, але запит прийнято."
+    },
+    "viber": {
+      "summary_v2": "Вебхук для Viber Bot API",
+      "description_v2": "Приймає колбеки від Viber Bot API.\nПотребує валідації запиту за допомогою заголовка `X-Viber-Content-Signature`.",
+      "response_desc_v2": "Відповідь серверу Viber.",
+      "response_message_stub_validation_needed": "Вебхук Viber отримано (заглушка, потрібна валідація підпису!).",
+      "status_processing_error": "Помилка обробки події Viber.",
+      "status_event_received": "Подія Viber отримана."
+    },
+    "slack": {
+      "summary_v2": "Вебхук для Slack (Events API, Interactive Components)",
+      "description_v2": "Приймає події від Slack Events API або запити від Interactive Components.\nПотребує валідації запиту за допомогою `X-Slack-Signature` та `X-Slack-Request-Timestamp`.",
+      "response_desc_v2": "Відповідь серверу Slack.",
+      "response_message_stub_validation_needed": "Вебхук Slack отримано (заглушка, потрібна валідація підпису!).",
+      "status_request_received": "Запит від Slack отримано."
+    },
+    "teams": {
+      "summary_v2": "Вебхук для Microsoft Teams (Bot Framework)",
+      "description_v2": "Приймає повідомлення та події для бота Microsoft Teams через Bot Framework.\nПотребує валідації JWT токена в заголовку `Authorization`.",
+      "response_desc_v2": "Відповідь Bot Framework.",
+      "response_message_stub_validation_needed": "Вебхук Teams отримано (заглушка, потрібна валідація токена!).",
+      "status_processing_error_accepted": "Помилка обробки активності Teams, але запит прийнято.",
+      "status_activity_received_processing": "Активність Teams отримана та обробляється."
+    },
+    "errors": {
+      "telegram_invalid_webhook_token": "Недійсний токен вебхука Telegram.",
+      "viber_service_unavailable_config": "Сервіс Viber тимчасово недоступний через помилку конфігурації.",
+      "viber_invalid_request_signature": "Невалідний підпис запиту Viber.",
+      "viber_invalid_json": "Некоректний JSON.",
+      "slack_missing_validation_headers": "Відсутні заголовки для валідації Slack.",
+      "slack_outdated_request": "Застарілий запит Slack.",
+      "slack_invalid_request_signature": "Невалідний підпис запиту Slack.",
+      "slack_json_parse_failed": "Не вдалося розпарсити JSON тіло запиту Slack.",
+      "slack_form_data_parse_failed": "Не вдалося розпарсити Form-data тіло запиту Slack.",
+      "slack_unsupported_content_type": "Непідтримуваний Content-Type: {content_type}",
+      "teams_auth_token_required": "Необхідний токен авторизації.",
+      "teams_invalid_auth_token_user": "Невалідний Authorization токен."
+    }
+  },
+  "api_external_webhook": {
+    "log": {
+      "router_init": "Ініціалізація загального роутера для вебхуків (/webhook).",
+      "generic_webhook_request_received": "Отримано запит на загальний вебхук (/generic):",
+      "request_method": "  Метод: {method}",
+      "request_url": "  URL: {url}",
+      "client_info": "  Клієнт: {host}:{port}",
+      "request_headers": "  Заголовки: {headers}",
+      "body_json": "  Тіло (JSON): {body_json}",
+      "body_raw_not_json": "  Тіло (raw, не JSON): {body_raw}...",
+      "router_defined_generic": "Роутер для загальних вебхуків (`/external/webhook`) визначено."
+    },
+    "generic": {
+      "summary": "Загальний приймач вебхуків",
+      "description": "Приймає вебхуки від неспецифікованих зовнішніх сервісів.\n    **УВАГА: Цей ендпоінт є концептуальним (заглушкою) і не реалізує жодних механізмів безпеки\n    (валідація підпису, токенів тощо) за замовчуванням. Не використовувати в продакшені без належної валідації!**\n    Він лише логує отримані дані. В майбутньому тут може бути реалізована логіка\n    маршрутизації до відповідних обробників на основі заголовків або тіла запиту.",
+      "response_description": "Відповідь, що підтверджує отримання вебхука.",
+      "path_service_name_title": "Назва зовнішнього сервісу",
+      "response_message_received_logged_stub": "Загальний вебхук отримано та залоговано. Потрібна реалізація обробки та валідації."
+    },
+    "errors": {
+        "invalid_json_payload": "Некоректний JSON payload.",
+        "service_not_supported": "Сервіс '{service_name}' не підтримується для вебхуків."
+    }
+  },
+  "api_middleware": {
+    "log": {
+      "error_processing_request": "Помилка під час обробки запиту {method} {path} (час до помилки: {time_to_error} сек): {error}",
+      "request_processed_summary": "Запит {method} {path} - Статус {status_code} - Оброблено за {process_time} сек.",
+      "api_key_header_missing": "API Key Middleware: Відсутній заголовок '{header_name}' для {path} від {client_host}",
+      "api_key_invalid": "API Key Middleware: Невалідний API ключ надано для {path}. Ключ: '{key_preview}...'",
+      "api_key_access_granted": "API Key Middleware: Доступ надано для клієнта '{client_name}' до {path}",
+      "module_loaded_defined_middlewares": "Модуль 'api.middleware' завантажено. Визначено: {middlewares}."
+    },
+    "errors": {
+      "api_key_header_required": "Обов'язковий заголовок '{header_name}' не надано.",
+      "api_key_invalid_provided": "Надано невалідний API ключ."
+    }
+  },
+  "schemas": {
+    "auth": {
+      "login": {
+        "username_description": "Електронна пошта користувача для входу.",
+        "password_description": "Пароль користувача.",
+        "log_demo_header": "--- Pydantic Схеми для Логіну та Відновлення Паролю ---",
+        "log_login_request_example": "\nLoginRequestSchema (приклад):",
+        "log_login_request_validation_error": "Помилка валідації LoginRequestSchema (очікувано): {error}",
+        "log_password_reset_request_example": "\nPasswordResetRequestSchema (приклад):",
+        "log_password_reset_confirm_example": "\nPasswordResetConfirmSchema (приклад):",
+        "log_password_reset_confirm_validation_error": "Помилка валідації PasswordResetConfirmSchema (очікувано): {error}",
+        "log_note_usage": "\nПримітка: Ці схеми використовуються для обробки запитів, пов'язаних з автентифікацією та відновленням доступу.",
+        "log_todo_password_validation": "TODO: Для поля 'new_password' в PasswordResetConfirmSchema додати валідацію надійності пароля."
+      },
+      "password_reset_request": {
+        "email_description": "Електронна пошта користувача, для якого запитується скидання пароля."
+      },
+      "password_reset_confirm": {
+        "token_description": "Токен скидання пароля, отриманий користувачем.",
+        "new_password_description": "Новий пароль користувача (мін. 8 символів, має відповідати політикам надійності)."
+      }
+    }
+  }
 }

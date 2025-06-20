@@ -1,4 +1,5 @@
 # backend/app/src/schemas/auth/login.py
+from backend.app.src.core.i18n import _
 """
 Pydantic схеми для процесів, пов'язаних з логіном та відновленням паролю.
 
@@ -27,8 +28,8 @@ class LoginRequestSchema(BaseSchema): # Перейменовано з LoginReque
     # оскільки модель User використовує email як унікальний ідентифікатор для входу.
     # Якщо логін за нікнеймом також підтримується, можна додати поле username: str
     # або зробити це поле Union[EmailStr, str].
-    username: EmailStr = Field(description="Електронна пошта користувача для входу.", examples=["user@example.com"])
-    password: str = Field(description="Пароль користувача.")
+    username: EmailStr = Field(description=_("schemas.auth.login.username_description"), examples=["user@example.com"])
+    password: str = Field(description=_("schemas.auth.login.password_description"))
     # model_config успадковується з BaseSchema
 
 
@@ -37,7 +38,7 @@ class PasswordResetRequestSchema(BaseSchema):
     Схема запиту для ініціації процедури скидання пароля.
     Очікує email адресу користувача, для якого потрібно скинути пароль.
     """
-    email: EmailStr = Field(description="Електронна пошта користувача, для якого запитується скидання пароля.")
+    email: EmailStr = Field(description=_("schemas.auth.password_reset_request.email_description"))
 
 
 class PasswordResetConfirmSchema(BaseSchema):
@@ -45,35 +46,34 @@ class PasswordResetConfirmSchema(BaseSchema):
     Схема для підтвердження скидання пароля.
     Очікує токен скидання (отриманий користувачем, наприклад, по email) та новий пароль.
     """
-    token: str = Field(description="Токен скидання пароля, отриманий користувачем.")
+    token: str = Field(description=_("schemas.auth.password_reset_confirm.token_description"))
     # TODO: Додати валідацію надійного пароля за допомогою constr(pattern=PASSWORD_REGEX),
     #       коли PASSWORD_REGEX буде доступний з констант.
     new_password: str = Field(
-        ...,  # Обов'язкове поле
-        min_length=8,  # Мінімальна довжина пароля
-        description="Новий пароль користувача (мін. 8 символів, має відповідати політикам надійності)."
+        ...,
+        min_length=8,
+        description=_("schemas.auth.password_reset_confirm.new_password_description")
     )
 
 
 if __name__ == "__main__":
-    # Демонстраційний блок для схем логіну та відновлення пароля.
-    logger.info("--- Pydantic Схеми для Логіну та Відновлення Паролю ---")
+    logger.info(_("schemas.auth.login.log_demo_header"))
 
-    logger.info("\nLoginRequestSchema (приклад):")
+    logger.info(_("schemas.auth.login.log_login_request_example"))
     login_data = {"username": "testlogin@example.com", "password": "securepassword123"}
     login_instance = LoginRequestSchema(**login_data)
     logger.info(login_instance.model_dump_json(indent=2))
     try:
         LoginRequestSchema(username="not-an-email", password="pw")
     except Exception as e:
-        logger.info(f"Помилка валідації LoginRequestSchema (очікувано): {e}")
+        logger.info(_("schemas.auth.login.log_login_request_validation_error", error=str(e)))
 
-    logger.info("\nPasswordResetRequestSchema (приклад):")
+    logger.info(_("schemas.auth.login.log_password_reset_request_example"))
     password_reset_request_data = {"email": "forgotpassword@example.com"}
     password_reset_request_instance = PasswordResetRequestSchema(**password_reset_request_data)
     logger.info(password_reset_request_instance.model_dump_json(indent=2))
 
-    logger.info("\nPasswordResetConfirmSchema (приклад):")
+    logger.info(_("schemas.auth.login.log_password_reset_confirm_example"))
     password_reset_confirm_data = {
         "token": "valid_reset_token_string_12345",
         "new_password": "NewStrongPassword123!"
@@ -83,8 +83,7 @@ if __name__ == "__main__":
     try:
         PasswordResetConfirmSchema(token="t", new_password="short")
     except Exception as e:
-        logger.info(f"Помилка валідації PasswordResetConfirmSchema (очікувано): {e}")
+        logger.info(_("schemas.auth.login.log_password_reset_confirm_validation_error", error=str(e)))
 
-    logger.info(
-        "\nПримітка: Ці схеми використовуються для обробки запитів, пов'язаних з автентифікацією та відновленням доступу.")
-    logger.info("TODO: Для поля 'new_password' в PasswordResetConfirmSchema додати валідацію надійності пароля.")
+    logger.info(_("schemas.auth.login.log_note_usage"))
+    logger.info(_("schemas.auth.login.log_todo_password_validation"))

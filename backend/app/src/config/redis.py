@@ -28,6 +28,8 @@ import redis.asyncio as aioredis # Використовуємо redis.asyncio д
 
 from backend.app.src.config import settings
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Імпорт для перекладів
+
 logger = get_logger(__name__)
 
 # Глобальна змінна для зберігання єдиного екземпляра клієнта Redis.
@@ -55,14 +57,14 @@ async def get_redis_client() -> aioredis.Redis:
     global _redis_client
     if _redis_client is None:
         if not settings.REDIS_URL:
-            logger.error("REDIS_URL не налаштовано. Неможливо ініціалізувати клієнт Redis.")
+            logger.error(_("redis.error.url_not_configured_log"))
             # TODO i18n: Повідомлення для перекладу (хоча це переважно для логів/розробників)
             # Можна розглянути кастомний виняток, якщо потрібно обробляти цю помилку специфічно.
-            raise ConnectionError("URL для підключення до Redis (REDIS_URL) не налаштовано в конфігурації.")
+            raise ConnectionError(_("redis.error.url_not_configured_user"))
         try:
             # Створення екземпляра клієнта Redis з URL-адреси, вказаної в налаштуваннях.
             # `aioredis.from_url` автоматично обробляє парсинг DSN (Data Source Name).
-            logger.info("Спроба підключення до Redis за адресою: %s", settings.REDIS_URL)
+            logger.info(_("redis.info.connecting_attempt"), settings.REDIS_URL)
             _redis_client = aioredis.from_url(
                 str(settings.REDIS_URL),  # Переконуємось, що URL є рядком
                 encoding="utf-8",         # Стандартне кодування для рядків
@@ -71,17 +73,17 @@ async def get_redis_client() -> aioredis.Redis:
             )
             # Перевірка з'єднання з сервером Redis шляхом виконання команди PING
             await _redis_client.ping()
-            logger.info("Успішно підключено до Redis та отримано відповідь на PING: %s", settings.REDIS_URL)
+            logger.info(_("redis.info.connect_ping_success"), settings.REDIS_URL)
         except Exception as e: # pylint: disable=broad-except
             # Логуємо детальну помилку та скидаємо _redis_client,
             # щоб при наступній спробі відбулася повторна ініціалізація.
             logger.error(
-                "Помилка підключення до Redis (%s): %s", settings.REDIS_URL, e, exc_info=True
+                _("redis.error.connect_failed_log", url=settings.REDIS_URL, error=str(e)), exc_info=True
             )
             _redis_client = None # Важливо для можливості повторної спроби
             # TODO i18n: Повідомлення для перекладу (для логів/розробників)
             raise ConnectionError(
-                f"Не вдалося підключитися до Redis ({settings.REDIS_URL}) або виконати PING: {e}"
+                _("redis.error.connect_failed_user", url=settings.REDIS_URL, error=str(e))
             )
     return _redis_client
 
@@ -95,16 +97,16 @@ async def close_redis_client() -> None:
     """
     global _redis_client
     if _redis_client:
-        logger.info("Закриття з'єднання з Redis...")
+        logger.info(_("redis.info.closing_connection"))
         try:
             await _redis_client.close()
-            logger.info("З'єднання з Redis успішно закрито.")
+            logger.info(_("redis.info.connection_closed_success"))
         except Exception as e: # pylint: disable=broad-except
-            logger.error("Помилка під час закриття з'єднання з Redis: %s", e, exc_info=True)
+            logger.error(_("redis.error.close_connection_failed", error=str(e)), exc_info=True)
         finally:
             _redis_client = None # Скидання глобальної змінної в будь-якому випадку
     else:
-        logger.info("Спроба закрити з'єднання з Redis, але клієнт не був ініціалізований.")
+        logger.info(_("redis.info.close_attempt_not_initialized"))
 
 
 # --- Залежність FastAPI для надання клієнта Redis ---
@@ -124,14 +126,14 @@ async def get_redis() -> AsyncGenerator[aioredis.Redis, None]:
     # Отримуємо (або ініціалізуємо) глобальний клієнт Redis
     redis_client = await get_redis_client()
     try:
-        logger.debug("Надано клієнт Redis (%s) для обробника запиту.", id(redis_client))
+        logger.debug(_("redis.debug.client_provided_for_request", client_id=id(redis_client)))
         yield redis_client # Передаємо клієнт в обробник запиту
     finally:
         # Життєвий цикл глобального клієнта Redis керується централізовано.
         # Тут не потрібно явно закривати `redis_client`, оскільки він
         # призначений для повторного використання протягом роботи додатку.
         # Закриття відбувається лише при виході з програми через `close_redis_client`.
-        logger.debug("Завершено використання клієнта Redis (%s) для поточного запиту.", id(redis_client))
+        logger.debug(_("redis.debug.client_usage_finished_for_request", client_id=id(redis_client)))
 
 
 # Блок для демонстраційних цілей або простого тестування функціональності модуля
@@ -142,40 +144,40 @@ if __name__ == "__main__":
 
     async def main_redis_test() -> None:
         """Основна функція для тестування підключення та операцій Redis."""
-        logger.info("=== Запуск тестування модуля Redis ===")
+        logger.info(_("redis.test.starting_module_test"))
         redis_cli = None # Ініціалізуємо змінну
         try:
             redis_cli = await get_redis_client()
-            logger.info("Клієнт Redis успішно отримано: %s", redis_cli)
+            logger.info(_("redis.test.client_obtained_success", client_obj=redis_cli))
 
             # Приклад використання клієнта Redis:
             test_key = "test_kudos_app_key"
-            test_value = "Привіт від Kudos з Redis! Перевірка UTF-8: українські літери."
+            test_value = _("redis.test.example_value") # "Привіт від Kudos з Redis! Перевірка UTF-8: українські літери."
 
             await redis_cli.set(test_key, test_value)
-            logger.info("Тестовий ключ '%s' успішно встановлено зі значенням '%s'.", test_key, test_value)
+            logger.info(_("redis.test.key_set_success", key=test_key, value=test_value))
 
             retrieved_value = await redis_cli.get(test_key)
-            logger.info("Отримане значення з Redis для ключа '%s': '%s'", test_key, retrieved_value)
+            logger.info(_("redis.test.value_retrieved_success", key=test_key, value=retrieved_value))
             assert retrieved_value == test_value, \
-                f"Отримане значення '{retrieved_value}' не співпадає з очікуваним '{test_value}'."
+                _("redis.test.assertion_value_mismatch", retrieved=retrieved_value, expected=test_value)
 
             await redis_cli.delete(test_key)
-            logger.info("Тестовий ключ '%s' успішно видалено.", test_key)
-            assert await redis_cli.get(test_key) is None, "Ключ все ще існує після видалення."
+            logger.info(_("redis.test.key_deleted_success", key=test_key))
+            assert await redis_cli.get(test_key) is None, _("redis.test.assertion_key_exists_after_delete")
 
-            logger.info("Тестування операцій Redis пройшло успішно.")
+            logger.info(_("redis.test.operations_successful"))
 
         except ConnectionError as e:
-            logger.error("Помилка з'єднання під час тестування Redis: %s", e, exc_info=True)
+            logger.error(_("redis.test.connection_error", error=str(e)), exc_info=True)
         except Exception as e: # pylint: disable=broad-except
-            logger.error("Неочікувана помилка під час тестування Redis: %s", e, exc_info=True)
+            logger.error(_("redis.test.unexpected_error", error=str(e)), exc_info=True)
         finally:
-            logger.info("Завершення тестування модуля Redis, спроба закрити з'єднання...")
+            logger.info(_("redis.test.finishing_test_closing_connection"))
             # close_redis_client закриє глобальний _redis_client, якщо він був ініціалізований.
             await close_redis_client()
             # Перевірка, чи _redis_client справді None після закриття
-            assert _redis_client is None, "Глобальний _redis_client не було скинуто після close_redis_client."
-            logger.info("Тестування Redis завершено.")
+            assert _redis_client is None, _("redis.test.assertion_global_client_not_reset")
+            logger.info(_("redis.test.finished"))
 
     asyncio.run(main_redis_test())

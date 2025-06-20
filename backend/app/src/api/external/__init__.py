@@ -1,5 +1,6 @@
 # backend/app/src/api/external/__init__.py
 # -*- coding: utf-8 -*-
+from backend.app.src.core.i18n import _
 """
 Пакет для обробки зовнішніх API запитів, переважно вебхуків від сторонніх сервісів.
 
@@ -27,24 +28,24 @@ external_api_router = APIRouter()
 # або для початкової обробки перед маршрутизацією до більш специфічних обробників.
 external_api_router.include_router(
     generic_webhook_router,
-    prefix="/webhook", # Загальний префікс для універсальних вебхуків
-    tags=["Зовнішні Вебхуки - Загальні"] # i18n
+    prefix="/webhook",
+    tags=[_("api_external_router.tags.webhooks_general")]
 )
 
 # Підключення роутера для вебхуків календарних сервісів
 # Наприклад, для отримання сповіщень про зміни в подіях Google Calendar.
 external_api_router.include_router(
     calendar_webhooks_router,
-    prefix="/calendar", # Префікс для вебхуків від календарних сервісів
-    tags=["Зовнішні Вебхуки - Календарі"] # i18n
+    prefix="/calendar",
+    tags=[_("api_external_router.tags.webhooks_calendar")]
 )
 
 # Підключення роутера для вебхуків месенджерів
 # Наприклад, для отримання повідомлень, надісланих боту в Telegram або Slack.
 external_api_router.include_router(
     messenger_webhooks_router,
-    prefix="/messenger", # Префікс для вебхуків від месенджерів
-    tags=["Зовнішні Вебхуки - Месенджери"] # i18n
+    prefix="/messenger",
+    tags=[_("api_external_router.tags.webhooks_messenger")]
 )
 
 # Експортуємо `external_api_router` для використання в головному API роутері (`backend/app/src/api/router.py`)
@@ -52,4 +53,4 @@ __all__ = [
     "external_api_router",
 ]
 
-logger.info("Роутер для зовнішніх API (`external_api_router`) зібрано та готовий до підключення.")
+logger.info(_("api_external_router.log.router_configured_and_ready"))

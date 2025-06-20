@@ -19,16 +19,66 @@
     },
     "account": {
       "insufficient_funds": "Insufficient funds in the account."
-    }
+    },
+    "generic_error_500": "An unexpected internal server error occurred. Please try again later."
   },
   "dependencies": {
     "auth": {
       "credentials_check_failed": "Could not validate credentials.",
-      "malformed_token_payload": "Malformed or incomplete token payload.",
+      "malformed_token_payload": "Malformed token payload.",
       "invalid_token_type": "Invalid token type, access token expected.",
       "inactive_user": "Inactive user.",
       "not_superuser": "Insufficient permissions (superuser status required).",
-      "not_group_admin": "You are not an administrator of this group."
+      "not_group_admin": "You are not an administrator of this group.",
+      "invalid_user_id_in_token": "Invalid user ID format in token.",
+      "user_associated_with_token_not_found": "User associated with the token not found.",
+      "inactive_user_account": "User account is inactive.",
+      "not_superuser_detail": "Insufficient rights: superuser rights required.",
+      "not_active_member_or_no_role_in_group": "You are not an active member of this group or do not have an assigned role.",
+      "not_group_admin_insufficient_rights": "Insufficient rights: administrator rights for this group are required."
+    },
+    "log": {
+      "invalid_token_or_sub_missing": "Invalid token or 'sub' missing. Token: {token_start}...",
+      "token_payload_validation_error": "TokenPayload validation error: {error}. Payload: {payload_dict}",
+      "token_payload_success": "Token payload successfully obtained for sub: {sub}",
+      "sub_missing_in_token_payload": "'sub' (user_id) missing in token payload.",
+      "sub_conversion_to_int_failed": "Failed to convert 'sub' from token ('{sub_value}') to int.",
+      "user_from_token_not_found_in_db": "User with id '{user_id}' (from token) not found in DB.",
+      "user_retrieved_from_db": "User '{username}' (id: {user_id}) retrieved from DB.",
+      "inactive_user_access_attempt": "Inactive user access attempt '{username}' (id: {user_id}).",
+      "user_is_active": "User '{username}' is active.",
+      "superuser_action_attempt_by_non_superuser": "User '{user_email}' (ID: {user_id}) attempted an action available only to superusers.",
+      "superuser_action_attempt_by_non_superuser_detail": "User '{username}' (id: {user_id}) is not a superuser. Access denied.",
+      "superuser_confirmed": "Superuser {user_email} (ID: {user_id}) confirmed.",
+      "superuser_auth_success": "User '{username}' successfully authorized as superuser.",
+      "group_admin_check_start": "Checking group admin rights for user '{username}' (ID: {user_id}) in group ID: {group_id}",
+      "group_admin_superuser_access": "User '{user_email}' is a superuser, administrative access to group ID {group_id} granted.",
+      "group_admin_superuser_override_log": "User '{username}' is a superuser, access granted.",
+      "group_admin_not_admin": "User '{user_email}' (ID: {user_id}) is not an administrator of group ID {group_id}.",
+      "group_admin_not_active_member_or_no_role": "User '{username}' is not an active member or has no role in group ID '{group_id}'.",
+      "group_admin_not_admin_role": "User '{username}' (ID: {user_id}) is not an admin of group ID '{group_id}' (role: {role_code}). Access denied.",
+      "group_admin_confirmed": "User '{user_email}' confirmed as administrator of group ID {group_id}.",
+      "group_admin_auth_success": "User '{username}' authorized as administrator of group ID '{group_id}'.",
+      "no_token_data": "no token data",
+      "cache_service_new_instance": "Creating new CacheService instance.",
+      "cache_service_redis_used": "Using RedisCacheService (USE_REDIS=True and Redis settings are present).",
+      "cache_service_redis_init_error": "RedisCacheService initialization error: {error}. Falling back to InMemoryCacheService.",
+      "cache_service_inmemory_fallback_after_redis_error": "Using InMemoryCacheService as fallback after Redis initialization failure.",
+      "cache_service_redis_disabled": "Redis usage disabled (USE_REDIS=False). Using InMemoryCacheService.",
+      "cache_service_redis_misconfigured": "Redis configuration (REDIS_HOST/REDIS_PORT) not found, though USE_REDIS=True. Using InMemoryCacheService.",
+      "cache_service_instance_creation_failed": "Failed to create any CacheService instance!",
+      "module_loaded_and_configured": "'api.dependencies' module loaded and configured with real services."
+    },
+    "descriptions": {
+      "group_id_for_admin_check": "ID of the group to check admin rights for",
+      "group_id_for_admin_check_path": "ID of the group to check admin rights for",
+      "pagination_skip": "Number of items to skip (for pagination)",
+      "pagination_skip_desc": "Number of items to skip (for pagination)",
+      "pagination_limit": "Maximum number of items to return (for pagination)",
+      "pagination_limit_desc": "Maximum number of items to return (for pagination)"
+    },
+    "errors": {
+        "cache_service_unavailable": "Cache service is unavailable."
     }
   },
   "user": {
@@ -1007,5 +1057,502 @@
     }
   },
   "global_scope": "global scope",
-  "in_group_scope":"in group ID '{group_id}'"
+  "in_group_scope":"in group ID '{group_id}'",
+  "main": {
+    "welcome_message": "Welcome to the API '{project_name}'!"
+  },
+  "redis": {
+    "error": {
+      "url_not_configured_log": "REDIS_URL is not configured. Cannot initialize Redis client.",
+      "url_not_configured_user": "Redis connection URL (REDIS_URL) is not configured.",
+      "connect_failed_log": "Error connecting to Redis ({url}): {error}",
+      "connect_failed_user": "Could not connect to Redis ({url}) or execute PING: {error}",
+      "close_connection_failed": "Error while closing Redis connection: {error}"
+    },
+    "info": {
+      "connecting_attempt": "Attempting to connect to Redis at: %s",
+      "connect_ping_success": "Successfully connected to Redis and PING response received: %s",
+      "closing_connection": "Closing Redis connection...",
+      "connection_closed_success": "Redis connection closed successfully.",
+      "close_attempt_not_initialized": "Attempted to close Redis connection, but client was not initialized."
+    },
+    "debug": {
+      "client_provided_for_request": "Redis client ({client_id}) provided for request handler.",
+      "client_usage_finished_for_request": "Finished using Redis client ({client_id}) for current request."
+    },
+    "test": {
+      "starting_module_test": "=== Starting Redis module test ===",
+      "client_obtained_success": "Redis client successfully obtained: {client_obj}",
+      "example_value": "Hello from Kudos with Redis! UTF-8 Check: English letters.",
+      "key_set_success": "Test key '{key}' set successfully with value '{value}'.",
+      "value_retrieved_success": "Retrieved value from Redis for key '{key}': '{value}'",
+      "assertion_value_mismatch": "Retrieved value '{retrieved}' does not match expected '{expected}'.",
+      "key_deleted_success": "Test key '{key}' deleted successfully.",
+      "assertion_key_exists_after_delete": "Key still exists after deletion.",
+      "operations_successful": "Redis operations testing passed successfully.",
+      "connection_error": "Connection error during Redis testing: {error}",
+      "unexpected_error": "Unexpected error during Redis testing: {error}",
+      "finishing_test_closing_connection": "Finishing Redis module test, attempting to close connection...",
+      "assertion_global_client_not_reset": "Global _redis_client was not reset after close_redis_client.",
+      "finished": "Redis testing finished."
+    }
+  },
+  "constants": {
+    "default_group_name": "My Group"
+  },
+  "permissions": {
+    "errors": {
+      "generic_permission_denied": "Permission error.",
+      "not_authenticated": "Authentication required.",
+      "access_denied": "Access denied.",
+      "not_implemented_dev_message": "Method has_permission is not implemented in subclass.",
+      "insufficient_rights": "You do not have sufficient rights to perform this action.",
+      "auth_required_for_action": "Authentication is required for this action.",
+      "superuser_required_for_action": "This action is available only to superusers.",
+      "group_admin_required_for_action": "You must be a group administrator to perform this action.",
+      "group_id_config_error_dev": "Configuration error: group_id not provided for IsGroupAdmin.",
+      "allow_all_should_not_deny": "AllowAll permission should not cause denial.",
+      "access_denied_default_message_for_dependency": "Access denied.",
+      "permission_config_error_dev_message": "Permission check configuration error.",
+      "invalid_group_id_format_user_message": "Invalid group ID format in path.",
+      "require_roles_user_not_authed": "Access denied: user not authenticated.",
+      "require_roles_user_config_error": "User roles configuration error.",
+      "specific_system_roles_required": "This action requires one of the following system roles: {roles}.",
+      "group_id_not_provided": "Group identifier was not provided in the request.",
+      "group_id_invalid": "Provided group identifier '{group_id_str}' is not valid.",
+      "group_member_required": "You must be a member of the group to perform this action.",
+      "object_owner_required": "You are not the owner of this object.",
+      "object_owner_model_undefined_dev": "IsObjectOwner class requires 'model' attribute to be defined.",
+      "object_id_not_provided": "Object identifier '{id_param_name}' was not provided.",
+      "object_id_invalid_format": "Provided object identifier '{object_id_str}' is not valid.",
+      "object_owner_config_error_dev": "Object ownership check configuration error.",
+      "combined_or_failed": "Access denied: none of the required conditions were met.",
+      "combined_and_failed_condition": "Access denied: one of the required conditions was not met."
+    },
+    "log": {
+      "access_denied_user_perm_path": "User '{user_identifier}' denied access by permission check '{permission_name}' to path '{path}'",
+      "is_authenticated_check": "IsAuthenticated: User '{user_email}', active: {is_active}. Permission: {is_permitted}",
+      "anonymous_user_log": "Anonymous",
+      "is_superuser_check": "IsSuperuser: User '{user_email}', superuser: {is_superuser}. Permission: {is_permitted}",
+      "system_user_check_no_id": "IsSystemUser check: user has no 'id' attribute or it is None.",
+      "system_user_no_role_or_not_found": "User ID {user_id} has no system role or not found for IsSystemUser check (required: {required_roles}).",
+      "system_user_check_role": "IsSystemUser check: user ID {user_id} has system role '{user_role}', required: {required_roles}.",
+      "is_group_admin_inactive_user": "IsGroupAdmin: Attempt to check for inactive or unauthenticated user.",
+      "is_group_admin_no_group_id_config_error": "IsGroupAdmin: group_id was not provided for permission check. This is a path or dependency configuration error.",
+      "is_group_admin_check": "IsGroupAdmin: Checking user '{user_email}' (ID: {user_id}) for group ID: {group_id}.",
+      "is_group_admin_superuser_override": "IsGroupAdmin: User '{user_email}' is a superuser. Granted access to group {group_id} (override).",
+      "is_group_admin_access_granted": "IsGroupAdmin: User '{user_email}' (ID: {user_id}) is an administrator of group {group_id}. Permission granted.",
+      "is_group_admin_access_denied": "IsGroupAdmin: User '{user_email}' (ID: {user_id}) is not an administrator of group {group_id}. Permission denied.",
+      "group_id_missing_path": "IsGroupAdmin: 'group_id' not found in path parameters for URL: {url_path}",
+      "group_id_invalid_format": "IsGroupAdmin: 'group_id' ('{group_id_str}') is not a valid number for URL: {url_path}",
+      "group_member_id_missing": "IsGroupMember: 'group_id' not found in path parameters for URL: {url_path}",
+      "group_member_id_invalid": "IsGroupMember: 'group_id' ('{group_id_str}') is not a valid number for URL: {url_path}",
+      "group_member_superuser_access": "IsGroupMember: User ID {user_id} is a superuser, access to group ID {group_id} granted.",
+      "group_member_not_member": "IsGroupMember: User ID {user_id} is not a member of group ID {group_id}.",
+      "group_member_access_granted": "IsGroupMember: User ID {user_id} is a member of group ID {group_id}. Access granted.",
+      "object_owner_id_param_missing": "IsObjectOwner: ID parameter '{id_param_name}' not found in path for model '{model_name}', URL: {url_path}",
+      "object_owner_id_param_invalid": "IsObjectOwner: ID parameter '{id_param_name}' ('{object_id_str}') is not a valid number for model '{model_name}', URL: {url_path}",
+      "object_owner_superuser_access": "IsObjectOwner: User ID {user_id} is a superuser, access to object {model_name} ID {object_id} granted.",
+      "object_owner_not_found": "IsObjectOwner: Object {model_name} ID {object_id} not found. User ID {user_id}.",
+      "object_owner_field_missing_config_error": "IsObjectOwner: Model '{model_name}' does not have field '{user_field_name}' or it is None for object ID {object_id}. Permission configuration error.",
+      "object_owner_access_granted": "IsObjectOwner: User ID {user_id} is the owner of object {model_name} ID {object_id}. Access granted.",
+      "object_owner_not_owner": "IsObjectOwner: User ID {user_id} is not the owner (owner ID {owner_id}) of object {model_name} ID {object_id}.",
+      "allow_all_access_granted": "AllowAll: Permission granted for user '{user_email}'.",
+      "permission_dependency_superuser_override": "Permission automatically granted to superuser '{user_email}'.",
+      "permission_dependency_invalid_group_id_format": "Invalid group_id format in path: '{group_id_str}'.",
+      "permission_dependency_no_results_config_error": "Permission list for check was empty or failed to get results.",
+      "permission_dependency_access_denied_user": "User '{user_email}' denied access. Check results: {results} (required {require_all_str}).",
+      "all_log": "all",
+      "any_log": "any",
+      "permission_dependency_access_granted_user": "User '{user_email}' granted access. Check results: {results}.",
+      "combined_or_permission_exception": "Permission {permission_name} raised exception: {error_detail}",
+      "require_roles_user_not_found": "@require_roles: User not found in function arguments. Access denied.",
+      "require_roles_user_no_roles_attr": "@require_roles: User object '{user_email}' does not have 'roles' attribute.",
+      "require_roles_access_granted_placeholder": "@require_roles: User '{user_email}' has access (placeholder).",
+      "test_logging_setup_success": "Logging configured for permissions.py test.",
+      "test_logging_setup_failed_fallback": "Failed to import setup_logging. Using basic logging configuration."
+    },
+    "test": {
+        "module_demonstration_header": "--- Permissions Module Demonstration ---",
+        "module_description": "This module defines permission classes and a dependency factory for FastAPI.",
+        "test_group_name": "Test Group",
+        "granted_log": "GRANTED",
+        "denied_log": "DENIED",
+        "log_invalid_group_id_format_in_test": "Test {perm_name}: Invalid group_id '{group_id_str}' for user '{user_email}'.",
+        "log_permission_check_result": "Test {perm_name}: User '{user_email}', path '{path}', kwargs {kwargs_str}. Permission: {result_status}",
+        "log_permission_check_error": "Test {perm_name}: Error during check for user '{user_email}': {error_str}",
+        "log_test_result_allowed": "Test for {permission_name} with user '{user_email}': Allowed = {is_allowed}. Message (if False): '{message}'",
+        "log_test_result_exception": "Test for {permission_name} with user '{user_email}': Exception = {exception_name}, Detail = '{detail}'",
+        "log_unexpected_error": "Unexpected error during {permission_name} test: {error}",
+        "starting_tests": "\n--- Testing Permissions ---",
+        "log_admin_action_success": "User '{user_email}' successfully performed an action requiring admin or superuser role.",
+        "log_member_action_success": "User '{user_email}' successfully performed an action requiring member role.",
+        "permission_classes_test_header": "\n--- Testing Permission Classes ---",
+        "testing_is_authenticated_header": "\nTesting IsAuthenticated:",
+        "testing_is_superuser_header": "\nTesting IsSuperuser:",
+        "testing_is_group_admin_header": "\nTesting IsGroupAdmin (real logic):",
+        "testing_allow_all_header": "\nTesting AllowAll:",
+        "testing_require_roles_decorator_header": "\n--- Testing @require_roles Decorator (conceptual) ---",
+        "decorator_direct_call_note": "Note: Decorator is tested with direct calls, passing 'user'.",
+        "log_decorator_test_error": "Test @require_roles ({user_email} for {function_name}): {error_detail}",
+        "log_decorator_test_expected_denial": "Test @require_roles ({user_email} for {function_name}): {error_detail} (EXPECTED DENIAL)",
+        "demonstration_finished_check_logs": "\nDemonstration finished. Check log output for details.",
+        "reminder_permission_dependency_usage": "Remember that PermissionDependency and permission classes are typically used in Depends() in FastAPI endpoints."
+    },
+    "anonymous_user": "Anonymous"
+  },
+  "utils": {
+    "timedelta": {
+      "negative_duration": "(negative duration)",
+      "zero_seconds_alt": "0 seconds",
+      "day": {
+        "one": "day",
+        "few": "days",
+        "many": "days"
+      },
+      "hour": {
+        "one": "hour",
+        "few": "hours",
+        "many": "hours"
+      },
+      "minute": {
+        "one": "minute",
+        "few": "minutes",
+        "many": "minutes"
+      },
+      "second": {
+        "one": "second",
+        "few": "seconds",
+        "many": "seconds"
+      }
+    },
+    "errors": {
+      "chunk_size_positive": "Chunk size (chunk_size) must be a positive integer."
+    },
+    "email": {
+        "smtp_disabled_log": "SMTP_ENABLED=False. Email sending to '{recipient}' with subject '{subject}' skipped (simulation).",
+        "simulated_body_log_debug": "HTML email body (simulation):\n{body_html}",
+        "sending_disabled_simulated_user_message": "Email sending is disabled by configuration. Simulated send.",
+        "smtp_misconfigured_log": "Not all required SMTP settings (HOST, PORT, EMAILS_FROM_EMAIL) are specified. Email sending to '{recipient}' is not possible.",
+        "smtp_misconfigured_user_error": "SMTP settings are incomplete. Cannot send email.",
+        "sending_attempt_log": "Attempting to send email to '{recipient}' with subject '{subject}'",
+        "send_success_log": "Email successfully sent to '{recipient}'",
+        "send_success_user_message": "Email has been sent successfully.",
+        "send_error_log": "Error while sending email to '{recipient}': {error}",
+        "send_error_user_message": "Failed to send email to {recipient}. Error: {error}"
+    }
+  },
+  "validators": {
+    "field_cannot_be_empty_log": "Field '{field_name}' cannot be empty.",
+    "field_required_no_spaces": "This field is required and cannot contain only spaces.",
+    "field_length_exceeds_max_log": "Field '{field_name}' length exceeds maximum allowed ({max_len} characters).",
+    "max_length_is_provided_len": "Maximum length is {max_len} characters. Provided {current_len}.",
+    "field_length_less_than_min_log": "Field '{field_name}' length is less than minimum allowed ({min_len} characters).",
+    "min_length_is_provided_len": "Minimum length is {min_len} characters. Provided {current_len}.",
+    "field_contains_invalid_chars_log": "Field '{field_name}' contains invalid characters.",
+    "value_does_not_match_format": "Value does not match allowed format.",
+    "fieldnames": {
+      "username": "username",
+      "password": "password",
+      "default_numeric_field": "Numeric field"
+    },
+    "username_format_requirements": "Username must be between 3 and 20 characters and can only contain Latin letters, numbers, underscores (_), and hyphens (-).",
+    "password_strength_requirements": "Password must be 8 to 128 characters long and contain at least one uppercase letter, one lowercase letter, one digit, and one special character (@$!%*?&_).",
+    "phone": {
+      "cannot_be_empty_log": "Phone number cannot be empty.",
+      "please_enter_number": "Please enter a phone number.",
+      "invalid_number_log": "The specified phone number is not valid.",
+      "invalid_format_or_nonexistent": "Phone number does not match a valid format or does not exist.",
+      "validation_success_log": "Phone number '{phone_number}' (region: {region}) successfully validated and formatted as {formatted_number}.",
+      "library_not_installed_log": "'phonenumbers' library is not installed. Phone number validation is not possible.",
+      "service_unavailable_no_library_log": "Phone number validation service is temporarily unavailable (missing library).",
+      "check_failed_no_library_user": "Could not check phone number due to a missing required library.",
+      "parse_error_log": "Error parsing phone number '{phone_number}': {error}",
+      "could_not_parse_user_message": "Could not parse phone number: {error_details}",
+      "parse_errors": {
+        "invalid_country_code": "Invalid country code.",
+        "not_a_number": "The string contains non-digit characters where digits were expected.",
+        "too_short_after_idd": "The number is too short after the international direct dialing prefix.",
+        "too_short_nsn": "The number is too short.",
+        "too_long": "The number is too long.",
+        "default_format_error": "Incorrect phone number format."
+      }
+    },
+    "field_must_be_number_log": "Field '{field_name}' must be a number.",
+    "value_must_be_numeric": "Value must be numeric.",
+    "field_must_be_positive_log": "Field '{field_name}' must be a positive number (greater than zero).",
+    "value_must_be_greater_than_zero": "Value must be greater than zero.",
+    "value_less_than_min_log": "Field '{field_name}' value ({value}) is less than minimum allowed ({min_val}).",
+    "value_must_be_not_less_than": "Value must be no less than {min_val}.",
+    "value_exceeds_max_log": "Field '{field_name}' value ({value}) exceeds maximum allowed ({max_val}).",
+    "value_must_be_not_greater_than": "Value must be no greater than {max_val}.",
+    "list_cannot_be_empty_log": "List '{field_name}' cannot be empty.",
+    "list_must_contain_elements": "List must contain at least one element."
+  },
+  "api_exceptions": {
+    "unknown_location": "unknown",
+    "not_applicable_short": "N/A",
+    "validation": {
+      "response_message_generic": "Input data validation error. Please check the provided parameters.",
+      "log_message_details": "Request validation error: {method} {path}. Details: {error_details}. Client: {client_host}",
+      "error_type_name": "VALIDATION_ERROR"
+    },
+    "http": {
+      "log_message_details": "HTTP exception: Status={status_code}, Detail='{detail}' for {method} {path}. Headers: {headers}. Client: {client_host}",
+      "default_error_type_name": "HTTP_EXCEPTION",
+      "error_type_401_name": "AUTHENTICATION_ERROR",
+      "error_type_403_name": "AUTHORIZATION_ERROR",
+      "error_type_404_name": "NOT_FOUND_ERROR"
+    },
+    "generic": {
+      "unhandled_exception_log": "Unhandled exception: {method} {path}. Error: {error_message}",
+      "error_type_500_name": "INTERNAL_SERVER_ERROR",
+      "user_message_500": "An unexpected error occurred on the server. Please try again later."
+    },
+    "custom_app": {
+        "log_details": "Custom exception '{error_code}': {detail} for {method} {path}. Data: {data}"
+    },
+    "log": {
+        "handler_registered_request_validation_error": "Handler for RequestValidationError registered.",
+        "handler_registered_http_exception": "Handler for HTTPException registered.",
+        "handler_registered_generic_exception": "Generic handler for Exception (500 Internal Server Error) registered.",
+        "handler_registered_custom_app_exception": "Handler for CustomAppException registered.",
+        "all_handlers_registered_successfully": "API custom exception handlers registered successfully.",
+        "module_loaded_info": "'api.exceptions' module loaded. Handlers for RequestValidationError, HTTPException, and generic Exception defined."
+    },
+     "pydantic": {
+        "default_client_detail": "Input data validation error.",
+        "invalid_value_generic": "invalid value",
+        "error_in_field_with_message": "Error in field '{field_path}': {error_msg}",
+        "and_other_errors_suffix": " (and others...)",
+        "error_type_name": "PYDANTIC_VALIDATION_ERROR"
+    }
+  },
+  "api_router": {
+    "responses": {
+      "400": "Invalid request from client",
+      "401": "Unauthorized (token not provided, invalid, or expired)",
+      "403": "Forbidden (insufficient rights to perform operation)",
+      "404": "Resource not found",
+      "422": "Data validation error",
+      "500": "Internal server error"
+    },
+    "tags": {
+      "api_v1": "API v1",
+      "external_api": "External APIs (Webhooks)",
+      "api_status": "API Status"
+    },
+    "log": {
+      "v1_router_included_successfully": "Router for API v1 successfully included in api_router.",
+      "v1_router_include_failed": "Failed to include v1_router from api.v1: {error}. API v1 may be unavailable.",
+      "external_router_included_successfully": "Router for external APIs (webhooks) successfully included in api_router.",
+      "external_router_include_failed": "Failed to include external_api_router from api.external: {error}. External APIs (webhooks) may be unavailable.",
+      "ping_endpoint_called": "API ping endpoint called.",
+      "main_router_configured": "Main API router (`api_router`) configured with base ping endpoint and included versioned routers."
+    },
+    "ping": {
+      "summary": "Check API aggregator availability",
+      "response_description": "Successful response from ping endpoint",
+      "status_message": "API Aggregator is active!",
+      "pong_message": "Pong!"
+    }
+  },
+  "api_external_router": {
+    "tags": {
+      "webhooks_general": "External Webhooks - General",
+      "webhooks_calendar": "External Webhooks - Calendars",
+      "webhooks_messenger": "External Webhooks - Messengers"
+    },
+    "log": {
+      "webhook_router_included": "webhook_router included in external_api_router with prefix /webhooks.",
+      "calendar_webhook_router_included": "calendar_webhook_router included in external_api_router with prefix /calendar.",
+      "messenger_webhook_router_included": "messenger_webhook_router included in external_api_router with prefix /messenger.",
+      "router_configured_and_ready": "Router for external APIs (`external_api_router`) assembled and ready for inclusion."
+    }
+  },
+  "api_external_calendar": {
+    "log": {
+      "router_init": "Initializing router for calendar service webhooks.",
+      "google_webhook_received_details": "Received webhook from Google Calendar. Headers: X-Goog-Channel-ID={channel_id}, X-Goog-Resource-ID={resource_id}, X-Goog-Resource-State={resource_state}, X-Goog-Message-Number={message_number}, X-Goog-Channel-Token present: {token_present}",
+      "google_invalid_token": "Invalid or missing X-Goog-Channel-Token for channel {channel_id}",
+      "google_sync_message_received": "This is a Google Calendar channel sync message (sync).",
+      "google_resource_changed": "Resource {resource_id} changed state to '{state}'. Synchronization needed.",
+      "google_unknown_resource_state": "Received unknown resource state '{state}' from Google Calendar.",
+      "google_event_webhook_stub": "[STUB] Google Calendar event webhook ({resource_state}) received. Further processing needed.",
+      "outlook_validation_request": "Received Microsoft Graph subscription validation request. ValidationToken: {token_start}...",
+      "outlook_webhook_payload_received": "Received webhook from Outlook Calendar. Body: {payload}",
+      "outlook_validation_token_from_query": "Received validationToken from query parameter for Outlook: {token}",
+      "outlook_json_parse_error_or_no_token": "Error parsing JSON from Outlook webhook or missing validationToken in query: {error}",
+      "outlook_validation_token_from_payload": "Received validationToken for Outlook: {token}",
+      "outlook_invalid_client_state": "clientState mismatch in Outlook webhook. Possible tampering.",
+      "outlook_event_webhook_stub": "[STUB] Outlook Calendar event webhook received. Further processing needed. Sending 202 Accepted.",
+      "outlook_webhook_processing_error": "Error processing Outlook Calendar webhook: {error}",
+      "router_defined": "Router for calendar service webhooks (`/external/calendar`) defined.",
+      "router_configured": "Router for calendar service webhooks configured."
+    },
+    "google": {
+      "summary": "Webhook for Google Calendar API Push Notifications",
+      "response_description": "Response confirming receipt of Google Calendar notification.",
+      "description": "This endpoint receives push notifications from Google Calendar API.\nRequires request validation (e.g., checking `X-Goog-Channel-Token`, `X-Goog-Resource-State`).",
+      "summary_v2": "Webhook for Google Calendar API Push Notifications",
+      "description_v2": "Accepts notifications from Google Calendar API (Push Notifications).\nRequires request validation (e.g., checking `X-Goog-Channel-Token`, `X-Goog-Resource-State`).",
+      "response_desc_v2": "Response confirming notification receipt.",
+      "response_sync_processed": "Google Calendar sync webhook processed.",
+      "response_event_stub_processed": "Google Calendar webhook processed (stub)."
+    },
+    "outlook": {
+      "summary": "Webhook for Outlook Calendar API (Microsoft Graph)",
+      "response_description": "Response confirming receipt of Microsoft Graph notification.",
+      "description": "This endpoint receives notifications from Microsoft Graph API\nfor subscriptions to Outlook calendar changes.\nRequires `clientState` validation in notifications if used.",
+      "summary_v2": "Webhook for Outlook Calendar API (Microsoft Graph)",
+      "description_v2": "Accepts notifications from Outlook Calendar API via Microsoft Graph Webhooks.\nHandles validation requests (`validationToken`) and change notifications.\nRequires `clientState` validation in notifications if used.",
+      "response_desc_v2": "Response confirming receipt or validation.",
+      "status_error_processing_accepted": "Error processing Outlook Calendar notification, but request accepted.",
+      "status_received_processing": "Outlook Calendar notification received and taken into processing."
+    },
+    "errors": {
+      "google_invalid_channel_token": "Invalid Google Calendar channel token.",
+      "outlook_json_parse_or_no_token": "Failed to parse JSON request body or missing validationToken.",
+      "outlook_invalid_client_state": "Invalid clientState in Outlook notification."
+    }
+  },
+  "common": {
+    "yes": "Yes",
+    "no": "No"
+  },
+  "api_external_messenger": {
+    "log": {
+      "router_init": "Initializing router for messenger webhooks.",
+      "telegram_invalid_secret_token": "Invalid secret token for Telegram webhook: {token}",
+      "telegram_webhook_received_payload": "Received webhook from Telegram: {payload}",
+      "viber_webhook_received_signature": "Received webhook from Viber. Signature: {signature}",
+      "viber_auth_token_not_configured": "VIBER_AUTH_TOKEN is not configured. Cannot validate Viber signature.",
+      "viber_invalid_signature_details": "Invalid Viber signature. Expected: {expected}, Received: {received}",
+      "viber_signature_valid_stub": "Viber signature is valid (or check not performed - STUB).",
+      "viber_payload_data": "Viber payload: {payload}",
+      "viber_json_parse_error_detail": "Error parsing JSON from Viber webhook: {error}",
+      "slack_webhook_received_sig_time": "Received webhook from Slack. Signature: {signature}, Timestamp: {timestamp}",
+      "slack_missing_validation_data": "Missing necessary data for Slack request validation (token or headers).",
+      "slack_request_outdated": "Slack request is outdated (timestamp check).",
+      "slack_invalid_signature_details": "Invalid Slack signature. Expected: {expected}, Received: {received}",
+      "slack_signature_valid_stub": "Slack signature is valid (or check not performed - STUB).",
+      "slack_json_parse_error_detail": "Error parsing JSON from Slack webhook: {error}",
+      "slack_form_data_parse_error_detail": "Error parsing Form-data from Slack webhook: {error}",
+      "slack_unsupported_content_type": "Unsupported Content-Type from Slack: {content_type}. Body: {body_preview}",
+      "slack_payload_content_type": "Slack payload ({content_type}): {payload}",
+      "slack_url_verification_challenge": "Handling Slack URL verification challenge: {challenge}",
+      "teams_webhook_received_payload": "Received webhook from Microsoft Teams: {payload}",
+      "teams_auth_header_presence": "Teams Authorization header present: {present}",
+      "teams_invalid_auth_token_detail": "Invalid Authorization token for Teams webhook.",
+      "teams_auth_token_valid_stub": "Teams Authorization token is valid (or check not performed - STUB).",
+      "router_defined": "Router for messenger webhooks (`/external/messenger`) defined.",
+      "router_configured": "Router for messenger webhooks configured."
+    },
+    "telegram": {
+      "summary_v2": "Webhook for Telegram Bot API",
+      "description_v2": "Accepts updates from Telegram Bot API.\nSecurity is usually ensured via a secret token appended to the webhook URL\nduring its registration with Telegram. This endpoint should verify this token if used.",
+      "response_desc_v2": "Response to Telegram server.",
+      "path_secret_token_title": "Telegram Webhook Secret Token",
+      "response_message_stub": "Telegram webhook received and queued for processing (stub).",
+      "status_processing_error_accepted": "Error processing Telegram update, but request accepted."
+    },
+    "viber": {
+      "summary_v2": "Webhook for Viber Bot API",
+      "description_v2": "Accepts callbacks from Viber Bot API.\nRequires request validation using `X-Viber-Content-Signature` header.",
+      "response_desc_v2": "Response to Viber server.",
+      "response_message_stub_validation_needed": "Viber webhook received (stub, signature validation needed!).",
+      "status_processing_error": "Error processing Viber event.",
+      "status_event_received": "Viber event received."
+    },
+    "slack": {
+      "summary_v2": "Webhook for Slack (Events API, Interactive Components)",
+      "description_v2": "Accepts events from Slack Events API or requests from Interactive Components.\nRequires request validation using `X-Slack-Signature` and `X-Slack-Request-Timestamp`.",
+      "response_desc_v2": "Response to Slack server.",
+      "response_message_stub_validation_needed": "Slack webhook received (stub, signature validation needed!).",
+      "status_request_received": "Request from Slack received."
+    },
+    "teams": {
+      "summary_v2": "Webhook for Microsoft Teams (Bot Framework)",
+      "description_v2": "Accepts messages and events for a Microsoft Teams bot via Bot Framework.\nRequires JWT token validation in `Authorization` header.",
+      "response_desc_v2": "Response to Bot Framework.",
+      "response_message_stub_validation_needed": "Teams webhook received (stub, token validation needed!).",
+      "status_processing_error_accepted": "Error processing Teams activity, but request accepted.",
+      "status_activity_received_processing": "Teams activity received and being processed."
+    },
+    "errors": {
+      "telegram_invalid_webhook_token": "Invalid Telegram webhook token.",
+      "viber_service_unavailable_config": "Viber service temporarily unavailable due to configuration error.",
+      "viber_invalid_request_signature": "Invalid Viber request signature.",
+      "viber_invalid_json": "Invalid JSON.",
+      "slack_missing_validation_headers": "Missing headers for Slack validation.",
+      "slack_outdated_request": "Outdated Slack request.",
+      "slack_invalid_request_signature": "Invalid Slack request signature.",
+      "slack_json_parse_failed": "Failed to parse Slack JSON request body.",
+      "slack_form_data_parse_failed": "Failed to parse Slack Form-data request body.",
+      "slack_unsupported_content_type": "Unsupported Content-Type: {content_type}",
+      "teams_auth_token_required": "Authorization token required.",
+      "teams_invalid_auth_token_user": "Invalid Authorization token."
+    }
+  },
+  "api_external_webhook": {
+    "log": {
+      "router_init": "Initializing generic webhook router (/webhook).",
+      "generic_webhook_request_received": "Received request on generic webhook (/generic):",
+      "request_method": "  Method: {method}",
+      "request_url": "  URL: {url}",
+      "client_info": "  Client: {host}:{port}",
+      "request_headers": "  Headers: {headers}",
+      "body_json": "  Body (JSON): {body_json}",
+      "body_raw_not_json": "  Body (raw, not JSON): {body_raw}...",
+      "router_defined_generic": "Router for generic webhooks (`/external/webhook`) defined."
+    },
+    "generic": {
+      "summary": "Generic Webhook Receiver",
+      "description": "Accepts webhooks from unspecified external services.\n    **WARNING: This endpoint is conceptual (a stub) and does not implement any security mechanisms\n    (signature validation, tokens, etc.) by default. Do not use in production without proper validation!**\n    It only logs received data. Future implementation may include logic for routing to appropriate handlers based on headers or request body.",
+      "response_description": "Response confirming webhook receipt.",
+      "path_service_name_title": "External Service Name",
+      "response_message_received_logged_stub": "Generic webhook received and logged. Processing and validation implementation needed."
+    },
+    "errors": {
+        "invalid_json_payload": "Invalid JSON payload.",
+        "service_not_supported": "Service '{service_name}' is not supported for webhooks."
+    }
+  },
+  "api_middleware": {
+    "log": {
+      "error_processing_request": "Error processing request {method} {path} (time to error: {time_to_error} sec): {error}",
+      "request_processed_summary": "Request {method} {path} - Status {status_code} - Processed in {process_time} sec.",
+      "api_key_header_missing": "API Key Middleware: Missing header '{header_name}' for {path} from {client_host}",
+      "api_key_invalid": "API Key Middleware: Invalid API key provided for {path}. Key: '{key_preview}...'",
+      "api_key_access_granted": "API Key Middleware: Access granted for client '{client_name}' to {path}",
+      "module_loaded_defined_middlewares": "'api.middleware' module loaded. Defined: {middlewares}."
+    },
+    "errors": {
+      "api_key_header_required": "Required header '{header_name}' not provided.",
+      "api_key_invalid_provided": "Invalid API key provided."
+    }
+  },
+  "schemas": {
+    "auth": {
+      "login": {
+        "username_description": "User's email for login.",
+        "password_description": "User's password.",
+        "log_demo_header": "--- Pydantic Schemas for Login and Password Reset ---",
+        "log_login_request_example": "\nLoginRequestSchema (example):",
+        "log_login_request_validation_error": "LoginRequestSchema validation error (expected): {error}",
+        "log_password_reset_request_example": "\nPasswordResetRequestSchema (example):",
+        "log_password_reset_confirm_example": "\nPasswordResetConfirmSchema (example):",
+        "log_password_reset_confirm_validation_error": "PasswordResetConfirmSchema validation error (expected): {error}",
+        "log_note_usage": "\nNote: These schemas are used for handling authentication and access recovery requests.",
+        "log_todo_password_validation": "TODO: Add strong password validation for 'new_password' field in PasswordResetConfirmSchema."
+      },
+      "password_reset_request": {
+        "email_description": "Email address of the user for whom password reset is requested."
+      },
+      "password_reset_confirm": {
+        "token_description": "Password reset token received by the user.",
+        "new_password_description": "New user password (min. 8 characters, must meet reliability policies)."
+      }
+    }
+  }
 }

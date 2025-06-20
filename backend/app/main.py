@@ -27,7 +27,7 @@ from backend.app.src.config.redis import get_redis_client, close_redis_client
 from backend.app.src.core.exceptions import AppException
 
 # TODO: Імпортувати головний маршрутизатор API, коли він буде створений
-from backend.app.src.api.v1.api_router import api_router as api_v1_router
+from backend.app.src.api.v1.router import v1_router as api_v1_router # Updated import
 from backend.app.src.api.admin.admin_router import admin_router # Приклад для адмін-панелі
 
 # Ініціалізація логера для цього модуля
@@ -169,12 +169,12 @@ async def generic_exception_handler(request: Request, exc: Exception):
 
 # --- Підключення маршрутизаторів (API Routers) ---
 # TODO: Розкоментувати та налаштувати, коли маршрутизатори будуть створені.
-# app.include_router(api_v1_router, prefix=settings.API_V1_STR)
-# logger.info(f"Маршрутизатор api_v1_router підключено з префіксом '{settings.API_V1_STR}'.")
+app.include_router(api_v1_router, prefix=settings.API_V1_STR)
+logger.info(f"Маршрутизатор api_v1_router підключено з префіксом '{settings.API_V1_STR}'.")
 
 # Приклад підключення адмін-роутера (якщо є)
-# app.include_router(admin_router, prefix="/admin", tags=["Admin"]) # tags - для групування в Swagger UI
-# logger.info("Маршрутизатор admin_router підключено з префіксом '/admin'.")
+app.include_router(admin_router, prefix="/admin", tags=["Admin"]) # tags - для групування в Swagger UI
+logger.info("Маршрутизатор admin_router підключено з префіксом '/admin'.")
 
 
 # --- Кореневий ендпоінт (Health Check / Info) ---

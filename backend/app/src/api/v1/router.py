@@ -34,7 +34,7 @@ from backend.app.src.api.v1.groups.router import groups_router
 from backend.app.src.api.v1.tasks.router import tasks_router
 from backend.app.src.api.v1.bonuses.router import bonuses_router
 from backend.app.src.api.v1.gamification.router import gamification_router
-from backend.app.src.api.v1.notifications.router import notifications_router # Виправлено з notifications_router на notifications_router
+from backend.app.src.api.v1.notifications.router import notifications_router
 from backend.app.src.api.v1.files.router import files_router
 from backend.app.src.api.v1.integrations.router import integrations_router
 

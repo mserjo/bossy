@@ -1,10 +1,6 @@
 # backend/app/src/services/dictionaries/statuses.py
-# import logging # Замінено на централізований логер
-# from typing import List # Видалено
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.future import select # Видалено
 
-# Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.dictionaries.statuses import Status # Модель SQLAlchemy
 from backend.app.src.repositories.dictionaries.status_repository import StatusRepository # Імпорт репозиторію
@@ -14,9 +10,11 @@ from backend.app.src.schemas.dictionaries.statuses import ( # Схеми Pydanti
     StatusUpdate,
     StatusResponse,
 )
-from backend.app.src.config import logger # Стандартизований імпорт логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
-class StatusService(BaseDictionaryService[Status, StatusRepository, StatusCreate, StatusUpdate, StatusResponse]): # Додано StatusRepository до Generic
+
+class StatusService(BaseDictionaryService[Status, StatusRepository, StatusCreate, StatusUpdate, StatusResponse]):
     """
     Сервіс для управління елементами довідника "Статуси".
     Статуси є загальними для системи і можуть застосовуватися до різних сутностей

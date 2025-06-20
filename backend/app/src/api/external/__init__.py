@@ -13,12 +13,11 @@
 
 from fastapi import APIRouter
 
-# Повні шляхи імпорту
 from backend.app.src.api.external.webhook import router as generic_webhook_router
 from backend.app.src.api.external.calendar import router as calendar_webhooks_router
 from backend.app.src.api.external.messenger import router as messenger_webhooks_router
-
-from backend.app.src.config import logger # Стандартизований імпорт логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Створюємо агрегований роутер для всіх ендпоінтів, призначених для зовнішніх систем (вебхуків)
 external_api_router = APIRouter()

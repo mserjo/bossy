@@ -13,10 +13,9 @@ from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import (
     get_api_db_session, get_current_active_user,
-    get_current_active_superuser, paginator, get_group_membership_service # Додано get_group_membership_service
+    get_current_active_superuser, paginator, get_group_membership_service
 )
 # TODO: Створити/використати гранульовані залежності для прав доступу
 from backend.app.src.api.v1.groups.groups import check_group_edit_permission, check_group_view_permission  # Тимчасово
@@ -29,9 +28,10 @@ from backend.app.src.core.pagination import PagedResponse, PageParams
 from backend.app.src.services.gamification.level import LevelService
 from backend.app.src.services.gamification.user_level import UserLevelService
 from backend.app.src.services.groups.group import GroupService  # Для перевірки групи при створенні/фільтрації
-from backend.app.src.services.groups.membership import GroupMembershipService # Додано для типізації
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.services.groups.membership import GroupMembershipService
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     # Префікс /levels буде додано в __init__.py батьківського роутера gamification

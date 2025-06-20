@@ -17,8 +17,7 @@ from backend.app.src.models.base import Base
 from backend.app.src.models.mixins import TimestampedMixin
 from backend.app.src.core.dicts import FileType # Enum для поля purpose, renamed from FileTypeEnum
 from sqlalchemy import Enum as SQLEnum # Імпорт SQLEnum
-from backend.app.src.config.logging import get_logger # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 if TYPE_CHECKING:

@@ -5,17 +5,16 @@
 
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-# import logging # Замінено на централізований логер
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо, якщо сесія інкапсульована в сервісах
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import get_api_db_session, get_current_active_user, get_user_service
 from backend.app.src.models.auth.user import User as UserModel  # Модель SQLAlchemy
 from backend.app.src.schemas.auth.user import UserResponse, UserUpdate  # Схеми Pydantic
 from backend.app.src.services.auth.user import UserService
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings  # Для доступу до DEBUG тощо
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 

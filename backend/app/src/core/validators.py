@@ -20,14 +20,12 @@ from phonenumbers import phonenumberutil # Розкоментуйте для в�
 from backend.app.src.core.exceptions import ValidationException
 from backend.app.src.core.constants import PASSWORD_REGEX, USERNAME_REGEX
 from backend.app.src.config.logging import get_logger
-
-# Отримання логера для цього модуля
 logger = get_logger(__name__)
 
 
 # from backend.app.src.config.logging import get_logger # Якщо потрібне логування
 
-# logger = get_logger(__name__) # Ініціалізація логера, якщо потрібен
+# logger = get_logger(__name__), якщо потрібен
 
 # --- Валідатори для рядкових значень ---
 

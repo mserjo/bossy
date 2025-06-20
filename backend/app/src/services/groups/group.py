@@ -5,24 +5,24 @@
 Надає бізнес-логіку для створення, оновлення, видалення, отримання груп,
 а також для управління членством та іншими аспектами груп.
 """
-from typing import List, Optional, Dict, Any # Tuple не використовується в сигнатурах
+from typing import List, Optional, Dict, Any
 from uuid import UUID
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func # Оновлено імпорт select, func може знадобитися
-from sqlalchemy.orm import selectinload, noload # joinedload видалено
+from sqlalchemy import select, func
+from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.groups.group import Group
-from backend.app.src.repositories.groups.group_repository import GroupRepository # Імпорт репозиторію
+from backend.app.src.repositories.groups.group_repository import GroupRepository
 from backend.app.src.models.auth.user import User
 from backend.app.src.models.dictionaries.group_types import GroupType
 from backend.app.src.models.groups.membership import GroupMembership
 from backend.app.src.models.dictionaries.user_roles import UserRole
 from backend.app.src.models.files.file import FileRecord
+from backend.app.src.models.groups.settings import GroupSetting # Added import
 
 from backend.app.src.schemas.groups.group import (
     GroupCreate,
@@ -30,8 +30,10 @@ from backend.app.src.schemas.groups.group import (
     GroupResponse,
     GroupDetailedResponse
 )
-from backend.app.src.config import logger  # Використання спільного логера з конфігу
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
+logger = get_logger(__name__)
 
 # TODO: [Configuration] Визначити константу для коду ролі "ADMIN" в конфігурації або в `core.constants`.
 ADMIN_ROLE_CODE = "ADMIN"
@@ -75,7 +77,7 @@ class GroupService(BaseService):
                         ),
                         selectinload(GroupMembership.role) # Змінено з user_role на role, відповідно до моделі GroupMembership
                     ),
-                    selectinload(Group.settings), # Додано settings, якщо є
+                    selectinload(Group.settings),
                 )
             else: # Мінімальне завантаження для GroupResponse
                 query = query.options(
@@ -115,21 +117,21 @@ class GroupService(BaseService):
         # Перевірки існування пов'язаних сутностей залишаються в сервісі
         creator_user_db = await self.db_session.get(User, creator_id)
         if not creator_user_db:
-            msg = f"Користувача-творця з ID '{creator_id}' не знайдено."
-            logger.error(msg + " Неможливо створити групу.")
-            raise ValueError(msg)
+            # msg = f"Користувача-творця з ID '{creator_id}' не знайдено." # Original for log
+            logger.error(f"Користувача-творця з ID '{creator_id}' не знайдено. Неможливо створити групу.")
+            raise ValueError(_("group.errors.creator_not_found", creator_id=creator_id))
 
         if group_create_data.group_type_id:
             if not await self.db_session.get(GroupType, group_create_data.group_type_id):
-                msg = f"Тип групи з ID '{group_create_data.group_type_id}' не знайдено."
-                logger.error(msg)
-                raise ValueError(msg)
+                # msg = f"Тип групи з ID '{group_create_data.group_type_id}' не знайдено." # Original for log
+                logger.error(f"Тип групи з ID '{group_create_data.group_type_id}' не знайдено.")
+                raise ValueError(_("group.errors.group_type_not_found", group_type_id=group_create_data.group_type_id))
 
-        if group_create_data.icon_file_id: # Припускаємо, що модель Group має icon_file_id
+        if group_create_data.icon_file_id:
             if not await self.db_session.get(FileRecord, group_create_data.icon_file_id):
-                msg = f"Файл іконки з ID '{group_create_data.icon_file_id}' не знайдено."
-                logger.error(msg)
-                raise ValueError(msg)
+                # msg = f"Файл іконки з ID '{group_create_data.icon_file_id}' не знайдено." # Original for log
+                logger.error(f"Файл іконки з ID '{group_create_data.icon_file_id}' не знайдено.")
+                raise ValueError(_("group.errors.icon_file_not_found", icon_file_id=group_create_data.icon_file_id))
 
         # Створення групи через репозиторій
         # Поля created_by_user_id, updated_by_user_id мають бути оброблені в repo.create або передані як kwargs
@@ -156,9 +158,14 @@ class GroupService(BaseService):
                 # Якщо repo.create робить flush, то new_group_db вже має ID
                 # Потрібно або видалити new_group_db з сесії, або відкотити сесію
                 await self.rollback() # Краще відкотити, щоб скасувати додавання new_group_db
-                msg = f"Роль за замовчуванням '{ADMIN_ROLE_CODE}' не знайдено в базі даних."
-                logger.error(msg + " Неможливо призначити творця адміністратором.")
-                raise ValueError(msg + " Налаштування групи не вдалося.")
+                # msg = f"Роль за замовчуванням '{ADMIN_ROLE_CODE}' не знайдено в базі даних." # Original for log
+                logger.error(f"Роль за замовчуванням '{ADMIN_ROLE_CODE}' не знайдено в базі даних. Неможливо призначити творця адміністратором.")
+                raise ValueError(_("group.errors.default_admin_role_not_found", role_code=ADMIN_ROLE_CODE))
+                # The part "Налаштування групи не вдалося." is context specific,
+                # so the key "group.errors.default_admin_role_not_found" should ideally cover this entire meaning.
+                # If a separate key like "group.errors.setup_failed_due_to_role" is preferred for the latter part,
+                # it would require restructuring the error raising or a more complex error message.
+                # For now, using the single key as per prompt's example structure.
 
             # Потрібен ID групи для GroupMembership. Якщо repo.create не робить flush, робимо тут.
             # Припускаємо, що repo.create робить flush, і new_group_db.id доступний.
@@ -174,12 +181,19 @@ class GroupService(BaseService):
             )
             self.db_session.add(initial_membership)
 
-            await self.commit() # Основний коміт для групи та членства
+            # Створення налаштувань групи за замовчуванням
+            logger.debug(f"Створення налаштувань за замовчуванням для групи ID: {new_group_db.id}")
+            default_group_settings = GroupSetting(
+                group_id=new_group_db.id
+                # currency_name and other fields will take default values from the GroupSetting model definition
+            )
+            self.db_session.add(default_group_settings)
+
+            await self.commit() # Основний коміт для групи, членства та налаштувань
 
             created_group_detailed = await self.get_group_by_id(new_group_db.id, include_details=True)
             if not created_group_detailed:
-                raise RuntimeError(
-                    f"Критична помилка: не вдалося отримати створену групу ID {new_group_db.id} після коміту.")
+                raise RuntimeError(_("group.errors.critical_create_failed", group_id=new_group_db.id))
 
             logger.info(
                 f"Групу '{new_group_db.name}' (ID: {new_group_db.id}) успішно створено користувачем ID '{creator_id}'.")
@@ -188,8 +202,8 @@ class GroupService(BaseService):
             await self.rollback()
             logger.error(f"Помилка цілісності при створенні групи '{group_create_data.name}': {e}",
                          exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося створити групу через конфлікт даних: {e}")
-        except Exception as e:
+            raise ValueError(_("group.errors.create_conflict", error_message=str(e)))
+        except Exception as e: # General exception, keep original message for logging, but could be generic for user
             await self.rollback()
             logger.error(f"Неочікувана помилка при створенні групи '{group_create_data.name}': {e}",
                          exc_info=settings.DEBUG)
@@ -210,12 +224,12 @@ class GroupService(BaseService):
         if 'group_type_id' in update_data_dict and update_data_dict['group_type_id'] is not None \
                 and group_to_update.group_type_id != update_data_dict['group_type_id']:
             if not await self.db_session.get(GroupType, update_data_dict['group_type_id']):
-                raise ValueError(f"Новий тип групи ID '{update_data_dict['group_type_id']}' не знайдено.")
+                raise ValueError(_("group.errors.group_type_not_found", group_type_id=update_data_dict['group_type_id']))
 
         if 'icon_file_id' in update_data_dict and update_data_dict['icon_file_id'] is not None \
-                and group_to_update.icon_file_id != update_data_dict['icon_file_id']: # Припускаємо, що модель Group має icon_file_id
+                and group_to_update.icon_file_id != update_data_dict['icon_file_id']:
             if not await self.db_session.get(FileRecord, update_data_dict['icon_file_id']):
-                raise ValueError(f"Новий файл іконки ID '{update_data_dict['icon_file_id']}' не знайдено.")
+                raise ValueError(_("group.errors.icon_file_not_found", icon_file_id=update_data_dict['icon_file_id']))
 
         # Оновлення через репозиторій. updated_at оновлюється автоматично через TimestampedMixin.
         try:
@@ -229,14 +243,15 @@ class GroupService(BaseService):
 
             updated_group_detailed = await self.get_group_by_id(updated_group_db.id, include_details=True)
             if not updated_group_detailed:
-                raise RuntimeError(f"Критична помилка: не вдалося отримати оновлену групу ID {updated_group_db.id} після коміту.")
+                # This is a critical internal error, so the message might not need full i18n for end-user.
+                raise RuntimeError(_("group.errors.critical_create_failed", group_id=updated_group_db.id)) # Reusing create error for critical get failure
             logger.info(f"Групу ID '{group_id}' успішно оновлено користувачем ID '{current_user_id}'.")
             return updated_group_detailed
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності при оновленні групи ID '{group_id}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося оновити групу через конфлікт даних: {e}")
-        except Exception as e:
+            raise ValueError(_("group.errors.update_conflict", error_message=str(e)))
+        except Exception as e: # General exception
             await self.rollback()
             logger.error(f"Помилка при оновленні групи ID '{group_id}': {e}", exc_info=settings.DEBUG)
             raise
@@ -261,8 +276,8 @@ class GroupService(BaseService):
             await self.rollback()
             logger.error(f"Помилка цілісності при видаленні групи ID '{group_id}' ({group_name_for_log}): {e}. Можливо, група використовується.",
                          exc_info=settings.DEBUG)
-            raise ValueError(f"Група '{group_name_for_log}' використовується і не може бути видалена.")
-        except Exception as e:
+            raise ValueError(_("group.errors.delete_conflict_in_use", group_name=group_name_for_log))
+        except Exception as e: # General exception
             await self.rollback()
             logger.error(f"Неочікувана помилка при видаленні групи ID '{group_id}' ({group_name_for_log}): {e}", exc_info=settings.DEBUG)
             raise
@@ -293,8 +308,7 @@ class GroupService(BaseService):
     async def get_group_activity_report(self, group_id: int) -> Dict[str, Any]:  # Заглушка, Змінено UUID на int
         """Генерує звіт про активність групи (заглушка)."""
         logger.info(f"Генерація звіту активності для групи ID: {group_id} (Заглушка)")
-        # i18n
-        return {"group_id": group_id, "status": "Генерація звіту ще не реалізована."}
+        return {"group_id": group_id, "status": _("group.reports.activity_report_not_implemented")}
 
 
 logger.debug(f"{GroupService.__name__} (сервіс груп) успішно визначено.")

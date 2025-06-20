@@ -6,20 +6,17 @@
 та надає специфічні методи для роботи із запрошеннями до груп.
 """
 
-from typing import List, Optional, Tuple, Any
-from datetime import datetime, timezone # Додано datetime, timezone
+from typing import List, Optional, Tuple, Any, Dict
+from datetime import datetime, timezone
 
-from sqlalchemy import select, func, update as sqlalchemy_update # Додано update
+from sqlalchemy import select, func, update as sqlalchemy_update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Абсолютний імпорт базового репозиторію
 from backend.app.src.repositories.base import BaseRepository
-# Абсолютний імпорт моделі та схем
 from backend.app.src.models.groups.invitation import GroupInvitation
 from backend.app.src.schemas.groups.invitation import GroupInvitationCreateSchema, GroupInvitationUpdateSchema
-from backend.app.src.core.dicts import InvitationStatus # Імпорт Enum
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.core.dicts import InvitationStatus
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 
@@ -111,8 +108,6 @@ class GroupInvitationRepository(
 
         Returns:
             Optional[GroupInvitation]: Екземпляр моделі `GroupInvitation`, якщо знайдено активне запрошення.
-        """
-        logger.debug(f"Отримання GroupInvitation для email {email} та group_id {group_id}")
         """
         logger.debug(f"Отримання GroupInvitation для email {email} та group_id {group_id}")
         conditions = [

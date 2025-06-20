@@ -11,17 +11,17 @@
 
 from typing import Optional, Dict, Any
 from datetime import datetime, timezone # timezone для прикладу в __main__
-# import uuid # Видалено, оскільки id тепер int
 from pydantic import Field
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
     DictionaryCreateSchema,
-    DictionaryBaseResponseSchema,  # Змінено на правильну назву базової схеми
+    DictionaryCreateSchema,
+    DictionaryBaseResponseSchema,
     DictionaryUpdateSchema
 )
-# Імпорт централізованого логера
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 
@@ -31,14 +31,14 @@ class CalendarProviderResponseSchema(DictionaryBaseResponseSchema):
     Успадковує всі поля від `DictionaryBaseResponseSchema`.
     Додає специфічні поля для провайдерів календарів.
     """
-    is_active: bool = Field(..., description="Статус активності провайдера.")
+    is_active: bool = Field(..., description=_("dictionaries.calendars.fields.is_active.description"))
     credentials_schema: Optional[Dict[str, Any]] = Field(
         default=None,
-        description="JSON схема необхідних credential для цього провайдера (наприклад, для OAuth)."
+        description=_("dictionaries.calendars.fields.credentials_schema.description")
     )
     sync_frequency_minutes: Optional[int] = Field(
         default=None,
-        description="Рекомендована частота синхронізації в хвилинах."
+        description=_("dictionaries.calendars.fields.sync_frequency_minutes.description")
     )
     # model_config успадковується
 
@@ -49,15 +49,15 @@ class CalendarProviderCreateSchema(DictionaryCreateSchema):
     Успадковує поля від `DictionaryCreateSchema` (name, code, description, icon, color).
     Додає специфічні поля для провайдерів календарів.
     """
-    is_active: bool = Field(default=True, description="Статус активності провайдера (за замовчуванням True).")
+    is_active: bool = Field(default=True, description=_("dictionaries.calendars.fields.is_active.description")) # Reusing base key, _create can be added if specific text is needed
     credentials_schema: Optional[Dict[str, Any]] = Field(
         default=None,
-        description="JSON схема необхідних credential для налаштування інтеграції."
+        description=_("dictionaries.calendars.fields.credentials_schema.description_create")
     )
     sync_frequency_minutes: Optional[int] = Field(
         default=None,
-        ge=1, # Мінімальна частота - 1 хвилина, якщо вказано
-        description="Рекомендована частота синхронізації в хвилинах (наприклад, 60 для щогодинної)."
+        ge=1,
+        description=_("dictionaries.calendars.fields.sync_frequency_minutes.description_create")
     )
 
 
@@ -67,15 +67,15 @@ class CalendarProviderUpdateSchema(DictionaryUpdateSchema):
     Успадковує поля від `DictionaryUpdateSchema` (всі поля з `DictionaryBaseSchema` опціональні).
     Додає опціональні версії специфічних полів для провайдерів календарів.
     """
-    is_active: Optional[bool] = Field(default=None, description="Новий статус активності провайдера.")
+    is_active: Optional[bool] = Field(default=None, description=_("dictionaries.calendars.fields.is_active.description_update"))
     credentials_schema: Optional[Dict[str, Any]] = Field(
         default=None,
-        description="Оновлена JSON схема credential."
+        description=_("dictionaries.calendars.fields.credentials_schema.description_update")
     )
     sync_frequency_minutes: Optional[int] = Field(
         default=None,
-        ge=1, # Мінімальна частота - 1 хвилина, якщо вказано
-        description="Оновлена рекомендована частота синхронізації в хвилинах."
+        ge=1,
+        description=_("dictionaries.calendars.fields.sync_frequency_minutes.description_update")
     )
 
 

@@ -15,9 +15,9 @@ from pydantic import Field # field_validator видалено, оскільки 
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, TimestampedSchemaMixin
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача
-from backend.app.src.config.logging import get_logger # Імпорт логера
 from backend.app.src.core.dicts import TaskAssignmentStatus # Імпортовано Enum
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # TaskAssignmentStatus Enum імпортовано вище.
@@ -27,11 +27,11 @@ class TaskAssignmentBaseSchema(BaseSchema):
     """
     Базова схема для полів призначення завдання.
     """
-    task_id: int = Field(description="Ідентифікатор завдання.")
-    user_id: int = Field(description="Ідентифікатор користувача, якому призначено завдання.")
-    status: Optional[TaskAssignmentStatus] = Field( # Змінено на TaskAssignmentStatus Enum
+    task_id: int = Field(description=_("task_assignment.fields.task_id.description"))
+    user_id: int = Field(description=_("task_assignment.fields.user_id.description"))
+    status: Optional[TaskAssignmentStatus] = Field(
         None,
-        description="Статус призначення."
+        description=_("task_assignment.fields.status.description")
     )
 
     # model_config успадковується з BaseSchema (from_attributes=True)
@@ -42,10 +42,10 @@ class TaskAssignmentCreateSchema(BaseSchema):
     Схема для створення нового запису про призначення завдання.
     `task_id` зазвичай передається як параметр шляху.
     """
-    user_id: int = Field(description="Ідентифікатор користувача, якому призначається завдання.")
-    status: Optional[TaskAssignmentStatus] = Field( # Змінено на TaskAssignmentStatus Enum
+    user_id: int = Field(description=_("task_assignment.create.fields.user_id.description"))
+    status: Optional[TaskAssignmentStatus] = Field(
         default=TaskAssignmentStatus.ASSIGNED,  # Статус за замовчуванням при створенні
-        description="Статус призначення."
+        description=_("task_assignment.create.fields.status.description")
     )
 
 
@@ -54,8 +54,7 @@ class TaskAssignmentUpdateSchema(BaseSchema):
     Схема для оновлення статусу призначення завдання.
     Дозволяє оновлювати лише поле `status`.
     """
-    status: TaskAssignmentStatus = Field( # Змінено на TaskAssignmentStatus Enum
-        description="Новий статус призначення.")
+    status: TaskAssignmentStatus = Field(description=_("task_assignment.update.fields.status.description"))
 
 
 class TaskAssignmentSchema(TaskAssignmentBaseSchema, TimestampedSchemaMixin):
@@ -68,7 +67,7 @@ class TaskAssignmentSchema(TaskAssignmentBaseSchema, TimestampedSchemaMixin):
     # created_at, updated_at успадковані з TimestampedSchemaMixin
 
     user: Optional[UserPublicProfileSchema] = Field(None,
-                                                    description="Публічний профіль користувача, якому призначено завдання.")
+                                                    description=_("task_assignment.response.fields.user.description"))
     # Можна додати поле `task: Optional[TaskBriefSchema] = None`, якщо потрібно коротко показувати деталі завдання.
 
 

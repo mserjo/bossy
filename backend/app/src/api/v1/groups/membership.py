@@ -13,7 +13,6 @@ from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Path  # Query не використовується прямо тут
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import (
     get_api_db_session, get_current_active_user,
     # Залежності для перевірки прав адміна групи або суперюзера
@@ -35,8 +34,9 @@ from backend.app.src.schemas.groups.membership import (
 )
 from backend.app.src.core.pagination import PagedResponse, PageParams
 from backend.app.src.services.groups.membership import GroupMembershipService
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()  # Префікс /{group_id} буде додано при включенні в groups/__init__.py
 

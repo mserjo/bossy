@@ -1,4 +1,5 @@
 # backend/app/src/services/auth/session.py
+# -*- coding: utf-8 -*-
 """
 Сервіс для управління сесіями користувачів.
 
@@ -20,8 +21,8 @@ from backend.app.src.models.auth.session import UserSession  # Модель SQLA
 from backend.app.src.models.auth.user import User  # Модель SQLAlchemy для користувача
 from backend.app.src.schemas.auth.session import UserSessionResponse, UserSessionCreate # Імпорт актуальних схем
 
-from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
-logger = get_logger(__name__) # Ініціалізація логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 from backend.app.src.config import settings  # Для доступу до конфігурацій, наприклад DEFAULT_SESSION_DURATION_DAYS
 
 # Тривалість сесії за замовчуванням береться з налаштувань.
@@ -44,7 +45,7 @@ class UserSessionService(BaseService):
 
     async def create_session(
             self,
-            user_id: int, # Змінено UUID на int
+            user_id: int,
             user_agent: Optional[str] = None,
             ip_address: Optional[str] = None,
             duration_days: Optional[int] = None
@@ -124,7 +125,7 @@ class UserSessionService(BaseService):
             f"Токен сесії (UUID) '{session_token}' валідовано для користувача ID '{session_db.user_id}'. Поле 'last_active_at' оновлено.")
         return UserSessionResponse.model_validate(session_db)
 
-    async def invalidate_session(self, session_token: UUID, user_id: Optional[int] = None) -> bool: # user_id змінено на Optional[int]
+    async def invalidate_session(self, session_token: UUID, user_id: Optional[int] = None) -> bool:
         """
         Інвалідує/видаляє конкретну сесію користувача за її токеном.
         Якщо надано user_id, переконується, що сесія належить цьому користувачеві.
@@ -152,7 +153,7 @@ class UserSessionService(BaseService):
             f"Токен сесії (UUID) '{session_token}' для користувача ID '{session_db.user_id}' успішно інвалідовано (видалено).")
         return True
 
-    async def list_user_sessions(self, user_id: int, skip: int = 0, limit: int = 100) -> List[UserSessionResponse]: # user_id змінено на int
+    async def list_user_sessions(self, user_id: int, skip: int = 0, limit: int = 100) -> List[UserSessionResponse]:
         """
         Перелічує всі активні (не прострочені) сесії для даного користувача.
         Сортування за `last_active_at` у спадаючому порядку.
@@ -177,7 +178,7 @@ class UserSessionService(BaseService):
         logger.info(f"Отримано {len(response_list)} активних сесій (UserSessionResponse) для користувача ID '{user_id}'.")
         return response_list
 
-    async def invalidate_all_user_sessions(self, user_id: int, exclude_session_token: Optional[UUID] = None) -> int: # user_id змінено на int
+    async def invalidate_all_user_sessions(self, user_id: int, exclude_session_token: Optional[UUID] = None) -> int:
         """
         Інвалідує/видаляє всі сесії для даного користувача, опціонально виключаючи один токен сесії.
         Корисно для функції "вийти з усіх інших пристроїв".

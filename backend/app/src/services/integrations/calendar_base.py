@@ -1,5 +1,4 @@
 # backend/app/src/services/integrations/calendar_base.py
-# import logging # Замінено на централізований логер
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
 from uuid import UUID
@@ -7,10 +6,11 @@ from datetime import datetime
 
 from sqlalchemy.ext.asyncio import AsyncSession # Для потенційної взаємодії з БД (токени/налаштування)
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.auth.user import User # Для контексту користувача (не використовується прямо тут, але в підкласах)
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
+logger = get_logger(__name__)
 
 from pydantic import BaseModel, Field # Використовуємо Pydantic для структур даних
 
@@ -21,25 +21,25 @@ class CalendarEventData(BaseModel):
     """
     Pydantic модель для уніфікованого представлення даних календарної події.
     """
-    id: Optional[str] = Field(None, description="Унікальний ID події від провайдера") # i18n
-    title: str = Field(..., description="Назва або короткий опис події") # i18n
-    start_time: datetime = Field(..., description="Час початку події (з інформацією про часовий пояс)") # i18n
-    end_time: datetime = Field(..., description="Час закінчення події (з інформацією про часовий пояс)") # i18n
-    description: Optional[str] = Field(None, description="Детальний опис події") # i18n
-    location: Optional[str] = Field(None, description="Місце проведення події") # i18n
-    is_all_day: bool = Field(False, description="True, якщо подія триває весь день") # i18n
-    attendees: Optional[List[str]] = Field(default_factory=list, description="Список email-адрес учасників") # i18n
-    meeting_link: Optional[str] = Field(None, description="Посилання на онлайн-зустріч (наприклад, Google Meet, Teams)") # i18n
+    id: Optional[str] = Field(None, description=_("integrations.calendar.event.fields.id.description"))
+    title: str = Field(..., description=_("integrations.calendar.event.fields.title.description"))
+    start_time: datetime = Field(..., description=_("integrations.calendar.event.fields.start_time.description"))
+    end_time: datetime = Field(..., description=_("integrations.calendar.event.fields.end_time.description"))
+    description: Optional[str] = Field(None, description=_("integrations.calendar.event.fields.description.description"))
+    location: Optional[str] = Field(None, description=_("integrations.calendar.event.fields.location.description"))
+    is_all_day: bool = Field(False, description=_("integrations.calendar.event.fields.is_all_day.description"))
+    attendees: Optional[List[str]] = Field(default_factory=list, description=_("integrations.calendar.event.fields.attendees.description"))
+    meeting_link: Optional[str] = Field(None, description=_("integrations.calendar.event.fields.meeting_link.description"))
     # raw: Optional[Dict[str, Any]] = Field(None, description="Оригінальні необроблені дані події від провайдера") # Для відладки
 
 class CalendarInfo(BaseModel):
     """
     Pydantic модель для інформації про календар користувача.
     """
-    id: str = Field(..., description="Унікальний ID календаря від провайдера") # i18n
-    name: str = Field(..., description="Відображуване ім'я календаря (наприклад, 'Основний', 'Робота')") # i18n
-    is_primary: bool = Field(False, description="True, якщо це основний календар користувача на платформі") # i18n
-    can_edit: bool = Field(False, description="True, якщо застосунок має права на запис до цього календаря") # i18n
+    id: str = Field(..., description=_("integrations.calendar.info.fields.id.description"))
+    name: str = Field(..., description=_("integrations.calendar.info.fields.name.description"))
+    is_primary: bool = Field(False, description=_("integrations.calendar.info.fields.is_primary.description"))
+    can_edit: bool = Field(False, description=_("integrations.calendar.info.fields.can_edit.description"))
 
 
 class BaseCalendarIntegrationService(BaseService, ABC):

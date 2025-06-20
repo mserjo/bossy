@@ -12,7 +12,6 @@ from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Path
 from sqlalchemy.ext.asyncio import AsyncSession  # Не використовується прямо, якщо сесія в сервісі
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import get_api_db_session, get_current_active_user
 # Використовуємо залежність, що перевіряє права адміна групи або суперюзера
 from backend.app.src.api.v1.groups.groups import check_group_edit_permission
@@ -22,8 +21,9 @@ from backend.app.src.schemas.groups.settings import (
     GroupSettingUpdate
 )
 from backend.app.src.services.groups.settings import GroupSettingService
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings  # Для DEBUG
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     # Префікс /{group_id}/settings буде додано в __init__.py батьківського роутера groups

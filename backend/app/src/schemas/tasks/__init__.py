@@ -13,7 +13,6 @@
 Моделі з цього пакету експортуються для використання в сервісному шарі та API.
 """
 
-# Імпорт централізованого логера
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
@@ -39,7 +38,7 @@ from backend.app.src.schemas.tasks.event import (
 from backend.app.src.schemas.tasks.assignment import (
     TaskAssignmentBaseSchema,
     TaskAssignmentCreateSchema,
-    TaskAssignmentUpdateSchema, # Додано, оскільки схема існує
+    TaskAssignmentUpdateSchema,
     TaskAssignmentSchema # Використовуємо фактичну назву
 )
 
@@ -74,7 +73,7 @@ __all__ = [
     # TaskAssignment schemas
     "TaskAssignmentBaseSchema",
     "TaskAssignmentCreateSchema",
-    "TaskAssignmentUpdateSchema", # Додано
+    "TaskAssignmentUpdateSchema",
     "TaskAssignmentSchema",
     # TaskCompletion schemas
     "TaskCompletionBaseSchema",

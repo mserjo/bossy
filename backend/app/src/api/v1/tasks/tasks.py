@@ -10,10 +10,9 @@ from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import (
     get_api_db_session, get_current_active_user,
-    get_current_active_superuser, paginator, get_group_membership_service # Додано get_group_membership_service
+    get_current_active_superuser, paginator, get_group_membership_service
 )
 # TODO: Створити та використовувати залежності для перевірки прав доступу до завдань/груп:
 #  - `require_group_member_or_superuser(group_id: UUID = Path(...))`
@@ -31,8 +30,9 @@ from backend.app.src.core.pagination import PagedResponse, PageParams
 from backend.app.src.services.tasks.task import TaskService
 from backend.app.src.services.groups.membership import GroupMembershipService  # Для перевірки членства в групі
 from backend.app.src.core.constants import ADMIN_ROLE_CODE # Для перевірки ролі адміна
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 

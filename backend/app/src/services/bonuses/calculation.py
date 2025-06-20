@@ -1,4 +1,5 @@
 # backend/app/src/services/bonuses/calculation.py
+# -*- coding: utf-8 -*-
 """
 Сервіс для розрахунку бонусів.
 
@@ -21,8 +22,8 @@ from backend.app.src.models.auth.user import User
 
 from backend.app.src.schemas.bonuses.bonus_rule import BonusRuleResponse # Schema name was BonusRule in previous version, now BonusRuleResponse
 from backend.app.src.services.bonuses.bonus_rule import BonusRuleService # Service name was BonusRule in previous version, now BonusRuleService
-from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
-logger = get_logger(__name__) # Ініціалізація логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 # settings видалено, оскільки не використовується
 # from backend.app.src.core.constants import TASK_COMPLETION_STATUS_APPROVED # Видалено, будемо використовувати Enum
 from backend.app.src.core.dicts import TaskStatus # Імпорт TaskStatus Enum

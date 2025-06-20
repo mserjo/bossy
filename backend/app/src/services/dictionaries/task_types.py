@@ -1,10 +1,6 @@
 # backend/app/src/services/dictionaries/task_types.py
-# import logging # Замінено на централізований логер
-# from typing import List # Видалено
 from sqlalchemy.ext.asyncio import AsyncSession
-# from sqlalchemy.future import select # Видалено
 
-# Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.dictionaries.task_types import TaskType # Модель SQLAlchemy
 from backend.app.src.repositories.dictionaries.task_type_repository import TaskTypeRepository # Імпорт репозиторію
@@ -14,9 +10,11 @@ from backend.app.src.schemas.dictionaries.task_types import ( # Схеми Pydan
     TaskTypeUpdate,
     TaskTypeResponse,
 )
-from backend.app.src.config import logger # Стандартизований імпорт логера
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
-class TaskTypeService(BaseDictionaryService[TaskType, TaskTypeRepository, TaskTypeCreate, TaskTypeUpdate, TaskTypeResponse]): # Додано TaskTypeRepository до Generic
+
+class TaskTypeService(BaseDictionaryService[TaskType, TaskTypeRepository, TaskTypeCreate, TaskTypeUpdate, TaskTypeResponse]):
     """
     Сервіс для управління елементами довідника "Типи Завдань".
     Типи завдань визначають різні категорії завдань у системі, наприклад,

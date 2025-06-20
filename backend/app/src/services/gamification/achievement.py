@@ -2,12 +2,10 @@
 """
 Сервіс для управління досягненнями користувачів.
 
-# Примітка: Тип ID для UserAchievement (achievement_id) та Badge (badge_id) припускається як int, оскільки моделі не були надані для перевірки.
-"""
-Сервіс для управління досягненнями користувачів.
-
 Відповідає за логіку нагородження користувачів бейджами (досягненнями)
 та отримання інформації про їхні досягнення.
+
+# Примітка: Тип ID для UserAchievement (achievement_id) та Badge (badge_id) припускається як int, оскільки моделі не були надані для перевірки.
 """
 from typing import List, Optional, Dict, Any # Dict, Any залишені для new_achievement_data
 from datetime import datetime, timezone
@@ -28,8 +26,10 @@ from backend.app.src.schemas.gamification.achievement import (
     UserAchievementCreate,
     UserAchievementResponse
 )
-from backend.app.src.config import logger  # Використання спільного логера з конфігу
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
+logger = get_logger(__name__)
 
 
 class UserAchievementService(BaseService): # type: ignore видалено
@@ -90,16 +90,16 @@ class UserAchievementService(BaseService): # type: ignore видалено
         async with self.db_session.begin_nested() if self.db_session.in_transaction() else self.db_session.begin():
             user = await self.db_session.get(User, user_id)
             if not user:
-                raise ValueError(f"Користувача з ID '{user_id}' не знайдено.")  # i18n
+                raise ValueError(_("user.errors.not_found_by_id", id=user_id))
 
             badge = await self.db_session.get(Badge, badge_id)
             if not badge:
-                raise ValueError(f"Бейдж з ID '{badge_id}' не знайдено.")  # i18n
+                raise ValueError(_("gamification.badge.errors.not_found_by_id", badge_id=badge_id))
 
             if achievement_data.group_id:
                 group = await self.db_session.get(Group, achievement_data.group_id)
                 if not group:
-                    raise ValueError(f"Групу з ID '{achievement_data.group_id}' не знайдено.")  # i18n
+                    raise ValueError(_("group.errors.not_found_by_id", id=achievement_data.group_id))
 
             if not badge.is_repeatable:
                 # Використовуємо репозиторій для перевірки існуючого досягнення
@@ -110,9 +110,9 @@ class UserAchievementService(BaseService): # type: ignore видалено
                     group_id=achievement_data.group_id
                 )
                 if existing_achievement:
-                    msg = f"Бейдж '{badge.name}' (ID: {badge_id}) вже було надано цьому користувачеві в даному контексті і він не є повторюваним."
-                    logger.warning(msg)
-                    raise ValueError(msg)
+                    # msg = f"Бейдж '{badge.name}' (ID: {badge_id}) вже було надано цьому користувачеві в даному контексті і він не є повторюваним." # Original for log
+                    # logger.warning(msg)
+                    raise ValueError(_("gamification.achievement.errors.badge_not_repeatable_and_awarded", badge_name=badge.name, badge_id=badge_id))
 
             # Дані для створення UserAchievementCreateSchema, який приймає UserAchievementRepository.create
             # awarded_at встановлюється автоматично через TimestampedMixin
@@ -137,7 +137,7 @@ class UserAchievementService(BaseService): # type: ignore видалено
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності при нагородженні ({log_ctx}): {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося нагородити досягненням через конфлікт даних: {e}")
+            raise ValueError(_("gamification.achievement.errors.award_conflict", error_message=str(e)))
         except Exception as e:
             await self.rollback()
             logger.error(f"Неочікувана помилка при коміті нагородження ({log_ctx}): {e}", exc_info=settings.DEBUG)
@@ -148,7 +148,7 @@ class UserAchievementService(BaseService): # type: ignore видалено
         if not refreshed_achievement:
             logger.critical(
                 f"Не вдалося отримати щойно створене досягнення ID {new_achievement_db.id} після коміту.")
-            raise RuntimeError("Критична помилка: не вдалося отримати запис досягнення після збереження.") # i18n
+            raise RuntimeError(_("gamification.achievement.errors.critical_award_failed"))
 
         logger.info(
             f"Досягнення (Бейдж ID: '{badge_id}') успішно надано користувачу ID '{user_id}'. ID Запису: {refreshed_achievement.id}")

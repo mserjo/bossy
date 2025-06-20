@@ -17,8 +17,7 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.bonuses.reward import Reward
 from backend.app.src.schemas.bonuses.reward import RewardCreateSchema, RewardUpdateSchema
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # from backend.app.src.core.dicts import SomeStateEnum # Якщо поле state використовує Enum

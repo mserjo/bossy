@@ -6,21 +6,17 @@
 
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-# import logging # Замінено на централізований логер
 from fastapi import APIRouter, Depends, HTTPException, status
-# from jose import JWTError, jwt # Тепер валідація через TokenService
 from sqlalchemy.ext.asyncio import AsyncSession  # Може не знадобитися, якщо сервіси обробляють сесію
 
-# Повні шляхи імпорту
-from backend.app.src.api.dependencies import get_api_db_session, get_current_active_superuser, get_token_service, \
-    get_user_service
+from backend.app.src.api.dependencies import get_api_db_session, get_current_active_superuser, get_token_service, get_user_service
 from backend.app.src.schemas.auth.token import TokenData, TokenVerifyRequest, TokenVerifyResponse
 from backend.app.src.services.auth.token import TokenService
 from backend.app.src.services.auth.user import UserService  # Для додаткової перевірки користувача
 from backend.app.src.models.auth.user import User as UserModel  # Для перевірки користувача
-from backend.app.src.config.logging import logger  # Централізований логер
-from backend.app.src.config import \
-    settings as global_settings  # Для JWT_SECRET_KEY, ALGORITHM (якщо потрібні напряму, але краще через сервіс)
+from backend.app.src.config import settings as global_settings  # Для JWT_SECRET_KEY, ALGORITHM (якщо потрібні напряму, але краще через сервіс)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 

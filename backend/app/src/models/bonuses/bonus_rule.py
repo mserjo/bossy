@@ -13,8 +13,7 @@ from decimal import Decimal
 
 from sqlalchemy import String, ForeignKey, Text, Numeric, func  # func для server_default в TimestampedMixin
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from backend.app.src.config.logging import get_logger # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # Абсолютний імпорт базових класів та міксинів
@@ -28,7 +27,7 @@ from backend.app.src.models.mixins import (
 # Попереднє оголошення типів для уникнення циклічних імпортів
 if TYPE_CHECKING:
     from backend.app.src.models.tasks.task import Task
-    from backend.app.src.models.tasks.event import Event # Додано імпорт Event
+    from backend.app.src.models.tasks.event import Event
     from backend.app.src.models.dictionaries.bonus_types import BonusType
 
 
@@ -73,7 +72,7 @@ class BonusRule(Base, TimestampedMixin, NameDescriptionMixin, StateMixin):
     # Поле event_id тепер посилається на таблицю 'events', що розрізняє Події від Завдань.
     # Попереднє TODO щодо цього питання було вирішено.
     event_id: Mapped[Optional[int]] = mapped_column(
-        ForeignKey('events.id', name='fk_bonus_rule_event_id', ondelete="SET NULL"), # Змінено на events.id
+        ForeignKey('events.id', name='fk_bonus_rule_event_id', ondelete="SET NULL"),
         nullable=True,
         index=True,
         comment="ID події, до якої застосовується правило (якщо є, FK до events.id)"
@@ -96,8 +95,7 @@ class BonusRule(Base, TimestampedMixin, NameDescriptionMixin, StateMixin):
 
     # --- Зв'язки (Relationships) ---
     task: Mapped[Optional["Task"]] = relationship(foreign_keys=[task_id], back_populates="bonus_rules", lazy="selectin")
-    event: Mapped[Optional["Event"]] = relationship(foreign_keys=[event_id],
-                                                     lazy="selectin")  # Змінено event_task на event, тип на Event. back_populates для Event.bonus_rules (якщо потрібно)
+    event: Mapped[Optional["Event"]] = relationship(foreign_keys=[event_id], lazy="selectin")
 
     bonus_type: Mapped["BonusType"] = relationship(foreign_keys=[bonus_type_id], lazy="selectin")
 
@@ -123,7 +121,7 @@ if __name__ == "__main__":
         logger.info(f"  - {field}")
 
     logger.info("\nОчікувані зв'язки (relationships):")
-    expected_relationships = ['task', 'event', 'bonus_type'] # Змінено event_task на event
+    expected_relationships = ['task', 'event', 'bonus_type']
     for rel in expected_relationships:
         logger.info(f"  - {rel}")
 

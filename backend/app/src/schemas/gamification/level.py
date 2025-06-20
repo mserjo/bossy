@@ -13,14 +13,15 @@ from typing import Optional, Any  # Any для тимчасових полів
 from pydantic import Field, AnyHttpUrl
 
 # Абсолютний імпорт базових схем
-from backend.app.src.schemas.base import BaseSchema, BaseMainSchema  # IDSchemaMixin, TimestampedSchemaMixin вже в BaseMainSchema
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.schemas.base import BaseSchema, BaseMainSchema
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
-# TODO: Замінити Any на конкретну схему GroupSchema (коротка версія), коли вона буде готова.
-# from backend.app.src.schemas.groups.group import GroupBriefSchema
-GroupBriefSchema = Any  # Тимчасовий заповнювач
+# Імпорт для конкретної схеми
+from backend.app.src.schemas.groups.group import GroupSchema
+
+# Placeholder GroupBriefSchema = Any removed
 
 LEVEL_NAME_MAX_LENGTH = 255
 LEVEL_ICON_URL_MAX_LENGTH = 512
@@ -33,42 +34,40 @@ class LevelBaseSchema(BaseSchema):
     name: str = Field(
         ...,
         max_length=LEVEL_NAME_MAX_LENGTH,
-        description="Назва рівня гейміфікації.",
+        description=_("gamification.level.fields.name.description"),
         examples=["Новачок", "Досвідчений Гравець"]
     )
     description: Optional[str] = Field(
         None,
-        description="Опис умов або переваг цього рівня."
+        description=_("gamification.level.fields.description.description")
     )
     required_points: int = Field(
         ...,
         ge=0,
-        description="Кількість балів, необхідна для досягнення цього рівня."
+        description=_("gamification.level.fields.required_points.description")
     )
     level_number: Optional[int] = Field(
         None,
         ge=0,
-        description="Порядковий номер рівня (наприклад, 1, 2, 3). Використовується для сортування та визначення прогресу."
+        description=_("gamification.level.fields.level_number.description")
     )
-    icon_url: Optional[AnyHttpUrl] = Field(  # Використовуємо AnyHttpUrl для валідації URL
+    icon_url: Optional[AnyHttpUrl] = Field(
         None,
-        # max_length не потрібен для AnyHttpUrl, валідація формату важливіша
-        description="URL або шлях до іконки, що представляє рівень."
+        description=_("gamification.level.fields.icon_url.description")
     )
     group_id: Optional[int] = Field(
         None,
-        description="ID групи, до якої належить цей рівень. NULL, якщо рівень глобальний/системний."
+        description=_("gamification.level.fields.group_id.description")
     )
-    # state успадковується в LevelSchema через BaseMainSchema, але може бути вказаний при створенні/оновленні
     state: Optional[str] = Field(
-        None,  # Або default="active"
+        None,
         max_length=50,
-        description="Стан рівня (наприклад, 'active', 'inactive').",
+        description=_("gamification.level.fields.state.description"),
         examples=["active"]
     )
-    notes: Optional[str] = Field(  # Додаємо notes, оскільки Level модель успадковує NotesMixin через BaseMainModel
+    notes: Optional[str] = Field(
         None,
-        description="Додаткові нотатки щодо рівня."
+        description=_("gamification.level.fields.notes.description")
     )
 
 
@@ -86,14 +85,14 @@ class LevelUpdateSchema(LevelBaseSchema):
     Всі поля, успадковані з `LevelBaseSchema`, стають опціональними.
     """
     name: Optional[str] = Field(None, max_length=LEVEL_NAME_MAX_LENGTH)
-    description: Optional[str] = None
-    required_points: Optional[int] = Field(None, ge=0)
-    level_number: Optional[int] = Field(None, ge=0)
-    icon_url: Optional[AnyHttpUrl] = None
+    description: Optional[str] = Field(None, description=_("gamification.level.fields.description.description")) # Reusing base
+    required_points: Optional[int] = Field(None, ge=0, description=_("gamification.level.fields.required_points.description")) # Reusing base
+    level_number: Optional[int] = Field(None, ge=0, description=_("gamification.level.fields.level_number.description")) # Reusing base
+    icon_url: Optional[AnyHttpUrl] = Field(None, description=_("gamification.level.fields.icon_url.description")) # Reusing base
     group_id: Optional[int] = Field(None,
-                                    description="Зміна групи для рівня (зазвичай не дозволяється або обробляється окремо).")  # Зазвичай group_id не змінюється
-    state: Optional[str] = Field(None, max_length=50)
-    notes: Optional[str] = None
+                                    description=_("gamification.level.fields.group_id.description")) # Reusing base, specific update description can be added if needed
+    state: Optional[str] = Field(None, max_length=50, description=_("gamification.level.fields.state.description")) # Reusing base
+    notes: Optional[str] = Field(None, description=_("gamification.level.fields.notes.description")) # Reusing base
 
 
 class LevelSchema(BaseMainSchema):  # Успадковує id, name, description, state, notes, group_id, timestamps
@@ -104,14 +103,13 @@ class LevelSchema(BaseMainSchema):  # Успадковує id, name, description
     # id, name, description, state, notes, group_id, created_at, updated_at, deleted_at - успадковані
 
     # Специфічні поля моделі Level
-    required_points: int = Field(description="Кількість балів, необхідна для досягнення рівня.")
-    level_number: Optional[int] = Field(description="Порядковий номер рівня.")
-    icon_url: Optional[AnyHttpUrl] = Field(None, description="URL іконки рівня.")
+    required_points: int = Field(description=_("gamification.level.fields.required_points.description")) # Reuse
+    level_number: Optional[int] = Field(description=_("gamification.level.fields.level_number.description")) # Reuse
+    icon_url: Optional[AnyHttpUrl] = Field(None, description=_("gamification.level.fields.icon_url.description")) # Reuse
 
     # Пов'язані об'єкти
-    # TODO: Замінити Any на GroupBriefSchema, коли вона буде імпортована.
-    group: Optional[GroupBriefSchema] = Field(None,
-                                              description="Коротка інформація про групу, до якої належить рівень (якщо є).")
+    group: Optional[GroupSchema] = Field(None,
+                                         description=_("gamification.level.response.fields.group.description"))
 
     # model_config успадковується з BaseMainSchema -> BaseSchema (from_attributes=True)
 
@@ -153,10 +151,10 @@ if __name__ == "__main__":
         "required_points": 5000,
         "level_number": 3,
         "icon_url": "https://example.com/icons/silver_level.png",
-        # "group": {"id": 1, "name": "Команда Альфа"} # Приклад GroupBriefSchema
+        # "group": {"id": 1, "name": "Команда Альфа", "group_type_code": "TEAM",
+        #           "created_at": str(datetime.now()), "updated_at": str(datetime.now())} # Приклад GroupSchema
     }
     level_response_instance = LevelSchema(**level_response_data)
     logger.info(level_response_instance.model_dump_json(indent=2, exclude_none=True))
 
-    logger.info("\nПримітка: Схема для `group` наразі є заповнювачем (Any).")
-    logger.info("Її потрібно буде замінити на `GroupBriefSchema` після її визначення.")
+    logger.info("\nПримітка: Схема для `group` тепер використовує `GroupSchema`.")

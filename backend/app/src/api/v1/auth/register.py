@@ -5,19 +5,18 @@
 
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-# import logging # Замінено на централізований логер
-from fastapi import APIRouter, Depends, HTTPException, status, Response  # Додано Response для set_cookie
+from fastapi import APIRouter, Depends, HTTPException, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import get_api_db_session, get_user_service, get_token_service
 # from backend.app.src.models.auth.user import User as UserModel # UserModel не використовується прямо у відповіді, якщо є UserResponse
 from backend.app.src.schemas.auth.user import UserCreate, UserResponse
 from backend.app.src.schemas.auth.token import TokenResponse  # Для опціонального авто-логіну
 from backend.app.src.services.auth.user import UserService
 from backend.app.src.services.auth.token import TokenService  # Для опціонального авто-логіну
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings  # Для налаштувань cookie та авто-логіну
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 

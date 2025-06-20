@@ -1,16 +1,14 @@
 # backend/app/src/services/gamification/badge.py
-# import logging # Замінено на централізований логер
-from typing import List, Optional # Any видалено
-from datetime import datetime, timezone  # Додано для updated_at
+from typing import List, Optional
+from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select # sqlalchemy.future видалено
 from sqlalchemy.orm import selectinload, or_  # Додано для завантаження зв'язків та or_
-from sqlalchemy.exc import IntegrityError # Додано для обробки помилок
+from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
-from backend.app.src.services.base import BaseService # Змінено на BaseService
-from backend.app.src.models.gamification.badge import Badge  # Модель SQLAlchemy Badge
+from backend.app.src.services.base import BaseService
+from backend.app.src.models.gamification.badge import Badge
 from backend.app.src.repositories.gamification.badge_repository import BadgeRepository # Імпорт репозиторію
 # BaseCacheService не потрібен, якщо сервіс не використовує BaseDictionaryService
 # from backend.app.src.services.cache.base_cache import BaseCacheService
@@ -22,8 +20,10 @@ from backend.app.src.schemas.gamification.badge import (  # Схеми Pydantic
     BadgeUpdate,
     BadgeResponse,
 )
-from backend.app.src.config import logger  # Стандартизований імпорт логера
 from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
+logger = get_logger(__name__)
 
 
 class BadgeService(BaseService): # Змінено успадкування на BaseService
@@ -155,9 +155,11 @@ class BadgeService(BaseService): # Змінено успадкування на 
 
         existing_item_id = (await self.db_session.execute(stmt)).scalar_one_or_none()
         if existing_item_id:
-            msg = f"{self._model_name} з ім'ям '{name}' вже існує в {scope_log_msg}."  # i18n
-            logger.warning(msg)
-            raise ValueError(msg)
+            # msg = f"{self._model_name} з ім'ям '{name}' вже існує в {scope_log_msg}."  # Original for log
+            # logger.warning(msg) # Log can be more detailed
+            # For user-facing error, use the translated version:
+            translated_scope = _("in_group_scope", group_id=group_id) if group_id else _("global_scope")
+            raise ValueError(_("gamification.badge.errors.name_exists_in_scope", model_name=self._model_name, name=name, scope=translated_scope))
 
     async def create(self, data: BadgeCreate, created_by_user_id: int) -> BadgeResponse: # created_by_user_id: UUID -> int
         """
@@ -169,7 +171,7 @@ class BadgeService(BaseService): # Змінено успадкування на 
         await self._check_name_uniqueness(data.name, data.group_id)
 
         if data.icon_file_id and not await self.db_session.get(FileRecord, data.icon_file_id):
-            raise ValueError(f"Файл іконки з ID '{data.icon_file_id}' не знайдено.")
+            raise ValueError(_("gamification.badge.errors.icon_file_not_found", file_id=data.icon_file_id))
 
         # Створюємо словник даних для kwargs, щоб передати created_by_user_id та updated_by_user_id
         # Хоча модель Badge їх не має, BaseRepository.create може їх прийняти, якщо вони є в **kwargs
@@ -191,11 +193,11 @@ class BadgeService(BaseService): # Змінено успадкування на 
             )
             await self.commit()
             refreshed_item = await self.get_by_id(new_item_db.id) # Використовуємо get_by_id сервісу для завантаження зв'язків
-            if not refreshed_item: raise RuntimeError("Не вдалося отримати створений бейдж.")
+            if not refreshed_item: raise RuntimeError(_("gamification.badge.errors.critical_create_failed"))
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності '{data.name}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося створити {self._model_name}: конфлікт даних.")
+            raise ValueError(_("gamification.badge.errors.create_conflict", model_name=self._model_name, error_message=str(e)))
 
         logger.info(f"{self._model_name} '{refreshed_item.name}' ID: {refreshed_item.id} успішно створено.")
         return refreshed_item
@@ -231,7 +233,7 @@ class BadgeService(BaseService): # Змінено успадкування на 
         if 'icon_file_id' in update_data_dict and update_data_dict['icon_file_id'] is not None \
                 and update_data_dict['icon_file_id'] != item_db.icon_file_id:
             if not await self.db_session.get(FileRecord, update_data_dict['icon_file_id']):
-                raise ValueError(f"Файл іконки з ID '{update_data_dict['icon_file_id']}' не знайдено.")
+                raise ValueError(_("gamification.badge.errors.icon_file_not_found", file_id=update_data_dict['icon_file_id']))
 
         # BaseRepository.update очікує obj_in як Pydantic схему або dict.
         # Передаємо data (BadgeUpdate schema), а updated_by_user_id як kwarg.
@@ -245,11 +247,11 @@ class BadgeService(BaseService): # Змінено успадкування на 
             )
             await self.commit()
             refreshed_item = await self.get_by_id(updated_item_db.id)
-            if not refreshed_item: raise RuntimeError("Не вдалося отримати оновлений бейдж.")
+            if not refreshed_item: raise RuntimeError(_("gamification.badge.errors.critical_update_failed"))
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності ID '{item_id}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося оновити {self._model_name}: конфлікт даних.")
+            raise ValueError(_("gamification.badge.errors.update_conflict", model_name=self._model_name, error_message=str(e)))
 
         logger.info(f"{self._model_name} '{refreshed_item.name}' ID: {refreshed_item.id} успішно оновлено.")
         return refreshed_item

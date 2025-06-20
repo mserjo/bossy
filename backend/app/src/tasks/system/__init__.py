@@ -20,6 +20,8 @@
 from backend.app.src.tasks.system.cleanup import CleanupTask
 from backend.app.src.tasks.system.backup import DatabaseBackupTask
 from backend.app.src.tasks.system.monitoring import SystemMetricsCollectorTask
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 __all__ = [
     'CleanupTask',
@@ -27,7 +29,4 @@ __all__ = [
     'SystemMetricsCollectorTask',
 ]
 
-import logging
-
-logger = logging.getLogger(__name__)
 logger.info("Підпакет 'tasks.system' ініціалізовано.")

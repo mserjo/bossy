@@ -9,8 +9,7 @@ Google Calendar, Outlook Calendar тощо.
 """
 
 import asyncio
-import logging
-from typing import Any, Dict, Optional, List # Додано List
+from typing import Any, Dict, Optional, List
 from datetime import datetime, timedelta # Для прикладів API
 
 from app.src.tasks.base import BaseTask
@@ -23,8 +22,8 @@ from app.src.tasks.base import BaseTask
 # Для прикладів Microsoft Graph API:
 # import httpx # Розкоментуйте для реальної інтеграції
 
-# Налаштування логера для цього модуля
-logger = logging.getLogger(__name__)
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Приклад конфігурації для OAuth2 клієнтів (має бути в settings та захищено)
 GOOGLE_CALENDAR_CLIENT_ID = "your_google_client_id.apps.googleusercontent.com_placeholder"

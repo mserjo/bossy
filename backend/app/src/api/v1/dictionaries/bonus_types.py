@@ -15,9 +15,7 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
-from backend.app.src.api.dependencies import get_api_db_session, get_current_active_superuser, \
-    get_current_active_user  # Залежності для авторизації
+from backend.app.src.api.dependencies import get_api_db_session, get_current_active_superuser, get_current_active_user  # Залежності для авторизації
 from backend.app.src.models.auth.user import User as UserModel  # Для типізації current_user
 from backend.app.src.schemas.dictionaries.bonus_types import BonusTypeCreate, BonusTypeUpdate, BonusTypeResponse
 from backend.app.src.services.dictionaries.bonus_types import BonusTypeService

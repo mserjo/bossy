@@ -14,14 +14,13 @@ from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Path  # Query не використовується прямо тут
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import (
     get_api_db_session, get_current_active_user,
     # TODO: Створити/використати залежності для перевірки прав, наприклад:
     #  `require_task_interaction_for_review(task_id: UUID = Path(...))` (чи користувач може залишити відгук)
     #  `require_review_owner_or_admin(review_id: UUID = Path(...))` (для редагування/видалення)
     get_current_active_superuser,  # Тимчасово для деяких адмінських дій
-    paginator, get_group_membership_service # Додано get_group_membership_service
+    paginator, get_group_membership_service
 )
 from backend.app.src.api.v1.groups.groups import check_group_view_permission  # Для перегляду відгуків в контексті групи
 from backend.app.src.services.tasks.task import TaskService  # Для отримання завдання, до якого належить відгук
@@ -33,8 +32,9 @@ from backend.app.src.schemas.tasks.review import (
 )
 from backend.app.src.core.pagination import PagedResponse, PageParams
 from backend.app.src.services.tasks.review import TaskReviewService
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     # Префікс /reviews буде додано в __init__.py батьківського роутера tasks

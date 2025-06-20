@@ -11,8 +11,7 @@ from datetime import datetime, date, timezone
 from decimal import Decimal, InvalidOperation
 from typing import Union, Optional
 
-# Імпорт централізованого логера проекту
-from backend.app.src.config.logging_config import setup_logging # type: ignore
+from backend.app.src.config.logging_config import setup_logging
 logger = setup_logging()
 
 
@@ -58,7 +57,7 @@ def format_datetime(
 
 def format_currency( # pylint: disable=too-many-arguments
     amount: Optional[Union[Decimal, float, int]],
-    currency_code: str = "UAH", # Змінено значення за замовчуванням на UAH
+    currency_code: str = "UAH",
     decimal_places: int = 2,
     default_if_none: str = "-",
     include_symbol: bool = True,

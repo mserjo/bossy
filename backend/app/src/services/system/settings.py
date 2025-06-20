@@ -1,15 +1,12 @@
 # backend/app/src/services/system/settings.py
-# backend/app/src/services/system/settings.py
-# import logging # Замінено на централізований логер
 import json
-from typing import List, Optional, Any, Dict # UUID видалено
+from typing import List, Optional, Any, Dict
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select # sqlalchemy.future тепер select
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.system.settings import SystemSetting
 from backend.app.src.repositories.system.settings_repository import SystemSettingRepository # Імпорт репозиторію
@@ -18,9 +15,10 @@ from backend.app.src.schemas.system.settings import (
     SystemSettingUpdate,
     SystemSettingResponse,
 )
-from backend.app.src.core.dicts import SettingValueType # Імпорт Enum
-from backend.app.src.config.logging import logger
+from backend.app.src.core.dicts import SettingValueType
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 class SystemSettingService(BaseService):

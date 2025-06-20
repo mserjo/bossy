@@ -5,13 +5,10 @@
 
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-# import logging # Замінено на централізований логер
 from fastapi import APIRouter, Depends, HTTPException, status, BackgroundTasks
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
-from backend.app.src.api.dependencies import get_api_db_session, get_current_active_user, get_user_service, \
-    get_password_service
+from backend.app.src.api.dependencies import get_api_db_session, get_current_active_user, get_user_service, get_password_service
 # TODO: Додати get_notification_service, коли він буде готовий для надсилання email
 # from backend.app.src.api.dependencies import get_notification_service
 from backend.app.src.models.auth.user import User as UserModel
@@ -24,8 +21,9 @@ from backend.app.src.schemas.message import MessageResponse  # Загальна 
 from backend.app.src.services.auth.user import UserService
 from backend.app.src.services.auth.password import PasswordService  # Оновлений PasswordService
 # from backend.app.src.services.notifications.notification import NotificationService # Для надсилання email
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings  # Для FRONTEND_URL
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 

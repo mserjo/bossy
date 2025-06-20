@@ -10,18 +10,14 @@ FastAPI дозволяє визначати кастомні обробники 
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
-# import logging # Замінено на централізований логер
 from typing import Any, Dict, Union
 
 from fastapi import FastAPI, Request, HTTPException, status, APIRouter
 from fastapi.responses import JSONResponse
 from fastapi.exceptions import RequestValidationError
-# Коментований імпорт StarletteHTTPException видалено
-
-# Повні шляхи імпорту
-from backend.app.src.config import logger  # Стандартизований імпорт логера
 from backend.app.src.config import settings  # Стандартизований імпорт settings
-# Коментований імпорт CustomAppException видалено
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 # --- Кастомний обробник для помилок валідації Pydantic (RequestValidationError) ---

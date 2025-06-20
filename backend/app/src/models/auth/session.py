@@ -15,8 +15,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from backend.app.src.models.base import Base  # Успадковуємо від Base
 from backend.app.src.models.mixins import TimestampedMixin  # Додаємо часові мітки
-from backend.app.src.config.logging import get_logger # Імпорт get_logger
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 if TYPE_CHECKING:
@@ -87,8 +86,8 @@ if __name__ == "__main__":
 
     logger.info("\nОчікувані поля:")
     expected_fields = [
-        'id', 'session_token', 'user_id', 'expires_at', # Змінено session_key на session_token
-        'user_agent', 'ip_address', 'last_active_at', 'created_at', 'updated_at' # Додано last_active_at
+        'id', 'session_token', 'user_id', 'expires_at',
+        'user_agent', 'ip_address', 'last_active_at', 'created_at', 'updated_at'
     ]
     for field in expected_fields:
         logger.info(f"  - {field}")
@@ -99,14 +98,14 @@ if __name__ == "__main__":
     # Приклад створення екземпляра (без взаємодії з БД)
     import uuid
 
-    example_session = UserSession( # Змінено Session на UserSession
+    example_session = UserSession(
         id=1,
-        session_token=str(uuid.uuid4()), # Змінено session_key, генеруємо UUID
+        session_token=str(uuid.uuid4()),
         user_id=101,
         expires_at=datetime.now(timezone.utc) + timedelta(hours=2),
         user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/90.0.4430.212 Safari/537.36",
         ip_address="192.168.1.100",
-        last_active_at=datetime.now(timezone.utc) # Додано last_active_at
+        last_active_at=datetime.now(timezone.utc)
     )
     # Імітуємо часові мітки
     example_session.created_at = datetime.now(timezone.utc)

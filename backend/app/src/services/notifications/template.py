@@ -1,11 +1,9 @@
 # backend/app/src/services/notifications/template.py
-# import logging # Замінено на централізований логер
 from typing import List, Optional, Dict, Any, Tuple
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select # sqlalchemy.future тепер select
 
-# Повні шляхи імпорту
 from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
 from backend.app.src.models.notifications.template import NotificationTemplate
 from backend.app.src.repositories.notifications.template_repository import NotificationTemplateRepository # Імпорт репозиторію
@@ -15,8 +13,11 @@ from backend.app.src.schemas.notifications.template import (
     NotificationTemplateUpdate,
     NotificationTemplateResponse,
 )
-from backend.app.src.config.logging import logger
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
+logger = get_logger(__name__)
+
 
 # Jinja2 залежність
 try:
@@ -54,7 +55,7 @@ class NotificationTemplateService(BaseDictionaryService[
     'name' - людиночитана назва.
     """
 
-    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService): # Додано cache_service
+    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService):
         """
         Ініціалізує NotificationTemplateService.
 
@@ -167,23 +168,19 @@ class NotificationTemplateService(BaseDictionaryService[
             logger.info(f"Шаблон '{template_name}' успішно відрендерено.")
             return rendered_subject, rendered_body
         except TemplateSyntaxError as e:
-            # i18n
-            err_msg = f"Синтаксична помилка в шаблоні '{template_name}': {e.message} (рядок {e.lineno})"
-            logger.error(err_msg, exc_info=True)
-            # Можна кинути кастомний виняток або повернути помилку
+            err_msg = _("notification.template.errors.render_syntax_error", template_name=template_name, error_message=e.message, line_number=e.lineno)
+            logger.error(f"TemplateSyntaxError for template '{template_name}': {e.message} (line {e.lineno})", exc_info=True)
             raise ValueError(err_msg)
         except UndefinedError as e:  # Jinja2 StrictUndefined кидає UndefinedError
-            # i18n
-            err_msg = f"Відсутня змінна в контексті для шаблону '{template_name}': {e.message}"
-            logger.error(err_msg, exc_info=True)
-            raise KeyError(err_msg)  # KeyError може бути більш доречним для відсутніх змінних
+            err_msg = _("notification.template.errors.render_undefined_variable", template_name=template_name, error_message=e.message)
+            logger.error(f"UndefinedError for template '{template_name}': {e.message}", exc_info=True)
+            raise KeyError(err_msg)
         except Exception as e:  # Інші можливі помилки під час рендерингу
-            # i18n
-            err_msg = f"Помилка рендерингу шаблону '{template_name}': {e}"
-            logger.error(err_msg, exc_info=True)
-            # Для надійності системи сповіщень, можна повернути запасне повідомлення
-            fallback_body = f"Помилка відображення сповіщення '{template_name}'. Будь ласка, зв'яжіться з підтримкою. Деталі: {str(e)}"  # i18n
-            fallback_subject = f"Помилка сповіщення: {template_name}" if template_content.subject_template else None  # i18n
+            # Log the original error with more details for developers
+            logger.error(f"General rendering error for template '{template_name}': {e}", exc_info=True)
+            # For the user, provide a generic fallback message
+            fallback_body = _("notification.template.render_fallback.body", template_name=template_name, error_details=str(e))
+            fallback_subject = _("notification.template.render_fallback.subject", template_name=template_name) if template_content.subject_template else None
             return fallback_subject, fallback_body
 
     # CRUD операції (create, update, delete, get_by_id, get_all) успадковуються з BaseDictionaryService.

@@ -1,11 +1,11 @@
 # backend/app/src/services/__init__.py
-# backend/app/src/services/__init__.py
+# -*- coding: utf-8 -*-
 # Центральний файл для експорту сервісів.
 # Дозволяє імпортувати сервіси через `from backend.app.src.services import SomeService`
 # замість вказання повного шляху до модуля сервісу.
 
-from backend.app.src.config.logging import get_logger # Змінено на get_logger
-logger = get_logger(__name__) # Ініціалізація логера через get_logger
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 logger.info("Ініціалізація пакету сервісів...")
 

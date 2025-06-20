@@ -1,15 +1,13 @@
 # backend/app/src/services/gamification/rating.py
-# import logging # Замінено на централізований логер
-from typing import List, Optional # Dict, Any, UUID видалено
-from datetime import datetime, timezone, date # date додано
+from typing import List, Optional
+from datetime import datetime, timezone, date
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, func # sqlalchemy.future видалено, func додано
+from sqlalchemy import select, func
 from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.gamification.rating import UserGroupRating
 from backend.app.src.repositories.gamification.rating_repository import UserGroupRatingRepository # Імпорт репозиторію
@@ -24,8 +22,10 @@ from backend.app.src.schemas.gamification.rating import (
     GroupLeaderboardResponse
 )
 from backend.app.src.core.dicts import RatingType # Імпорт RatingType Enum
-from backend.app.src.config.logging import logger
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
+logger = get_logger(__name__)
 
 DEFAULT_RATING_TYPE = RatingType.OVERALL # Змінено на Enum
 
@@ -137,7 +137,7 @@ class UserRatingService(BaseService):
 
         if not updated_orm_obj: # Якщо create/update повернули None (малоймовірно для BaseRepository)
              logger.error(f"Не вдалося оновити або створити запис рейтингу для {log_ctx}.")
-             raise RuntimeError("Помилка оновлення/створення запису рейтингу.")
+             raise RuntimeError(_("gamification.rating.errors.critical_update_create_failed"))
 
         try:
             await self.commit()
@@ -152,12 +152,12 @@ class UserRatingService(BaseService):
             refreshed_rating_db = (await self.db_session.execute(final_rating_stmt)).scalar_one_or_none()
             if not refreshed_rating_db: # Дуже малоймовірно
                  logger.critical(f"Не вдалося отримати щойно оновлений/створений рейтинг ID {updated_orm_obj.id}")
-                 raise RuntimeError("Критична помилка: Не вдалося отримати рейтинг після збереження.")
+                 raise RuntimeError(_("gamification.rating.errors.critical_get_after_save_failed"))
 
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності UserGroupRating для {log_ctx}: {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося оновити/створити рейтинг через конфлікт даних: {e}")
+            raise ValueError(_("gamification.rating.errors.update_create_conflict", error_message=str(e)))
         except Exception as e:
             await self.rollback()
             logger.error(f"Неочікувана помилка при коміті рейтингу для {log_ctx}: {e}", exc_info=settings.DEBUG)

@@ -17,8 +17,9 @@ from pydantic import BaseModel
 from backend.app.src.services.base import BaseService
 from backend.app.src.repositories.dictionaries.base_dict_repository import BaseDictionaryRepository # Імпорт репозиторію
 from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт сервісу кешування
-from backend.app.src.config import logger # Використання спільного логера з конфігу
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 # Визначення генеричних типів

@@ -1,6 +1,4 @@
 # backend/app/src/services/tasks/task.py
-# backend/app/src/services/tasks/task.py
-# import logging # Замінено на централізований логер
 from typing import List, Optional, Any
 # UUID видалено
 from datetime import datetime, timezone
@@ -10,7 +8,6 @@ from sqlalchemy import select # sqlalchemy.future тепер select
 from sqlalchemy.orm import selectinload, noload # joinedload видалено
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.tasks.task import Task
 from backend.app.src.repositories.tasks.task_repository import TaskRepository # Імпорт репозиторію
@@ -29,8 +26,10 @@ from backend.app.src.schemas.tasks.task import (
     TaskResponse,
     TaskDetailedResponse
 )
-from backend.app.src.config.logging import logger
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
+logger = get_logger(__name__)
 
 DEFAULT_TASK_STATUS_CODE = "OPEN" # TODO: Перенести в конфігурацію
 
@@ -47,8 +46,7 @@ class TaskService(BaseService):
         self.task_repo = TaskRepository() # Ініціалізація репозиторію
         logger.info("TaskService ініціалізовано.")
 
-    async def get_task_by_id(self, task_id: int, include_details: bool = False) -> Optional[ # Змінено UUID на int
-        TaskResponse]:
+    async def get_task_by_id(self, task_id: int, include_details: bool = False) -> Optional[TaskResponse]:
         """
         Отримує завдання за його ID.
         Опціонально може включати більше деталей.
@@ -77,7 +75,7 @@ class TaskService(BaseService):
         logger.info(f"Завдання з ID '{task_id}' не знайдено.")
         return None
 
-    async def create_task(self, task_create_data: TaskCreate, creator_user_id: int) -> TaskDetailedResponse: # Змінено UUID на int
+    async def create_task(self, task_create_data: TaskCreate, creator_user_id: int) -> TaskDetailedResponse:
         """
         Створює нове завдання.
         """
@@ -85,9 +83,9 @@ class TaskService(BaseService):
 
         # Перевірки існування залишаються в сервісі
         if not await self.db_session.get(Group, task_create_data.group_id):
-            raise ValueError(f"Групу з ID '{task_create_data.group_id}' не знайдено.")
+            raise ValueError(_("group.errors.not_found_by_id", id=task_create_data.group_id))
         if not await self.db_session.get(TaskType, task_create_data.task_type_id):
-            raise ValueError(f"Тип завдання з ID '{task_create_data.task_type_id}' не знайдено.")
+            raise ValueError(_("task.errors.task_type_not_found_by_id", task_type_id=task_create_data.task_type_id))
 
         status_id_to_set = task_create_data.status_id
         if not status_id_to_set:
@@ -98,12 +96,12 @@ class TaskService(BaseService):
                 logger.error(
                     f"Статус за замовчуванням '{DEFAULT_TASK_STATUS_CODE}' не знайдено. Створення завдання не вдалося.")
                 raise ValueError(
-                    f"Статус завдання є обов'язковим, але статус за замовчуванням '{DEFAULT_TASK_STATUS_CODE}' не знайдено.")
+                    _("task.errors.create.default_status_not_found", status_code=DEFAULT_TASK_STATUS_CODE))
             status_id_to_set = default_status_db.id
             logger.info(
                 f"Для нового завдання не надано ID статусу, використано статус за замовчуванням ID: {status_id_to_set}")
         elif not await self.db_session.get(Status, status_id_to_set):
-            raise ValueError(f"Статус з ID '{status_id_to_set}' не знайдено.")
+            raise ValueError(_("task.errors.status_not_found_by_id", status_id=status_id_to_set))
 
         # Підготовка даних для репозиторію
         # TaskCreateSchema (який очікує repo.create) має включати всі необхідні поля.
@@ -135,7 +133,7 @@ class TaskService(BaseService):
             created_task_detailed = await self.get_task_by_id(new_task_db.id, include_details=True)
             if not created_task_detailed:
                 raise RuntimeError(
-                    f"Критична помилка: не вдалося отримати створене завдання ID {new_task_db.id} після коміту.")
+                    _("task.errors.critical_create_failed", task_id=new_task_db.id))
 
             logger.info(
                 f"Завдання '{new_task_db.title}' (ID: {new_task_db.id}) успішно створено користувачем ID '{creator_user_id}'.")
@@ -144,15 +142,14 @@ class TaskService(BaseService):
             await self.rollback()
             logger.error(f"Помилка цілісності при створенні завдання '{task_create_data.title}': {e}",
                          exc_info=global_settings.DEBUG)
-            raise ValueError(f"Не вдалося створити завдання через конфлікт даних: {e}")
+            raise ValueError(_("task.errors.create_conflict", error_message=str(e)))
         except Exception as e:
             await self.rollback()
             logger.error(f"Неочікувана помилка при створенні завдання '{task_create_data.title}': {e}",
                          exc_info=global_settings.DEBUG)
             raise
 
-    async def update_task(self, task_id: int, task_update_data: TaskUpdate, current_user_id: int) -> Optional[ # Змінено UUID на int
-        TaskDetailedResponse]:
+    async def update_task(self, task_id: int, task_update_data: TaskUpdate, current_user_id: int) -> Optional[TaskDetailedResponse]:
         """Оновлює деталі завдання."""
         logger.debug(f"Спроба оновлення завдання ID: {task_id} користувачем ID: {current_user_id}")
 
@@ -166,10 +163,10 @@ class TaskService(BaseService):
         # Перевірки існування FK залишаються в сервісі
         if 'task_type_id' in update_data_dict and task_db.task_type_id != update_data_dict['task_type_id']:
             if not await self.db_session.get(TaskType, update_data_dict['task_type_id']):
-                raise ValueError(f"Новий тип завдання ID '{update_data_dict['task_type_id']}' не знайдено.")
+                raise ValueError(_("task.errors.task_type_not_found_by_id", task_type_id=update_data_dict['task_type_id']))
         if 'status_id' in update_data_dict and task_db.status_id != update_data_dict['status_id']:
             if not await self.db_session.get(Status, update_data_dict['status_id']):
-                raise ValueError(f"Новий статус ID '{update_data_dict['status_id']}' не знайдено.")
+                raise ValueError(_("task.errors.status_not_found_by_id", status_id=update_data_dict['status_id']))
 
         # updated_at оновлюється автоматично через TimestampedMixin в BaseRepository.update
         try:
@@ -184,14 +181,14 @@ class TaskService(BaseService):
             updated_task_detailed = await self.get_task_by_id(updated_task_db.id, include_details=True)
             if not updated_task_detailed:
                 raise RuntimeError(
-                    f"Критична помилка: не вдалося отримати оновлене завдання ID {updated_task_db.id} після коміту.")
+                    _("task.errors.critical_update_failed", task_id=updated_task_db.id))
             logger.info(f"Завдання ID '{task_id}' успішно оновлено користувачем ID '{current_user_id}'.")
             return updated_task_detailed
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності при оновленні завдання ID '{task_id}': {e}",
                          exc_info=global_settings.DEBUG)
-            raise ValueError(f"Не вдалося оновити завдання через конфлікт даних: {e}")
+            raise ValueError(_("task.errors.update_conflict", error_message=str(e)))
         except Exception as e:
             await self.rollback()
             logger.error(f"Помилка при оновленні завдання ID '{task_id}': {e}", exc_info=global_settings.DEBUG)
@@ -218,7 +215,7 @@ class TaskService(BaseService):
             await self.rollback()
             logger.error(f"Помилка цілісності при видаленні завдання ID '{task_id}' ({task_title_for_log}): {e}. Можливо, завдання використовується.",
                          exc_info=global_settings.DEBUG)
-            raise ValueError(f"Завдання '{task_title_for_log}' використовується і не може бути видалене.")
+            raise ValueError(_("task.errors.delete_in_use", task_title=task_title_for_log))
         except Exception as e:
             await self.rollback()
             logger.error(f"Неочікувана помилка при видаленні завдання ID '{task_id}' ({task_title_for_log}): {e}", exc_info=global_settings.DEBUG)

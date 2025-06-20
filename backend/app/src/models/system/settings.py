@@ -14,10 +14,9 @@ from sqlalchemy.orm import Mapped, mapped_column
 # Абсолютний імпорт базових класів та міксинів
 from backend.app.src.models.base import Base  # Системні налаштування можуть не мати всіх полів BaseMainModel
 from backend.app.src.models.mixins import TimestampedMixin, NameDescriptionMixin  # Name/Description можуть бути корисні
-from backend.app.src.config.logging import get_logger # Імпорт логера
+from backend.app.src.config.logging import get_logger
 from backend.app.src.core.dicts import SettingValueType # Імпорт Enum
 from sqlalchemy import Enum as SQLEnum # Імпорт SQLEnum
-# Отримання логера для цього модуля
 logger = get_logger(__name__)
 
 

@@ -23,8 +23,8 @@
 from backend.app.src.tasks.gamification.levels import RecalculateUserLevelsTask
 from backend.app.src.tasks.gamification.badges import AwardBadgesTask
 from backend.app.src.tasks.gamification.ratings import UpdateUserRatingsTask
-
-from backend.app.src.config import logger # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 __all__ = [
     'RecalculateUserLevelsTask',
@@ -32,7 +32,4 @@ __all__ = [
     'UpdateUserRatingsTask',
 ]
 
-# import logging # Видалено
-
-# logger = logging.getLogger(__name__) # Видалено
 logger.info("Підпакет 'tasks.gamification' ініціалізовано та експортує 'RecalculateUserLevelsTask', 'AwardBadgesTask', 'UpdateUserRatingsTask'.")

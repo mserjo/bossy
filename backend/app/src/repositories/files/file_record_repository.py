@@ -17,10 +17,8 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.files.file import FileRecord
 from backend.app.src.schemas.files.file import FileRecordCreateSchema
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
 from backend.app.src.core.dicts import FileType # Імпорт FileType Enum
-
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # Записи файлів зазвичай не оновлюються після створення (окрім, можливо, metadata або purpose).
@@ -110,7 +108,7 @@ class FileRecordRepository(BaseRepository[FileRecord, FileRecordCreateSchema, Fi
     async def get_files_by_purpose(
             self,
             session: AsyncSession,
-            purpose: FileType,  # Змінено на FileType Enum
+            purpose: FileType,
             skip: int = 0,
             limit: int = 100
     ) -> Tuple[List[FileRecord], int]:

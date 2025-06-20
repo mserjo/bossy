@@ -36,8 +36,6 @@ from fastapi import Depends, HTTPException, status, Request
 from backend.app.src.core.dependencies import get_current_active_user, UserModel  # UserModel тут є заповнювачем
 from backend.app.src.core.dicts import GroupRole  # Імпорт Enum для ролей в групі
 from backend.app.src.config.logging import get_logger
-
-# Отримання логера для цього модуля
 logger = get_logger(__name__)
 
 

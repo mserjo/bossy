@@ -56,7 +56,7 @@ __all__ = [
     "UserResponseSchema",
     "UserPublicProfileSchema",
     # Token schemas
-    "TokenPayload", # Змінено з TokenDataSchema
+    "TokenPayload",
     "TokenResponse",
     "RefreshTokenRequestSchema",
     "RefreshTokenCreateSchema",
@@ -64,7 +64,7 @@ __all__ = [
     "LoginRequestSchema",
     "PasswordResetRequestSchema",
     "PasswordResetConfirmSchema",
-    # "TwoFactorAuthRequestSchema", # Видалено
+    # "TwoFactorAuthRequestSchema",
     # Session schemas
     "UserSessionResponse",
     "UserSessionCreate",

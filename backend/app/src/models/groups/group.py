@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING, List, Optional
 
 from sqlalchemy import String, ForeignKey, Text  # Text може знадобитися для description з міксину
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from backend.app.src.config.logging import get_logger # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
+from backend.app.src.config import settings # Added import
 logger = get_logger(__name__)
 
 # Абсолютний імпорт базових класів та міксинів
@@ -117,6 +117,24 @@ class Group(
     # `id` автоматично обробляється Base.__repr__.
     # Додаємо специфічні для Group поля, які важливі для __repr__.
     _repr_fields = ("owner_id", "group_type_id")
+
+    @property
+    def icon_url(self) -> Optional[str]:
+        if self.icon_file and self.icon_file.file_path:
+            base_url = str(settings.SERVER_HOST).rstrip('/')
+            file_path = str(self.icon_file.file_path)
+
+            if file_path.startswith('/'):
+                return f"{base_url}{file_path}"
+            else:
+                static_url_prefix = str(getattr(settings, 'STATIC_URL', '/static/'))
+                if not static_url_prefix.startswith('/'):
+                    static_url_prefix = '/' + static_url_prefix
+                if not static_url_prefix.endswith('/'):
+                    static_url_prefix += '/'
+
+                return f"{base_url}{static_url_prefix}{file_path.lstrip('/')}"
+        return None
 
 
 if __name__ == "__main__":

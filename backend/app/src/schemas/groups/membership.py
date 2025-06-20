@@ -17,8 +17,7 @@ from pydantic import Field  # field_validator видалено, оскільки
 from backend.app.src.schemas.base import BaseSchema, TimestampedSchemaMixin
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача
 from backend.app.src.core.dicts import GroupRole  # Enum для ролей в групі
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger 
 logger = get_logger(__name__)
 
 
@@ -28,8 +27,8 @@ class GroupMembershipBaseSchema(BaseSchema):
     """
     user_id: int = Field(description="Ідентифікатор користувача.")
     group_id: int = Field(description="Ідентифікатор групи.")
-    role: GroupRole = Field( # Змінено на GroupRole Enum
-        default=GroupRole.MEMBER, # Використовуємо Enum напряму
+    role: GroupRole = Field(
+        default=GroupRole.MEMBER,
         description="Роль користувача в групі."
     )
 
@@ -46,8 +45,8 @@ class GroupMembershipCreateSchema(
     `user_id` може бути в тілі запиту або визначатися інакше (наприклад, для запрошення).
     """
     user_id: int = Field(description="Ідентифікатор користувача, якого додають до групи.")
-    role: GroupRole = Field( # Змінено на GroupRole Enum
-        default=GroupRole.MEMBER, # Використовуємо Enum напряму
+    role: GroupRole = Field(
+        default=GroupRole.MEMBER,
         description="Роль, що призначається користувачеві в групі."
     )
 
@@ -59,8 +58,7 @@ class GroupMembershipUpdateSchema(BaseSchema):
     Схема для оновлення ролі користувача в групі.
     Дозволяє оновлювати лише поле `role`.
     """
-    role: GroupRole = Field( # Змінено на GroupRole Enum
-        description="Нова роль користувача в групі.")
+    role: GroupRole = Field(description="Нова роль користувача в групі.")
 
     # Валідатор validate_role_on_update більше не потрібен
 

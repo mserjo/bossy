@@ -11,16 +11,16 @@
 
 from typing import Optional
 from datetime import datetime, timezone # Для прикладу в __main__, додав timezone
-# import uuid # Видалено, оскільки id тепер int
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
     DictionaryCreateSchema,
-    DictionaryBaseResponseSchema, # Змінено на фактичну назву базової схеми
+    DictionaryCreateSchema,
+    DictionaryBaseResponseSchema,
     DictionaryUpdateSchema
 )
-# Імпорт централізованого логера
 from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # from pydantic import Field # Розкоментувати, якщо будуть специфічні поля з Field атрибутами

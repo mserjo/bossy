@@ -19,8 +19,7 @@ from backend.app.src.repositories.base import BaseRepository
 # Абсолютний імпорт моделі RefreshToken та схеми RefreshTokenCreateSchema
 from backend.app.src.models.auth.token import RefreshToken
 from backend.app.src.schemas.auth.token import RefreshTokenCreateSchema
-from backend.app.src.config.logging import get_logger # Стандартизований імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 # Для RefreshTokenUpdateSchema, якщо оновлення не передбачено, можна використати PydanticBaseModel.

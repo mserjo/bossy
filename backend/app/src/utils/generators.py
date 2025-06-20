@@ -15,8 +15,7 @@ import secrets
 import string
 from typing import List, Optional
 
-# Імпорт централізованого логера проекту
-from backend.app.src.config.logging_config import setup_logging # type: ignore
+from backend.app.src.config.logging_config import setup_logging
 logger = setup_logging()
 
 # Спроба імпортувати бібліотеку python-slugify.
@@ -257,7 +256,7 @@ if __name__ == "__main__":
     assert slug5 not in existing, f"Згенерований слаг '{slug5}' вже існує."
     existing.append(slug5)
 
-    existing_for_trunc = ["korotka-n"] # Змінено, щоб не конфліктувати з логікою обрізки
+    existing_for_trunc = ["korotka-n"]
     title6 = "Коротка Назва"
     # Тест, де базовий слаг "korotka-nazva" обрізається до "korotka-n" (max_length=10)
     # Потім додається суфікс, наприклад "-1", що робить "korotka-n-1" (12 символів)

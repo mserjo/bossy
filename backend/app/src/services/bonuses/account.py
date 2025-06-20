@@ -1,4 +1,5 @@
 # backend/app/src/services/bonuses/account.py
+# -*- coding: utf-8 -*-
 """
 Сервіс для управління бонусними рахунками користувачів.
 
@@ -27,8 +28,9 @@ from backend.app.src.schemas.bonuses.account import (  # Pydantic Схеми
     # UserAccountUpdate, # Для ручних коригувань адміністратором (не реалізовано в цьому сервісі)
 )
 from backend.app.src.schemas.bonuses.transaction import AccountTransactionResponse
-from backend.app.src.config.logging import get_logger  # Стандартизований імпорт логера
-logger = get_logger(__name__) # Ініціалізація логера
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
+logger = get_logger(__name__)
 from backend.app.src.config import settings  # Для доступу до конфігурацій
 from backend.app.src.core.exceptions import InsufficientFundsError # Імпорт перенесеного винятку
 
@@ -134,19 +136,36 @@ class UserAccountService(BaseService):
         user = await self.db_session.get(User, user_id)
         if not user:
             logger.error(f"Користувача з ID '{user_id}' не знайдено при спробі створити бонусний рахунок.")
-            raise ValueError(f"Користувача з ID '{user_id}' не знайдено.")  # i18n
+            raise ValueError(_("user.errors.not_found_by_id", id=user_id)) # Using generic user not found by id
 
+        group = None # Initialize group to None
         if group_id:
             group = await self.db_session.get(Group, group_id)
             if not group:
                 logger.error(f"Групу з ID '{group_id}' не знайдено при спробі створити бонусний рахунок.")
-                raise ValueError(f"Групу з ID '{group_id}' не знайдено.")  # i18n
+                raise ValueError(_("group.errors.not_found_by_id", id=group_id)) # Using generic group not found by id
+
+        # Визначення валюти для нового рахунку
+        group_currency = "бали" # Значення за замовчуванням
+        if group: # group - це ORM об'єкт Group
+            # lazy="selectin" для Group.settings має завантажити налаштування при доступі
+            if group.settings and group.settings.currency_name:
+                group_currency = group.settings.currency_name
+                logger.info(f"Для групи ID {group_id} знайдено валюту '{group_currency}' в налаштуваннях.")
+            else:
+                logger.warning(f"GroupSetting або currency_name не знайдено для групи ID {group_id}. "
+                               f"Використовується валюта за замовчуванням '{group_currency}'.")
+        else: # Глобальний рахунок
+            # Можна мати глобальне налаштування валюти за замовчуванням, якщо потрібно
+            logger.info(f"Створюється глобальний рахунок, використовується валюта за замовчуванням '{group_currency}'.")
+
 
         # Створюємо новий рахунок
         new_account_db = UserAccount(
             user_id=user_id,
             group_id=group_id,  # Може бути None для глобального
             balance=initial_balance,
+            currency=group_currency, # Використання визначеної валюти
             # created_at, updated_at - обробляються базовою моделлю або БД
             # last_transaction_at - буде None до першої транзакції
         )
@@ -167,7 +186,7 @@ class UserAccountService(BaseService):
                 logger.info(
                     f"Рахунок для {log_msg} знайдено після помилки цілісності (ймовірно, створено конкурентно).")
                 return account_db_retry
-            raise ValueError(f"Не вдалося створити рахунок для {log_msg} через конфлікт даних.")  # i18n
+            raise ValueError(_("account.errors.create_conflict", context_message=log_msg))
 
     async def adjust_account_balance(
             self,
@@ -204,7 +223,9 @@ class UserAccountService(BaseService):
         account_db = await self.get_or_create_user_account(user_id, group_id)
         if not account_db:  # Практично неможливо, якщо get_or_create_user_account працює коректно
             logger.error(f"Рахунок для {log_msg} не знайдено навіть після get_or_create_user_account.")
-            raise ValueError(f"Рахунок для {log_msg} не знайдено.")  # i18n
+            # This error should ideally not be reached if get_or_create works.
+            # If it is, it implies a deeper issue, but for completeness:
+            raise ValueError(_("account.errors.not_found_for_context", context_message=log_msg))
 
         current_balance = Decimal(account_db.balance)
         adjustment_amount = Decimal(amount)

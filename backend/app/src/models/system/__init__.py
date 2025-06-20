@@ -13,13 +13,12 @@
 інтерфейсах, системах моніторингу та для внутрішніх потреб додатку.
 """
 
-# Імпорт централізованого логера
-from backend.app.src.config import logger
-
 # Імпорт моделей з відповідних файлів цього пакету
 from backend.app.src.models.system.settings import SystemSetting
 from backend.app.src.models.system.monitoring import SystemLog, PerformanceMetric
 from backend.app.src.models.system.health import ServiceHealthStatus
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Визначаємо, які символи будуть експортовані при використанні `from backend.app.src.models.system import *`.
 __all__ = [

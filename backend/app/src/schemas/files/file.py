@@ -15,8 +15,8 @@ from pydantic import Field, AnyHttpUrl, field_validator
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import FileType # Змінено імпорт FileTypeEnum на FileType
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # TODO: Замінити Any на UserPublicProfileSchema, коли вона буде доступна/рефакторена.
@@ -35,28 +35,27 @@ class FileRecordBaseSchema(BaseSchema):
     file_name: str = Field(
         ...,
         max_length=FILE_NAME_MAX_LENGTH,
-        description="Оригінальне або згенероване ім'я файлу.",
+        description=_("file_record.fields.file_name.description"),
         examples=["profile_picture.jpg", "документ_завдання.pdf"]
     )
     mime_type: str = Field(
         ...,
         max_length=MIME_TYPE_MAX_LENGTH,
-        description="MIME-тип файлу.",
+        description=_("file_record.fields.mime_type.description"),
         examples=["image/jpeg", "application/pdf"]
     )
     file_size: int = Field(
         ...,
         ge=0,
-        description="Розмір файлу в байтах."
+        description=_("file_record.fields.file_size.description")
     )
-    purpose: Optional[FileType] = Field( # Змінено на FileType
+    purpose: Optional[FileType] = Field(
         None,
-        # max_length більше не потрібен для Enum
-        description="Призначення файлу."
+        description=_("file_record.fields.purpose.description")
     )
     metadata: Optional[Dict[str, Any]] = Field(
         None,
-        description="Додаткові метадані файлу у форматі JSON (наприклад, розміри зображення, тривалість аудіо/відео)."
+        description=_("file_record.fields.metadata.description")
     )
 
     # Валідатор validate_purpose більше не потрібен, Pydantic v2 обробляє Enum автоматично
@@ -85,18 +84,11 @@ class FileRecordResponseSchema(FileRecordBaseSchema, IDSchemaMixin, TimestampedS
     # file_name, mime_type, file_size, purpose, metadata успадковані.
 
     file_path: str = Field(
-        description="Шлях до файлу на сервері або ключ в об'єктному сховищі (зазвичай не повертається клієнту напряму).")
-    uploader_user_id: Optional[int] = Field(None, description="ID користувача, який завантажив файл.")
-
-    # TODO: URL має генеруватися сервісом (наприклад, presigned URL для S3 або статичний URL).
-    #       Це поле може бути @computed_field в Pydantic v2, якщо логіка генерації URL проста
-    #       і не потребує асинхронних операцій або доступу до request.
-    #       Або ж воно заповнюється на рівні сервісу перед поверненням відповіді.
-    url: Optional[AnyHttpUrl] = Field(None, description="Публічний URL для доступу до файлу (якщо застосовно).")
-
-    # TODO: Замінити Any на UserPublicProfileSchema.
+        description=_("file_record.fields.file_path.description"))
+    uploader_user_id: Optional[int] = Field(None, description=_("file_record.fields.uploader_user_id.description"))
+    url: Optional[AnyHttpUrl] = Field(None, description=_("file_record.fields.url.description"))
     uploader: Optional[UserPublicProfileSchema] = Field(None,
-                                                        description="Інформація про користувача, який завантажив файл.")
+                                                        description=_("file_record.fields.uploader.description"))
 
 
 if __name__ == "__main__":

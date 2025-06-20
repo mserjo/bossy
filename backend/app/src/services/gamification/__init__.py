@@ -6,14 +6,14 @@
 досягненнями користувачів, бейджами та рейтингами.
 """
 
-from backend.app.src.config import logger
-
 # Явний імпорт сервісів для кращої читабельності та статичного аналізу
 from backend.app.src.services.gamification.level import LevelService
 from backend.app.src.services.gamification.user_level import UserLevelService
 from backend.app.src.services.gamification.badge import BadgeService
 from backend.app.src.services.gamification.achievement import UserAchievementService
 from backend.app.src.services.gamification.rating import UserRatingService # Змінено на UserRatingService
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 __all__ = [
     "LevelService",

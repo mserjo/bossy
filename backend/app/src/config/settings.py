@@ -31,11 +31,8 @@ from dotenv import load_dotenv
 from pydantic import (AnyHttpUrl, EmailStr, PostgresDsn, RedisDsn,
                         ValidationInfo, field_validator)
 from pydantic_settings import BaseSettings, SettingsConfigDict
-
-# Абсолютний імпорт централізованого логера
-# Логер тут використовується для повідомлень під час ініціалізації налаштувань
-# та для демонстраційного блоку `if __name__ == "__main__":`.
-from backend.app.src.config import logger # Імпортуємо вже налаштований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # --- Визначення шляху до файлу .env ---
 # Пріоритет: спочатку шукаємо .env у директорії `backend/`, потім у корені проекту.

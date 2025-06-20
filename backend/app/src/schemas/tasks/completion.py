@@ -17,9 +17,9 @@ from pydantic import Field  # field_validator видалено, оскільки
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача та верифікатора
 from backend.app.src.core.dicts import TaskStatus  # Enum для статусів виконання
-from backend.app.src.config.logging import get_logger # Імпорт логера
 from datetime import timedelta # Переміщено timedelta сюди
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 
@@ -32,14 +32,14 @@ class TaskCompletionBaseSchema(BaseSchema):
     # user_id: int = Field(description="Ідентифікатор користувача, який виконав завдання.") # Зазвичай поточний користувач
 
     completed_at: Optional[datetime] = Field(
-        default_factory=datetime.now,  # Встановлює поточний час, якщо не надано
-        description="Фактичний час завершення завдання користувачем (або час подання на перевірку)."
+        default_factory=datetime.now,
+        description=_("task_completion.fields.completed_at.description")
     )
-    status: TaskStatus = Field( # Змінено на TaskStatus Enum
-        default=TaskStatus.PENDING_REVIEW, # Використовуємо Enum напряму
-        description="Статус виконання завдання."
+    status: TaskStatus = Field(
+        default=TaskStatus.PENDING_REVIEW,
+        description=_("task_completion.fields.status.description")
     )
-    notes: Optional[str] = Field(None, description="Нотатки користувача щодо виконання завдання.")
+    notes: Optional[str] = Field(None, description=_("task_completion.fields.notes.description"))
 
     # Валідатор validate_status більше не потрібен, Pydantic обробляє Enum
 
@@ -62,13 +62,12 @@ class TaskCompletionUpdateSchema(
     Схема для оновлення запису про виконання завдання (зазвичай адміністратором).
     Дозволяє оновлювати статус, час верифікації та нотатки.
     """
-    # completed_at: Optional[datetime] = None # Зазвичай не змінюється після подання
-    verified_at: Optional[datetime] = Field(None, description="Час перевірки виконання адміністратором.")
-    # verifier_id: Optional[int] = None # Встановлюється сервісом на основі поточного адміністратора
+    # completed_at: Optional[datetime] = None
+    verified_at: Optional[datetime] = Field(None, description=_("task_completion.update.fields.verified_at.description"))
+    # verifier_id: Optional[int] = None
 
-    status: Optional[TaskStatus] = Field(None, # Змінено на TaskStatus Enum
-                                  description="Новий статус виконання.")
-    notes: Optional[str] = Field(None, description="Додаткові нотатки (наприклад, від адміністратора при перевірці).")
+    status: Optional[TaskStatus] = Field(None, description=_("task_completion.update.fields.status.description"))
+    notes: Optional[str] = Field(None, description=_("task_completion.update.fields.notes.description"))
 
     # Валідатор validate_status_on_update більше не потрібен
 
@@ -82,15 +81,15 @@ class TaskCompletionSchema(TaskCompletionBaseSchema, IDSchemaMixin, TimestampedS
     # id, created_at, updated_at успадковані.
     # task_id, user_id, completed_at, status, notes успадковані з TaskCompletionBaseSchema.
     # Однак, task_id та user_id потрібно явно додати, бо вони не в TaskCompletionBaseSchema
-    task_id: int = Field(description="Ідентифікатор виконаного завдання.")
-    user_id: int = Field(description="Ідентифікатор користувача, який виконав завдання.")
+    task_id: int = Field(description=_("task_completion.response.fields.task_id.description"))
+    user_id: int = Field(description=_("task_completion.response.fields.user_id.description"))
 
-    verified_at: Optional[datetime] = Field(None, description="Час перевірки виконання (якщо було перевірено).")
+    verified_at: Optional[datetime] = Field(None, description=_("task_completion.response.fields.verified_at.description"))
 
     user: Optional[UserPublicProfileSchema] = Field(None,
-                                                    description="Публічний профіль користувача, який виконав завдання.")
+                                                    description=_("task_completion.response.fields.user.description"))
     verifier: Optional[UserPublicProfileSchema] = Field(None,
-                                                        description="Публічний профіль користувача (адміністратора), який перевірив виконання.")
+                                                        description=_("task_completion.response.fields.verifier.description"))
 
 
 if __name__ == "__main__":

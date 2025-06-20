@@ -17,9 +17,8 @@ from pydantic import Field, EmailStr, field_validator
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import GroupRole, InvitationStatus  # Enum для ролей в групі та статусу запрошення
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-from datetime import timedelta # Переміщено timedelta сюди
-# Отримання логера для цього модуля
+from datetime import timedelta
+from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 
@@ -32,8 +31,8 @@ class GroupInvitationBaseSchema(BaseSchema):
     # TODO: Додати валідацію номера телефону, коли буде доступний валідатор.
     phone_number: Optional[str] = Field(None, max_length=30,
                                         description="Номер телефону запрошеного (якщо запрошення по SMS).")
-    role_to_assign: GroupRole = Field( # Змінено на GroupRole Enum
-        default=GroupRole.MEMBER, # Використовуємо Enum напряму
+    role_to_assign: GroupRole = Field(
+        default=GroupRole.MEMBER,
         description=f"Роль, яка буде призначена користувачеві при прийнятті запрошення."
     )
 
@@ -68,7 +67,7 @@ class GroupInvitationUpdateSchema(BaseSchema):
     """
     Схема для оновлення статусу запрошення (наприклад, скасування).
     """
-    status: InvitationStatus = Field(description="Новий статус запрошення.") # Змінено на InvitationStatus Enum
+    status: InvitationStatus = Field(description="Новий статус запрошення.")
 
 
 class GroupInvitationSchema(GroupInvitationBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
@@ -81,7 +80,7 @@ class GroupInvitationSchema(GroupInvitationBaseSchema, IDSchemaMixin, Timestampe
     group_id: int = Field(description="Ідентифікатор групи, до якої створено запрошення.")
     invitation_code: str = Field(description="Унікальний код запрошення.")
     expires_at: datetime = Field(description="Час закінчення терміну дії запрошення.")
-    status: InvitationStatus = Field(description="Поточний статус запрошення.") # Змінено на InvitationStatus Enum
+    status: InvitationStatus = Field(description="Поточний статус запрошення.")
     created_by_user_id: Optional[int] = Field(None, description="Ідентифікатор користувача, який створив запрошення.")
     # Можна додати інформацію про користувача, що створив, якщо потрібно:
     # created_by: Optional[UserPublicProfileSchema] = None

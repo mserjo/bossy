@@ -7,13 +7,13 @@ Pydantic схеми для довідника "Типи Бонусів".
 """
 
 from typing import Optional
-from backend.app.src.config.logging import get_logger  # Імпорт логера
-# Отримання логера для цього модуля
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
 logger = get_logger(__name__)
 
 # Абсолютний імпорт базових схем для довідників
 from backend.app.src.schemas.dictionaries.base_dict import (
-    DictionaryBaseResponseSchema,  # Змінено на правильну назву базової схеми
+    DictionaryBaseResponseSchema,
     DictionaryCreateSchema,
     DictionaryUpdateSchema
 )

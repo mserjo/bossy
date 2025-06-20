@@ -1,5 +1,4 @@
 # backend/app/src/services/groups/settings.py
-# import logging # Замінено на централізований логер
 from typing import Optional, Any # List, Dict, UUID видалено
 from datetime import datetime, timezone
 
@@ -8,7 +7,6 @@ from sqlalchemy import select # sqlalchemy.future тепер select
 # from sqlalchemy.orm import selectinload
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.groups.settings import GroupSetting
 from backend.app.src.repositories.groups.settings_repository import GroupSettingRepository # Імпорт репозиторію
@@ -19,8 +17,9 @@ from backend.app.src.schemas.groups.settings import (
     GroupSettingUpdate,
     GroupSettingResponse
 )
-from backend.app.src.config.logging import logger
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 class GroupSettingService(BaseService):

@@ -1,17 +1,15 @@
 # backend/app/src/services/integrations/messenger_base.py
-# import logging # Замінено на централізований логер
 from abc import ABC, abstractmethod
 from typing import List, Optional, Dict, Any
 from uuid import UUID
 
 from sqlalchemy.ext.asyncio import AsyncSession  # Для потенційної взаємодії з БД (токени/налаштування)
 
-# Повні шляхи імпорту
-from backend.app.src.services.base import \
-    BaseService  # Опціонально: успадкувати, якщо потрібна сесія БД для спільних завдань
-from backend.app.src.models.auth.user import \
-    User  # Для контексту користувача (не використовується прямо тут, але в підкласах)
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.services.base import BaseService  # Опціонально: успадкувати, якщо потрібна сесія БД для спільних завдань
+from backend.app.src.models.auth.user import User  # Для контексту користувача (не використовується прямо тут, але в підкласах)
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
+logger = get_logger(__name__)
 
 from pydantic import BaseModel, Field  # Використовуємо Pydantic для структур даних
 
@@ -24,9 +22,9 @@ class MessengerUserProfile(BaseModel):
     Pydantic модель для уніфікованого представлення профілю користувача месенджера.
     """
     id: str = Field(...,
-                    description="ID користувача, специфічний для платформи (наприклад, Telegram chat_id, Slack user_id)")  # i18n
-    username: Optional[str] = Field(None, description="Ім'я користувача (username) на платформі, якщо є")  # i18n
-    full_name: Optional[str] = Field(None, description="Повне ім'я користувача на платформі, якщо є")  # i18n
+                    description=_("integrations.messenger.user_profile.fields.id.description"))
+    username: Optional[str] = Field(None, description=_("integrations.messenger.user_profile.fields.username.description"))
+    full_name: Optional[str] = Field(None, description=_("integrations.messenger.user_profile.fields.full_name.description"))
     # TODO: Додати інші загальні поля, які можуть бути корисними (наприклад, avatar_url)
 
 
@@ -34,7 +32,7 @@ class MessengerMessage(BaseModel):
     """
     Pydantic модель для уніфікованого представлення повідомлення для надсилання.
     """
-    text: Optional[str] = Field(None, description="Текстовий вміст повідомлення")  # i18n
+    text: Optional[str] = Field(None, description=_("integrations.messenger.message.fields.text.description"))
     # TODO: Додати підтримку для вкладень, кнопок, швидких відповідей тощо.
     # attachments: Optional[List[Any]] = Field(None, description="Список вкладень (зображення, файли тощо)") # i18n
     # quick_replies: Optional[List[Dict[str, str]]] = Field(None, description="Список швидких відповідей") # i18n
@@ -46,8 +44,8 @@ class MessageSendCommand(BaseModel):
     Pydantic модель команди для надсилання повідомлення.
     """
     recipient_platform_id: str = Field(...,
-                                       description="ID отримувача, специфічний для платформи (ID користувача або каналу)")  # i18n
-    message: MessengerMessage = Field(..., description="Об'єкт повідомлення для надсилання")  # i18n
+                                       description=_("integrations.messenger.send_command.fields.recipient_platform_id.description"))
+    message: MessengerMessage = Field(..., description=_("integrations.messenger.send_command.fields.message.description"))
     # delivery_options: Optional[Dict[str, Any]] = Field(None, description="Додаткові параметри доставки (напр. silent notification)") # i18n
 
 
@@ -55,10 +53,10 @@ class MessageSendResponse(BaseModel):
     """
     Pydantic модель відповіді після надсилання повідомлення.
     """
-    status: str = Field(..., description="Статус надсилання ('success', 'failed', 'pending')")  # i18n
+    status: str = Field(..., description=_("integrations.messenger.send_response.fields.status.description"))
     platform_message_id: Optional[str] = Field(None,
-                                               description="ID повідомлення на зовнішній платформі, якщо є")  # i18n
-    error_message: Optional[str] = Field(None, description="Повідомлення про помилку, якщо статус 'failed'")  # i18n
+                                               description=_("integrations.messenger.send_response.fields.platform_message_id.description"))
+    error_message: Optional[str] = Field(None, description=_("integrations.messenger.send_response.fields.error_message.description"))
 
 
 class BaseMessengerIntegrationService(BaseService, ABC):

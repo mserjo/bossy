@@ -6,7 +6,7 @@
 Фактичне завантаження або видалення файлів зі сховища координується з іншими сервісами
 (наприклад, FileUploadService).
 """
-from typing import List, Optional, Any # Додано Any
+from typing import List, Optional, Any
 from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,11 +25,11 @@ from backend.app.src.schemas.files.file import (
     FileRecordUpdate,
     FileRecordResponse
 )
-from backend.app.src.config import logger  # Використання спільного логера з конфігу
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
+logger = get_logger(__name__)
 
-
-# from .file_upload_service import FileUploadService # Розглянути переміщення імпорту, якщо немає циркулярності
 
 class FileRecordService(BaseService): # type: ignore видалено
     """
@@ -101,13 +101,13 @@ class FileRecordService(BaseService): # type: ignore видалено
         if effective_uploader_user_id: # Перевірка існування uploader_user_id
             user_exists = await self.db_session.get(User, effective_uploader_user_id)
             if not user_exists:
-                raise ValueError(f"Користувача-завантажувача з ID '{effective_uploader_user_id}' не знайдено.")
+                raise ValueError(_("file_record.errors.uploader_not_found", user_id=effective_uploader_user_id))
 
         # Перевірка унікальності storage_path через репозиторій
         existing_by_path = await self.file_record_repo.get_by_file_path(session=self.db_session, file_path=record_data.storage_path)
         if existing_by_path:
-            msg = f"Запис файлу зі шляхом зберігання '{record_data.storage_path}' вже існує (ID: {existing_by_path.id})."
-            logger.warning(msg)
+            msg = _("file_record.errors.path_exists", path=record_data.storage_path, existing_id=existing_by_path.id)
+            logger.warning(f"File record with storage path '{record_data.storage_path}' already exists (ID: {existing_by_path.id}).") # Log can be in English or more detailed
             raise ValueError(msg)
 
         create_data_dict = record_data.model_dump(exclude_unset=True)
@@ -126,14 +126,14 @@ class FileRecordService(BaseService): # type: ignore видалено
             created_record_response = await self.get_file_record_by_id(new_record_db.id, load_relations=True)
             if not created_record_response:
                 logger.error(f"Не вдалося отримати щойно створений запис файлу ID {new_record_db.id} після створення.")
-                raise RuntimeError("Помилка створення запису файлу: не вдалося отримати після збереження.")
+                raise RuntimeError(_("file_record.errors.critical_create_failed"))
 
             logger.info(f"Запис файлу '{new_record_db.file_name}' (ID: {new_record_db.id}) успішно створено.")
             return created_record_response
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності '{record_data.file_name}': {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося створити запис файлу через конфлікт даних.")  # i18n
+            raise ValueError(_("file_record.errors.create_conflict", error_message=str(e)))
         except Exception as e:
             await self.rollback()
             logger.error(f"Неочікувана помилка '{record_data.file_name}': {e}", exc_info=settings.DEBUG)
@@ -144,7 +144,7 @@ class FileRecordService(BaseService): # type: ignore видалено
             file_id: int, # file_id: UUID -> int
             metadata_update_data: FileRecordUpdate,
             # TODO: Додати current_user_id для аудиту, якщо поле updated_by_user_id є в моделі FileRecord
-            # current_user_id: Optional[int] = None # Змінено UUID на int
+            # current_user_id: Optional[int] = None
     ) -> Optional[FileRecordResponse]:
         """Оновлює метадані запису файлу (наприклад, ім'я, опис)."""
         logger.debug(f"Спроба оновлення метаданих для запису файлу ID: {file_id}")
@@ -199,8 +199,8 @@ class FileRecordService(BaseService): # type: ignore видалено
 
     async def delete_file_record(
             self,
-            file_id: int, # file_id: UUID -> int
-            # current_user_id: Optional[int] = None, # Змінено UUID на int
+            file_id: int,
+            # current_user_id: Optional[int] = None,
             delete_from_storage: bool = True  # Чи видаляти також фізичний файл
     ) -> bool:
         """
@@ -232,7 +232,7 @@ class FileRecordService(BaseService): # type: ignore видалено
             logger.error(
                 f"Помилка цілісності при видаленні запису файлу ID '{file_id}': {e}. Можливо, він використовується.",
                 exc_info=settings.DEBUG)
-            raise ValueError(f"Запис файлу '{file_name_for_log}' використовується і не може бути видалений.")
+            raise ValueError(_("file_record.errors.delete_in_use", file_name=file_name_for_log))
         except Exception as e:
             await self.rollback()
             logger.error(f"Помилка видалення запису файлу ID '{file_id}' з БД: {e}", exc_info=settings.DEBUG)

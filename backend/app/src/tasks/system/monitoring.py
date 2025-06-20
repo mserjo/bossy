@@ -12,17 +12,16 @@
 """
 
 import asyncio
-import logging
 import psutil # Популярна бібліотека для отримання системних метрик
 import shutil # Для shutil.disk_usage
-from typing import Any, Dict # Додано для типізації run
+from typing import Any, Dict
 
 
 from app.src.tasks.base import BaseTask
 # from app.src.config.settings import settings # Для можливих налаштувань моніторингу
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
-# Налаштування логера для цього модуля
-logger = logging.getLogger(__name__)
 
 class SystemMetricsCollectorTask(BaseTask):
     """

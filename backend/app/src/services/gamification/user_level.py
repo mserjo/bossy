@@ -10,11 +10,10 @@ from datetime import datetime, timezone
 from decimal import Decimal
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select # Оновлено імпорт
+from sqlalchemy import select
 from sqlalchemy.orm import selectinload, noload
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.gamification.user_level import UserLevel
 from backend.app.src.repositories.gamification.user_level_repository import UserLevelRepository # Імпорт репозиторію
@@ -24,16 +23,17 @@ from backend.app.src.models.groups.group import Group
 
 from backend.app.src.schemas.gamification.user_level import (
     UserLevelResponse,
-    UserLevelCreateSchema, # Додано
-    # UserLevelUpdateSchema # Не використовується, оскільки UserLevelUpdateSchema в репо - заглушка
+    UserLevelCreateSchema,
 )
 from backend.app.src.schemas.gamification.level import LevelResponse
 
 from backend.app.src.services.bonuses.account import UserAccountService
 from backend.app.src.services.gamification.level import LevelService
 
-from backend.app.src.config import logger
 from backend.app.src.config import settings
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
+logger = get_logger(__name__)
 
 
 class UserLevelService(BaseService):
@@ -196,7 +196,7 @@ class UserLevelService(BaseService):
                  refreshed_user_level = await self._get_orm_user_level_with_relations(saved_user_level_orm.id)
                  if not refreshed_user_level:
                      logger.error(f"Не вдалося отримати UserLevel ID {saved_user_level_orm.id} зі зв'язками після коміту.")
-                     raise RuntimeError("Помилка оновлення рівня: не вдалося отримати запис після збереження.")
+                     raise RuntimeError(_("gamification.user_level.errors.critical_update_failed"))
                  logger.info(f"Рівень для {log_ctx} успішно встановлено на '{target_level_schema.name}'.")
                  return UserLevelResponse.model_validate(refreshed_user_level)
             else: # Якщо рівень не змінився і не було чого зберігати
@@ -205,7 +205,7 @@ class UserLevelService(BaseService):
         except IntegrityError as e:
             await self.rollback()
             logger.error(f"Помилка цілісності UserLevel для {log_ctx}: {e}", exc_info=settings.DEBUG)
-            raise ValueError(f"Не вдалося оновити/створити рівень користувача через конфлікт даних: {e}")
+            raise ValueError(_("gamification.user_level.errors.update_create_conflict", error_message=str(e)))
         except Exception as e: # Обробка інших можливих помилок
             await self.rollback()
             logger.error(f"Неочікувана помилка при оновленні рівня для {log_ctx}: {e}", exc_info=settings.DEBUG)

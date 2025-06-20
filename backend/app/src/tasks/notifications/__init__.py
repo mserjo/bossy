@@ -20,6 +20,8 @@
 from backend.app.src.tasks.notifications.email import SendEmailTask
 from backend.app.src.tasks.notifications.sms import SendSmsTask
 from backend.app.src.tasks.notifications.messenger import SendMessengerNotificationTask
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 __all__ = [
     'SendEmailTask',
@@ -27,7 +29,4 @@ __all__ = [
     'SendMessengerNotificationTask',
 ]
 
-import logging
-
-logger = logging.getLogger(__name__)
 logger.info("Підпакет 'tasks.notifications' ініціалізовано.")

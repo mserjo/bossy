@@ -1,5 +1,5 @@
 # backend/app/src/services/tasks/assignment.py
-# import logging # Замінено на централізований логер
+# -*- coding: utf-8 -*-
 from typing import List, Optional
 from uuid import UUID
 from datetime import datetime, timezone
@@ -9,7 +9,6 @@ from sqlalchemy.future import select
 from sqlalchemy.orm import selectinload, joinedload, noload
 from sqlalchemy.exc import IntegrityError
 
-# Повні шляхи імпорту
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.tasks.assignment import TaskAssignment  # Модель SQLAlchemy TaskAssignment
 from backend.app.src.models.tasks.task import Task  # Для контексту завдання
@@ -24,8 +23,10 @@ from backend.app.src.schemas.tasks.assignment import (  # Схеми Pydantic
     # TaskAssignmentUpdate, # Призначення зазвичай незмінні; зміни = нове призначення або скасування/перепризначення
     TaskAssignmentResponse
 )
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
+from backend.app.src.config.logging import get_logger
+from backend.app.src.core.i18n import _ # Added import
+logger = get_logger(__name__)
 
 
 class TaskAssignmentService(BaseService):
@@ -74,10 +75,10 @@ class TaskAssignmentService(BaseService):
 
         # Перевірка існування завдання та користувача
         task = await self.db_session.get(Task, task_id)
-        if not task: raise ValueError(f"Завдання з ID '{task_id}' не знайдено.")  # i18n
+        if not task: raise ValueError(_("task.errors.not_found_by_id", task_id=task_id))
 
         user = await self.db_session.get(User, user_id)
-        if not user: raise ValueError(f"Користувача з ID '{user_id}' не знайдено.")  # i18n
+        if not user: raise ValueError(_("user.errors.not_found_by_id", id=user_id))
 
         # Пошук існуючого призначення (активного або неактивного)
         existing_assignment_stmt = select(TaskAssignment).where(
@@ -121,13 +122,11 @@ class TaskAssignmentService(BaseService):
             # Оновлюємо для завантаження всіх зв'язків для відповіді
             refreshed_assignment = await self._get_orm_assignment_with_relations(assignment_db.id)
             if not refreshed_assignment:  # Малоймовірно
-                # i18n
-                raise RuntimeError("Критична помилка: не вдалося отримати запис призначення після збереження.")
+                raise RuntimeError(_("task_assignment.errors.critical_create_failed"))
         except IntegrityError as e:  # На випадок унікальних обмежень (task_id, user_id), якщо логіка вище дала збій
             await self.rollback()
             logger.error(f"Помилка цілісності '{task_id}' для '{user_id}': {e}", exc_info=global_settings.DEBUG)
-            # i18n
-            raise ValueError(f"Не вдалося призначити завдання через конфлікт даних: {e}")
+            raise ValueError(_("task_assignment.errors.assign_conflict", error_message=str(e)))
 
         logger.info(
             f"Успішно призначено завдання ID '{task_id}' користувачу ID '{user_id}'. ID Призначення: {refreshed_assignment.id}")

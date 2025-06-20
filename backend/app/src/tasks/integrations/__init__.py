@@ -17,13 +17,12 @@
 
 from backend.app.src.tasks.integrations.calendar import SyncCalendarTask
 from backend.app.src.tasks.integrations.messenger_processing import ProcessIncomingMessageTask
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 __all__ = [
     'SyncCalendarTask',
     'ProcessIncomingMessageTask',
 ]
 
-import logging
-
-logger = logging.getLogger(__name__)
 logger.info("Підпакет 'tasks.integrations' ініціалізовано.")

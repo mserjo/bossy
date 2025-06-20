@@ -5,12 +5,11 @@
 
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-from typing import List, Optional  # Generic, TypeVar, BaseModel не потрібні, якщо імпортуються з core
+from typing import List, Optional
 from uuid import UUID  # ID тепер UUID
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Повні шляхи імпорту
 from backend.app.src.api.dependencies import (
     get_api_db_session, get_current_active_user,
     get_current_active_superuser,  # Для CRUD операцій над визначеннями нагород
@@ -19,19 +18,19 @@ from backend.app.src.api.dependencies import (
 # TODO: Створити/використати залежності для перевірки прав, наприклад:
 #  `require_reward_editor_permission(reward_id: UUID = Path(...))` (перевіряє адміна групи нагороди або суперюзера)
 #  `require_reward_viewer_permission(reward_id: UUID = Path(...))` (перевіряє членство в групі нагороди або суперюзера)
-from backend.app.src.api.v1.groups.groups import \
-    check_group_edit_permission  # Тимчасово, для створення/оновлення в групі
+from backend.app.src.api.v1.groups.groups import check_group_edit_permission  # Тимчасово, для створення/оновлення в групі
 
 from backend.app.src.models.auth.user import User as UserModel
 from backend.app.src.schemas.bonuses.reward import (
     RewardCreate, RewardUpdate, RewardResponse,
-    RedeemRewardRequest, UserRewardRedemptionResponse  # Додано UserRewardRedemptionResponse
+    RedeemRewardRequest, UserRewardRedemptionResponse
 )
 from backend.app.src.core.pagination import PagedResponse, PageParams
 from backend.app.src.services.bonuses.reward import RewardService
 from backend.app.src.services.groups.group import GroupService  # Для перевірки групи при створенні
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 

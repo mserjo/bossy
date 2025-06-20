@@ -16,13 +16,12 @@
 """
 from fastapi import APIRouter
 
-# Повні шляхи імпорту
 from backend.app.src.api.v1.bonuses.bonus_rules import router as bonus_rules_router
 from backend.app.src.api.v1.bonuses.accounts import router as accounts_router
 from backend.app.src.api.v1.bonuses.transactions import router as transactions_router
 from backend.app.src.api.v1.bonuses.rewards import router as rewards_router
-
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Створюємо агрегований роутер для всіх ендпоінтів, пов'язаних з бонусною системою
 bonuses_router = APIRouter()

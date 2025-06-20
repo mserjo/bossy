@@ -1,5 +1,6 @@
 # backend/app/src/api/dependencies.py
 # -*- coding: utf-8 -*-
+from backend.app.src.core.i18n import _
 """
 Модуль для визначення загальних залежностей (dependencies) для API ендпоінтів FastAPI.
 
@@ -84,25 +85,25 @@ async def get_current_user_payload(
     """
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Не вдалося валідувати облікові дані",
+        detail=_("dependencies.auth.credentials_check_failed"), # "Не вдалося валідувати облікові дані"
         headers={"WWW-Authenticate": "Bearer"},
     )
     payload_dict = await token_service.validate_access_token(token=token)
     if not payload_dict or payload_dict.get("sub") is None:
-        logger.warning(f"Невалідний токен або відсутній 'sub'. Токен: {token[:15]}...")
-        # i18n
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Невалідний токен або відсутній 'sub'.")
+        logger.warning(_("dependencies.log.invalid_token_or_sub_missing", token_start=token[:15]))
+        raise credentials_exception # Використовуємо вже створений виняток
 
-    # TODO: Переконатися, що TokenPayload схема відповідає вмісту payload_dict
-    #  і обробляє можливі помилки валідації Pydantic.
     try:
         token_payload = TokenPayload(**payload_dict)
     except Exception as e:  # Наприклад, pydantic.ValidationError
-        logger.warning(f"Помилка валідації TokenPayload: {e}. Payload: {payload_dict}")
-        # i18n
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Некоректний формат токена.")
+        logger.warning(_("dependencies.log.token_payload_validation_error", error=str(e), payload_dict=str(payload_dict)))
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=_("dependencies.auth.malformed_token_payload"), # "Некоректний формат токена."
+            headers={"WWW-Authenticate": "Bearer"} # Додаємо заголовок і сюди
+        )
 
-    logger.debug(f"Payload токена успішно отримано для sub: {token_payload.sub}")
+    logger.debug(_("dependencies.log.token_payload_success", sub=token_payload.sub))
     return token_payload
 
 
@@ -114,28 +115,32 @@ async def get_current_user(
     Отримує поточного користувача з бази даних на основі user_id ('sub') з payload токена.
     """
     if not payload.sub:
-        logger.warning("Відсутній 'sub' (user_id) в payload токена.")
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Некоректний формат токена.")
+        logger.warning(_("dependencies.log.sub_missing_in_token_payload"))
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail=_("dependencies.auth.malformed_token_payload"), # "Некоректний формат токена."
+            headers={"WWW-Authenticate": "Bearer"}
+        )
 
     try:
         user_id_from_token = int(payload.sub)
     except (ValueError, TypeError):
-        logger.warning(f"Не вдалося конвертувати 'sub' з токена ('{payload.sub}') в int.")
+        logger.warning(_("dependencies.log.sub_conversion_to_int_failed", sub_value=payload.sub))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Некоректний формат ідентифікатора користувача в токені.",
+            detail=_("dependencies.auth.invalid_user_id_in_token"),
             headers={"WWW-Authenticate": "Bearer"},
         )
-    # Використання захищеного методу, який повертає ORM модель, або get_user_by_id, якщо він повертає модель
+
     user = await user_service._get_user_model_by_id(user_id=user_id_from_token)
     if user is None:
-        logger.warning(f"Користувача з id '{user_id_from_token}' (з токена) не знайдено в БД.")
+        logger.warning(_("dependencies.log.user_from_token_not_found_in_db", user_id=user_id_from_token))
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Користувача, пов'язаного з токеном, не знайдено.",
+            detail=_("dependencies.auth.user_associated_with_token_not_found"),
             headers={"WWW-Authenticate": "Bearer"},
         )
-    logger.debug(f"Користувача '{user.username}' (id: {user.id}) отримано з БД.")
+    logger.debug(_("dependencies.log.user_retrieved_from_db", username=user.username, user_id=user.id))
     return user
 
 
@@ -147,9 +152,9 @@ async def get_current_active_user(
     Якщо користувач неактивний, викликає помилку HTTP 403 Forbidden.
     """
     if not current_user.is_active:
-        logger.warning(f"Спроба доступу неактивним користувачем '{current_user.username}' (id: {current_user.id}).")
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Обліковий запис користувача неактивний.")
-    logger.debug(f"Користувач '{current_user.username}' активний.")
+        logger.warning(_("dependencies.log.inactive_user_access_attempt", username=current_user.username, user_id=current_user.id))
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=_("dependencies.auth.inactive_user_account"))
+    logger.debug(_("dependencies.log.user_is_active", username=current_user.username))
     return current_user
 
 
@@ -162,18 +167,18 @@ async def get_current_active_superuser(
     """
     if not current_user.is_superuser:
         logger.warning(
-            f"Користувач '{current_user.username}' (id: {current_user.id}) не є суперюзером. Доступ заборонено."
+            _("dependencies.log.superuser_action_attempt_by_non_superuser_detail", username=current_user.username, user_id=current_user.id)
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Недостатньо прав: потрібні права суперкористувача."
+            detail=_("dependencies.auth.not_superuser_detail")
         )
-    logger.debug(f"Користувач '{current_user.username}' успішно авторизований як суперюзер.")
+    logger.debug(_("dependencies.log.superuser_auth_success", username=current_user.username))
     return current_user
 
 
 async def get_current_active_group_admin(
-        group_id: int = Path(..., description="ID групи для перевірки прав адміністратора"),  # i18n, group_id змінено на int
+        group_id: int = Path(..., description=_("dependencies.descriptions.group_id_for_admin_check_path")),
         current_user: User = Depends(get_current_active_user),
         membership_service: GroupMembershipService = Depends(get_group_membership_service)
 ) -> User:
@@ -189,40 +194,39 @@ async def get_current_active_group_admin(
                            404, якщо групу або членство не знайдено (обробляється в membership_service).
     """
     logger.debug(
-        f"Перевірка прав адміна групи для користувача '{current_user.username}' (ID: {current_user.id}) в групі ID: {group_id}")
+        _("dependencies.log.group_admin_check_start", username=current_user.username, user_id=current_user.id, group_id=group_id)
+    )
     if current_user.is_superuser:
-        logger.debug(f"Користувач '{current_user.username}' є суперюзером, доступ дозволено.")
+        logger.debug(_("dependencies.log.group_admin_superuser_override_log", username=current_user.username))
         return current_user
 
-    # TODO: Додати в GroupMembershipService метод `check_user_role_in_group(user_id, group_id, role_code)`
-    #  або `is_user_group_admin(user_id, group_id)` для більш чистої перевірки.
-    #  Поточний `get_membership_details` може повернути None, якщо членства немає.
     membership = await membership_service.get_membership_details(group_id=group_id, user_id=current_user.id)
 
     if not membership or not membership.is_active or not membership.role:
         logger.warning(
-            f"Користувач '{current_user.username}' не є активним членом або не має ролі в групі ID '{group_id}'.")
+             _("dependencies.log.group_admin_not_active_member_or_no_role", username=current_user.username, group_id=group_id)
+        )
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN,
-                            detail="Ви не є активним членом цієї групи або не маєте призначеної ролі.")
+                            detail=_("dependencies.auth.not_active_member_or_no_role_in_group"))
 
-    if membership.role.code != ADMIN_ROLE_CODE:  # Використовуємо імпортовану константу
+    if membership.role.code != ADMIN_ROLE_CODE:
         logger.warning(
-            f"Користувач '{current_user.username}' (ID: {current_user.id}) не є адміністратором групи ID '{group_id}' (роль: {membership.role.code}). Доступ заборонено."
+            _("dependencies.log.group_admin_not_admin_role", username=current_user.username, user_id=current_user.id, group_id=group_id, role_code=membership.role.code)
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Недостатньо прав: потрібні права адміністратора цієї групи."
+            detail=_("dependencies.auth.not_group_admin_insufficient_rights")
         )
 
-    logger.debug(f"Користувач '{current_user.username}' авторизований як адміністратор групи ID '{group_id}'.")
+    logger.debug(_("dependencies.log.group_admin_auth_success", username=current_user.username, group_id=group_id))
     return current_user
 
 
 # --- Залежність для пагінації ---
 async def get_pagination_params(
-        skip: int = Query(0, ge=0, description="Кількість елементів для пропуску (для пагінації)"),  # i18n
-        limit: int = Query(settings.DEFAULT_PAGE_SIZE, ge=1, le=settings.MAX_PAGE_SIZE, # Використання settings замість global_settings
-                           description="Максимальна кількість елементів для повернення (для пагінації)")  # i18n
+        skip: int = Query(0, ge=0, description=_("dependencies.descriptions.pagination_skip_desc")),
+        limit: int = Query(settings.DEFAULT_PAGE_SIZE, ge=1, le=settings.MAX_PAGE_SIZE,
+                           description=_("dependencies.descriptions.pagination_limit_desc"))
 ) -> Dict[str, int]:
     """
     Отримує параметри пагінації `skip` та `limit` з параметрів запиту.
@@ -251,27 +255,25 @@ async def get_cache_service() -> BaseCacheService:
     global _cache_service_instance
 
     if _cache_service_instance is None:
-        logger.info("Створення нового екземпляра CacheService.")
+        logger.info(_("dependencies.log.cache_service_new_instance"))
         if settings.USE_REDIS and settings.REDIS_HOST and settings.REDIS_PORT:
             try:
                 _cache_service_instance = RedisCacheService()
-                # Можна додати перевірку з'єднання тут, якщо потрібно, хоча RedisCacheService може робити це "ліниво"
-                # await _cache_service_instance._get_client() # Приклад перевірки
-                logger.info("Використовується RedisCacheService (USE_REDIS=True та налаштування Redis присутні).")
+                logger.info(_("dependencies.log.cache_service_redis_used"))
             except Exception as e:
-                logger.error(f"Помилка ініціалізації RedisCacheService: {e}. Перехід на InMemoryCacheService.")
+                logger.error(_("dependencies.log.cache_service_redis_init_error", error=str(e)))
                 _cache_service_instance = InMemoryCacheService()
-                logger.info("Використовується InMemoryCacheService як запасний варіант після невдалої ініціалізації Redis.")
+                logger.info(_("dependencies.log.cache_service_inmemory_fallback_after_redis_error"))
         else:
             if not settings.USE_REDIS:
-                logger.info("Використання Redis вимкнено (USE_REDIS=False). Використовується InMemoryCacheService.")
-            else: # USE_REDIS is True, але REDIS_HOST або REDIS_PORT не налаштовані
-                logger.info("Конфігурація Redis (REDIS_HOST/REDIS_PORT) не знайдена, хоча USE_REDIS=True. Використовується InMemoryCacheService.")
+                logger.info(_("dependencies.log.cache_service_redis_disabled"))
+            else:
+                logger.info(_("dependencies.log.cache_service_redis_misconfigured"))
             _cache_service_instance = InMemoryCacheService()
 
-    if _cache_service_instance is None: # Якщо ініціалізація все ще не вдалася (малоймовірно після змін)
-        logger.error("Не вдалося створити жоден екземпляр CacheService!")
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Сервіс кешування недоступний.")
+    if _cache_service_instance is None:
+        logger.error(_("dependencies.log.cache_service_instance_creation_failed"))
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=_("dependencies.errors.cache_service_unavailable"))
 
     return _cache_service_instance
 
@@ -325,4 +327,4 @@ async def get_messenger_platform_service(
     return MessengerPlatformService(db_session=db_session, cache_service=cache_service)
 
 
-logger.info("Модуль залежностей 'api.dependencies' завантажено та налаштовано з реальними сервісами.")
+logger.info(_("dependencies.log.module_loaded_and_configured"))

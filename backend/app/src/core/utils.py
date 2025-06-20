@@ -1,5 +1,6 @@
 # backend/app/src/core/utils.py
 # -*- coding: utf-8 -*-
+from backend.app.src.core.i18n import _
 """
 Допоміжні утиліти для ядра програми Kudos.
 
@@ -90,9 +91,9 @@ def _get_ukrainian_plural(number: int, one: str, few: str, many: str) -> str:
 
     Args:
         number (int): Число для визначення форми.
-        one (str): Форма для однини (наприклад, "день"). # TODO i18n: Translatable string
-        few (str): Форма для чисел 2, 3, 4 (наприклад, "дні"). # TODO i18n: Translatable string
-        many (str): Форма для чисел 0, 5-20, 21 (якщо закінчується на 1, але не 11) і т.д. (наприклад, "днів"). # TODO i18n: Translatable string
+        one (str): Перекладений рядок для однини (наприклад, результат _("key.one")).
+        few (str): Перекладений рядок для форми з числами 2, 3, 4 (наприклад, результат _("key.few")).
+        many (str): Перекладений рядок для множини (наприклад, результат _("key.many")).
 
     Returns:
         str: Відповідна форма слова.
@@ -121,10 +122,9 @@ def human_readable_timedelta(delta: timedelta) -> str:
     total_seconds = int(delta.total_seconds())
 
     if total_seconds < 0:
-        # Можна додати обробку від'ємних значень, якщо це потрібно
-        return "(від'ємна тривалість)"  # TODO i18n: Translatable string
+        return _("utils.timedelta.negative_duration")
     if total_seconds == 0:
-        return "0 секунд"  # TODO i18n: Translatable string (or "щойно", "миттєво" depending on context)
+        return _("utils.timedelta.zero_seconds_alt") # "0 секунд" або "щойно"
 
     days, remainder = divmod(total_seconds, 86400)
     hours, remainder = divmod(remainder, 3600)
@@ -132,16 +132,15 @@ def human_readable_timedelta(delta: timedelta) -> str:
 
     parts = []
     if days > 0:
-        # Inner strings are marked in _get_ukrainian_plural
-        parts.append(f"{days} {_get_ukrainian_plural(days, 'день', 'дні', 'днів')}")
+        parts.append(f"{days} {_get_ukrainian_plural(days, _('utils.timedelta.day.one'), _('utils.timedelta.day.few'), _('utils.timedelta.day.many'))}")
     if hours > 0:
-        parts.append(f"{hours} {_get_ukrainian_plural(hours, 'година', 'години', 'годин')}")
+        parts.append(f"{hours} {_get_ukrainian_plural(hours, _('utils.timedelta.hour.one'), _('utils.timedelta.hour.few'), _('utils.timedelta.hour.many'))}")
     if minutes > 0:
-        parts.append(f"{minutes} {_get_ukrainian_plural(minutes, 'хвилина', 'хвилини', 'хвилин')}")
+        parts.append(f"{minutes} {_get_ukrainian_plural(minutes, _('utils.timedelta.minute.one'), _('utils.timedelta.minute.few'), _('utils.timedelta.minute.many'))}")
     if seconds > 0 or not parts:  # Відображати секунди, якщо це єдина одиниця або якщо вони не нульові і є інші частини
-        parts.append(f"{seconds} {_get_ukrainian_plural(seconds, 'секунда', 'секунди', 'секунд')}")
+        parts.append(f"{seconds} {_get_ukrainian_plural(seconds, _('utils.timedelta.second.one'), _('utils.timedelta.second.few'), _('utils.timedelta.second.many'))}")
 
-    return ", ".join(parts) if parts else "0 секунд"  # TODO i18n: "0 секунд" part if needed for other locales
+    return ", ".join(parts) if parts else _("utils.timedelta.zero_seconds_alt")
 
 
 # --- Числові утиліти ---
@@ -189,8 +188,7 @@ def chunk_list(data: List[Any], chunk_size: int) -> List[List[Any]]:
         ValueError: Якщо `chunk_size` не є додатним цілим числом.
     """
     if chunk_size <= 0:
-        # TODO i18n: Translatable message
-        raise ValueError("Розмір частини (chunk_size) повинен бути додатним цілим числом.")
+        raise ValueError(_("utils.errors.chunk_size_positive"))
     return [data[i:i + chunk_size] for i in range(0, len(data), chunk_size)]
 
 

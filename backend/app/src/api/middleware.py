@@ -1,5 +1,6 @@
 # backend/app/src/api/middleware.py
 # -*- coding: utf-8 -*-
+from backend.app.src.core.i18n import _
 """
 Модуль для визначення проміжних обробників (middleware), специфічних для API.
 
@@ -34,34 +35,34 @@ async def add_process_time_header_middleware(
     start_time = time.perf_counter()
 
     try:
-        response: Response = await call_next(request)  # Передача запиту наступному обробнику
+        response: Response = await call_next(request)
     except Exception as e:
-        # Важливо обробляти винятки, щоб middleware не "зламав" відповідь про помилку
         process_time_on_error = time.perf_counter() - start_time
         logger.error(
-            f"Помилка під час обробки запиту {request.method} {request.url.path} "
-            f"(час до помилки: {process_time_on_error:.4f} сек): {e}",
-            exc_info=True  # Додаємо traceback для діагностики
+            _("api_middleware.log.error_processing_request",
+              method=request.method,
+              path=request.url.path,
+              time_to_error=f"{process_time_on_error:.4f}",
+              error=str(e)),
+            exc_info=True
         )
-        # Перепрокидаємо виняток, щоб FastAPI міг його обробити стандартним чином
-        # (наприклад, через зареєстровані обробники винятків)
         raise
 
     process_time = time.perf_counter() - start_time
-    response.headers["X-Process-Time"] = f"{process_time:.4f} сек"
+    # Додаємо одиниці виміру до ключа, щоб уникнути плутанини при автоматичному парсингу заголовків
+    response.headers["X-Process-Time-Seconds"] = f"{process_time:.4f}"
 
-    # Логування може бути більш детальним, включаючи статус відповіді
-    # Використовуємо settings.DEBUG для визначення рівня деталізації логування.
-    # Рівень логування для `logger` (кастомного) визначається його власною конфігурацією.
-    # Замість `logger.log(log_level, ...)` будемо використовувати `logger.debug` або `logger.info`.
-    log_message = (
-        f"Запит {request.method} {request.url.path} - Статус {response.status_code} - "
-        f"Оброблено за {process_time:.4f} сек."
+    log_message = _(
+        "api_middleware.log.request_processed_summary",
+        method=request.method,
+        path=request.url.path,
+        status_code=response.status_code,
+        process_time=f"{process_time:.4f}"
     )
     if settings.DEBUG:
         logger.debug(log_message)
     else:
-        logger.info(log_message) # Або logger.debug, якщо бажано менше логів у production за замовчуванням
+        logger.info(log_message)
 
     return response
 
@@ -96,24 +97,22 @@ async def add_process_time_header_middleware(
 #     received_api_key = request.headers.get(api_key_header_name)
 
 #     if not received_api_key:
-#         logger.warning(f"API Key Middleware: Відсутній заголовок '{api_key_header_name}' для {request.url.path} від {request.client.host if request.client else 'N/A'}")
-#         # i18n
+#         logger.warning(_("api_middleware.log.api_key_header_missing", header_name=api_key_header_name, path=request.url.path, client_host=request.client.host if request.client else _("api_exceptions.not_applicable_short")))
 #         raise HTTPException(
 #             status_code=status.HTTP_401_UNAUTHORIZED,
-#             detail=f"Обов'язковий заголовок '{api_key_header_name}' не надано."
+#             detail=_("api_middleware.errors.api_key_header_required", header_name=api_key_header_name)
 #         )
 
 #     if received_api_key not in valid_api_keys:
-#         logger.warning(f"API Key Middleware: Невалідний API ключ надано для {request.url.path}. Ключ: '{received_api_key[:10]}...'")
-#         # i18n
+#         logger.warning(_("api_middleware.log.api_key_invalid", path=request.url.path, key_preview=received_api_key[:10]))
 #         raise HTTPException(
 #             status_code=status.HTTP_403_FORBIDDEN,
-#             detail="Надано невалідний API ключ."
+#             detail=_("api_middleware.errors.api_key_invalid_provided")
 #         )
 
 #     client_name = valid_api_keys[received_api_key]
-#     # request.state.api_client_name = client_name # Зберігаємо ім'я клієнта в стані запиту
-#     logger.info(f"API Key Middleware: Доступ надано для клієнта '{client_name}' до {request.url.path}")
+#     # request.state.api_client_name = client_name
+#     logger.info(_("api_middleware.log.api_key_access_granted", client_name=client_name, path=request.url.path))
 
 #     response = await call_next(request)
 #     return response
@@ -132,4 +131,4 @@ async def add_process_time_header_middleware(
 # external_router = APIRouter()
 # external_router.middleware("http")(verify_api_key_middleware) # Застосувати тільки до цього роутера
 
-logger.info("Модуль 'api.middleware' завантажено. Визначено: add_process_time_header_middleware.")
+logger.info(_("api_middleware.log.module_loaded_defined_middlewares", middlewares="add_process_time_header_middleware"))

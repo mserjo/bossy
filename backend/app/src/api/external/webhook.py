@@ -1,5 +1,6 @@
 # backend/app/src/api/external/webhook.py
 # -*- coding: utf-8 -*-
+from backend.app.src.core.i18n import _
 """
 Загальні обробники вебхуків від зовнішніх сервісів.
 
@@ -24,13 +25,10 @@ router = APIRouter()
 
 @router.post(
     "/generic",
-    summary="Загальний приймач вебхуків", # i18n
-    description="""Приймає вебхуки від неспецифікованих зовнішніх сервісів.
-    **УВАГА: Цей ендпоінт є концептуальним (заглушкою) і не реалізує жодних механізмів безпеки
-    (валідація підпису, токенів тощо) за замовчуванням. Не використовувати в продакшені без належної валідації!**
-    Він лише логує отримані дані. В майбутньому тут може бути реалізована логіка
-    маршрутизації до відповідних обробників на основі заголовків або тіла запиту.""", # i18n
-    deprecated=True # Позначаємо як застарілий, щоб підкреслити його статус заглушки
+    summary=_("api_external_webhook.generic.summary"),
+    description=_("api_external_webhook.generic.description"),
+    deprecated=True,
+    response_description=_("api_external_webhook.generic.response_description")
 )
 async def generic_webhook_receiver(
     request: Request,
@@ -50,36 +48,30 @@ async def generic_webhook_receiver(
     #  Без валідації цей ендпоінт є вразливим.
 
     headers = dict(request.headers)
-    body = await request.body() # Отримуємо тіло як байти
+    body = await request.body()
 
-    logger.info(f"Отримано запит на загальний вебхук (/generic):")
-    logger.info(f"  Метод: {request.method}")
-    logger.info(f"  URL: {request.url}")
-    logger.info(f"  Клієнт: {request.client.host if request.client else 'N/A'}:{request.client.port if request.client else 'N/A'}")
-    logger.info(f"  Заголовки: {headers}")
+    logger.info(_("api_external_webhook.log.generic_webhook_request_received"))
+    logger.info(_("api_external_webhook.log.request_method", method=request.method))
+    logger.info(_("api_external_webhook.log.request_url", url=str(request.url)))
+    logger.info(_("api_external_webhook.log.client_info",
+                 host=request.client.host if request.client else _("api_exceptions.not_applicable_short"),
+                 port=request.client.port if request.client else _("api_exceptions.not_applicable_short")))
+    logger.info(_("api_external_webhook.log.request_headers", headers=str(headers)))
 
     try:
-        # Спроба розкодувати body_bytes (які є bytes) та розпарсити як JSON
         decoded_body = body.decode('utf-8')
         json_body = json.loads(decoded_body)
-        logger.info(f"  Тіло (JSON): {json_body}")
+        logger.info(_("api_external_webhook.log.body_json", body_json=str(json_body)))
     except Exception:
-        # Якщо не вдалося розпарсити як JSON або розкодувати, логуємо як raw string (з обмеженням довжини)
-        logger.info(f"  Тіло (raw, не JSON): {body.decode(errors='ignore')[:1000]}...")
+        logger.info(_("api_external_webhook.log.body_raw_not_json", body_raw=body.decode(errors='ignore')[:1000]))
 
     # Тут може бути логіка для визначення типу вебхука та його маршрутизації
-    # на основі заголовків або вмісту тіла.
-    # Наприклад:
-    # if "X-Github-Event" in headers:
-    #     # await process_github_webhook(json_body)
-    #     pass
-    # elif "X-Gitlab-Event" in headers:
-    #     # await process_gitlab_webhook(json_body)
-    #     pass
+    # ...
 
-    # Поки що просто повертаємо успішну відповідь
-    # i18n
-    return {"status": "received", "message": "Загальний вебхук отримано та залоговано. Потрібна реалізація обробки та валідації."}
+    return {
+        "status": "received", # Системний статус
+        "message": _("api_external_webhook.generic.response_message_received_logged_stub")
+    }
 
 
-logger.info("Роутер для загальних вебхуків (`/external/webhook`) визначено.")
+logger.info(_("api_external_webhook.log.router_defined_generic"))

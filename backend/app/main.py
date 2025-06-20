@@ -161,9 +161,10 @@ async def generic_exception_handler(request: Request, exc: Exception):
         exc_info=True # Завжди логуємо повне трасування для невідомих помилок
     )
     # TODO i18n: Translatable message
+    from backend.app.src.core.i18n import _ # Імпорт для перекладу
     return JSONResponse(
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={"detail": "Виникла непередбачена внутрішня помилка сервера. Будь ласка, спробуйте пізніше."},
+        content={"detail": _("exceptions.generic_error_500")},
     )
 
 
@@ -185,11 +186,12 @@ async def root():
     (health check) або отримання базової інформації про програму.
     """
     # TODO i18n: Translatable message
+    from backend.app.src.core.i18n import _ # Імпорт для перекладу
     return {
         "project_name": settings.PROJECT_NAME,
         "environment": settings.ENVIRONMENT,
-        "status": "OK",
-        "message": f"Ласкаво просимо до API '{settings.PROJECT_NAME}'!",
+        "status": "OK", # Статус зазвичай не перекладається
+        "message": _("main.welcome_message", project_name=settings.PROJECT_NAME),
         "documentation_swagger": app.docs_url,
         "documentation_redoc": app.redoc_url
     }

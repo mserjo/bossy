@@ -45,11 +45,10 @@ def validate_not_empty(value: Optional[str], field_name: str) -> str:
     """
     if value is None or not value.strip():
         raise ValidationException(
-            # TODO i18n: Translatable message
-            message=f"Поле '{field_name}' не може бути порожнім.",
+            message=_("validators.field_cannot_be_empty_log", field_name=field_name),
             errors=[{
-                "loc": (field_name,),  # Кортеж шляху до поля
-                "msg": "Це поле є обов'язковим і не може містити лише пробіли.",  # TODO i18n: Translatable message
+                "loc": (field_name,),
+                "msg": _("validators.field_required_no_spaces"),
                 "type": "value_error.missing_or_empty"
             }]
         )
@@ -72,14 +71,14 @@ def validate_max_length(value: str, max_len: int, field_name: str) -> str:
         ValidationException: Якщо довжина значення перевищує `max_len`.
     """
     if len(value) > max_len:
-        # TODO i18n: Translatable message
-        message = f"Довжина поля '{field_name}' перевищує максимально допустиму ({max_len} символів).",
-        errors = [{
-            "loc": (field_name,),
-            "msg": f"Максимальна довжина становить {max_len} символів. Надано {len(value)}.",
-            # TODO i18n: Translatable message
-            "type": "value_error.string.max_length"
-        }]
+        raise ValidationException(
+            message=_("validators.field_length_exceeds_max_log", field_name=field_name, max_len=max_len),
+            errors=[{
+                "loc": (field_name,),
+                "msg": _("validators.max_length_is_provided_len", max_len=max_len, current_len=len(value)),
+                "type": "value_error.string.max_length"
+            }]
+        )
     return value
 
 
@@ -99,14 +98,14 @@ def validate_min_length(value: str, min_len: int, field_name: str) -> str:
         ValidationException: Якщо довжина значення менша за `min_len`.
     """
     if len(value) < min_len:
-        # TODO i18n: Translatable message
-        message = f"Довжина поля '{field_name}' менша за мінімально допустиму ({min_len} символів).",
-        errors = [{
-            "loc": (field_name,),
-            "msg": f"Мінімальна довжина становить {min_len} символів. Надано {len(value)}.",
-            # TODO i18n: Translatable message
-            "type": "value_error.string.min_length"
-        }]
+        raise ValidationException(
+            message=_("validators.field_length_less_than_min_log", field_name=field_name, min_len=min_len),
+            errors=[{
+                "loc": (field_name,),
+                "msg": _("validators.min_length_is_provided_len", min_len=min_len, current_len=len(value)),
+                "type": "value_error.string.min_length"
+            }]
+        )
     return value
 
 
@@ -120,6 +119,7 @@ def validate_allowed_characters(value: str, pattern: str, field_name: str, error
         field_name (str): Назва поля, що валідується.
         error_message (Optional[str]): Кастомне повідомлення про помилку. Якщо `None`,
                                        використовується повідомлення за замовчуванням.
+                                       Очікується, що error_message вже перекладено, якщо надано.
 
     Returns:
         str: Оригінальне значення, якщо воно відповідає шаблону.
@@ -128,17 +128,15 @@ def validate_allowed_characters(value: str, pattern: str, field_name: str, error
         ValidationException: Якщо значення не відповідає регулярному виразу.
     """
     if not re.fullmatch(pattern, value):
-        # TODO i18n: Translatable message (default_msg might be complex for direct translation if pattern is included)
-        default_msg = f"Поле '{field_name}' містить недійсні символи."
-        # custom_msg is already expected to be a potentially translated message if provided
-        final_user_msg = error_message or "Значення не відповідає дозволеному формату."  # TODO i18n: Translatable message
+        default_log_msg = _("validators.field_contains_invalid_chars_log", field_name=field_name)
+        final_user_msg = error_message or _("validators.value_does_not_match_format")
         raise ValidationException(
-            message=error_message or default_msg,  # Internal message can be more detailed
+            message=error_message or default_log_msg,
             errors=[{
                 "loc": (field_name,),
                 "msg": final_user_msg,
                 "type": "value_error.string.pattern_mismatch",
-                "ctx": {"pattern": pattern}  # pattern is for context, not direct display
+                "ctx": {"pattern": pattern}
             }]
         )
     return value
@@ -152,13 +150,11 @@ def validate_username_format(username: str) -> str:
     з модуля `core.constants`.
     """
     try:
-        # TODO i18n: Translatable error_message
         return validate_allowed_characters(
-            username, USERNAME_REGEX, "ім'я користувача",  # "ім'я користувача" is for internal field_name
-            error_message="Ім'я користувача повинно містити від 3 до 20 символів і може складатися лише з латинських літер, цифр, знаків підкреслення (_) та дефісів (-)."
+            username, USERNAME_REGEX, _("validators.fieldnames.username"), # "ім'я користувача"
+            error_message=_("validators.username_format_requirements")
         )
     except ValidationException as e:
-        # Налаштування типу помилки для більшої специфічності
         if e.errors and isinstance(e.errors, list) and e.errors[0]:
             e.errors[0]["type"] = "value_error.username.format"
         raise
@@ -170,16 +166,11 @@ def validate_password_strength(password: str) -> str:
     з модуля `core.constants`.
     """
     try:
-        # TODO i18n: Translatable error_message
         return validate_allowed_characters(
-            password, PASSWORD_REGEX, "пароль",  # "пароль" is for internal field_name
-            error_message=(
-                "Пароль повинен мати довжину від 8 до 128 символів і містити принаймні одну "
-                "велику літеру, одну малу літеру, одну цифру та один спеціальний символ (@$!%*?&_)."
-            )
+            password, PASSWORD_REGEX, _("validators.fieldnames.password"), # "пароль"
+            error_message=_("validators.password_strength_requirements")
         )
     except ValidationException as e:
-        # Налаштування типу помилки для більшої специфічності
         if e.errors and isinstance(e.errors, list) and e.errors[0]:
             e.errors[0]["type"] = "value_error.password.strength"
         raise
@@ -206,58 +197,49 @@ def validate_phone_number(phone_number: str, default_region: Optional[str] = "UA
         ValidationException: Якщо номер телефону недійсний або бібліотека `phonenumbers` не встановлена.
     """
     try:
-        # Розкоментуйте наступні рядки, коли бібліотека phonenumbers буде встановлена
         import phonenumbers
         from phonenumbers import phonenumberutil
 
-        if not phone_number:  # Додаткова перевірка на порожній рядок перед парсингом
+        if not phone_number:
             raise ValidationException(
-                # TODO i18n: Translatable message
-                "Номер телефону не може бути порожнім.",
-                errors=[{"loc": ("phone_number",), "msg": "Введіть, будь ласка, номер телефону.",
-                         "type": "value_error.phone_number.empty"}]  # TODO i18n: Translatable msg
+                _("validators.phone.cannot_be_empty_log"),
+                errors=[{"loc": ("phone_number",), "msg": _("validators.phone.please_enter_number"),
+                         "type": "value_error.phone_number.empty"}]
             )
 
         parsed_number = phonenumbers.parse(phone_number, region=default_region)
         if not phonenumbers.is_valid_number(parsed_number):
             raise ValidationException(
-                # TODO i18n: Translatable message
-                "Вказаний номер телефону не є дійсним.",
-                errors=[{"loc": ("phone_number",), "msg": "Номер телефону не відповідає дійсному формату або не існує.",
-                         "type": "value_error.phone_number.invalid"}]  # TODO i18n: Translatable msg
+                _("validators.phone.invalid_number_log"),
+                errors=[{"loc": ("phone_number",), "msg": _("validators.phone.invalid_format_or_nonexistent"),
+                         "type": "value_error.phone_number.invalid"}]
             )
 
         formatted_number = phonenumbers.format_number(parsed_number, phonenumbers.PhoneNumberFormat.E164)
-        logger.info(f"Номер телефону '{phone_number}' (регіон: {default_region}) успішно валідовано та відформатовано як {formatted_number}.")
+        logger.info(_("validators.phone.validation_success_log", phone_number=phone_number, region=default_region, formatted_number=formatted_number))
         return formatted_number
     except ImportError:
-        logger.error("Бібліотека 'phonenumbers' не встановлена. Валідація номера телефону неможлива.")
-        # У продакшені це має бути критичною помилкою конфігурації.
-        # Для розробки можна повернути оригінальне значення або викликати помилку.
-        # Наразі, щоб не блокувати розробку без залежності, повернемо помилку валідації
-        # TODO i18n: Translatable message
+        logger.error(_("validators.phone.library_not_installed_log"))
         raise ValidationException(
-            "Сервіс валідації номерів телефонів тимчасово недоступний (відсутня бібліотека).",
+            _("validators.phone.service_unavailable_no_library_log"),
             errors=[{"loc": ("phone_number",),
-                     "msg": "Не вдалося перевірити номер телефону через відсутність необхідної бібліотеки.",
-                     "type": "value_error.phone_number.config_error"}]  # TODO i18n: Translatable msg
+                     "msg": _("validators.phone.check_failed_no_library_user"),
+                     "type": "value_error.phone_number.config_error"}]
         )
     except phonenumberutil.NumberParseException as e:
-        logger.warning(f"Помилка парсингу номера телефону '{phone_number}': {e}")
-        # TODO i18n: Translatable messages in error_type_map
-        error_type_map = {
-            phonenumberutil.NumberParseException.INVALID_COUNTRY_CODE: "Недійсний код країни.",
-            phonenumberutil.NumberParseException.NOT_A_NUMBER: "Рядок містить нецифрові символи там, де очікувались цифри.",
-            phonenumberutil.NumberParseException.TOO_SHORT_AFTER_IDD: "Номер занадто короткий після міжнародного префіксу.",
-            phonenumberutil.NumberParseException.TOO_SHORT_NSN: "Номер занадто короткий.",
-            phonenumberutil.NumberParseException.TOO_LONG: "Номер занадто довгий."
+        logger.warning(_("validators.phone.parse_error_log", phone_number=phone_number, error=str(e)))
+        error_key_map = {
+            phonenumberutil.NumberParseException.INVALID_COUNTRY_CODE: "validators.phone.parse_errors.invalid_country_code",
+            phonenumberutil.NumberParseException.NOT_A_NUMBER: "validators.phone.parse_errors.not_a_number",
+            phonenumberutil.NumberParseException.TOO_SHORT_AFTER_IDD: "validators.phone.parse_errors.too_short_after_idd",
+            phonenumberutil.NumberParseException.TOO_SHORT_NSN: "validators.phone.parse_errors.too_short_nsn",
+            phonenumberutil.NumberParseException.TOO_LONG: "validators.phone.parse_errors.too_long"
         }
-        specific_error_msg = error_type_map.get(e.error_type,
-                                                "Некоректний формат номера телефону.")  # TODO i18n: Translatable default
+        specific_error_msg_key = error_key_map.get(e.error_type, "validators.phone.parse_errors.default_format_error")
+        specific_error_msg = _(specific_error_msg_key)
 
-        # TODO i18n: Translatable message format
         raise ValidationException(
-            f"Не вдалося розпізнати номер телефону: {specific_error_msg}",
+            _("validators.phone.could_not_parse_user_message", error_details=specific_error_msg),
             errors=[
                 {"loc": ("phone_number",), "msg": specific_error_msg, "type": "value_error.phone_number.parse_error"}]
         )
@@ -270,18 +252,15 @@ def validate_positive_number(value: Any, field_name: str) -> Any:
     Перевіряє, що надане значення є числом (int або float) і є строго додатним (> 0).
     """
     if not isinstance(value, (int, float)):
-        # TODO i18n: Translatable message
         raise ValidationException(
-            message=f"Поле '{field_name}' повинно бути числом.",
-            errors=[{"loc": (field_name,), "msg": "Значення має бути числовим.", "type": "type_error.number"}]
-            # TODO i18n: Translatable msg
+            message=_("validators.field_must_be_number_log", field_name=field_name),
+            errors=[{"loc": (field_name,), "msg": _("validators.value_must_be_numeric"), "type": "type_error.number"}]
         )
     if value <= 0:
-        # TODO i18n: Translatable message
         raise ValidationException(
-            message=f"Поле '{field_name}' має бути додатним числом (більше нуля).",
-            errors=[{"loc": (field_name,), "msg": "Значення повинно бути більше нуля.",
-                     "type": "value_error.number.positive"}]  # TODO i18n: Translatable msg
+            message=_("validators.field_must_be_positive_log", field_name=field_name),
+            errors=[{"loc": (field_name,), "msg": _("validators.value_must_be_greater_than_zero"),
+                     "type": "value_error.number.positive"}]
         )
     return value
 
@@ -290,33 +269,27 @@ def validate_number_range(
         value: Any,
         min_val: Optional[Union[int, float]] = None,
         max_val: Optional[Union[int, float]] = None,
-        field_name: str = "Числове поле"
+        field_name: str = _("validators.fieldnames.default_numeric_field") # "Числове поле"
 ) -> Any:
     """
     Перевіряє, що числове значення знаходиться у вказаному діапазоні (включно з межами).
     """
     if not isinstance(value, (int, float)):
-        # TODO i18n: Translatable message
         raise ValidationException(
-            message=f"Поле '{field_name}' повинно бути числом.",
-            errors=[{"loc": (field_name,), "msg": "Значення має бути числовим.", "type": "type_error.number"}]
-            # TODO i18n: Translatable msg
+            message=_("validators.field_must_be_number_log", field_name=field_name),
+            errors=[{"loc": (field_name,), "msg": _("validators.value_must_be_numeric"), "type": "type_error.number"}]
         )
     if min_val is not None and value < min_val:
-        # TODO i18n: Translatable message
         raise ValidationException(
-            message=f"Значення поля '{field_name}' ({value}) менше за мінімально допустиме ({min_val}).",
-            errors=[{"loc": (field_name,), "msg": f"Значення повинно бути не менше {min_val}.",
+            message=_("validators.value_less_than_min_log", field_name=field_name, value=value, min_val=min_val),
+            errors=[{"loc": (field_name,), "msg": _("validators.value_must_be_not_less_than", min_val=min_val),
                      "type": "value_error.number.min_value", "ctx": {"limit_value": min_val}}]
-            # TODO i18n: Translatable msg
         )
     if max_val is not None and value > max_val:
-        # TODO i18n: Translatable message
         raise ValidationException(
-            message=f"Значення поля '{field_name}' ({value}) перевищує максимально допустиме ({max_val}).",
-            errors=[{"loc": (field_name,), "msg": f"Значення повинно бути не більше {max_val}.",
+            message=_("validators.value_exceeds_max_log", field_name=field_name, value=value, max_val=max_val),
+            errors=[{"loc": (field_name,), "msg": _("validators.value_must_be_not_greater_than", max_val=max_val),
                      "type": "value_error.number.max_value", "ctx": {"limit_value": max_val}}]
-            # TODO i18n: Translatable msg
         )
     return value
 
@@ -327,12 +300,11 @@ def validate_list_not_empty(value: Optional[List[Any]], field_name: str) -> List
     """
     Перевіряє, що наданий список не є `None` і містить принаймні один елемент.
     """
-    if value is None or not value:  # Порожній список також вважається невалідним
-        # TODO i18n: Translatable message
+    if value is None or not value:
         raise ValidationException(
-            message=f"Список '{field_name}' не може бути порожнім.",
-            errors=[{"loc": (field_name,), "msg": "Список повинен містити принаймні один елемент.",
-                     "type": "value_error.list.not_empty"}]  # TODO i18n: Translatable msg
+            message=_("validators.list_cannot_be_empty_log", field_name=field_name),
+            errors=[{"loc": (field_name,), "msg": _("validators.list_must_contain_elements"),
+                     "type": "value_error.list.not_empty"}]
         )
     return value
 

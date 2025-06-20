@@ -44,8 +44,10 @@ PASSWORD_REGEX_EXAMPLE: str = (
 )
 
 # --- Значення за замовчуванням для моделей даних ---
+from backend.app.src.core.i18n import _ # Імпорт для перекладів
+
 DEFAULT_USERNAME_PREFIX: str = "user_" # Префікс для автоматично генерованих імен користувачів (якщо така логіка є).
-DEFAULT_GROUP_NAME: str = "Моя група" # TODO i18n: Назва групи за замовчуванням при її створенні. Потребує перекладу.
+DEFAULT_GROUP_NAME: str = _("constants.default_group_name") # "Моя група" # TODO i18n: Назва групи за замовчуванням при її створенні. Потребує перекладу.
 DEFAULT_TASK_POINTS: int = 10 # Кількість балів, що нараховуються за виконання завдання за замовчуванням.
 DEFAULT_AVATAR_FILENAME: str = "default_avatar.png" # Ім'я файлу стандартного аватара користувача.
 

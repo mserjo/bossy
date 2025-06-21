@@ -6,15 +6,15 @@ from backend.app.src.models.dictionaries.task_types import TaskType # Модел
 from backend.app.src.repositories.dictionaries.task_type_repository import TaskTypeRepository # Імпорт репозиторію
 from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.task_types import ( # Схеми Pydantic
-    TaskTypeCreate,
-    TaskTypeUpdate,
-    TaskTypeResponse,
+    TaskTypeCreateSchema,
+    TaskTypeUpdateSchema,
+    TaskTypeResponseSchema,
 )
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 
-class TaskTypeService(BaseDictionaryService[TaskType, TaskTypeRepository, TaskTypeCreate, TaskTypeUpdate, TaskTypeResponse]):
+class TaskTypeService(BaseDictionaryService[TaskType, TaskTypeRepository, TaskTypeCreateSchema, TaskTypeUpdateSchema, TaskTypeResponseSchema]):
     """
     Сервіс для управління елементами довідника "Типи Завдань".
     Типи завдань визначають різні категорії завдань у системі, наприклад,
@@ -35,7 +35,7 @@ class TaskTypeService(BaseDictionaryService[TaskType, TaskTypeRepository, TaskTy
             db_session,
             repository=task_type_repo,
             cache_service=cache_service,
-            response_schema=TaskTypeResponse
+            response_schema=TaskTypeResponseSchema
         )
         # _model_name ініціалізується в BaseDictionaryService з repository.model.__name__
         logger.info(f"TaskTypeService ініціалізовано для моделі: {self._model_name}")

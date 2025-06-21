@@ -13,7 +13,7 @@ from backend.app.src.core.i18n import _
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
 
-from fastapi import APIRouter, status # Додано status для використання в responses
+from fastapi import APIRouter, status
 
 from backend.app.src.api.v1 import v1_router
 from backend.app.src.api.external import external_api_router
@@ -26,9 +26,9 @@ api_router = APIRouter(
         status.HTTP_400_BAD_REQUEST: {"description": _("api_router.responses.400")},
         status.HTTP_401_UNAUTHORIZED: {"description": _("api_router.responses.401")},
         status.HTTP_403_FORBIDDEN: {"description": _("api_router.responses.403")},
-        status.HTTP_404_NOT_FOUND: {"description": _("api_router.responses.404")}, # Додано для повноти, хоча FastAPI часто обробляє це
-        status.HTTP_422_UNPROCESSABLE_ENTITY: {"description": _("api_router.responses.422")}, # Додано для повноти
-        status.HTTP_500_INTERNAL_SERVER_ERROR: {"description": _("api_router.responses.500")} # Додано для повноти
+        status.HTTP_404_NOT_FOUND: {"description": _("api_router.responses.404")},
+        status.HTTP_422_UNPROCESSABLE_ENTITY: {"description": _("api_router.responses.422")},
+        status.HTTP_500_INTERNAL_SERVER_ERROR: {"description": _("api_router.responses.500")}
     }
 )
 

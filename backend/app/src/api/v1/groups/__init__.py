@@ -19,7 +19,8 @@ from backend.app.src.api.v1.groups.membership import router as group_membership_
 from backend.app.src.api.v1.groups.invitation import router as group_invitation_router
 from backend.app.src.api.v1.groups.reports import router as group_reports_router
 
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Створюємо агрегований роутер для всіх ендпоінтів, пов'язаних з групами
 groups_router = APIRouter()

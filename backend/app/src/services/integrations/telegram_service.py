@@ -14,7 +14,7 @@ from backend.app.src.services.integrations.messenger_base import (
 from backend.app.src.models.integrations.user_integration import UserIntegration  # Припустима модель для зберігання telegram_chat_id
 from backend.app.src.config.settings import settings  # Для Telegram Bot Token
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 # TODO: Додати залежність: pip install python-telegram-bot --pre (для v20+) або httpx

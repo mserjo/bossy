@@ -6,15 +6,15 @@ from backend.app.src.models.dictionaries.bonus_types import BonusType # Моде
 from backend.app.src.repositories.dictionaries.bonus_type_repository import BonusTypeRepository # Імпорт репозиторію
 from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.bonus_types import ( # Схеми Pydantic
-    BonusTypeCreate,
-    BonusTypeUpdate,
-    BonusTypeResponse,
+    BonusTypeCreateSchema,
+    BonusTypeUpdateSchema,
+    BonusTypeResponseSchema,
 )
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 
-class BonusTypeService(BaseDictionaryService[BonusType, BonusTypeRepository, BonusTypeCreate, BonusTypeUpdate, BonusTypeResponse]):
+class BonusTypeService(BaseDictionaryService[BonusType, BonusTypeRepository, BonusTypeCreateSchema, BonusTypeUpdateSchema, BonusTypeResponseSchema]):
     """
     Сервіс для управління елементами довідника "Типи Бонусів".
     Успадковує загальні CRUD-операції від BaseDictionaryService.

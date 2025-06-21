@@ -33,7 +33,8 @@ from backend.app.src.schemas.pagination_schemas import PaginatedResponseSchema, 
     PageParamsSchema  # Стандартні схеми пагінації
 from backend.app.src.schemas.message_schemas import MessageResponseSchema  # Для простих відповідей
 from backend.app.src.services.notification.notification_service import NotificationService  # Сервіс для сповіщень
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 # Базова функція-заглушка для інтернаціоналізації рядків

@@ -17,7 +17,12 @@ from fastapi import APIRouter, Response, status, Depends
 from pydantic import BaseModel, Field, ConfigDict
 
 # Сервіс для виконання перевірок стану
-from backend.app.src.services.system.health_check_service import HealthCheckService, ComponentHealthReport as ServiceComponentHealthReport, OverallHealthReport
+from backend.app.src.services.system.health import HealthCheckService
+from backend.app.src.schemas.system.health import (
+    ComponentHealth as ServiceComponentHealthReport,
+    OverallHealthStatusSchema as OverallHealthReport
+)
+from backend.app.src.api.dependencies import get_health_check_service
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
@@ -72,7 +77,7 @@ class DetailedHealthResponse(BaseModel):
 )
 async def get_detailed_health_check(
     response: Response, # Використовуємо Response для динамічного встановлення статус-коду
-    health_service: HealthCheckService = Depends() # Впровадження залежності HealthCheckService
+    health_service: HealthCheckService = Depends(get_health_check_service) # Впровадження залежності HealthCheckService
 ) -> DetailedHealthResponse:
     """
     Отримує детальний звіт про стан системи.

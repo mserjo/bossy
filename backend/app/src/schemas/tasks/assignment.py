@@ -15,9 +15,9 @@ from pydantic import Field # field_validator видалено, оскільки 
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.schemas.base import BaseSchema, TimestampedSchemaMixin
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача
-from backend.app.src.core.dicts import TaskAssignmentStatus # Імпортовано Enum
+from backend.app.src.core.dicts import TaskAssignmentStatus
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 # TaskAssignmentStatus Enum імпортовано вище.

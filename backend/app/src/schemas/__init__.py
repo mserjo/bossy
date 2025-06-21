@@ -23,14 +23,14 @@
 from backend.app.src.schemas.base import (
     BaseSchema,
     MsgResponse,
-    IDSchemaMixin, # Виправлено з IDSchema
-    TimestampedSchemaMixin, # Виправлено з TimestampSchema
-    SoftDeleteSchemaMixin, # Виправлено з SoftDeleteSchema
-    # BaseMainResponseSchema, # Закоментовано, оскільки відсутня в base.py
-    # BaseMainCreateSchema, # Закоментовано, оскільки відсутня в base.py
-    # BaseMainUpdateSchema, # Закоментовано, оскільки відсутня в base.py
-    PaginatedResponse, # Виправлено з PaginatedResponseSchema (в base.py це PaginatedResponse)
-    BaseMainSchema # Додано BaseMainSchema, оскільки вона є в base.py
+    IDSchemaMixin,
+    TimestampedSchemaMixin,
+    SoftDeleteSchemaMixin,
+    # BaseMainResponseSchema,
+    # BaseMainCreateSchema,
+    # BaseMainUpdateSchema,
+    PaginatedResponse,
+    BaseMainSchema
     # GenericTypeVar # T буде визначено в PaginatedResponseSchema, немає потреби експортувати окремо
 )
 
@@ -54,14 +54,14 @@ __all__ = [
     # Базові схеми
     "BaseSchema",
     "MsgResponse",
-    "IDSchemaMixin", # Виправлено
-    "TimestampedSchemaMixin", # Виправлено
-    "SoftDeleteSchemaMixin", # Виправлено
-    "BaseMainSchema", # Додано
-    # "BaseMainResponseSchema", # Закоментовано
-    # "BaseMainCreateSchema", # Закоментовано
-    # "BaseMainUpdateSchema", # Закоментовано
-    "PaginatedResponse", # Виправлено
+    "IDSchemaMixin",
+    "TimestampedSchemaMixin",
+    "SoftDeleteSchemaMixin",
+    "BaseMainSchema",
+    # "BaseMainResponseSchema",
+    # "BaseMainCreateSchema",
+    # "BaseMainUpdateSchema",
+    "PaginatedResponse",
     # Підпакети зі схемами
     "auth",
     "bonuses",

@@ -26,7 +26,8 @@ from backend.app.src.api.v1.gamification.badges import router as badges_router
 from backend.app.src.api.v1.gamification.achievements import router as achievements_router
 from backend.app.src.api.v1.gamification.ratings import router as ratings_router
 
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Створюємо агрегований роутер для всіх ендпоінтів, пов'язаних з гейміфікацією
 gamification_router = APIRouter()

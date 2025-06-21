@@ -1,4 +1,5 @@
 # backend/app/src/schemas/auth/session.py
+# -*- coding: utf-8 -*-
 """
 Pydantic схеми для сутності "Сесія Користувача" (Session).
 

@@ -22,7 +22,7 @@ from backend.app.src.schemas.tasks.review import (
 )
 from backend.app.src.config import settings as global_settings
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 

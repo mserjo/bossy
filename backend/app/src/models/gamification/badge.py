@@ -54,7 +54,7 @@ class Badge(BaseMainModel):
     # Зв'язок з групою, якщо бейджі є специфічними для груп.
     # Якщо group_id=NULL, це може бути глобальний/системний бейдж.
     group: Mapped[Optional["Group"]] = relationship(
-        foreign_keys=[BaseMainModel.group_id],  # Явно вказуємо foreign_keys
+        foreign_keys=["Badge.group_id"],  # Явно вказуємо foreign_keys рядком
         # Якщо Group не має back_populates="badges", то тут його не вказуємо,
         # або додаємо "badges" до моделі Group.
         # back_populates="badges", # Потребує Mapped[List["Badge"]] = relationship(...) в моделі Group

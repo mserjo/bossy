@@ -19,7 +19,7 @@ from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для 
 from backend.app.src.core.dicts import TaskStatus  # Enum для статусів виконання
 from datetime import timedelta # Переміщено timedelta сюди
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 

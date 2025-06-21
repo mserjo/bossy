@@ -8,15 +8,16 @@
 """
 
 from typing import List, Optional, Tuple, Any, Dict
+from datetime import datetime
 
-from sqlalchemy import select, func, delete as sqlalchemy_delete  # delete для можливих операцій очищення
+from sqlalchemy import select, func, delete as sqlalchemy_delete
 from sqlalchemy.ext.asyncio import AsyncSession
-from pydantic import BaseModel as PydanticBaseModel  # Для UpdateSchemaType-заглушок
+from pydantic import BaseModel as PydanticBaseModel
 
 from backend.app.src.repositories.base import BaseRepository
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
-from enum import Enum # Додано для isinstance check
+from enum import Enum
 
 # Абсолютний імпорт моделей та схем
 from backend.app.src.models.system.monitoring import SystemLog, PerformanceMetric

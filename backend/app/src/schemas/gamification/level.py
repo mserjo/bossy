@@ -15,7 +15,7 @@ from pydantic import Field, AnyHttpUrl
 # Абсолютний імпорт базових схем
 from backend.app.src.schemas.base import BaseSchema, BaseMainSchema
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 # Імпорт для конкретної схеми

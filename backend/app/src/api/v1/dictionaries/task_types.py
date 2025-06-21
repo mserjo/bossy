@@ -21,7 +21,8 @@ from backend.app.src.schemas.dictionaries.task_types import TaskTypeCreate, Task
 from backend.app.src.services.dictionaries.task_types import TaskTypeService
 # from backend.app.src.repositories.dictionaries import TaskTypeRepository # Видалено
 from backend.app.src.core.pagination import PagedResponse, PageParams
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     # Префікс /task-types буде додано в __init__.py батьківського роутера

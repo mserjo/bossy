@@ -17,17 +17,17 @@ from backend.app.src.services.bonuses.account import UserAccountService
 
 from backend.app.src.schemas.gamification.rating import (
     UserGroupRatingResponse,
-    UserGroupRatingCreateSchema, # Додано для створення
-    UserGroupRatingUpdateSchema, # Додано для оновлення
+    UserGroupRatingCreateSchema,
+    UserGroupRatingUpdateSchema,
     GroupLeaderboardResponse
 )
 from backend.app.src.core.dicts import RatingType # Імпорт RatingType Enum
 from backend.app.src.config import settings
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
-DEFAULT_RATING_TYPE = RatingType.OVERALL # Змінено на Enum
+DEFAULT_RATING_TYPE = RatingType.OVERALL
 
 
 class UserRatingService(BaseService):
@@ -79,8 +79,8 @@ class UserRatingService(BaseService):
             user_id: int, # Змінено UUID на int
             group_id: int, # Змінено UUID на int
             rating_type: RatingType = DEFAULT_RATING_TYPE,
-            period_start_date: Optional[date] = None, # Додано для повноти даних
-            period_end_date: Optional[date] = None   # Додано для повноти даних
+            period_start_date: Optional[date] = None,
+            period_end_date: Optional[date] = None
     ) -> UserGroupRatingResponse:
         """
         Оновлює або створює запис рейтингу користувача для вказаної групи та періоду.

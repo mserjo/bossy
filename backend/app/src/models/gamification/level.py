@@ -57,7 +57,7 @@ class Level(BaseMainModel):
     # Зв'язок з групою, якщо рівні є специфічними для груп.
     # Якщо group_id=NULL, це може бути глобальний/системний рівень.
     group: Mapped[Optional["Group"]] = relationship(
-        foreign_keys=[BaseMainModel.group_id],  # Явно вказуємо foreign_keys
+        foreign_keys=["Level.group_id"],  # Явно вказуємо foreign_keys рядком
         # Якщо Group не має back_populates="levels", то тут його не вказуємо,
         # або додаємо "levels" до моделі Group.
         # back_populates="levels", # Потребує Mapped[List["Level"]] = relationship(...) в моделі Group

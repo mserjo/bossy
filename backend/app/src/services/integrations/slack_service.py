@@ -15,7 +15,7 @@ from backend.app.src.services.integrations.messenger_base import (
 from backend.app.src.models.integrations.user_integration import UserIntegration # Для зберігання Slack user_id / токена бота
 from backend.app.src.config.settings import settings # Для Slack Bot Token
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 # TODO: Додати залежність: pip install slack_sdk

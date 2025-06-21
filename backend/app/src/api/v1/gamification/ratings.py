@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession  # Не використовує
 from backend.app.src.api.dependencies import (
     get_api_db_session, get_current_active_user,
     paginator,  # paginator може не використовуватися, якщо лідерборд має власний ліміт
-    get_group_membership_service # Додано get_group_membership_service
+    get_group_membership_service
 )
 # TODO: Використати залежність для перевірки членства в групі або прав суперюзера
 from backend.app.src.api.v1.groups.groups import check_group_view_permission

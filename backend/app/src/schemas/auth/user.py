@@ -1,4 +1,5 @@
 # backend/app/src/schemas/auth/user.py
+# -*- coding: utf-8 -*-
 """
 Pydantic схеми для сутності "Користувач" (User).
 
@@ -10,7 +11,7 @@ Pydantic схеми для сутності "Користувач" (User).
 - Представлення публічного профілю користувача (`UserPublicProfileSchema`).
 """
 from datetime import datetime
-from typing import Optional, Any  # Any для тимчасових полів user_type, system_role
+from typing import Optional, Any
 
 from pydantic import BaseModel, Field, EmailStr, AnyHttpUrl
 

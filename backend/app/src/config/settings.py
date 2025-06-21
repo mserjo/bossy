@@ -28,8 +28,7 @@ from pathlib import Path
 from typing import Any, List, Optional, Union
 
 from dotenv import load_dotenv
-from pydantic import (AnyHttpUrl, EmailStr, PostgresDsn, RedisDsn,
-                        ValidationInfo, field_validator)
+from pydantic import (AnyHttpUrl, EmailStr, PostgresDsn, RedisDsn, ValidationInfo, field_validator)
 from pydantic_settings import BaseSettings, SettingsConfigDict
 # Імпорт get_logger та logger видалено звідси, буде імпортуватися локально за потребою
 
@@ -95,6 +94,8 @@ class Settings(BaseSettings):
     ECHO_SQL: bool = False # Чи логувати SQL запити SQLAlchemy (встановлюється в True, якщо DEBUG=True, в database.py)
     DB_POOL_SIZE: int = 10 # Розмір пулу з'єднань БД
     DB_MAX_OVERFLOW: int = 20 # Максимальна кількість додаткових з'єднань понад DB_POOL_SIZE
+    DEFAULT_PAGE_SIZE: int = 20
+    MAX_PAGE_SIZE: int = 20
 
     @field_validator("DATABASE_URL", mode="before")
     @classmethod

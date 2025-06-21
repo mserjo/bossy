@@ -1,4 +1,5 @@
 # backend/app/src/schemas/notifications/template.py
+# -*- coding: utf-8 -*-
 """
 Pydantic схеми для сутності "Шаблон Сповіщення" (NotificationTemplate).
 
@@ -9,6 +10,7 @@ Pydantic схеми для сутності "Шаблон Сповіщення" 
 from typing import Optional
 
 from pydantic import Field
+from backend.app.src.schemas.base import BaseSchema
 from backend.app.src.config.logging import get_logger 
 logger = get_logger(__name__)
 
@@ -18,8 +20,8 @@ from backend.app.src.schemas.dictionaries.base_dict import (
     DictionaryCreateSchema,
     DictionaryUpdateSchema
 )
-from backend.app.src.core.dicts import NotificationChannelType # Імпортовано Enum
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.dicts import NotificationChannelType
+from backend.app.src.core.i18n import _
 
 
 TEMPLATE_SUBJECT_MAX_LENGTH = 500

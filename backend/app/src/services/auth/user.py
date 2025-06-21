@@ -28,7 +28,7 @@ from backend.app.src.schemas.auth.user import (
 )
 from backend.app.src.core.security import get_password_hash
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 from backend.app.src.config import settings  # Для доступу до DEBUG тощо
 # from backend.app.src.core.dicts import UserState # Removed import

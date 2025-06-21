@@ -15,9 +15,9 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
-from backend.app.src.core.dicts import SettingValueType # Імпортовано Enum
+from backend.app.src.core.dicts import SettingValueType
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 # SettingValueType Enum імпортовано вище.
@@ -68,8 +68,7 @@ class SystemSettingCreateSchema(SystemSettingBaseSchema):
     Схема для створення нового системного налаштування.
     """
     # Успадковує key, name, description, value_type, is_editable, is_sensitive.
-    value: Optional[Any] = Field(None,
-                                 description=_("system.settings.create.fields.value.description"))
+    value: Optional[Any] = Field(None, description=_("system.settings.create.fields.value.description"))
 
 
 class SystemSettingUpdateSchema(BaseSchema):
@@ -87,15 +86,14 @@ class SystemSettingUpdateSchema(BaseSchema):
     # value_type та key зазвичай не змінюються для існуючого налаштування.
 
 
-class SystemSettingSchema(SystemSettingBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+class SystemSettingResponseSchema(SystemSettingBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
     """
     Схема для представлення даних про системне налаштування у відповідях API.
     Успадковує `id`, `created_at`, `updated_at` та поля з `SystemSettingBaseSchema`.
     """
     # id, created_at, updated_at - успадковані.
     # key, name, description, value_type, is_editable, is_sensitive - успадковані.
-    value: Optional[Any] = Field(None,
-                                 description=_("system.settings.response.fields.value.description"))
+    value: Optional[Any] = Field(None, description=_("system.settings.response.fields.value.description"))
     # Примітка: Фактичне маскування чутливих значень (`is_sensitive` = True)
     # має відбуватися на рівні сервісу або при формуванні відповіді API,
     # а не в самій схемі Pydantic (схема описує структуру даних).

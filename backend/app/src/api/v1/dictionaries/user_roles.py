@@ -21,7 +21,8 @@ from backend.app.src.schemas.dictionaries.user_roles import UserRoleCreate, User
 from backend.app.src.services.dictionaries.user_roles import UserRoleService
 # from backend.app.src.repositories.dictionaries import UserRoleRepository # Видалено
 from backend.app.src.core.pagination import PagedResponse, PageParams
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     # Префікс /user-roles буде додано в __init__.py батьківського роутера

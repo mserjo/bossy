@@ -156,15 +156,15 @@ class Task(BaseMainModel):
     # --- Зв'язки (Relationships) ---
     # group_id успадковано з BaseMainModel (через GroupAffiliationMixin)
     group: Mapped["Group"] = relationship(
-        foreign_keys=[BaseMainModel.group_id],  # Явно вказуємо foreign_keys через неоднозначність успадкування
+        foreign_keys=["Task.group_id"],  # Явно вказуємо foreign_keys рядком
         back_populates="tasks",
         lazy="selectin"
     )
     task_type: Mapped["TaskType"] = relationship(foreign_keys=[task_type_id], lazy="selectin")
     # Зв'язок status тепер використовує успадкований state_id
-    status: Mapped[Optional["Status"]] = relationship(foreign_keys=[BaseMainModel.state_id], lazy="selectin")
+    status: Mapped[Optional["Status"]] = relationship(foreign_keys=["Task.state_id"], lazy="selectin")
 
-    parent_task: Mapped[Optional["Task"]] = relationship(remote_side=[BaseMainModel.id], back_populates="sub_tasks",
+    parent_task: Mapped[Optional["Task"]] = relationship(remote_side=["Task.id"], back_populates="sub_tasks",
                                                          lazy="selectin")  # id успадковано
     sub_tasks: Mapped[List["Task"]] = relationship(back_populates="parent_task", cascade="all, delete-orphan",
                                                    lazy="selectin")

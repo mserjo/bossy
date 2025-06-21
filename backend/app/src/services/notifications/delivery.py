@@ -26,7 +26,7 @@ from backend.app.src.schemas.notifications.delivery import (
 from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType, NotificationType # Імпорт Enum
 from backend.app.src.config import settings
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 

@@ -11,9 +11,9 @@ from backend.app.src.services.base import BaseService
 from backend.app.src.models.system.settings import SystemSetting
 from backend.app.src.repositories.system.settings_repository import SystemSettingRepository # Імпорт репозиторію
 from backend.app.src.schemas.system.settings import (
-    SystemSettingCreate,
-    SystemSettingUpdate,
-    SystemSettingResponse,
+    SystemSettingCreateSchema,
+    SystemSettingUpdateSchema,
+    SystemSettingResponseSchema,
 )
 from backend.app.src.core.dicts import SettingValueType
 from backend.app.src.config import settings as global_settings
@@ -34,7 +34,7 @@ class SystemSettingService(BaseService):
         self.setting_repo = SystemSettingRepository() # Ініціалізація репозиторію
         logger.info("SystemSettingService ініціалізовано.")
 
-    async def get_setting_by_key(self, key: str) -> Optional[SystemSettingResponse]:
+    async def get_setting_by_key(self, key: str) -> Optional[SystemSettingResponseSchema]:
         """
         Отримує конкретне системне налаштування за його ключем.
         """
@@ -43,12 +43,12 @@ class SystemSettingService(BaseService):
 
         if setting_db:
             logger.info(f"Системне налаштування з ключем '{key}' знайдено.")
-            return SystemSettingResponse.model_validate(setting_db)
+            return SystemSettingResponseSchema.model_validate(setting_db)
 
         logger.info(f"Системне налаштування з ключем '{key}' не знайдено.")
         return None
 
-    async def get_all_settings(self, skip: int = 0, limit: int = 100) -> List[SystemSettingResponse]:
+    async def get_all_settings(self, skip: int = 0, limit: int = 100) -> List[SystemSettingResponseSchema]:
         """
         Отримує список всіх системних налаштувань з пагінацією.
         """
@@ -58,12 +58,12 @@ class SystemSettingService(BaseService):
         )
         # total_count тут не використовується, але метод get_multi_with_total_count його повертає
 
-        response_list = [SystemSettingResponse.model_validate(s) for s in settings_db_list]
+        response_list = [SystemSettingResponseSchema.model_validate(s) for s in settings_db_list]
         logger.info(f"Отримано {len(response_list)} системних налаштувань.")
         return response_list
 
-    async def create_setting(self, setting_data: SystemSettingCreate,
-                             creator_id: Optional[int] = None) -> SystemSettingResponse: # Змінено UUID на int
+    async def create_setting(self, setting_data: SystemSettingCreateSchema,
+                             creator_id: Optional[int] = None) -> SystemSettingResponseSchema: # Змінено UUID на int
         """
         Створює нове системне налаштування.
         Переконується, що налаштування з таким ключем ще не існує.
@@ -96,10 +96,10 @@ class SystemSettingService(BaseService):
             raise ValueError(f"Не вдалося створити налаштування '{setting_data.key}' через конфлікт даних.")
 
         logger.info(f"Системне налаштування '{new_setting_db.key}' ID: {new_setting_db.id} успішно створено.")
-        return SystemSettingResponse.model_validate(new_setting_db)
+        return SystemSettingResponseSchema.model_validate(new_setting_db)
 
-    async def update_setting(self, setting_id: int, setting_update_data: SystemSettingUpdate, # Змінено UUID на int
-                             updater_id: Optional[int] = None) -> Optional[SystemSettingResponse]: # Змінено UUID на int
+    async def update_setting(self, setting_id: int, setting_update_data: SystemSettingUpdateSchema, # Змінено UUID на int
+                             updater_id: Optional[int] = None) -> Optional[SystemSettingResponseSchema]: # Змінено UUID на int
         """
         Оновлює існуюче системне налаштування за його ID.
         """
@@ -146,7 +146,7 @@ class SystemSettingService(BaseService):
 
 
         logger.info(f"Системне налаштування з ID '{updated_setting_db.id}' (ключ: {updated_setting_db.key}) успішно оновлено.")
-        return SystemSettingResponse.model_validate(updated_setting_db)
+        return SystemSettingResponseSchema.model_validate(updated_setting_db)
 
     async def delete_setting(self, setting_id: int) -> bool: # Змінено UUID на int
         """
@@ -206,10 +206,10 @@ class SystemSettingService(BaseService):
         """
         setting_response = await self.get_setting_by_key(key)
         if setting_response and setting_response.value is not None and setting_response.value_type is not None:
-            # `value` в SystemSettingResponse вже має бути правильного типу завдяки Pydantic моделі,
-            # якщо модель SystemSetting.value є JSONB/JSON і SystemSettingResponse.value має тип Any/Dict/List/etc.
+            # `value` в SystemSettingResponseSchema вже має бути правильного типу завдяки Pydantic моделі,
+            # якщо модель SystemSetting.value є JSONB/JSON і SystemSettingResponseSchema.value має тип Any/Dict/List/etc.
             # Якщо SystemSetting.value є просто TEXT, то потрібна десеріалізація тут.
-            # Припускаємо, що SystemSettingResponse.value вже є Python-типом.
+            # Припускаємо, що SystemSettingResponseSchema.value вже є Python-типом.
             # Якщо ні, то треба десеріалізувати:
             # return self._deserialize_setting_value(str(setting_response.value), setting_response.value_type)
             # Для Pydantic v2, якщо value є Json[Any] в моделі, то воно вже буде десеріалізоване.

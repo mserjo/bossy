@@ -19,7 +19,7 @@ from backend.app.src.core.dicts import NotificationType as NotificationTypeEnum 
 from backend.app.src.core.dicts import RelatedEntityType # Імпорт RelatedEntityType
 from backend.app.src.config.logging import get_logger
 from datetime import timedelta # Переміщено timedelta сюди
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 # Імпорти для конкретних схем

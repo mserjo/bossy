@@ -15,20 +15,20 @@ from typing import List, Any, Optional
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 
 # Залежності API та моделі користувача
-from backend.app.src.api.dependencies import get_current_active_superuser, get_current_active_user
-from backend.app.src.models.auth import User as UserModel  # Для типізації current_user
+from backend.app.src.api.dependencies import get_current_active_superuser, get_current_active_user, get_system_setting_service
+from backend.app.src.models.auth import User as UserModel
 
 # Схеми Pydantic для налаштувань
-from backend.app.src.schemas.system.setting_schemas import (
+from backend.app.src.schemas.system.settings import (
     SystemSettingResponseSchema,
     SystemSettingUpdateSchema,
     SystemSettingCreateSchema
 )
 
 # Сервіс системних налаштувань
-from backend.app.src.services.system.system_setting_service import SystemSettingService
-# Логер з конфігурації
-from backend.app.src.config.logging import logger  # Використовуємо централізований логер
+from backend.app.src.services.system.settings import SystemSettingService
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -52,7 +52,7 @@ router = APIRouter()
     dependencies=[Depends(get_current_active_user)]  # Потрібен будь-який активний користувач
 )
 async def list_system_settings(
-        service: SystemSettingService = Depends(),
+        service: SystemSettingService = Depends(get_system_setting_service),
         current_user: UserModel = Depends(get_current_active_user)
 ) -> List[SystemSettingResponseSchema]:
     """
@@ -77,7 +77,7 @@ async def list_system_settings(
 )
 async def get_system_setting(
         setting_key: str,
-        service: SystemSettingService = Depends(),
+        service: SystemSettingService = Depends(get_system_setting_service),
         current_user: UserModel = Depends(get_current_active_user)
 ) -> SystemSettingResponseSchema:
     """
@@ -113,7 +113,7 @@ async def get_system_setting(
 # як зазначено в TODO на початку файлу.
 async def create_system_setting(
         setting_data: SystemSettingCreateSchema,
-        service: SystemSettingService = Depends(),
+        service: SystemSettingService = Depends(get_system_setting_service),
         current_superuser: UserModel = Depends(get_current_active_superuser)
 ) -> SystemSettingResponseSchema:
     """
@@ -155,7 +155,7 @@ async def create_system_setting(
 async def update_system_setting(
         setting_key: str,
         setting_update_data: SystemSettingUpdateSchema = Body(...),
-        service: SystemSettingService = Depends(),
+        service: SystemSettingService = Depends(get_system_setting_service),
         current_superuser: UserModel = Depends(get_current_active_superuser)
 ) -> SystemSettingResponseSchema:
     """
@@ -196,7 +196,7 @@ async def update_system_setting(
 )
 async def delete_system_setting(
         setting_key: str,
-        service: SystemSettingService = Depends(),
+        service: SystemSettingService = Depends(get_system_setting_service),
         current_superuser: UserModel = Depends(get_current_active_superuser)
 ):
     """

@@ -30,7 +30,7 @@ from backend.app.src.schemas.bonuses.account import UserAccountResponse
 from backend.app.src.services.bonuses.account import UserAccountService
 from backend.app.src.core.exceptions import InsufficientFundsError
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 from backend.app.src.config import settings
 

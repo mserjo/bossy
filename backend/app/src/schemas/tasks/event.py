@@ -10,7 +10,7 @@ from pydantic import Field
 
 # Абсолютний імпорт базових схем та Enum
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 from backend.app.src.schemas.base import BaseSchema, BaseMainSchema # BaseMainSchema for response

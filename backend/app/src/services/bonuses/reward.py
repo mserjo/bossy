@@ -32,7 +32,7 @@ from backend.app.src.schemas.bonuses.reward import (
 # AccountTransactionCreate не використовується напряму цим сервісом
 from backend.app.src.services.bonuses.account import UserAccountService
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 from backend.app.src.config import settings
 from backend.app.src.core.exceptions import RewardUnavailableError, RedemptionConditionError # Імпорт перенесених винятків

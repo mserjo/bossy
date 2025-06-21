@@ -1,62 +1,71 @@
-# backend/app/src/services/dictionaries/bonus_types.py
-from sqlalchemy.ext.asyncio import AsyncSession
+# backend/app/src/models/dictionaries/bonus_types.py
+# -*- coding: utf-8 -*-
+"""
+Модель SQLAlchemy для довідника "Типи бонусів".
 
-from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
-from backend.app.src.models.dictionaries.bonus_types import BonusType # Модель SQLAlchemy
-from backend.app.src.repositories.dictionaries.bonus_type_repository import BonusTypeRepository # Імпорт репозиторію
-from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
-from backend.app.src.schemas.dictionaries.bonus_types import ( # Схеми Pydantic
-    BonusTypeCreateSchema, # Виправлено
-    BonusTypeUpdateSchema, # Виправлено
-    BonusTypeResponseSchema, # Виправлено
-)
+Цей модуль визначає модель `BonusType`, яка представляє записи в довіднику
+типів бонусів (наприклад, "Нагорода", "Штраф"
+відповідно до `core.dicts.BonusType` або технічного завдання).
+Ці типи визначають характер бонусної транзакції.
+"""
+
+# Абсолютний імпорт базової моделі для довідників
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
+# Можливо, знадобляться додаткові імпорти, якщо будуть специфічні поля.
+# from sqlalchemy.orm import Mapped, mapped_column
+# from sqlalchemy import Float
 
-class BonusTypeService(BaseDictionaryService[BonusType, BonusTypeRepository, BonusTypeCreateSchema, BonusTypeUpdateSchema, BonusTypeResponseSchema]):
+class BonusType(BaseDictionary):
     """
-    Сервіс для управління елементами довідника "Типи Бонусів".
-    Успадковує загальні CRUD-операції від BaseDictionaryService.
-    Типи бонусів визначають різні категорії нарахувань або списань балів,
-    наприклад, "Нагорода за виконання завдання", "Ручне коригування", "Штраф за протермінування".
-    Кожен тип може мати позначку `is_penalty`, яка вказує, чи є цей тип штрафом.
+    Модель SQLAlchemy для довідника "Типи бонусів".
+
+    Успадковує всі поля від `BaseDictionary` (включаючи `id`, `name`, `description`, `code`,
+    часові мітки, м'яке видалення, стан, нотатки та опціональний `group_id`).
+    `group_id` для системних типів бонусів, ймовірно, буде NULL.
+
+    Атрибути:
+        __tablename__ (str): Назва таблиці в базі даних (`dict_bonus_types`).
     """
+    __tablename__ = "dict_bonus_types"
 
-    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService):
-        """
-        Ініціалізує сервіс BonusTypeService.
+    # Якщо для типів бонусів потрібні специфічні додаткові поля,
+    # наприклад, множник за замовчуванням для цього типу бонусу,
+    # їх можна визначити тут.
+    # Наприклад:
+    # default_multiplier: Mapped[Optional[float]] = mapped_column(Float, nullable=True, comment="Множник за замовчуванням (наприклад, -1 для штрафів)")
 
-        :param db_session: Асинхронна сесія бази даних SQLAlchemy.
-        :param cache_service: Екземпляр сервісу кешування.
-        """
-        bonus_type_repo = BonusTypeRepository(model=BonusType)
-        super().__init__(
-            db_session,
-            repository=bonus_type_repo,
-            cache_service=cache_service,
-            response_schema=BonusTypeResponse
-        )
-        # _model_name ініціалізується в BaseDictionaryService з repository.model.__name__
-        logger.info(f"BonusTypeService ініціалізовано для моделі: {self._model_name}")
+    # _repr_fields успадковуються та збираються автоматично з BaseDictionary (id, name, code, state_id тощо).
+    # Немає додаткових специфічних полів для __repr__ на цьому рівні.
+    _repr_fields: tuple[str, ...] = ()
 
-    # --- Кастомні методи для BonusTypeService (якщо потрібні) ---
-    # Наприклад, метод для отримання тільки типів, які є штрафами:
-    # async def get_penalty_bonus_types(self) -> List[BonusTypeResponse]:
-    #     """Отримує всі типи бонусів, які є штрафами."""
-    #     logger.debug(f"Спроба отримання всіх типів бонусів, які є штрафами ({self._model_name}).")
-    #     if not hasattr(self.model, 'is_penalty'):
-    #         logger.warning(f"Модель {self._model_name} не має атрибута 'is_penalty'. Повернення порожнього списку.")
-    #         return []
-    #
-    #     stmt = select(self.model).where(self.model.is_penalty == True).order_by(self.model.name) # type: ignore
-    #     items_db = (await self.db_session.execute(stmt)).scalars().all()
-    #
-    #     response_list = [self.response_schema.model_validate(item) for item in items_db]
-    #     logger.info(f"Отримано {len(response_list)} типів бонусів, які є штрафами.")
-    #     return response_list
-    #
-    # Примітка: Поля 'code', 'name', 'description', 'is_penalty' обробляються базовим сервісом,
-    # якщо вони присутні в відповідних Pydantic схемах (Create, Update).
 
-logger.debug(f"{BonusTypeService.__name__} (сервіс типів бонусів) успішно визначено.")
+if __name__ == "__main__":
+    # Демонстраційний блок для моделі BonusType.
+    logger.info("--- Модель Довідника: BonusType ---")
+    logger.info(f"Назва таблиці: {BonusType.__tablename__}")
+
+    logger.info("\nОчікувані поля (успадковані та власні):")
+    expected_fields = ['id', 'name', 'description', 'code', 'created_at', 'updated_at', 'deleted_at', 'state',
+                       'group_id', 'notes']
+    # Якщо додано кастомні поля:
+    # expected_fields.append('default_multiplier')
+    for field in expected_fields:
+        logger.info(f"  - {field}")
+
+    # Приклад створення екземпляра (без взаємодії з БД)
+    example_bonus_type = BonusType(
+        id=1,
+        name="Нагорода за завдання",
+        description="Стандартний тип бонусу за виконання завдання.",
+        code="REWARD",  # Може відповідати значенням з core.dicts.BonusType
+        state="active"
+    )
+
+    logger.info(f"\nПриклад екземпляра BonusType (без сесії):\n  {example_bonus_type}")
+    # Очікуваний __repr__ (порядок може відрізнятися):
+    # <BonusType(id=1, name='Нагорода за завдання', code='REWARD', state='active')>
+
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

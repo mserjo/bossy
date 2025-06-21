@@ -14,7 +14,7 @@ from backend.app.src.services.integrations.messenger_base import (
 from backend.app.src.models.integrations.user_integration import UserIntegration # Для зберігання ID користувача Teams або посилань на розмову
 from backend.app.src.config.settings import settings # Для Microsoft App ID, пароля/секрету для бота
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 # TODO: Додати залежності: pip install botbuilder-core botbuilder-schema botframework-connector msgraph-sdk-python

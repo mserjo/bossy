@@ -21,7 +21,8 @@ from backend.app.src.api.v1.dictionaries.bonus_types import router as bonus_type
 from backend.app.src.api.v1.dictionaries.calendars import router as calendars_router
 from backend.app.src.api.v1.dictionaries.messengers import router as messengers_router
 
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Головний роутер для всіх довідників
 dictionaries_router = APIRouter()

@@ -19,7 +19,7 @@ logger = get_logger(__name__)
 # Абсолютний імпорт моделі та схем
 from backend.app.src.models.system.health import ServiceHealthStatus
 from backend.app.src.schemas.system.health import ServiceHealthStatusCreateSchema
-from backend.app.src.core.dicts import HealthStatusType # Імпортовано Enum
+from backend.app.src.core.dicts import HealthStatusType
 
 
 # Записи про стан здоров'я зазвичай створюються або оновлюються повністю,

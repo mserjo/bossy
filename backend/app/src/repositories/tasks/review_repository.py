@@ -6,7 +6,7 @@
 та надає специфічні методи для роботи з відгуками на завдання.
 """
 
-from typing import List, Optional, Tuple, Any, Dict # Додано Dict
+from typing import List, Optional, Tuple, Any, Dict
 
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession

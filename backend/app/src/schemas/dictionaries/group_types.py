@@ -8,7 +8,7 @@ Pydantic схеми для довідника "Типи Груп".
 
 from typing import Optional
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 # Абсолютний імпорт базових схем для довідників

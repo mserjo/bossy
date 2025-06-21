@@ -24,7 +24,8 @@ from backend.app.src.api.v1.tasks.assignments import router as task_assignments_
 from backend.app.src.api.v1.tasks.completions import router as task_completions_router
 from backend.app.src.api.v1.tasks.reviews import router as task_reviews_router
 
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Створюємо агрегований роутер для всіх ендпоінтів, пов'язаних із задачами та подіями
 tasks_router = APIRouter()

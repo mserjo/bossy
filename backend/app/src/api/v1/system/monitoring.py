@@ -1,148 +1,229 @@
-# backend/app/src/api/v1/system/monitoring.py
+# backend/app/src/api/v1/system/settings.py
 # -*- coding: utf-8 -*-
 """
-API ендпоінти для моніторингу системи.
+API ендпоінти для управління загальними налаштуваннями системи (System Settings).
 
-Надає доступ до даних моніторингу, таких як системні логи
-(SystemLog) та метрики продуктивності (PerformanceMetric).
-Доступ до цих ендпоінтів зазвичай обмежений суперкористувачами.
+Надає CRUD-операції для перегляду та модифікації
+глобальних параметрів системи. Читання доступне автентифікованим користувачам
+(з фільтрацією публічних налаштувань), запис - тільки суперкористувачам.
 
 Сумісність: Python 3.13, SQLAlchemy v2, Pydantic v2.
 """
-import json  # Для розбору JSON рядка для тегів
-from typing import List, Optional, Dict, Any
-from datetime import datetime
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from typing import List, Any, Optional
+
+from fastapi import APIRouter, Depends, HTTPException, status, Body
 
 # Залежності API та моделі користувача
-from backend.app.src.api.dependencies import get_current_active_superuser
-from backend.app.src.models.auth import User as UserModel  # Для типізації current_user
+from backend.app.src.api.dependencies import get_current_active_superuser, get_current_active_user, get_system_setting_service
+from backend.app.src.models.auth import User as UserModel
 
-# Схеми Pydantic для моніторингу (припускаємо, що вони визначені тут)
-from backend.app.src.schemas.system.monitoring_schemas import (
-    SystemLogResponseSchema,
-    PerformanceMetricResponseSchema,
-    SystemLogQueryFiltersSchema,
-    PerformanceMetricQueryFiltersSchema  # Додамо схему для фільтрів метрик
+# Схеми Pydantic для налаштувань
+from backend.app.src.schemas.system.settings import (
+    SystemSettingResponseSchema,
+    SystemSettingUpdateSchema,
+    SystemSettingCreateSchema
 )
 
-# Сервіс моніторингу
-from backend.app.src.services.system.system_monitoring_service import SystemMonitoringService
-# Логер з конфігурації
-from backend.app.src.config.logging import logger  # Використовуємо централізований логер
+# Сервіс системних налаштувань
+from backend.app.src.services.system.settings import SystemSettingService
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 
 
-# --- Ендпоінти ---
-# TODO: Уточнити, які саме дані моніторингу є критично важливими (наприклад, логи Celery, довжина черг, стан БД).
+# TODO: Визначити, які налаштування є суто для читання (read-only) з конфігураційних файлів,
+# а які можуть динамічно змінюватися та зберігатися в БД.
+# TODO: Додати валідацію типів значень для налаштувань при створенні/оновленні (можливо в сервісі або через Pydantic).
 
-# ПРИМІТКА: Цей ендпоінт залежить від реалізації методу `get_system_logs`
-# в `SystemMonitoringService`, включаючи підтримку фільтрів та пагінації.
-# Важливою є також обробка помилок, що можуть виникнути в сервісі.
+# --- Ендпоінти ---
+
+# ПРИМІТКА: Фільтрація публічних налаштувань для звичайних користувачів
+# та надання повного доступу для суперкористувачів реалізується
+# в методах `SystemSettingService`.
 @router.get(
-    "/logs",
-    response_model=List[SystemLogResponseSchema],
-    summary="Отримати системні логи",  # i18n
-    description="Дозволяє суперкористувачам переглядати системні логи з можливістю фільтрації та пагінації.",  # i18n
+    "/",
+    response_model=List[SystemSettingResponseSchema],
+    summary="Отримати список системних налаштувань",  # i18n
+    description="""Дозволяє отримати список системних налаштувань.
+Суперкористувачі бачать всі налаштування.
+Інші автентифіковані користувачі бачать тільки публічні налаштування (`is_public=True`).""",  # i18n
+    dependencies=[Depends(get_current_active_user)]  # Потрібен будь-який активний користувач
+)
+async def list_system_settings(
+        service: SystemSettingService = Depends(get_system_setting_service),
+        current_user: UserModel = Depends(get_current_active_user)
+) -> List[SystemSettingResponseSchema]:
+    """
+    Повертає список системних налаштувань.
+    Фільтрує непублічні налаштування для звичайних користувачів на рівні сервісу.
+    """
+    logger.info(
+        f"Користувач '{current_user.username}' (ID: {current_user.id}, Суперюзер: {current_user.is_superuser}) запитує список системних налаштувань.")  # i18n
+
+    settings_list = await service.get_all_settings(requesting_user=current_user)
+    return settings_list
+
+
+@router.get(
+    "/{setting_key}",
+    response_model=SystemSettingResponseSchema,
+    summary="Отримати конкретне системне налаштування за ключем",  # i18n
+    responses={
+        status.HTTP_404_NOT_FOUND: {"description": "Налаштування не знайдено або доступ заборонено"}  # i18n
+    },
+    dependencies=[Depends(get_current_active_user)]  # Потрібен будь-який активний користувач
+)
+async def get_system_setting(
+        setting_key: str,
+        service: SystemSettingService = Depends(get_system_setting_service),
+        current_user: UserModel = Depends(get_current_active_user)
+) -> SystemSettingResponseSchema:
+    """
+    Повертає конкретне системне налаштування за його ключем.
+    Якщо налаштування не публічне, доступне тільки суперкористувачам (логіка в сервісі).
+    """
+    logger.info(f"Користувач '{current_user.username}' запитує налаштування '{setting_key}'.")  # i18n
+
+    setting = await service.get_setting_by_key(key=setting_key, requesting_user=current_user)
+
+    if not setting:
+        logger.warning(
+            f"Налаштування '{setting_key}' не знайдено або доступ для користувача '{current_user.username}' обмежено.")  # i18n
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Налаштування з ключем '{setting_key}' не знайдено або доступ до нього обмежено."  # i18n
+        )
+    return setting
+
+
+@router.post(
+    "/",
+    response_model=SystemSettingResponseSchema,
+    status_code=status.HTTP_201_CREATED,
+    summary="Створити нове системне налаштування (тільки для суперюзерів)",  # i18n
+    description="Дозволяє суперкористувачам створювати нові системні налаштування. "  # i18n
+                "Ключ налаштування має бути унікальним.",  # i18n
     dependencies=[Depends(get_current_active_superuser)]
 )
-async def list_system_logs(
-        filters: SystemLogQueryFiltersSchema = Depends(),  # Фільтри з query параметрів
-        skip: int = Query(0, ge=0, description="Кількість записів для пропуску (пагінація)"),  # i18n
-        limit: int = Query(100, ge=1, le=500, description="Максимальна кількість записів для повернення (пагінація)"),
-        # i18n
-        service: SystemMonitoringService = Depends(),  # Реальна ін'єкція сервісу
-        current_superuser: UserModel = Depends(get_current_active_superuser)  # Поточний суперкористувач
-):
+# ПРИМІТКА: Валідація типів значень для налаштувань, а також визначення
+# налаштувань "тільки для читання" (якщо такі є серед створюваних/оновлюваних
+# через API) має бути реалізовано в `SystemSettingService`,
+# як зазначено в TODO на початку файлу.
+async def create_system_setting(
+        setting_data: SystemSettingCreateSchema,
+        service: SystemSettingService = Depends(get_system_setting_service),
+        current_superuser: UserModel = Depends(get_current_active_superuser)
+) -> SystemSettingResponseSchema:
     """
-    Повертає список записів системного логу.
-    Доступно тільки суперкористувачам.
-    Підтримує фільтрацію за рівнем, іменем логера, ID користувача, датою та вмістом повідомлення, а також пагінацію.
+    Створює нове системне налаштування. Доступно тільки суперкористувачам.
     """
-    active_filters_dict = filters.model_dump(exclude_none=True)
     logger.info(
-        f"Користувач '{current_superuser.username}' запитує список системних логів. "  # i18n
-        f"Фільтри: {active_filters_dict if active_filters_dict else 'немає'}. "  # i18n
-        f"Пагінація: skip={skip}, limit={limit}."  # i18n
+        f"Суперкористувач '{current_superuser.username}' створює нове налаштування: {setting_data.model_dump(exclude_unset=True)}")  # i18n
+
+    try:
+        # Передаємо UserModel як creating_user
+        created_setting = await service.create_setting(setting_data=setting_data, creating_user=current_superuser)
+    except HTTPException as e:  # Наприклад, конфлікт, якщо ключ вже існує (обробляється сервісом)
+        logger.warning(
+            f"Помилка при створенні налаштування '{setting_data.key}' користувачем '{current_superuser.username}': {e.detail}")  # i18n
+        raise e
+    except Exception as e:  # Інші непередбачені помилки
+        logger.error(
+            f"Непередбачена помилка при створенні налаштування '{setting_data.key}' користувачем '{current_superuser.username}': {e}",
+            exc_info=True)  # i18n
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                            detail="Внутрішня помилка сервера при створенні налаштування.")  # i18n
+
+    logger.info(
+        f"Налаштування '{created_setting.key}' успішно створено суперкористувачем '{current_superuser.username}'.")  # i18n
+    return created_setting
+
+
+@router.put(
+    "/{setting_key}",
+    response_model=SystemSettingResponseSchema,
+    summary="Оновити значення системного налаштування (тільки для суперюзерів)",  # i18n
+    description="Дозволяє суперкористувачам оновлювати значення існуючих системних налаштувань.",  # i18n
+    dependencies=[Depends(get_current_active_superuser)]
+)
+# ПРИМІТКА: Валідація типів значень для налаштувань, а також визначення
+# налаштувань "тільки для читання" (якщо такі є серед створюваних/оновлюваних
+# через API) має бути реалізовано в `SystemSettingService`,
+# як зазначено в TODO на початку файлу.
+async def update_system_setting(
+        setting_key: str,
+        setting_update_data: SystemSettingUpdateSchema = Body(...),
+        service: SystemSettingService = Depends(get_system_setting_service),
+        current_superuser: UserModel = Depends(get_current_active_superuser)
+) -> SystemSettingResponseSchema:
+    """
+    Оновлює значення існуючого системного налаштування.
+    Доступно тільки суперкористувачам.
+    """
+    logger.info(
+        f"Суперкористувач '{current_superuser.username}' оновлює налаштування '{setting_key}' значенням: {setting_update_data.value}")  # i18n
+
+    # Передаємо UserModel як updating_user
+    updated_setting = await service.update_setting(
+        key=setting_key,
+        new_value_data=setting_update_data,
+        updating_user=current_superuser
     )
 
-    system_logs = await service.get_system_logs(filters=filters, skip=skip, limit=limit)
-    # TODO: Додати обробку можливих помилок від сервісу, якщо це потрібно (наприклад, якщо сервіс може повернути помилку)
-    return system_logs
+    if not updated_setting:  # Сервіс поверне None, якщо налаштування не знайдено
+        logger.warning(
+            f"Налаштування '{setting_key}' не знайдено для оновлення суперкористувачем '{current_superuser.username}'.")  # i18n
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Налаштування з ключем '{setting_key}' не знайдено для оновлення."  # i18n
+        )
+
+    logger.info(
+        f"Налаштування '{setting_key}' успішно оновлено суперкористувачем '{current_superuser.username}'.")  # i18n
+    return updated_setting
 
 
-@router.get(
-    "/metrics",
-    response_model=List[PerformanceMetricResponseSchema],
-    summary="Отримати метрики продуктивності",  # i18n
-    description="Дозволяє суперкористувачам переглядати зібрані метрики продуктивності системи.",  # i18n
+@router.delete(
+    "/{setting_key}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Видалити системне налаштування (тільки для суперюзерів)",  # i18n
+    description="Дозволяє суперкористувачам видаляти системні налаштування. "  # i18n
+                "**Увага**: Ця дія незворотна і може вплинути на стабільність системи, якщо налаштування використовується.",
+    # i18n
     dependencies=[Depends(get_current_active_superuser)]
 )
-# ПРИМІТКА: Обробка фільтра `tags_json` виконується вручну з парсингом JSON.
-# Розглянути можливість інтеграції цього в Pydantic схему фільтрів,
-# якщо FastAPI підтримує такий тип даних для query параметрів.
-# Також важлива надійна обробка помилок від сервісу.
-async def list_performance_metrics(
-        # Використовуємо Depends для фільтрів метрик так само, як для логів
-        filters: PerformanceMetricQueryFiltersSchema = Depends(),
-        tags_json: Optional[str] = Query(None,
-                                         description="Фільтр по тегах у форматі JSON рядка (наприклад, '{\"service\":\"worker\"}')"),
-        # i18n
-        skip: int = Query(0, ge=0, description="Кількість записів для пропуску (пагінація)"),  # i18n
-        limit: int = Query(100, ge=1, le=1000, description="Максимальна кількість записів для повернення (пагінація)"),
-        # i18n
-        service: SystemMonitoringService = Depends(),
+async def delete_system_setting(
+        setting_key: str,
+        service: SystemSettingService = Depends(get_system_setting_service),
         current_superuser: UserModel = Depends(get_current_active_superuser)
 ):
     """
-    Повертає список зібраних метрик продуктивності.
+    Видаляє системне налаштування за його ключем.
     Доступно тільки суперкористувачам.
-    Підтримує фільтрацію за назвою метрики, датою, тегами (через JSON рядок) та пагінацію.
+    Повертає 204 No Content у разі успішного видалення.
+    Повертає 404 Not Found, якщо налаштування не знайдено (обробляється сервісом).
     """
-    parsed_tags_filter: Optional[Dict[str, str]] = None
-    if tags_json:
-        try:
-            parsed_tags_filter = json.loads(tags_json)
-            if not isinstance(parsed_tags_filter, dict):
-                raise ValueError("Теги мають бути представлені як словник JSON.")  # i18n
-            # Додаткова валідація: ключі та значення мають бути рядками
-            if not all(isinstance(k, str) and isinstance(v, str) for k, v in parsed_tags_filter.items()):
-                raise ValueError("Ключі та значення тегів повинні бути рядками.")  # i18n
-        except (json.JSONDecodeError, ValueError) as e:
-            logger.warning(f"Некоректний JSON для фільтра тегів: '{tags_json}'. Помилка: {e}")  # i18n
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Некоректний формат JSON для тегів: {e}"  # i18n
-            )
+    logger.info(
+        f"Суперкористувач '{current_superuser.username}' запитує видалення налаштування '{setting_key}'.")  # i18n
 
-    # Оновлюємо об'єкт фільтрів з розпарсеними тегами
-    # Краще було б, якби PerformanceMetricQueryFiltersSchema мав поле tags: Optional[Dict[str,str]]
-    # і FastAPI автоматично парсив його, але це може бути складніше для query параметрів.
-    # Поки що передаємо окремо в сервіс.
-    # Або модифікувати filters об'єкт: filters.tags = parsed_tags_filter (якщо таке поле існує в схемі)
+    # Передаємо UserModel як deleting_user
+    deleted_count = await service.delete_setting(key=setting_key,
+                                                 deleting_user=current_superuser)  # Сервіс має повернути кількість видалених (0 або 1)
 
-    active_filters_dict = filters.model_dump(exclude_none=True)
-    log_message = (
-        f"Користувач '{current_superuser.username}' запитує список метрик продуктивності. "  # i18n
-        f"Фільтри: {active_filters_dict if active_filters_dict else 'немає'}. "  # i18n
-    )
-    if parsed_tags_filter:
-        log_message += f"Теги: {parsed_tags_filter}. "  # i18n
-    log_message += f"Пагінація: skip={skip}, limit={limit}."  # i18n
-    logger.info(log_message)
+    if deleted_count == 0:  # Якщо сервіс не зміг видалити (не знайдено)
+        logger.warning(
+            f"Налаштування '{setting_key}' не знайдено для видалення суперкористувачем '{current_superuser.username}'.")  # i18n
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Налаштування з ключем '{setting_key}' не знайдено."  # i18n
+        )
 
-    # Передаємо розпарсені теги в сервіс. Сервіс має очікувати `tags_filter: Optional[Dict[str, str]]`
-    performance_metrics = await service.get_performance_metrics(
-        filters=filters,  # Передаємо об'єкт фільтрів
-        tags_filter=parsed_tags_filter,  # Окремо передаємо теги
-        skip=skip,
-        limit=limit
-    )
-    # TODO: Додати обробку можливих помилок від сервісу
-    return performance_metrics
+    logger.info(
+        f"Налаштування '{setting_key}' успішно видалено суперкористувачем '{current_superuser.username}'.")  # i18n
+    # Для DELETE з 204 No Content відповідь має бути порожньою
+    return None
 
 
-logger.info("Маршрутизатор для ендпоінтів моніторингу API v1 (`monitoring.router`) визначено.")  # i18n
-# Примітка: назва файлу monitoring.py, лог повідомлення було monitoring_endpoints.router. Виправлено на monitoring.router.
+logger.info("Маршрутизатор для системних налаштувань API v1 (`settings.router`) визначено.")  # i18n

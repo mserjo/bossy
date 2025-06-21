@@ -15,9 +15,9 @@ from pydantic import Field
 # Абсолютний імпорт базових схем
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType # Імпортовано Enums
+from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType
 from datetime import timedelta # Переміщено timedelta сюди
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 # Enums NotificationChannelType та DeliveryStatusType імпортовано вище.

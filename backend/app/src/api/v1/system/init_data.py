@@ -17,17 +17,17 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field, ConfigDict
 
 # Залежності API та моделі користувача
-from backend.app.src.api.dependencies import get_current_active_superuser
-from backend.app.src.models.auth import User as UserModel  # Для типізації current_user
+from backend.app.src.api.dependencies import get_current_active_superuser, get_initial_data_service
+from backend.app.src.models.auth import User as UserModel
 
 # Сервіс ініціалізації
-from backend.app.src.services.system.initial_data_service import (
+from backend.app.src.services.system.initialization import (
     InitialDataService,
     InitializationResult as ServiceInitializationResult,  # Результат з сервісу
     InitializationStepDetail as ServiceStepDetail  # Деталі кроку з сервісу
 )
-# Логер з конфігурації
-from backend.app.src.config.logging import logger  # Використовуємо централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 
@@ -91,7 +91,7 @@ class FullInitializationResponse(BaseModel):
     }
 )
 async def trigger_system_data_initialization(
-        service: InitialDataService = Depends(),  # Впровадження залежності InitialDataService
+        service: InitialDataService = Depends(get_initial_data_service),  # Впровадження залежності InitialDataService
         current_user: UserModel = Depends(get_current_active_superuser)  # Для логування, хто запустив
 ) -> FullInitializationResponse:
     """

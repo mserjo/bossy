@@ -20,7 +20,7 @@ from pydantic import Field
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin, BaseMainSchema
 from backend.app.src.core.dicts import TaskStatus as TaskStatusEnum  # Для значень за замовчуванням та валідації
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 # TODO: Замінити Any на конкретні схеми, коли вони будуть доступні/рефакторені.

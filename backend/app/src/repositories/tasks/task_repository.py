@@ -8,11 +8,11 @@
 та підзавдань.
 """
 
-from typing import List, Optional, Tuple, Any, Sequence, Dict, TYPE_CHECKING # Added Sequence, Dict, TYPE_CHECKING
-from datetime import datetime # For type hints, removed 'import datetime as dt'
+from typing import List, Optional, Tuple, Any, Sequence, Dict, TYPE_CHECKING
+from datetime import datetime, timedelta # For type hints, removed 'import datetime as dt'
 from sqlalchemy.sql.expression import false, true  # For boolean comparisons
 
-from sqlalchemy import select, func, and_, or_, not_ # join видалено
+from sqlalchemy import select, func, and_, or_, not_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -156,10 +156,10 @@ class TaskRepository(BaseRepository[Task, TaskCreateSchema, TaskUpdateSchema]):
             selectinload(self.model.assignments).options(
                 selectinload(TaskAssignment.user)
             ),
-            selectinload(self.model.completions).options( # Виправлено тут
+            selectinload(self.model.completions).options(
                 selectinload(TaskCompletion.user).options(selectinload(UserModel.user_type))
             ),
-            selectinload(self.model.reviews).options( # Виправлено тут
+            selectinload(self.model.reviews).options(
                 selectinload(TaskReview.user).options(selectinload(UserModel.user_type))
             ),
             selectinload(self.model.bonus_rules)
@@ -276,7 +276,7 @@ class TaskRepository(BaseRepository[Task, TaskCreateSchema, TaskUpdateSchema]):
             return [], 0
 
     async def get_recurring_task_templates_due(
-            self, session: AsyncSession, current_time: datetime.datetime
+            self, session: AsyncSession, current_time: datetime
     ) -> Sequence[Task]:
         """
         Отримує шаблони повторюваних завдань, для яких настав час створення нового екземпляра.
@@ -316,18 +316,18 @@ class TaskRepository(BaseRepository[Task, TaskCreateSchema, TaskUpdateSchema]):
     async def get_tasks_needing_reminders(
             self,
             session: AsyncSession,
-            window_start: datetime.datetime,
-            window_end: datetime.datetime,
-            reminder_delta: datetime.timedelta
+            window_start: datetime,
+            window_end: datetime,
+            reminder_delta: timedelta
     ) -> Sequence[Task]:
         """
         Отримує завдання, для яких потрібно надіслати нагадування.
 
         Args:
             session (AsyncSession): Асинхронна сесія SQLAlchemy.
-            window_start (datetime.datetime): Початок вікна для перевірки due_date.
-            window_end (datetime.datetime): Кінець вікна для перевірки due_date.
-            reminder_delta (datetime.timedelta): Проміжок часу, раніше якого нагадування не надсилалося.
+            window_start (datetime): Початок вікна для перевірки due_date.
+            window_end (datetime): Кінець вікна для перевірки due_date.
+            reminder_delta (timedelta): Проміжок часу, раніше якого нагадування не надсилалося.
 
         Returns:
             Sequence[Task]: Послідовність завдань, що потребують нагадування.

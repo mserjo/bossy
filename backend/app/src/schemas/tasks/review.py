@@ -18,7 +18,7 @@ from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedS
 from backend.app.src.schemas.auth.user import UserPublicProfileSchema  # Для представлення користувача
 from datetime import timedelta
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 

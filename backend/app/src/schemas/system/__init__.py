@@ -38,7 +38,7 @@ from backend.app.src.schemas.system.settings import (
     SystemSettingBaseSchema,
     SystemSettingCreateSchema,
     SystemSettingUpdateSchema,
-    SystemSettingSchema,
+    SystemSettingResponseSchema as SystemSettingSchema,
 )
 
 # Схеми для Моніторингу (Логи та Метрики)

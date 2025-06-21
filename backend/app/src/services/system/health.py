@@ -9,19 +9,18 @@ from sqlalchemy import text
 from backend.app.src.services.base import BaseService
 from backend.app.src.repositories.system.health_repository import ServiceHealthStatusRepository # Імпорт репозиторію
 from backend.app.src.schemas.system.health import (
-    HealthCheckResponse,
-    ComponentHealth,
-    HealthStatusEnum
+    OverallHealthStatusSchema, # Імпортуємо напряму
+    ComponentHealth
 )
+from backend.app.src.core.dicts import HealthStatusType # Імпортуємо напряму з core.dicts
 # ServiceHealthStatusCreateSchema, ServiceHealthStatusUpdateSchema не потрібні сервісу напряму
-# from backend.app.src.core.dicts import HealthStatusType as CoreHealthStatusType # Якщо використовується з core.dicts
-from backend.app.src.config.redis import get_redis_pool_or_none
+from backend.app.src.config.redis import get_redis_client # Змінено імпорт
 from backend.app.src.config import settings
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 
-ComponentStatusType = HealthStatusEnum
+ComponentStatusType = HealthStatusType # Використовуємо імпортований HealthStatusType
 
 
 class HealthCheckService(BaseService):
@@ -33,12 +32,12 @@ class HealthCheckService(BaseService):
 
     def __init__(self, db_session: AsyncSession):
         super().__init__(db_session)
-        self.redis_pool = get_redis_pool_or_none()
         self.health_repo = ServiceHealthStatusRepository() # Ініціалізація репозиторію
-        if self.redis_pool:
-            logger.info("HealthCheckService: Клієнт Redis буде створено з пулу при потребі.")
+        self.is_redis_configured = bool(settings.USE_REDIS and settings.REDIS_URL)
+        if self.is_redis_configured:
+            logger.info("HealthCheckService: Redis налаштовано, буде перевірятися.")
         else:
-            logger.warning("HealthCheckService: Пул з'єднань Redis не налаштовано. Перевірка Redis буде недоступна.")
+            logger.warning("HealthCheckService: Redis не налаштовано або вимкнено. Перевірка Redis буде недоступна.")
         logger.info("HealthCheckService ініціалізовано.")
 
     async def _check_database_health(self) -> ComponentHealth:
@@ -48,7 +47,7 @@ class HealthCheckService(BaseService):
         """
         component_name = "database"
         start_time = time.perf_counter()
-        status: ComponentStatusType = HealthStatusEnum.HEALTHY
+        status: ComponentStatusType = HealthStatusType.HEALTHY
         message = "База даних успішно підключена та відповідає."
         details_dict: Dict[str, Any] = {} # Змінено ім'я, щоб не конфліктувати з параметром details в repo
 
@@ -58,7 +57,7 @@ class HealthCheckService(BaseService):
                 raise Exception("Запит перевірки стану бази даних не повернув 1.")
         except Exception as e:
             logger.error(f"Перевірка стану бази даних не вдалася: {e}", exc_info=settings.DEBUG)
-            status = HealthStatusEnum.UNHEALTHY
+            status = HealthStatusType.UNHEALTHY
             message = f"Помилка з'єднання з базою даних: {str(e)}"
 
         duration_ms = (time.perf_counter() - start_time) * 1000
@@ -69,7 +68,7 @@ class HealthCheckService(BaseService):
             session=self.db_session,
             service_name=component_name,
             status=status, # Передаємо Enum член
-            details=message if status == HealthStatusEnum.UNHEALTHY else None # Зберігаємо message як details при помилці
+            details=message if status == HealthStatusType.UNHEALTHY else None # Зберігаємо message як details при помилці
         )
         # Потрібен commit після update_or_create_status, якщо він сам не комітить.
         # Припускаємо, що коміт буде в perform_full_health_check або зовнішньому контексті.
@@ -91,11 +90,11 @@ class HealthCheckService(BaseService):
         start_time = time.perf_counter()
         details_dict: Dict[str, Any] = {}
 
-        if not self.redis_pool:
-            logger.info("Клієнт Redis не налаштований, пропуск перевірки стану Redis.")
-            status = HealthStatusEnum.DEGRADED
-            message = "Клієнт Redis не налаштований."
-            details_dict["reason"] = "Пул з'єднань Redis не доступний."
+        if not self.is_redis_configured:
+            logger.info("HealthCheckService: Redis не налаштовано або вимкнено, пропуск перевірки стану Redis.")
+            status = HealthStatusType.DEGRADED # Або UNKNOWN, якщо це краще відображає ситуацію
+            message = "Redis не налаштовано або вимкнено."
+            details_dict["reason"] = "USE_REDIS is False or REDIS_URL is not set."
             await self.health_repo.update_or_create_status(
                 session=self.db_session, service_name=component_name, status=status, details=message
             )
@@ -104,18 +103,21 @@ class HealthCheckService(BaseService):
                 timestamp=datetime.now(timezone.utc)
             )
 
-        status: ComponentStatusType = HealthStatusEnum.HEALTHY
+        status: ComponentStatusType = HealthStatusType.HEALTHY
         message = "З'єднання з Redis успішне, PING отримав відповідь."
-
+        redis_client = None
         try:
-            import redis.asyncio as aioredis
-            redis_client = aioredis.Redis(connection_pool=self.redis_pool)
+            redis_client = await get_redis_client() # Отримуємо клієнт тут
             if not await redis_client.ping():
                 raise Exception("Команда Redis PING не вдалася (повернула False).")
-            await redis_client.close()
+            # Не потрібно redis_client.close() тут, оскільки get_redis_client керує глобальним клієнтом
+        except ConnectionRefusedError: # Більш специфічна обробка помилки підключення
+            logger.error(f"Перевірка стану Redis: ConnectionRefusedError", exc_info=settings.DEBUG)
+            status = HealthStatusType.UNHEALTHY
+            message = "Помилка з'єднання з Redis: Connection refused."
         except Exception as e:
             logger.error(f"Перевірка стану Redis не вдалася: {e}", exc_info=settings.DEBUG)
-            status = HealthStatusEnum.UNHEALTHY
+            status = HealthStatusType.UNHEALTHY
             message = f"Помилка з'єднання з Redis: {str(e)}"
 
         duration_ms = (time.perf_counter() - start_time) * 1000
@@ -123,7 +125,7 @@ class HealthCheckService(BaseService):
 
         await self.health_repo.update_or_create_status(
             session=self.db_session, service_name=component_name, status=status,
-            details=message if status != HealthStatusEnum.HEALTHY else None
+            details=message if status != HealthStatusType.HEALTHY else None
         )
         # Потрібен commit після update_or_create_status
 
@@ -144,7 +146,7 @@ class HealthCheckService(BaseService):
         component_name = f"external_api:{api_name}"
         start_time = time.perf_counter()
         details_dict: Dict[str, Any] = {"url": api_url, "method": http_method}
-        status: ComponentStatusType = HealthStatusEnum.DEGRADED # За замовчуванням для заглушки
+        status: ComponentStatusType = HealthStatusType.DEGRADED # За замовчуванням для заглушки
         message = f"Перевірка API {api_name} не реалізована повністю (заглушка)."
 
         # Логіка перевірки (закоментовано)
@@ -168,7 +170,7 @@ class HealthCheckService(BaseService):
             timestamp=datetime.now(timezone.utc)
         )
 
-    async def perform_full_health_check(self) -> HealthCheckResponse:
+    async def perform_full_health_check(self) -> OverallHealthStatusSchema: # Змінено тип повернення
         """
         Виконує комплексну перевірку стану всіх критичних компонентів системи,
         зберігає їх статуси та агрегує загальний статус.
@@ -197,24 +199,24 @@ class HealthCheckService(BaseService):
             # Навіть якщо коміт не вдався, продовжуємо формувати відповідь з поточними даними
             # Можливо, варто додати спеціальний статус або повідомлення про помилку збереження.
 
-        overall_status: ComponentStatusType = HealthStatusEnum.HEALTHY
+        overall_status: ComponentStatusType = HealthStatusType.HEALTHY
         for component in components_health_list:
-            if component.status == HealthStatusEnum.UNHEALTHY:
-                overall_status = HealthStatusEnum.UNHEALTHY
+            if component.status == HealthStatusType.UNHEALTHY:
+                overall_status = HealthStatusType.UNHEALTHY
                 break
-            if component.status == HealthStatusEnum.DEGRADED and overall_status == HealthStatusEnum.HEALTHY:
-                overall_status = HealthStatusEnum.DEGRADED
+            if component.status == HealthStatusType.DEGRADED and overall_status == HealthStatusType.HEALTHY:
+                overall_status = HealthStatusType.DEGRADED
 
-        response = HealthCheckResponse(
+        response = OverallHealthStatusSchema( # Змінено на OverallHealthStatusSchema
             overall_status=overall_status,
             components=components_health_list,
-            system_timestamp=datetime.now(timezone.utc)
+            timestamp=datetime.now(timezone.utc) # Змінено system_timestamp на timestamp
         )
 
         # Використовуємо logger з backend.app.src.config.logging, який вже налаштований
         # Тому logging.INFO та logging.WARNING тут не потрібні.
         status_value = overall_status.value if hasattr(overall_status, 'value') else str(overall_status)
-        if overall_status == HealthStatusEnum.HEALTHY:
+        if overall_status == HealthStatusType.HEALTHY:
             logger.info(f"Повну перевірку стану системи завершено. Загальний статус: {status_value}")
         else:
             logger.warning(f"Повну перевірку стану системи завершено. Загальний статус: {status_value}")

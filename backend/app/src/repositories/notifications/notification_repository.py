@@ -23,7 +23,7 @@ from backend.app.src.schemas.notifications.notification import (
     NotificationCreateSchema,
     NotificationUpdateSchema  # Для позначки як прочитане
 )
-from backend.app.src.core.dicts import NotificationType # Імпортовано Enum
+from backend.app.src.core.dicts import NotificationType
 
 
 class NotificationRepository(BaseRepository[Notification, NotificationCreateSchema, NotificationUpdateSchema]):

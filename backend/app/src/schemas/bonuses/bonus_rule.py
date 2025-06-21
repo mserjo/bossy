@@ -17,7 +17,7 @@ from pydantic import Field
 # Абсолютний імпорт базових схем та міксинів
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.config.logging import get_logger # Новий імпорт логера
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 # Оскільки BonusRule модель успадковує NameDescriptionMixin, StateMixin, їх поля теж мають бути тут.

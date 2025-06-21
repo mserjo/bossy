@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession # Для потенційної 
 from backend.app.src.services.base import BaseService
 from backend.app.src.models.auth.user import User # Для контексту користувача (не використовується прямо тут, але в підкласах)
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 from pydantic import BaseModel, Field # Використовуємо Pydantic для структур даних

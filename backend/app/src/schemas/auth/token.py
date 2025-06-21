@@ -1,5 +1,5 @@
 # backend/app/src/schemas/auth/token.py
-from backend.app.src.core.i18n import _
+# -*- coding: utf-8 -*-
 """
 Pydantic схеми для JWT токенів.
 
@@ -12,6 +12,7 @@ from datetime import datetime, timedelta # Moved timedelta here
 from typing import Optional, List
 
 from pydantic import Field
+from backend.app.src.core.i18n import _
 
 # Абсолютний імпорт базової схеми
 from backend.app.src.schemas.base import BaseSchema
@@ -54,7 +55,7 @@ class TokenResponse(BaseSchema):
     token_type: str = Field("bearer", description="Тип токена (завжди 'bearer').")
 
 
-class RefreshTokenRequest(BaseSchema):
+class RefreshTokenRequestSchema(BaseSchema):
     """
     Схема запиту для оновлення токена доступу.
     Очікує надання дійсного токена оновлення.

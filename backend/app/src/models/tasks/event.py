@@ -63,7 +63,7 @@ class Event(BaseMainModel):
 
     # Зв'язок з групою (group_id успадковано від BaseMainModel через GroupAffiliationMixin)
     group: Mapped[Optional["Group"]] = relationship(
-        foreign_keys=[BaseMainModel.group_id], # Використовуємо успадкований group_id
+        foreign_keys=["Event.group_id"], # Використовуємо успадкований group_id, рядкове представлення
         lazy="selectin"
         # back_populates="events" # Потребуватиме додавання Mapped[List["Event"]] = relationship(back_populates="group") до моделі Group
     )

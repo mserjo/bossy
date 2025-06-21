@@ -20,7 +20,7 @@ from backend.app.src.schemas.files.upload import (
     FileUploadInitiateResponse,
     FileUploadCompleteRequest,
     FileUploadResponse,
-    FileDataUploadResponse  # Додано для відповіді на завантаження даних
+    FileDataUploadResponse
 )
 from backend.app.src.services.files.file_upload_service import FileUploadService
 from backend.app.src.config import settings as global_settings

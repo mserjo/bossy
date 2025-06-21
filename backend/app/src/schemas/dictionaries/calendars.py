@@ -21,7 +21,7 @@ from backend.app.src.schemas.dictionaries.base_dict import (
     DictionaryUpdateSchema
 )
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 

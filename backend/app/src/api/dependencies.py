@@ -326,5 +326,38 @@ async def get_messenger_platform_service(
 ) -> MessengerPlatformService:
     return MessengerPlatformService(db_session=db_session, cache_service=cache_service)
 
+# Додаємо залежність для SystemSettingService
+from backend.app.src.services.system.settings import SystemSettingService as SystemSettingsSvc # Використовуємо псевдонім, щоб уникнути конфлікту з модулем settings
+
+async def get_system_setting_service( # Перейменовано з get_system_settings_service для узгодженості
+    db_session: AsyncSession = Depends(get_api_db_session)
+) -> SystemSettingsSvc: # Використовуємо псевдонім
+    return SystemSettingsSvc(db_session=db_session)
+
+# Додаємо залежність для SystemMonitoringService
+from backend.app.src.services.system.monitoring import SystemMonitoringService # Імпортуємо сервіс моніторингу
+
+async def get_system_monitoring_service(
+    db_session: AsyncSession = Depends(get_api_db_session)
+) -> SystemMonitoringService:
+    return SystemMonitoringService(db_session=db_session)
+
+# Додаємо залежність для HealthCheckService
+from backend.app.src.services.system.health import HealthCheckService # Імпортуємо сервіс перевірки стану
+
+async def get_health_check_service(
+    db_session: AsyncSession = Depends(get_api_db_session)
+) -> HealthCheckService:
+    return HealthCheckService(db_session=db_session)
+
+# Додаємо залежність для InitialDataService
+from backend.app.src.services.system.initialization import InitialDataService # Імпортуємо сервіс ініціалізації
+
+async def get_initial_data_service(
+    db_session: AsyncSession = Depends(get_api_db_session)
+    # InitialDataService може не потребувати cache_service, уточнити при необхідності
+) -> InitialDataService:
+    return InitialDataService(db_session=db_session)
+
 
 logger.info(_("dependencies.log.module_loaded_and_configured"))

@@ -6,15 +6,15 @@ from backend.app.src.models.dictionaries.messengers import MessengerPlatform # �
 from backend.app.src.repositories.dictionaries.messenger_platform_repository import MessengerPlatformRepository # Імпорт репозиторію
 from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.messengers import ( # Схеми Pydantic
-    MessengerPlatformCreate,
-    MessengerPlatformUpdate,
-    MessengerPlatformResponse,
+    MessengerPlatformCreateSchema,
+    MessengerPlatformUpdateSchema,
+    MessengerPlatformResponseSchema,
 )
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 
-class MessengerPlatformService(BaseDictionaryService[MessengerPlatform, MessengerPlatformRepository, MessengerPlatformCreate, MessengerPlatformUpdate, MessengerPlatformResponse]):
+class MessengerPlatformService(BaseDictionaryService[MessengerPlatform, MessengerPlatformRepository, MessengerPlatformCreateSchema, MessengerPlatformUpdateSchema, MessengerPlatformResponseSchema]):
     """
     Сервіс для управління елементами довідника "Платформи Месенджерів".
     Ці елементи представляють різні платформи обміну повідомленнями, з якими система може інтегруватися

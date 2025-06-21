@@ -20,7 +20,8 @@ from backend.app.src.api.v1.notifications.notifications import router as user_no
 from backend.app.src.api.v1.notifications.templates import router as notification_templates_router
 from backend.app.src.api.v1.notifications.delivery import router as notification_delivery_router
 
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Створюємо агрегований роутер для всіх ендпоінтів, пов'язаних із системою сповіщень
 notifications_router = APIRouter()

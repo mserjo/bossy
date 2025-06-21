@@ -33,8 +33,9 @@ from backend.app.src.services.integrations.user_integration_credential_service i
     UserIntegrationCredentialService  # Для зберігання зв'язків
 from backend.app.src.services.dictionaries.messengers import \
     MessengerPlatformService  # Для отримання списку провайдерів
-from backend.app.src.config.logging import logger  # Централізований логер
 from backend.app.src.config import settings as global_settings
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter()
 

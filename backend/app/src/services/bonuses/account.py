@@ -29,7 +29,7 @@ from backend.app.src.schemas.bonuses.account import (  # Pydantic Схеми
 )
 from backend.app.src.schemas.bonuses.transaction import AccountTransactionResponse
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 from backend.app.src.config import settings  # Для доступу до конфігурацій
 from backend.app.src.core.exceptions import InsufficientFundsError # Імпорт перенесеного винятку

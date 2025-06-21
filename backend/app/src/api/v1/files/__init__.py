@@ -20,7 +20,8 @@ from backend.app.src.api.v1.files.uploads import router as uploads_router
 from backend.app.src.api.v1.files.avatars import router as avatars_router
 from backend.app.src.api.v1.files.files import router as general_files_router
 
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Створюємо агрегований роутер для всіх ендпоінтів, пов'язаних з файлами
 files_router = APIRouter()

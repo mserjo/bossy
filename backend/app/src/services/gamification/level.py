@@ -5,7 +5,7 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, or_
 from sqlalchemy.orm import selectinload
-from sqlalchemy.exc import IntegrityError # Додано для обробки помилок
+from sqlalchemy.exc import IntegrityError
 
 from backend.app.src.services.base import BaseService # Змінено на BaseService
 from backend.app.src.models.gamification.level import Level  # Модель SQLAlchemy Level
@@ -20,7 +20,7 @@ from backend.app.src.schemas.gamification.level import (  # Схеми Pydantic
 )
 from backend.app.src.config import settings  # Для доступу до конфігурацій (наприклад, DEBUG)
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 

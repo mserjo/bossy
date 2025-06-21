@@ -6,15 +6,15 @@ from backend.app.src.models.dictionaries.calendars import CalendarProvider # М�
 from backend.app.src.repositories.dictionaries.calendar_provider_repository import CalendarProviderRepository # Імпорт репозиторію
 from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.calendars import ( # Схеми Pydantic
-    CalendarProviderCreate,
-    CalendarProviderUpdate,
-    CalendarProviderResponse,
+    CalendarProviderCreateSchema,
+    CalendarProviderUpdateSchema,
+    CalendarProviderResponseSchema,
 )
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 
-class CalendarProviderService(BaseDictionaryService[CalendarProvider, CalendarProviderRepository, CalendarProviderCreate, CalendarProviderUpdate, CalendarProviderResponse]):
+class CalendarProviderService(BaseDictionaryService[CalendarProvider, CalendarProviderRepository, CalendarProviderCreateSchema, CalendarProviderUpdateSchema, CalendarProviderResponseSchema]):
     """
     Сервіс для управління елементами довідника "Постачальники Календарів".
     Ці елементи представляють різні платформи календарів, з якими система може інтегруватися

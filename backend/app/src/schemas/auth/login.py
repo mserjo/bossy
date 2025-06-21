@@ -1,5 +1,5 @@
 # backend/app/src/schemas/auth/login.py
-from backend.app.src.core.i18n import _
+# -*- coding: utf-8 -*-
 """
 Pydantic схеми для процесів, пов'язаних з логіном та відновленням паролю.
 
@@ -10,6 +10,7 @@ Pydantic схеми для процесів, пов'язаних з логіно
 """
 
 from pydantic import BaseModel, Field, EmailStr
+from backend.app.src.core.i18n import _
 
 # Абсолютний імпорт базової схеми
 from backend.app.src.schemas.base import BaseSchema

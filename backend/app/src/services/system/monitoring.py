@@ -15,16 +15,17 @@ from sqlalchemy.future import select
 from sqlalchemy import func
 
 # --- Імпорт компонентів додатку ---
-from backend.app.src.services.base_service import BaseService  # Оновлений шлях до BaseService
-from backend.app.src.models.system.monitoring_models import SystemLog, PerformanceMetric  # Оновлений шлях
-from backend.app.src.schemas.system.monitoring_schemas import (  # Оновлений шлях
+from backend.app.src.services.base import BaseService  # Оновлений шлях до BaseService
+from backend.app.src.models.system.monitoring import SystemLog, PerformanceMetric  # Оновлений шлях
+from backend.app.src.schemas.system.monitoring import (  # Оновлений шлях
     SystemLogCreateSchema,
     SystemLogResponseSchema,
     PerformanceMetricCreateSchema,
     PerformanceMetricResponseSchema,
     SystemMonitoringSummaryResponseSchema  # Оновлено назву для відповідності
 )
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 
 # Базова функція-заглушка для інтернаціоналізації рядків

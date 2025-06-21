@@ -29,7 +29,7 @@ from backend.app.src.schemas.bonuses.bonus_rule import (
     BonusRuleResponse
 )
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 from backend.app.src.config import settings
 

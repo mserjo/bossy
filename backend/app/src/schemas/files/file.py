@@ -16,7 +16,7 @@ from pydantic import Field, AnyHttpUrl, field_validator
 from backend.app.src.schemas.base import BaseSchema, IDSchemaMixin, TimestampedSchemaMixin
 from backend.app.src.core.dicts import FileType # Змінено імпорт FileTypeEnum на FileType
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 # TODO: Замінити Any на UserPublicProfileSchema, коли вона буде доступна/рефакторена.

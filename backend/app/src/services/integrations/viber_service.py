@@ -15,7 +15,7 @@ from backend.app.src.services.integrations.messenger_base import (
 from backend.app.src.models.integrations.user_integration import UserIntegration  # Припустима модель для зберігання Viber User ID
 from backend.app.src.config.settings import settings  # Для Viber Auth Token
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 # TODO: Додати залежність: pip install viberbot (або viber-bot-python) або httpx

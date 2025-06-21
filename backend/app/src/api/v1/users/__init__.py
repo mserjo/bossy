@@ -15,7 +15,8 @@ from fastapi import APIRouter
 # Оновлений повний шлях імпорту для під-роутера
 from backend.app.src.api.v1.users.users import router as crud_users_router # Роутер з CRUD операціями для користувачів
 
-from backend.app.src.config.logging import logger # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 # Створюємо агрегований роутер для всіх ендпоінтів керування користувачами
 users_router = APIRouter()

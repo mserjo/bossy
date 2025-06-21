@@ -21,7 +21,8 @@ from backend.app.src.schemas.dictionaries.bonus_types import BonusTypeCreate, Bo
 from backend.app.src.services.dictionaries.bonus_types import BonusTypeService
 from backend.app.src.core.pagination import PagedResponse, PageParams  # Для пагінації
 from backend.app.src.api.dependencies import paginator  # Залежність для пагінації
-from backend.app.src.config.logging import logger  # Централізований логер
+from backend.app.src.config.logging import get_logger
+logger = get_logger(__name__)
 
 router = APIRouter(
     # Префікс буде /bonus-types з __init__.py батьківського роутера

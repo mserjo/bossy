@@ -1,71 +1,119 @@
-# backend/app/src/services/dictionaries/messengers.py
-from sqlalchemy.ext.asyncio import AsyncSession
+# backend/app/src/models/dictionaries/messengers.py
+# -*- coding: utf-8 -*-
+"""
+Модель SQLAlchemy для довідника "Месенджери" (платформи обміну повідомленнями).
+Цей модуль визначає модель `MessengerPlatform`, яка представляє записи
+в довіднику платформ месенджерів, з якими система може інтегруватися
+для надсилання сповіщень (наприклад, Telegram, Viber, Slack).
+"""
 
-from backend.app.src.services.dictionaries.base_dict import BaseDictionaryService
-from backend.app.src.models.dictionaries.messengers import MessengerPlatform # Модель SQLAlchemy
-from backend.app.src.repositories.dictionaries.messenger_platform_repository import MessengerPlatformRepository # Імпорт репозиторію
-from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
-from backend.app.src.schemas.dictionaries.messengers import ( # Схеми Pydantic
-    MessengerPlatformCreateSchema, # Виправлено
-    MessengerPlatformUpdateSchema, # Виправлено
-    MessengerPlatformResponseSchema, # Виправлено
-)
+# Абсолютний імпорт базової моделі для довідників
+from backend.app.src.models.dictionaries.base_dict import BaseDictionary
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)
 
 
-class MessengerPlatformService(BaseDictionaryService[MessengerPlatform, MessengerPlatformRepository, MessengerPlatformCreateSchema, MessengerPlatformUpdateSchema, MessengerPlatformResponseSchema]):
-    """
-    Сервіс для управління елементами довідника "Платформи Месенджерів".
-    Ці елементи представляють різні платформи обміну повідомленнями, з якими система може інтегруватися
-    для надсилання сповіщень (наприклад, Telegram, Slack, Email).
-    Успадковує загальні CRUD-операції від BaseDictionaryService.
-    Кожна платформа може мати позначку `is_active_for_notifications`, що вказує, чи доступна
-    вона для надсилання сповіщень в системі.
-    """
+# Можливо, знадобляться додаткові імпорти, якщо будуть специфічні поля.
+# from sqlalchemy.orm import Mapped, mapped_column
+# from sqlalchemy import String
 
-    def __init__(self, db_session: AsyncSession, cache_service: BaseCacheService):
-        """
-        Ініціалізує сервіс MessengerPlatformService.
+class MessengerPlatform(BaseDictionary):
+    """
+    Модель SQLAlchemy для довідника "Платформи месенджерів".
 
-        :param db_session: Асинхронна сесія бази даних SQLAlchemy.
-        :param cache_service: Екземпляр сервісу кешування.
+    Успадковує всі поля від `BaseDictionary` (включаючи `id`, `name`, `description`, `code`,
+    часові мітки, м'яке видалення, стан, нотатки та опціональний `group_id`).
+    `group_id` для цього типу довідника, ймовірно, буде NULL, оскільки це системний довідник.
+
+    Атрибути:
+        __tablename__ (str): Назва таблиці в базі даних (`dict_messenger_platforms`).
         """
-        messenger_platform_repo = MessengerPlatformRepository(model=MessengerPlatform)
-        super().__init__(
-            db_session,
-            repository=messenger_platform_repo,
-            cache_service=cache_service,
-            response_schema=MessengerPlatformResponseSchema # Виправлено
+    __tablename__ = "dict_messenger_platforms"
+
+    # Якщо для платформ месенджерів потрібні специфічні додаткові поля,
+    # наприклад, деталі конфігурації API (які можуть бути зашифровані або зберігатися окремо),
+    # їх можна визначити тут або в пов'язаній моделі налаштувань інтеграції.
+    # Наприклад:
+    # webhook_url_template: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, comment="Шаблон URL для вебхука (якщо застосовно)")
+    # supports_buttons: Mapped[bool] = mapped_column(Boolean, default=False, comment="Чи підтримує платформа інтерактивні кнопки")
+
+    # _repr_fields успадковуються та збираються автоматично з BaseDictionary.
+    # Немає додаткових специфічних полів для __repr__ на цьому рівні.
+    _repr_fields: tuple[str, ...] = ()
+
+
+if __name__ == "__main__":
+    # Демонстраційний блок для моделі MessengerPlatform.
+    logger.info("--- Модель Довідника: MessengerPlatform ---")
+    logger.info(f"Назва таблиці: {MessengerPlatform.__tablename__}")
+
+    logger.info("\nОчікувані поля (успадковані та власні):")
+    expected_fields = ['id', 'name', 'description', 'code', 'created_at', 'updated_at', 'deleted_at', 'state',
+                       'group_id', 'notes']
+    # Якщо додано кастомні поля:
+    # expected_fields.extend(['webhook_url_template', 'supports_buttons'])
+    for field in expected_fields:
+        logger.info(f"  - {field}")
+        # Приклад створення екземпляра (без взаємодії з БД)
+        example_messenger = MessengerPlatform(
+            id=1,
+            name="Telegram",
+            description="Платформа обміну повідомленнями Telegram для надсилання сповіщень.",
+            code="TELEGRAM",
+            state="active"
         )
-        # _model_name ініціалізується в BaseDictionaryService з repository.model.__name__
-        logger.info(f"MessengerPlatformService ініціалізовано для моделі: {self._model_name}")
+        from backend.app.src.config.logging import get_logger
+        logger = get_logger(__name__)
 
-    # --- Кастомні методи для MessengerPlatformService (якщо потрібні) ---
-    # Наприклад, методи для отримання нечутливих деталей конфігурації платформи.
-    # Важливо: Чутливі дані, такі як токени API, ключі тощо, повинні зберігатися
-    # безпечно в конфігурації системи (наприклад, settings.py або змінні середовища),
-    # а не в цьому довіднику в базі даних.
-    #
-    # async def get_platform_public_details(self, platform_code: str) -> Optional[Dict[str, Any]]:
-    #     """
-    #     Отримує загальнодоступні деталі або нечутливу конфігурацію для платформи месенджера.
-    #     Припускає наявність поля 'public_config_details' (наприклад, JSONB) в моделі MessengerPlatform.
-    #
-    #     :param platform_code: Код платформи.
-    #     :return: Словник з деталями або None.
-    #     """
-    #     platform = await self.get_by_code(platform_code)
-    #     if platform and hasattr(platform, 'public_config_details'):
-    #         # Якщо public_config_details - це рядок JSON в БД, може знадобитися json.loads().
-    #         # Якщо модель Pydantic вже обробляє це поле як Dict, перетворення не потрібне.
-    #         config_details = getattr(platform, 'public_config_details', {})
-    #         logger.debug(f"Отримано публічні деталі для платформи '{platform_code}': {config_details}")
-    #         return config_details # type: ignore
-    #     logger.debug(f"Публічні деталі для платформи '{platform_code}' не знайдено.")
-    #     return None
-    #
-    # Примітка: Поля 'code', 'name', 'description', 'is_active_for_notifications' обробляються базовим сервісом,
-    # якщо вони присутні в відповідних Pydantic схемах (Create, Update).
+        # Можливо, знадобляться додаткові імпорти, якщо будуть специфічні поля.
+        # from sqlalchemy.orm import Mapped, mapped_column
+        # from sqlalchemy import String
 
-logger.debug(f"{MessengerPlatformService.__name__} (сервіс платформ месенджерів) успішно визначено.")
+        class MessengerPlatform(BaseDictionary):
+            """
+            Модель SQLAlchemy для довідника "Платформи месенджерів".
+
+            Успадковує всі поля від `BaseDictionary` (включаючи `id`, `name`, `description`, `code`,
+            часові мітки, м'яке видалення, стан, нотатки та опціональний `group_id`).
+            `group_id` для цього типу довідника, ймовірно, буде NULL, оскільки це системний довідник.
+
+            Атрибути:
+                __tablename__ (str): Назва таблиці в базі даних (`dict_messenger_platforms`).
+            """
+            __tablename__ = "dict_messenger_platforms"
+
+            # Якщо для платформ месенджерів потрібні специфічні додаткові поля,
+            # наприклад, деталі конфігурації API (які можуть бути зашифровані або зберігатися окремо),
+            # їх можна визначити тут або в пов'язаній моделі налаштувань інтеграції.
+            # Наприклад:
+            # webhook_url_template: Mapped[Optional[str]] = mapped_column(String(512), nullable=True, comment="Шаблон URL для вебхука (якщо застосовно)")
+            # supports_buttons: Mapped[bool] = mapped_column(Boolean, default=False, comment="Чи підтримує платформа інтерактивні кнопки")
+
+            # _repr_fields успадковуються та збираються автоматично з BaseDictionary.
+            # Немає додаткових специфічних полів для __repr__ на цьому рівні.
+            _repr_fields: tuple[str, ...] = ()
+
+
+        if __name__ == "__main__":
+            # Демонстраційний блок для моделі MessengerPlatform.
+            logger.info("--- Модель Довідника: MessengerPlatform ---")
+            logger.info(f"Назва таблиці: {MessengerPlatform.__tablename__}")
+            logger.info("\nОчікувані поля (успадковані та власні):")
+            expected_fields = ['id', 'name', 'description', 'code', 'created_at', 'updated_at', 'deleted_at', 'state',
+                               'group_id', 'notes']
+            # Якщо додано кастомні поля:
+            # expected_fields.extend(['webhook_url_template', 'supports_buttons'])
+            for field in expected_fields:
+                logger.info(f"  - {field}")
+                # Приклад створення екземпляра (без взаємодії з БД)
+                example_messenger = MessengerPlatform(
+                    id=1,
+                    name="Telegram",
+                    description="Платформа обміну повідомленнями Telegram для надсилання сповіщень.",
+                    code="TELEGRAM",
+                    state="active"
+                )
+                logger.info(f"\nПриклад екземпляра MessengerPlatform (без сесії):\n  {example_messenger}")
+                # Очікуваний __repr__ (порядок може відрізнятися):
+                # <MessengerPlatform(id=1, name='Telegram', code='TELEGRAM', state='active')>
+    logger.info("\nПримітка: Для повноцінної роботи з моделлю потрібна сесія SQLAlchemy та підключення до БД.")

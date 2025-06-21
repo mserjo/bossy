@@ -35,10 +35,10 @@ from backend.app.src.schemas.files.avatar import (
 
 # Схеми, пов'язані з Процесом Завантаження Файлів (згідно з завданням)
 from backend.app.src.schemas.files.upload import (
-    PresignedUrlRequestSchema,  # Змінено з FileUploadInitiateRequestSchema
-    PresignedUrlResponseSchema, # Змінено з PresignedUploadURLResponse
-    FileUploadCompleteRequestSchema, # Розкоментовано та додано
-    FileUploadResponseSchema    # Змінено з FileUploadResponse
+    PresignedUrlRequestSchema,
+    PresignedUrlResponseSchema,
+    FileUploadCompleteRequestSchema,
+    FileUploadResponseSchema
 )
 
 __all__ = [
@@ -55,7 +55,7 @@ __all__ = [
     # FileUpload process schemas
     "PresignedUrlRequestSchema",
     "PresignedUrlResponseSchema",
-    "FileUploadCompleteRequestSchema", # Розкоментовано та додано
+    "FileUploadCompleteRequestSchema",
     "FileUploadResponseSchema",
 ]
 

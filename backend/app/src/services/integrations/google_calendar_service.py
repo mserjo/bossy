@@ -14,7 +14,7 @@ from backend.app.src.services.integrations.calendar_base import (
 from backend.app.src.models.integrations.user_integration import UserIntegration  # Припустима модель для зберігання токенів
 from backend.app.src.config.settings import settings  # Для ключів API Google, OAuth client ID/secret
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 # TODO: Додати залежності для Google API: pip install google-api-python-client google-auth-httplib2 google-auth-oauthlib

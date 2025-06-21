@@ -14,7 +14,7 @@ from backend.app.src.services.integrations.calendar_base import (
 from backend.app.src.models.integrations.user_integration import UserIntegration  # Припустима модель для зберігання токенів
 from backend.app.src.config.settings import settings  # Для Microsoft App ID, Secret, Redirect URI, Scopes
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.i18n import _ # Added import
+from backend.app.src.core.i18n import _
 logger = get_logger(__name__)
 
 # TODO: Додати залежності для Microsoft Graph API, наприклад: pip install msgraph-sdk httpx-oauth

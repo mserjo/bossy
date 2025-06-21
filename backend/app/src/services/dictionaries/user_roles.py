@@ -6,9 +6,9 @@ from backend.app.src.models.dictionaries.user_roles import UserRole # Модел
 from backend.app.src.repositories.dictionaries.user_role_repository import UserRoleRepository # Імпорт репозиторію
 from backend.app.src.services.cache.base_cache import BaseCacheService # Імпорт базового сервісу кешування
 from backend.app.src.schemas.dictionaries.user_roles import ( # Схеми Pydantic
-    UserRoleCreateSchema, # Виправлено
-    UserRoleUpdateSchema, # Виправлено
-    UserRoleResponseSchema, # Виправлено
+    UserRoleCreateSchema,
+    UserRoleUpdateSchema,
+    UserRoleResponseSchema,
 )
 from backend.app.src.config.logging import get_logger
 logger = get_logger(__name__)

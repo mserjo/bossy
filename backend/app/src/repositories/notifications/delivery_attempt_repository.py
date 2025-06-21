@@ -7,7 +7,7 @@
 """
 
 from typing import List, Optional, Tuple, Any
-
+from datetime import datetime
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -19,7 +19,7 @@ from backend.app.src.schemas.notifications.delivery import NotificationDeliveryA
 # NotificationDeliveryAttemptUpdateSchema зазвичай не потрібна
 from pydantic import BaseModel as PydanticBaseModel  # Для "заглушки" UpdateSchema
 from backend.app.src.config.logging import get_logger
-from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType # Імпортовано Enums
+from backend.app.src.core.dicts import NotificationChannelType, DeliveryStatusType
 logger = get_logger(__name__)
 
 # Enums NotificationChannelType та DeliveryStatusType імпортовано вище.

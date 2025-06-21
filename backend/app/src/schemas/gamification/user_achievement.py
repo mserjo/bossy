@@ -5,7 +5,7 @@ Pydantic схеми для сутності "Досягнення Користу
 Цей модуль визначає схеми для:
 - Базового представлення запису про досягнення (`UserAchievementBaseSchema`).
 - Створення нового запису про досягнення (зазвичай виконується сервісом) (`UserAchievementCreateSchema`).
-- Представлення даних про досягнення у відповідях API (`UserAchievementResponseSchema`).
+- Представлення даних про досягнення у відповідях API (`UserAchievementSchema`).
 """
 from datetime import datetime
 from typing import Optional, Any
@@ -43,7 +43,7 @@ class UserAchievementCreateSchema(UserAchievementBaseSchema):
     pass
 
 
-class UserAchievementResponseSchema(UserAchievementBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
+class UserAchievementSchema(UserAchievementBaseSchema, IDSchemaMixin, TimestampedSchemaMixin):
     """
     Схема для представлення даних про досягнення користувача у відповідях API.
     Поле `created_at` (з `TimestampedSchemaMixin`) позначає час отримання досягнення.
@@ -70,7 +70,7 @@ if __name__ == "__main__":
     create_ua_instance = UserAchievementCreateSchema(**create_ua_data)
     logger.info(create_ua_instance.model_dump_json(indent=2))
 
-    logger.info("\nUserAchievementResponseSchema (приклад відповіді API):")
+    logger.info("\nUserAchievementSchema (приклад відповіді API):")
     ua_response_data = {
         "id": 1,
         "user_id": 101,
@@ -82,7 +82,7 @@ if __name__ == "__main__":
         # "badge": {"id": 22, "name": "Супер Бейдж"},
         # "group": {"id": 1, "name": "Група Досягнень"}
     }
-    ua_response_instance = UserAchievementResponseSchema(**ua_response_data)
+    ua_response_instance = UserAchievementSchema(**ua_response_data)
     logger.info(ua_response_instance.model_dump_json(indent=2, exclude_none=True))
 
     logger.info("\nПримітка: Схеми для пов'язаних об'єктів наразі є заповнювачами (Any).")

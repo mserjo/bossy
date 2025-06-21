@@ -19,8 +19,8 @@ from backend.app.src.schemas.groups.group import (
     GroupBaseSchema,
     GroupCreateSchema,
     GroupUpdateSchema,
-    GroupSchema,  # Використовуємо фактичну назву
-    GroupDetailSchema # Додано деталізовану схему
+    GroupSchema,
+    GroupDetailSchema
 )
 
 # Схеми, пов'язані з Членством в Групі
@@ -44,8 +44,8 @@ from backend.app.src.schemas.groups.invitation import (
     GroupInvitationBaseSchema,
     GroupInvitationCreateSchema,
     GroupInvitationUpdateSchema,
-    GroupInvitationSchema, # Використовуємо фактичну назву
-    GroupInvitationAcceptSchema # Додано схему прийняття запрошення
+    GroupInvitationSchema,
+    GroupInvitationAcceptSchema
 )
 
 __all__ = [

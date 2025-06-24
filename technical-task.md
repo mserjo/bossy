@@ -5,8 +5,8 @@
 Запасні варіанти: Kudos/Meritum/Incentive/Laudis/Virtus (або запропонуй свій варіант, можливо на латині).
 
 Основні технології (можеш додати ще необхідні бібліотеки та технології):
-backend: Python 3.13, FastAPI, PostgreSQL v16, Pydantic v2, SQLAlchemy v2, pytest + httpx + asyncio, alembic, fastapi-limiter, fastapi-users/python-jose/passlib, Celery Beat, loguru - або кращі альтернативи
-frontend: Flutter, dio, flutter_test, flutter_translate, flutter_local_notifications, bloc, freezed, flutter_launcher_icons, flutter_native_splash, flutter_secure_storage - або кращі альтернативи
+backend: Python 3.13, FastAPI, PostgreSQL v16, asyncpg, Pydantic v2, SQLAlchemy v2, pytest + httpx + asyncio, alembic, uvloop, fastapi-limiter (або slowapi), fastapi-users/python-jose/passlib, Celery Beat, loguru - або кращі альтернативи
+frontend: Flutter, dio, flutter_test, flutter_translate, flutter_local_notifications, flutter_riverpod, freezed, flutter_launcher_icons, flutter_native_splash, flutter_secure_storage, workmanager - або кращі альтернативи
 CI/CD: Jenkins/GitHub Actions
 
 Вимоги до системи:
@@ -16,7 +16,7 @@ CI/CD: Jenkins/GitHub Actions
 - GraphQL API
 - Нотифікації - внутрішні в додатку
 - Логування backend (logger) та frontend
-- Використання docker та docker-compose
+- Використання docker та docker-compose (multi-stage builds, healthcheck, Alpine)
 - Підтримка різних мов (одразу переклади для англійської, української) і UI, і контент, і помилки, і сповіщення (JSON)
 - Різні теми оформлення frontend
 - backend - Індекси для поліпшення продуктивності

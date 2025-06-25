@@ -41,12 +41,12 @@ class AccountSchema(AuditDatesSchema): # Успадковує id, created_at, up
     bonus_type_code: str = Field(..., description="Код типу бонусів для цього рахунку (з довідника BonusTypeModel.code)")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    user: Optional[UserPublicSchema] = None
-    group: Optional[GroupSimpleSchema] = None
-    # bonus_type: Optional[BonusTypeSchema] = None # Розгорнута інформація про тип бонусу
+    user: Optional[UserPublicSchema] = Field(None, description="Власник рахунку")
+    group: Optional[GroupSimpleSchema] = Field(None, description="Група, до якої належить рахунок")
+    bonus_type: Optional[BonusTypeSchema] = Field(None, description="Деталі типу бонусу для цього рахунку")
 
     # Список транзакцій зазвичай не включається сюди повністю, а отримується окремим запитом з пагінацією.
-    # transactions: List[TransactionSchema] = Field(default_factory=list)
+    transactions: List[TransactionSchema] = Field(default_factory=list, description="Історія транзакцій по рахунку (може бути обмежена або винесена)")
 
 
 # --- Схема для створення рахунку (зазвичай виконується сервісом автоматично) ---

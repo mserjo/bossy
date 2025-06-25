@@ -71,11 +71,11 @@ class SystemEventLogCreateSchema(BaseSchema):
     @field_validator('level')
     @classmethod
     def level_must_be_known(cls, value: str) -> str:
-        # TODO: Визначити список дозволених рівнів логування (можливо, з Enum)
         known_levels = ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'AUDIT']
-        if value.upper() not in known_levels:
-            raise ValueError(f"Невідомий рівень логування: {value}. Дозволені: {', '.join(known_levels)}")
-        return value.upper()
+        val_upper = value.upper()
+        if val_upper not in known_levels:
+            raise ValueError(f"Невідомий рівень логування: '{value}'. Дозволені: {', '.join(known_levels)}.")
+        return val_upper
 
     # @field_validator('ip_address')
     # @classmethod

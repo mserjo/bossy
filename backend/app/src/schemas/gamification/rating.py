@@ -42,8 +42,8 @@ class RatingSchema(AuditDatesSchema): # Успадковує id, created_at, upd
 
 
     # --- Розгорнуті зв'язки (приклад) ---
-    user: Optional[UserPublicSchema] = None
-    group: Optional[GroupSimpleSchema] = None
+    user: Optional[UserPublicSchema] = Field(None, description="Користувач, до якого відноситься рейтинг")
+    group: Optional[GroupSimpleSchema] = Field(None, description="Група, в якій розраховано рейтинг")
 
 
 # --- Схема для створення запису рейтингу (зазвичай внутрішнє використання системою) ---

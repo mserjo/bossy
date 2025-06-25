@@ -35,9 +35,9 @@ class TaskReviewSchema(AuditDatesSchema): # Успадковує id, created_at,
     # status_id: Optional[uuid.UUID] = Field(None, description="ID статусу відгуку (якщо є модерація)")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # task: Optional[TaskSimpleSchema] = None
-    user: Optional[UserPublicSchema] = None
-    # status: Optional[StatusSchema] = None # Якщо є модерація
+    task: Optional[TaskSimpleSchema] = Field(None, description="Завдання, до якого залишено відгук")
+    user: Optional[UserPublicSchema] = Field(None, description="Користувач, який залишив відгук")
+    # status: Optional[StatusSchema] = None # Якщо є модерація відгуків
 
 
 # --- Схема для створення нового відгуку на завдання ---

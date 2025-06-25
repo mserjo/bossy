@@ -42,13 +42,13 @@ class RewardSchema(BaseMainSchema):
     # icon_url: Optional[HttpUrl] = Field(None, description="URL іконки нагороди") # Може генеруватися
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # group: Optional[GroupSimpleSchema] = None # `group_id` вже є
-    # state: Optional[StatusSchema] = None # `state_id` вже є
-    # icon: Optional[FileSchema] = None # Або `icon_url`
-    # bonus_type: Optional[BonusTypeSchema] = None # Розгорнута інформація про тип бонусу вартості
+    # group: Optional[GroupSimpleSchema] = Field(None, description="Група, якій належить нагорода") # `group_id` вже є
+    state: Optional[ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')] = Field(None, description="Статус нагороди")
+    icon: Optional[ForwardRef('backend.app.src.schemas.files.file.FileSchema')] = Field(None, description="Файл іконки нагороди") # Або `icon_url`
+    bonus_type: Optional[BonusTypeSchema] = Field(None, description="Тип бонусу, в якому вказана вартість")
 
-    # Статистика покупок (обчислювані поля, якщо потрібні)
-    # total_purchased_count: Optional[int] = Field(None, description="Загальна кількість куплених екземплярів цієї нагороди")
+    # Статистика покупок (обчислювані поля, додаються сервісом)
+    total_purchased_count: Optional[int] = Field(None, description="Загальна кількість куплених екземплярів цієї нагороди")
 
 
 # --- Схема для створення нової нагороди ---

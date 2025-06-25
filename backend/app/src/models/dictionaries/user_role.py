@@ -50,13 +50,24 @@ class UserRoleModel(BaseDictModel):
     # Поки що робимо `code` унікальним глобально.
     __table_args__ = (
         UniqueConstraint('code', name='uq_user_roles_code'),
+        # Ролі зазвичай глобальні, тому group_id тут не використовується для унікальності.
+        # Якщо б були кастомні ролі на рівні групи, то:
+        # UniqueConstraint('group_id', 'code', name='uq_user_roles_group_code', postgresql_where=(Column('group_id').isnot(None))),
+        # UniqueConstraint('code', name='uq_user_roles_global_code', postgresql_where=(Column('group_id').is_(None))),
     )
 
-    # TODO: Визначити зв'язки з іншими моделями.
-    # Наприклад, якщо модель UserMembershipModel (зв'язок користувач-група-роль)
-    # посилається на UserRoleModel:
-    # user_memberships = relationship("UserMembershipModel", back_populates="role")
-    # Це дозволить отримати всіх користувачів з певною роллю (опосередковано через таблицю зв'язку).
+    # --- Зворотні зв'язки (Relationships) ---
+    # Зв'язок з GroupMembershipModel (роль користувача в групі)
+    # TODO: Узгодити back_populates="role" з GroupMembershipModel
+    group_memberships_with_this_role = relationship("GroupMembershipModel", back_populates="role", foreign_keys="[GroupMembershipModel.user_role_id]")
+
+    # Зв'язок з GroupInvitationModel (роль, що призначається при запрошенні)
+    # TODO: Узгодити back_populates="role_to_assign" з GroupInvitationModel
+    group_invitations_assigning_this_role = relationship("GroupInvitationModel", back_populates="role_to_assign", foreign_keys="[GroupInvitationModel.role_to_assign_id]")
+
+    # Якщо UserModel матиме поле default_role_id або щось подібне для глобальної ролі користувача
+    # (окрім user_type_code, який посилається на інший довідник або Enum):
+    # users_with_this_as_default_role = relationship("UserModel", back_populates="default_role", foreign_keys="[UserModel.default_role_id]")
 
     # TODO: Розглянути можливість додавання поля `permissions` (наприклад, JSON або зв'язок
     # з окремою таблицею дозволів), якщо система дозволів буде базуватися безпосередньо на ролях.

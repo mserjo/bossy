@@ -92,11 +92,35 @@ def slugify_string(text: str, separator: str = "-") -> str:
     Можна використовувати бібліотеку `python-slugify`.
     """
     # Дуже проста реалізація, потребує покращення.
+    # Для більш надійної реалізації, особливо з Unicode, розгляньте python-slugify.
     import re
-    text = text.lower()
+    text = str(text).strip().lower() # Переконуємося, що це рядок, прибираємо зайві пробіли
     text = re.sub(r'[^\w\s-]', '', text) # Видаляємо не-алфавітно-цифрові (крім пробілів та дефісів)
-    text = re.sub(r'[\s-]+', separator, text).strip(separator) # Замінюємо пробіли/дефіси на один розділювач
-    return text
+    text = re.sub(r'[\s._-]+', separator, text) # Замінюємо пробіли, крапки, підкреслення, дефіси на один розділювач
+    text = re.sub(r'%s+' % separator, separator, text) # Видаляємо дублікати розділювача
+    return text.strip(separator)
+
+# --- Валідація cron-виразів ---
+def is_valid_cron_expression(cron_expression: str) -> bool:
+    """
+    Перевіряє, чи є рядок валідним cron-виразом (базова перевірка).
+    Для повної валідації краще використовувати бібліотеку типу `croniter`.
+    """
+    if not isinstance(cron_expression, str):
+        return False
+    parts = cron_expression.split()
+    if len(parts) not in [5, 6]: # 5 частин (хв, год, день місяця, місяць, день тижня) або 6 (з секундами на початку)
+        return False
+    # TODO: Додати більш детальну перевірку діапазонів та символів для кожної частини,
+    #       або інтегрувати `croniter.is_valid()`.
+    # from croniter import croniter
+    # try:
+    #     return croniter.is_valid(cron_expression)
+    # except: # ImportError або інші помилки від croniter
+    #     # Проста перевірка, якщо croniter недоступний
+    #     # (цей блок лише для прикладу, croniter має бути в залежностях, якщо використовується)
+    #     pass
+    return True # Поки що дуже базова перевірка
 
 # --- Робота зі словниками/JSON ---
 

@@ -46,9 +46,9 @@ class FileSchema(AuditDatesSchema): # Успадковує id, created_at, updat
     file_url: Optional[HttpUrl] = Field(None, description="URL для доступу/завантаження файлу")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    uploader: Optional[UserPublicSchema] = None
-    # group_context: Optional[GroupSimpleSchema] = None
-    # status: Optional[StatusSchema] = None
+    uploader: Optional[UserPublicSchema] = Field(None, description="Користувач, який завантажив файл")
+    group_context: Optional[GroupSimpleSchema] = Field(None, description="Група, в контексті якої завантажено файл")
+    # status: Optional[StatusSchema] = Field(None, description="Статус файлу (якщо є)")
 
 
 # --- Схема для створення метаданих файлу (після завантаження файлу на сервер/сховище) ---

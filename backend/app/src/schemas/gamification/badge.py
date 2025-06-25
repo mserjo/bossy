@@ -41,12 +41,12 @@ class BadgeSchema(BaseMainSchema):
     is_repeatable: bool = Field(..., description="Чи можна отримувати цей бейдж повторно")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # group: Optional[GroupSimpleSchema] = None # `group_id` вже є
-    # state: Optional[StatusSchema] = None # `state_id` вже є
-    # icon: Optional[FileSchema] = None # Або `icon_url`
+    # group: Optional[GroupSimpleSchema] = Field(None, description="Група, якій належить бейдж") # `group_id` вже є
+    state: Optional[ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')] = Field(None, description="Статус налаштування бейджа")
+    icon: Optional[ForwardRef('backend.app.src.schemas.files.file.FileSchema')] = Field(None, description="Файл іконки бейджа") # Або `icon_url`
 
-    # Список досягнень (хто і коли отримав цей бейдж) - зазвичай не включається сюди, а отримується окремо.
-    # achievements: List[AchievementSchema] = Field(default_factory=list)
+    # Список досягнень (хто і коли отримав цей бейдж)
+    achievements: List[AchievementSchema] = Field(default_factory=list, description="Записи про отримання цього бейджа користувачами")
 
 
 # --- Схема для створення нового налаштування бейджа ---

@@ -71,5 +71,10 @@ __all__ = [
 
 # Поки що залишаю без явних викликів `model_rebuild`.
 # Головне, що всі схеми експортуються через `__all__`.
-#
+
+# Виклик model_rebuild для схем, що містять ForwardRef
+NotificationSchema.model_rebuild()
+NotificationTemplateSchema.model_rebuild()
+NotificationDeliverySchema.model_rebuild()
+
 # Все виглядає добре.

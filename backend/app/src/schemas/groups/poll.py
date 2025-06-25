@@ -60,8 +60,8 @@ class PollVoteSchema(PollVoteBaseSchema, AuditDatesSchema): # Додаємо id,
     """Схема для відображення поданого голосу."""
     poll_id: uuid.UUID = Field(..., description="ID опитування")
     user_id: Optional[uuid.UUID] = Field(None, description="ID користувача, який проголосував (NULL для анонімних)")
-    # user: Optional[UserPublicSchema] = None # Розгорнута інформація про користувача (якщо не анонімне)
-    # option: Optional[PollOptionSchema] = None # Розгорнута інформація про обраний варіант (зазвичай не потрібно тут)
+    user: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача, який проголосував (якщо не анонімне)")
+    option: Optional[PollOptionSchema] = Field(None, description="Інформація про обраний варіант") # Може бути корисним
 
 # --- Схеми для Poll ---
 
@@ -86,13 +86,13 @@ class PollSchema(BaseMainSchema):
     results_visibility: str = Field(..., description="Хто може бачити результати ('all', 'voted_only', 'admins_only', 'after_end')")
 
     # --- Розгорнуті зв'язки ---
-    # creator: Optional[UserPublicSchema] = None
-    # group: Optional[GroupSimpleSchema] = None # `group_id` вже є
-    # state: Optional[StatusSchema] = None # `state_id` вже є
+    creator: Optional[UserPublicSchema] = Field(None, description="Інформація про творця опитування")
+    # group: Optional[GroupSimpleSchema] = None # `group_id` вже є, і зв'язок успадковується, якщо є в BaseMainSchema
+    state: Optional[StatusSchema] = Field(None, description="Інформація про статус опитування (з BaseMainSchema.state_id)")
 
     options: List[PollOptionSchema] = Field(default_factory=list, description="Список варіантів відповідей для опитування")
     # votes: List[PollVoteSchema] = [] # Список голосів (зазвичай не віддається весь, а агрегується)
-    # total_votes: Optional[int] = Field(None, description="Загальна кількість голосів (обчислюване поле)")
+    total_votes: Optional[int] = Field(None, description="Загальна кількість голосів (обчислюване поле, додається сервісом)")
 
     @model_validator(mode='after')
     def check_max_choices(cls, data: 'PollSchema') -> 'PollSchema':
@@ -122,7 +122,7 @@ class PollCreateSchema(BaseSchema):
     min_choices: Optional[int] = Field(None, ge=1) # Стане 1, якщо None і allow_multiple_choices=False
     max_choices: Optional[int] = Field(None, ge=1)
     show_results_before_voting: bool = Field(default=False)
-    results_visibility: str = Field(default="after_end") # TODO: Enum для results_visibility
+    results_visibility: str = Field(default="after_end")
     notes: Optional[str] = Field(None)
 
     options: List[PollOptionCreateSchema] = Field(..., min_length=1, description="Список варіантів відповідей (мінімум 1)") # min_items в OpenAPI
@@ -157,6 +157,14 @@ class PollCreateSchema(BaseSchema):
             raise ValueError("Дата закінчення опитування має бути пізнішою за дату початку.")
         return data
 
+    @field_validator('results_visibility')
+    @classmethod
+    def validate_results_visibility(cls, value: str) -> str:
+        allowed = ['all', 'voted_only', 'admins_only', 'after_end']
+        if value not in allowed:
+            raise ValueError(f"Недопустиме значення для results_visibility. Дозволені: {', '.join(allowed)}")
+        return value
+
 
 class PollUpdateSchema(BaseSchema):
     """Схема для оновлення існуючого опитування."""
@@ -176,6 +184,15 @@ class PollUpdateSchema(BaseSchema):
     results_visibility: Optional[str] = Field(None)
     notes: Optional[str] = Field(None)
     is_deleted: Optional[bool] = Field(None)
+
+    @field_validator('results_visibility')
+    @classmethod
+    def validate_results_visibility_update(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            allowed = ['all', 'voted_only', 'admins_only', 'after_end']
+            if value not in allowed:
+                raise ValueError(f"Недопустиме значення для results_visibility. Дозволені: {', '.join(allowed)}")
+        return value
 
     # Оновлення варіантів відповідей (options) - це складніша операція:
     # додавання нових, видалення старих, оновлення існуючих.

@@ -54,6 +54,31 @@ class RefreshTokenRequestSchema(BaseSchema):
     """
     refresh_token: str = Field(..., description="Дійсний Refresh токен")
 
+# --- Схема для вмісту JWT токена (payload) ---
+class TokenPayloadSchema(BaseSchema):
+    """
+    Схема для валідації та представлення даних (payload) з JWT токена.
+    """
+    sub: uuid.UUID = Field(..., description="Ідентифікатор суб'єкта (user_id)")
+    exp: Optional[datetime] = Field(None, description="Час закінчення терміну дії токена (Unix timestamp or datetime)")
+    iat: Optional[datetime] = Field(None, description="Час видачі токена (Unix timestamp or datetime)")
+    token_type: Optional[str] = Field(None, description="Тип токена ('access' або 'refresh')")
+    # Можна додати інші кастомні поля, якщо вони є в payload:
+    # "scopes": List[str] = []
+    # "session_id": Optional[uuid.UUID] = None
+
+    @field_validator('sub', mode='before')
+    @classmethod
+    def sub_to_uuid(cls, value: Any) -> uuid.UUID:
+        if isinstance(value, str):
+            try:
+                return uuid.UUID(value)
+            except ValueError:
+                raise ValueError("Поле 'sub' має бути валідним UUID рядком")
+        if not isinstance(value, uuid.UUID):
+            raise ValueError("Поле 'sub' має бути UUID")
+        return value
+
 
 # TODO: Переконатися, що схеми відповідають моделі `RefreshTokenModel`.
 # `RefreshTokenModel` має: id, user_id, hashed_token, expires_at, is_revoked, revoked_at,

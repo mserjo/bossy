@@ -49,11 +49,11 @@ class TaskCompletionSchema(AuditDatesSchema): # Успадковує id, created
     attachments: Optional[List[Dict[str, Any]]] = Field(None, description="Список метаданих файлів-додатків (JSON)") # Або схема для файлу
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # task: Optional[TaskSimpleSchema] = None
-    user: Optional[UserPublicSchema] = None
-    team: Optional[TeamSimpleSchema] = None
-    status: Optional[StatusSchema] = None
-    reviewer: Optional[UserPublicSchema] = None
+    task: Optional[TaskSimpleSchema] = Field(None, description="Інформація про завдання")
+    user: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача-виконавця")
+    team: Optional[TeamSimpleSchema] = Field(None, description="Інформація про команду-виконавця")
+    status: Optional[StatusSchema] = Field(None, description="Розгорнутий статус виконання")
+    reviewer: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача, який перевірив завдання")
 
 
 # --- Схема для створення запису про взяття завдання в роботу (початок виконання) ---

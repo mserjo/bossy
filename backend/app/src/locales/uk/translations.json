@@ -1,0 +1,38 @@
+{
+  "hello_world": "Привіт, світе!",
+  "greeting": "Вітаємо, {name}!",
+  "error_resource_not_found": "Ресурс не знайдено.",
+  "error_item_not_found": "{item_name} з ID {item_id} не знайдено.",
+  "error_unauthorized": "Не авторизовано.",
+  "error_forbidden": "Доступ заборонено.",
+  "error_bad_request": "Некоректний запит.",
+  "error_internal_server": "Внутрішня помилка сервера.",
+  "success_resource_created": "{resource_name} успішно створено.",
+  "success_resource_updated": "{resource_name} успішно оновлено.",
+  "success_resource_deleted": "{resource_name} успішно видалено.",
+
+  "role_superadmin": "Супер Адміністратор",
+  "role_group_admin": "Адміністратор Групи",
+  "role_group_user": "Користувач Групи",
+
+  "user_login_successful": "Вхід успішний.",
+  "user_logout_successful": "Вихід успішний.",
+  "user_registration_successful": "Реєстрація успішна. Будь ласка, перевірте свою електронну пошту для підтвердження облікового запису.",
+  "user_password_reset_request_sent": "Якщо обліковий запис з таким email або телефоном існує, посилання для скидання пароля було надіслано.",
+  "user_password_reset_successful": "Пароль успішно скинуто.",
+  "user_email_verified_successfully": "Електронну пошту успішно підтверджено.",
+  "user_profile_updated": "Профіль успішно оновлено.",
+
+  "group_created": "Групу '{group_name}' створено.",
+  "group_settings_updated": "Налаштування для групи '{group_name}' оновлено.",
+  "group_invitation_sent": "Запрошення до групи '{group_name}' надіслано.",
+  "group_joined_successfully": "Успішно приєднано до групи '{group_name}'.",
+
+  "task_created": "Завдання '{task_name}' створено.",
+  "task_completed_notification_title": "Завдання виконано: {task_name}",
+  "task_completed_notification_body": "Користувач {user_name} позначив завдання '{task_name}' як виконане, воно очікує на вашу перевірку.",
+  "task_status_changed_notification_title": "Статус завдання оновлено: {task_name}",
+  "task_status_changed_notification_body": "Статус вашого завдання '{task_name}' було змінено на: {new_status}.",
+  "task_deadline_reminder_title": "Нагадування про термін завдання: {task_name}",
+  "task_deadline_reminder_body": "Це нагадування, що термін виконання завдання '{task_name}' спливає {due_date}."
+}

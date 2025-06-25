@@ -185,8 +185,32 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
     #             return obj
     #         else:
     #             # Модель не підтримує м'яке видалення
-    #             raise NotImplementedError(f"{self._model.__name__} не підтримує м'яке видалення.")
-    #     return None
+    async def soft_delete(self, db: AsyncSession, *, item_id: uuid.UUID, current_user_id: Optional[uuid.UUID] = None) -> Optional[ModelType]:
+        """
+        Виконує "м'яке" видалення запису за ID.
+        Встановлює is_deleted = True та deleted_at = current_time.
+        Також встановлює updated_by_user_id, якщо передано.
+        """
+        obj = await self.get_by_id(db, item_id)
+        if obj:
+            if not hasattr(obj, 'is_deleted') or not hasattr(obj, 'deleted_at'):
+                raise NotImplementedError(f"Модель {self._model.__name__} не підтримує 'м'яке' видалення (відсутні поля is_deleted/deleted_at).")
+
+            obj.is_deleted = True # type: ignore
+            obj.deleted_at = datetime.utcnow().replace(tzinfo=timezone.utc) # type: ignore
+
+            if current_user_id and hasattr(obj, 'updated_by_user_id'):
+                obj.updated_by_user_id = current_user_id # type: ignore
+            elif hasattr(obj, 'updated_by_user_id'): # Якщо поле є, але юзер не переданий, можна встановити None або не чіпати
+                obj.updated_by_user_id = None # type: ignore
+
+            # updated_at оновиться автоматично через onupdate=func.now() в BaseModel
+
+            db.add(obj)
+            await db.flush()
+            await db.refresh(obj)
+            return obj
+        return None
 
 
 # --- Базовий клас для сервісів ---
@@ -202,29 +226,35 @@ class BaseService:
         """
         self.db_session = db_session
         # Тут також можуть ініціалізуватися репозиторії, якщо сервіс їх використовує.
-        # Наприклад:
-        # self.user_repository = UserRepository(db_session) # Якщо є UserRepository
+        # Наприклад, якщо сервіс завжди працює з певним репозиторієм:
+        # self.repository = self._get_repository() # Приватний метод, що повертає екземпляр репозиторію
 
-    # Сервіси будуть мати методи, що реалізують конкретні бізнес-операції,
-    # наприклад, `create_user_with_initial_setup`, `process_task_completion`,
-    # `calculate_user_rating` тощо.
+    # def _get_repository(self) -> BaseRepository:
+    #     # Цей метод має бути перевизначений у класах-наслідниках,
+    #     # щоб повертати конкретний екземпляр репозиторію.
+    #     raise NotImplementedError("Метод _get_repository має бути реалізований у класі-насліднику сервісу.")
+
+    # Сервіси будуть мати методи, що реалізують конкретні бізнес-операції.
     # Вони можуть використовувати один або декілька репозиторіїв.
+    # Приклад:
+    # async def get_item_by_id_as_schema(self, item_id: uuid.UUID, schema: Type[SchemaType]) -> Optional[SchemaType]:
+    #     item_orm = await self.repository.get_by_id(self.db_session, item_id)
+    #     if item_orm:
+    #         return schema.model_validate(item_orm)
+    #     return None
 
-    # Приклад методу в сервісі, що використовує репозиторій:
-    # async def get_user_profile(self, user_id: uuid.UUID) -> Optional[UserSchema]:
-    #     user_orm = await self.user_repository.get_by_id(self.db_session, user_id)
-    #     if not user_orm:
-    #         raise NotFoundException("Користувача не знайдено.")
-    #     # ... додаткова логіка ...
-    #     return UserSchema.model_validate(user_orm) # Pydantic v2
+    async def _commit_session(self):
+        """Допоміжний метод для коміту поточної сесії."""
+        try:
+            await self.db_session.commit()
+        except Exception as e:
+            await self.db_session.rollback()
+            # logger.error(f"Помилка під час коміту сесії: {e}", exc_info=True)
+            raise DatabaseErrorException(f"Помилка під час коміту сесії: {e}")
 
     # TODO: Визначити, чи потрібні тут якісь спільні методи для всіх сервісів.
-    # Можливо, методи для обробки транзакцій (commit, rollback),
-    # хоча це часто робиться на рівні залежності FastAPI або декоратора.
-    # Або ж, якщо сервіс завжди працює в межах однієї транзакції,
-    # то `commit` може викликатися в кінці успішного методу сервісу.
-    # `rollback` - при винятках.
-    # Це потребує ретельного проектування обробки транзакцій.
+    # Наприклад, _commit_session може бути корисним.
+    # Або декоратор @manage_transaction для методів сервісу.
     pass
 
 

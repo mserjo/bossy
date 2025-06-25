@@ -38,11 +38,11 @@ class TaskAssignmentSchema(AuditDatesSchema): # Успадковує id, created
     notes: Optional[str] = Field(None, description="Нотатки щодо цього призначення")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # task: Optional[TaskSimpleSchema] = None # Інформація про завдання
-    user: Optional[UserPublicSchema] = None # Інформація про користувача-виконавця
-    team: Optional[TeamSimpleSchema] = None # Інформація про команду-виконавця
-    assigner: Optional[UserPublicSchema] = None # Інформація про того, хто призначив
-    status: Optional[StatusSchema] = None # Розгорнутий статус призначення
+    task: Optional[TaskSimpleSchema] = Field(None, description="Інформація про завдання")
+    user: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача-виконавця")
+    team: Optional[TeamSimpleSchema] = Field(None, description="Інформація про команду-виконавця")
+    assigner: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача, який зробив призначення")
+    status: Optional[StatusSchema] = Field(None, description="Розгорнутий статус призначення")
 
 
 # --- Схема для створення нового призначення завдання ---

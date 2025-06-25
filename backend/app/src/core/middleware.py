@@ -28,17 +28,18 @@ from backend.app.src.config.logging import logger
 from backend.app.src.config.settings import settings
 
 # --- Приклад Middleware для вимірювання часу обробки запиту ---
-# async def add_process_time_header_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
-#     """
-#     Middleware, що додає заголовок X-Process-Time до кожної відповіді,
-#     який вказує час обробки запиту на сервері.
-#     """
-#     start_time = time.time()
-#     response = await call_next(request)
-#     process_time = time.time() - start_time
-#     response.headers["X-Process-Time"] = str(process_time)
-#     logger.info(f"Запит {request.method} {request.url.path} оброблено за {process_time:.4f} сек.")
-#     return response
+async def add_process_time_header_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    """
+    Middleware, що додає заголовок X-Process-Time до кожної відповіді,
+    який вказує час обробки запиту на сервері.
+    """
+    start_time = time.perf_counter() # Використовуємо perf_counter для більшої точності
+    response = await call_next(request)
+    process_time = time.perf_counter() - start_time
+    response.headers["X-Process-Time"] = f"{process_time:.4f}" # Форматуємо рядок
+    # Логування часу обробки може бути тут або в іншому middleware
+    # logger.info(f"Запит {request.method} {request.url.path} оброблено за {process_time:.4f} сек.")
+    return response
 
 # --- Приклад Middleware для логування запитів/відповідей (більш детальний) ---
 # async def request_response_logging_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
@@ -79,27 +80,35 @@ from backend.app.src.config.settings import settings
 
 
 # --- Приклад Middleware для додавання стандартних заголовків безпеки ---
-# async def add_security_headers_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
-#     """
-#     Middleware для додавання стандартних HTTP заголовків безпеки до відповідей.
-#     """
-#     response = await call_next(request)
-#     response.headers["X-Content-Type-Options"] = "nosniff"
-#     response.headers["X-Frame-Options"] = "DENY"
-#     # response.headers["Content-Security-Policy"] = "default-src 'self'; img-src * data:; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline';" # Дуже базовий CSP
-#     response.headers["X-XSS-Protection"] = "1; mode=block" # Застарілий, краще CSP
-#
-#     # HSTS (HTTP Strict Transport Security) - лише якщо сайт завжди на HTTPS
-#     # if request.url.scheme == "https": # Або якщо завжди HTTPS
-#     #     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-#
-#     # Referrer-Policy
-#     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-#
-#     # Permissions-Policy (Feature-Policy)
-#     # response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(), payment=()" # Приклад: вимкнути все
-#
-#     return response
+async def add_security_headers_middleware(request: Request, call_next: Callable[[Request], Awaitable[Response]]) -> Response:
+    """
+    Middleware для додавання стандартних HTTP заголовків безпеки до відповідей.
+    """
+    response = await call_next(request)
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    # Content-Security-Policy - дуже залежить від контенту, що віддається.
+    # Потрібно ретельно налаштовувати. Приклад:
+    # response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self';"
+    response.headers["X-XSS-Protection"] = "0" # Рекомендовано вимикати, якщо використовується сильний CSP. "1; mode=block" застарілий.
+
+    # HSTS (HTTP Strict Transport Security) - Вмикати, якщо сайт завжди обслуговується через HTTPS.
+    # Потребує попереднього налаштування HTTPS на сервері.
+    # if settings.app.ENVIRONMENT == "production" and request.url.scheme == "https": # Або просто завжди, якщо HTTPS гарантовано
+    #     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    # Або, якщо за проксі, який обробляє TLS:
+    if settings.app.ENVIRONMENT == "production": # Припускаємо, що в production завжди HTTPS
+         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+
+
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+
+    # Permissions-Policy (раніше Feature-Policy)
+    # Приклад: вимкнути доступ до камери, мікрофону, геолокації для всіх джерел.
+    # response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    # Це потрібно налаштовувати відповідно до потреб додатку.
+
+    return response
 
 # --- Реєстрація Middleware в FastAPI додатку (в `main.py`) ---
 # Middleware додаються до екземпляра FastAPI `app`.

@@ -27,8 +27,8 @@ class TaskDependencySchema(AuditDatesSchema): # Успадковує id, created
     dependency_type: Optional[str] = Field(default="finish-to-start", description="Тип залежності (наприклад, 'finish-to-start')")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # dependent_task: Optional[TaskSimpleSchema] = None
-    # prerequisite_task: Optional[TaskSimpleSchema] = None
+    dependent_task: Optional[TaskSimpleSchema] = Field(None, description="Залежне завдання")
+    prerequisite_task: Optional[TaskSimpleSchema] = Field(None, description="Завдання-передумова")
 
 # --- Схема для створення нової залежності між завданнями ---
 class TaskDependencyCreateSchema(BaseSchema):
@@ -45,14 +45,15 @@ class TaskDependencyCreateSchema(BaseSchema):
             raise ValueError("Завдання не може залежати саме від себе.")
         return data
 
-    # TODO: Додати валідатор для `dependency_type`, щоб він був з дозволеного списку.
-    # @field_validator('dependency_type')
-    # def dependency_type_must_be_known(cls, value: Optional[str]) -> Optional[str]:
-    #     if value is not None:
-    #         known_types = ['finish-to-start', 'start-to-start', 'finish-to-finish', 'start-to-finish']
-    #         if value not in known_types:
-    #             raise ValueError(f"Невідомий тип залежності: {value}. Дозволені: {', '.join(known_types)}")
-    #     return value
+    @field_validator('dependency_type')
+    @classmethod
+    def dependency_type_must_be_known(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            known_types = ['finish-to-start', 'start-to-start', 'finish-to-finish', 'start-to-finish']
+            if value.lower() not in known_types: # Перевірка в нижньому регістрі для гнучкості
+                raise ValueError(f"Невідомий тип залежності: '{value}'. Дозволені: {', '.join(known_types)}.")
+            return value.lower()
+        return value
 
 # --- Схема для оновлення залежності (зазвичай залежності не оновлюються, а видаляються та створюються нові) ---
 # Якщо все ж потрібно оновлювати, наприклад, тип залежності:
@@ -65,7 +66,15 @@ class TaskDependencyUpdateSchema(BaseSchema):
     # `dependent_task_id` та `prerequisite_task_id` зазвичай не змінюються для існуючої залежності.
     # Якщо потрібно змінити самі завдання, то це видалення старої залежності та створення нової.
 
-    # TODO: Додати валідатор для `dependency_type` (аналогічно до CreateSchema), якщо поле передано.
+    @field_validator('dependency_type')
+    @classmethod
+    def dependency_type_must_be_known_update(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            known_types = ['finish-to-start', 'start-to-start', 'finish-to-finish', 'start-to-finish']
+            if value.lower() not in known_types:
+                raise ValueError(f"Невідомий тип залежності: '{value}'. Дозволені: {', '.join(known_types)}.")
+            return value.lower()
+        return value
 
 # TaskDependencySchema.model_rebuild() # Для ForwardRef
 

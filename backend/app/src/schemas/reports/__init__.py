@@ -93,5 +93,15 @@ __all__ = [
 #         print(f"Warning: Could not rebuild schema {schema.__name__}: {e}")
 
 # Поки що залишаю без явних викликів `model_rebuild`.
-#
+
+# Виклик model_rebuild для схем, що містять ForwardRef
+ReportSchema.model_rebuild()
+# ReportDataResponseSchema також може потребувати, якщо Union типи використовують ForwardRef,
+# але зараз UserActivityReportDataSchema і т.д. не мають складних ForwardRef всередині.
+# Якщо ReportDataResponseSchema.data буде містити схеми, що самі мають ForwardRef,
+# то для ReportDataResponseSchema також може знадобитися model_rebuild.
+# Поки що достатньо для ReportSchema.
+ReportDataResponseSchema.model_rebuild()
+
+
 # Все виглядає добре.

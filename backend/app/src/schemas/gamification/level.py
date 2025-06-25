@@ -42,12 +42,12 @@ class LevelSchema(BaseMainSchema):
     # icon_url: Optional[HttpUrl] = Field(None, description="URL іконки рівня") # Може генеруватися
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # group: Optional[GroupSimpleSchema] = None # `group_id` вже є
-    # state: Optional[StatusSchema] = None # `state_id` вже є
-    # icon: Optional[FileSchema] = None # Або `icon_url`
+    # group: Optional[GroupSimpleSchema] = Field(None, description="Група, якій належить рівень") # `group_id` вже є
+    state: Optional[ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')] = Field(None, description="Статус налаштування рівня")
+    icon: Optional[ForwardRef('backend.app.src.schemas.files.file.FileSchema')] = Field(None, description="Файл іконки рівня") # Або `icon_url`
 
-    # Список користувачів, які досягли цього рівня (зазвичай не включається сюди, а отримується окремо)
-    # user_levels: List[UserLevelSchema] = Field(default_factory=list)
+    # Список користувачів, які досягли цього рівня (зазвичай не включається сюди)
+    user_levels: List[UserLevelSchema] = Field(default_factory=list, description="Записи про досягнення цього рівня користувачами")
 
 
 # --- Схема для створення нового налаштування рівня ---

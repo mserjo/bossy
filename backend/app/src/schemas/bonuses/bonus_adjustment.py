@@ -34,9 +34,9 @@ class BonusAdjustmentSchema(AuditDatesSchema): # Успадковує id, create
     transaction_id: Optional[uuid.UUID] = Field(None, description="ID створеної транзакції, що відображає це коригування")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # account: Optional[AccountSchema] = None
-    admin: Optional[UserPublicSchema] = None # Хто зробив коригування
-    # transaction: Optional[TransactionSchema] = None # Пов'язана транзакція
+    account: Optional[AccountSchema] = Field(None, description="Рахунок, до якого застосовано коригування")
+    admin: Optional[UserPublicSchema] = Field(None, description="Адміністратор, який виконав коригування")
+    transaction: Optional[TransactionSchema] = Field(None, description="Пов'язана транзакція, що відображає коригування")
 
 
 # --- Схема для створення нового ручного коригування бонусів ---

@@ -95,5 +95,12 @@ __all__ = [
 # оскільки ці записи зазвичай створюються системою і не оновлюються через API,
 # або оновлюються специфічною логікою (наприклад, `is_current` для `UserLevel`).
 # Самі класи схем Update можуть існувати (закоментовані) у відповідних файлах.
-#
+
+# Виклик model_rebuild для схем, що містять ForwardRef
+LevelSchema.model_rebuild()
+UserLevelSchema.model_rebuild()
+BadgeSchema.model_rebuild()
+AchievementSchema.model_rebuild()
+RatingSchema.model_rebuild()
+
 # Все виглядає добре.

@@ -3,221 +3,191 @@
 """
 Цей модуль призначений для налаштування інтернаціоналізації (i18n)
 та локалізації (l10n) в додатку FastAPI.
-
-Інтернаціоналізація - це процес проектування додатку таким чином,
-щоб його можна було легко адаптувати до різних мов та регіональних налаштувань.
-Локалізація - це процес адаптації інтернаціоналізованого додатку
-для конкретного регіону або мови шляхом перекладу тексту та додавання
-локаль-специфічних компонентів.
-
-Для FastAPI можуть використовуватися бібліотеки типу `FastAPI- zowel` (на основі Babel)
-або кастомні рішення для обробки мовних файлів (наприклад, JSON, YAML, .po/.mo).
-
-На даному етапі створюється заглушка для цього модуля.
 """
 
-from fastapi import Request, Depends, Header
-from fastapi.middleware.locale import LocaleMiddleware # Приклад, якщо використовується Starlette/FastAPI LocaleMiddleware
-# from babel import Locale # type: ignore # Приклад, якщо використовується Babel
-# from speaklater import pengunjung_นิยม # type: ignore # Приклад для "лінивих" перекладів
-from typing import Optional, List, Dict
+from fastapi import Request, Header
+from typing import Optional, List, Dict, Any
+import json
+import os
 
 # Імпорт налаштувань, де можуть бути визначені підтримувані мови та мова за замовчуванням.
 from backend.app.src.config.settings import settings
 from backend.app.src.config.logging import logger
 
 # --- Налаштування мов ---
-# Ці значення можуть братися з `settings.app`
-# SUPPORTED_LOCALES: List[str] = getattr(settings.app, "SUPPORTED_LOCALES", ["uk", "en"])
-# DEFAULT_LOCALE: str = getattr(settings.app, "DEFAULT_LOCALE", "uk")
-# TODO: Додати ці налаштування в `AppSettings` в `config/settings.py`.
-# Приклад в AppSettings:
-# SUPPORTED_LOCALES: List[str] = Field(default=["uk", "en"], description="Список підтримуваних мов (коди ISO 639-1)")
-# DEFAULT_LOCALE: str = Field(default="uk", description="Мова за замовчуванням")
+SUPPORTED_LOCALES: List[str] = getattr(settings.app, "SUPPORTED_LOCALES", ["uk", "en"])
+DEFAULT_LOCALE: str = getattr(settings.app, "DEFAULT_LOCALE", "uk")
+if DEFAULT_LOCALE not in SUPPORTED_LOCALES:
+    logger.warning(f"Мова за замовчуванням '{DEFAULT_LOCALE}' не в списку підтримуваних: {SUPPORTED_LOCALES}. Використовується перша з списку: '{SUPPORTED_LOCALES[0] if SUPPORTED_LOCALES else 'en'}'")
+    DEFAULT_LOCALE = SUPPORTED_LOCALES[0] if SUPPORTED_LOCALES else "en"
 
-# Поки що визначаю тут, якщо їх немає в settings
-SUPPORTED_LOCALES: List[str] = ["uk", "en"] # Українська та англійська
-DEFAULT_LOCALE: str = "uk"
 
-# Шлях до каталогів з файлами перекладів (якщо використовуються .po/.mo файли)
-# LOCALE_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'locales')
-# Цей шлях має вказувати на `backend/app/src/locales/`
-# import os
-# CURRENT_DIR = os.path.dirname(os.path.abspath(__file__)) # backend/app/src/core
-# APP_SRC_DIR = os.path.dirname(CURRENT_DIR) # backend/app/src
-# LOCALES_DIR = os.path.join(APP_SRC_DIR, "locales")
-# print(f"DEBUG: Calculated locales_dir: {LOCALES_DIR}")
+# Шлях до каталогів з файлами перекладів
+# Припускаємо, що цей файл знаходиться в backend/app/src/core/
+# А каталоги локалей в backend/app/src/locales/
+APP_SRC_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # backend/app/src/
+LOCALES_DIR = os.path.join(APP_SRC_DIR, "locales")
 
-# --- Функція для отримання поточної локалі з запиту ---
-# Це може бути залежність FastAPI.
+# Кеш для завантажених перекладів
+translations_cache: Dict[str, Dict[str, str]] = {}
+
+def load_translations(locale: str) -> Dict[str, str]:
+    """
+    Завантажує переклади для вказаної локалі з JSON файлу.
+    Файли очікуються у форматі: locales/{locale}/translations.json
+    """
+    if locale in translations_cache:
+        return translations_cache[locale]
+
+    file_path = os.path.join(LOCALES_DIR, locale, "translations.json")
+    try:
+        # Переконуємося, що каталог локалей існує, якщо ні - то і файлу не буде
+        if not os.path.exists(os.path.dirname(file_path)):
+            os.makedirs(os.path.dirname(file_path), exist_ok=True)
+            logger.info(f"Створено каталог для локалі: {os.path.dirname(file_path)}")
+
+        with open(file_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+            translations_cache[locale] = data
+            logger.info(f"Переклади для локалі '{locale}' успішно завантажено з {file_path}")
+            return data
+    except FileNotFoundError:
+        logger.warning(f"Файл перекладів не знайдено для локалі '{locale}' за шляхом: {file_path}. Використовуватимуться ключі.")
+        translations_cache[locale] = {} # Порожній словник, якщо файл не знайдено
+        return {}
+    except json.JSONDecodeError:
+        logger.error(f"Помилка декодування JSON у файлі перекладів для локалі '{locale}': {file_path}")
+        translations_cache[locale] = {}
+        return {}
+    except Exception as e:
+        logger.error(f"Невідома помилка при завантаженні перекладів для '{locale}': {e}")
+        translations_cache[locale] = {}
+        return {}
+
+# Завантажуємо переклади для всіх підтримуваних мов при старті (або ліниво)
+# for loc in SUPPORTED_LOCALES:
+#    load_translations(loc) # Можна завантажити при старті додатку
+
+
 async def get_locale(
-    request: Optional[Request] = None, # Якщо використовується як залежність, Request буде передано
-    accept_language: Optional[str] = Header(None) # Отримуємо заголовок Accept-Language
+    request: Optional[Request] = None,
+    accept_language: Optional[str] = Header(None)
 ) -> str:
     """
-    Визначає поточну локаль на основі заголовка Accept-Language або
-    інших параметрів запиту (наприклад, query parameter, cookie, user profile setting).
-    Повертає код мови (наприклад, "uk", "en").
+    Визначає поточну локаль на основі заголовка Accept-Language або інших параметрів.
     """
-    # Пріоритети визначення мови:
-    # 1. Query parameter (наприклад, ?lang=en)
-    # 2. Cookie (наприклад, user_locale=uk)
-    # 3. Налаштування мови з профілю користувача (якщо користувач автентифікований)
-    # 4. Заголовок Accept-Language
-    # 5. Мова за замовчуванням
-
+    # 1. Query parameter (наприклад, ?lang=en) - якщо request передано
     if request:
-        # 1. Перевірка query parameter 'lang'
         lang_query = request.query_params.get("lang")
         if lang_query and lang_query in SUPPORTED_LOCALES:
-            # logger.trace(f"Мова визначена з query parameter: {lang_query}")
             return lang_query
 
-        # 2. Перевірка cookie 'locale' (або іншої назви)
-        lang_cookie = request.cookies.get("locale") # Назва cookie може бути іншою
+    # 2. Cookie (наприклад, user_locale=uk) - якщо request передано
+    if request:
+        lang_cookie = request.cookies.get("locale")
         if lang_cookie and lang_cookie in SUPPORTED_LOCALES:
-            # logger.trace(f"Мова визначена з cookie: {lang_cookie}")
             return lang_cookie
 
-        # 3. TODO: Перевірка налаштувань мови з профілю користувача
-        # user = getattr(request.state, 'user', None) # Якщо користувач додається до request.state
-        # if user and hasattr(user, 'preferred_language') and user.preferred_language in SUPPORTED_LOCALES:
-        #     return user.preferred_language
+    # 3. TODO: Налаштування мови з профілю користувача (потребує доступу до user)
+    # if request and hasattr(request.state, "user") and request.state.user:
+    #     user_profile_lang = getattr(request.state.user, "preferred_language", None)
+    #     if user_profile_lang and user_profile_lang in SUPPORTED_LOCALES:
+    #         return user_profile_lang
 
-    # 4. Обробка заголовка Accept-Language
+    # 4. Заголовок Accept-Language
     if accept_language:
-        # Приклад простої обробки: беремо першу мову з Accept-Language, що підтримується.
-        # Формат Accept-Language: "uk-UA,uk;q=0.9,en-US;q=0.8,en;q=0.7"
-        # Потрібен парсер для правильної обробки ваг (q-factors).
-        # Бібліотека `babel.negotiating` може допомогти.
-        # Або простий парсинг:
         languages = [lang.split(';')[0].strip().lower() for lang in accept_language.split(',')]
         for lang_tag in languages:
-            # Спроба знайти точне співпадіння (наприклад, "uk-ua" -> "uk")
-            # або співпадіння основного коду мови (наприклад, "uk" з "uk-ua")
             main_lang_code = lang_tag.split('-')[0]
             if lang_tag in SUPPORTED_LOCALES:
-                # logger.trace(f"Мова визначена з Accept-Language (точне співпадіння): {lang_tag}")
                 return lang_tag
             if main_lang_code in SUPPORTED_LOCALES:
-                # logger.trace(f"Мова визначена з Accept-Language (основний код): {main_lang_code}")
                 return main_lang_code
 
-    # 5. Мова за замовчуванням
-    # logger.trace(f"Використовується мова за замовчуванням: {DEFAULT_LOCALE}")
     return DEFAULT_LOCALE
 
-# --- Функція для перекладу рядків (транслятор) ---
-# Це приклад, реальна функція залежатиме від обраної бібліотеки i18n.
-# Вона може використовувати об'єкт перекладу, завантажений для поточної локалі.
-#
-# translations_cache: Dict[str, Dict[str, str]] = {} # Простий кеш для перекладів
-#
-# def load_translations(locale: str) -> Dict[str, str]:
-#     """Завантажує переклади для вказаної локалі (наприклад, з JSON файлу)."""
-#     if locale in translations_cache:
-#         return translations_cache[locale]
-#
-#     # Припускаємо, що переклади зберігаються в backend/app/src/locales/{locale}/messages.json
-#     # file_path = os.path.join(LOCALES_DIR, locale, "messages.json")
-#     # try:
-#     #     with open(file_path, "r", encoding="utf-8") as f:
-#     #         data = json.load(f)
-#     #         translations_cache[locale] = data
-#     #         return data
-#     # except FileNotFoundError:
-#     #     logger.warning(f"Файл перекладів не знайдено для локалі '{locale}' за шляхом: {file_path}")
-#     #     translations_cache[locale] = {} # Порожній словник, якщо файл не знайдено
-#     #     return {}
-#     # except json.JSONDecodeError:
-#     #     logger.error(f"Помилка декодування JSON у файлі перекладів для локалі '{locale}': {file_path}")
-#     #     translations_cache[locale] = {}
-#     #     return {}
-#     # Поки що повертаємо порожній словник, якщо немає реального завантаження
-#     translations_cache[locale] = {}
-#     logger.debug(f"Заглушка: переклади для локалі '{locale}' не завантажено (повернуто порожній словник).")
-#     return {}
-#
-# def _(text: str, locale: Optional[str] = None, **kwargs: Any) -> str: # Або gettext
-#     """
-#     Функція для перекладу рядка на поточну або вказану локаль.
-#     Використовує `text` як ключ для пошуку перекладу.
-#     `kwargs` можуть використовуватися для підстановки змінних у перекладений рядок.
-#     """
-#     if locale is None:
-#         # TODO: Потрібен спосіб отримати поточну локаль запиту тут.
-#         # Це може бути через контекстну змінну, залежність або передачу явно.
-#         # Якщо ця функція викликається поза контекстом запиту, використовується мова за замовчуванням.
-#         # current_locale = get_current_request_locale_somehow() or DEFAULT_LOCALE
-#         # Поки що, для прикладу, завжди DEFAULT_LOCALE, якщо не передано.
-#         # Це НЕПРАВИЛЬНО для використання в реальному часі, потрібен контекст запиту.
-#         current_locale = DEFAULT_LOCALE # ЗАГЛУШКА
-#         # logger.warning(f"Функція перекладу викликана без явної локалі, використовується дефолтна: {current_locale}")
-#     else:
-#         current_locale = locale
-#
-#     if current_locale not in SUPPORTED_LOCALES:
-#         current_locale = DEFAULT_LOCALE # Якщо передано непідтримувану локаль
-#
-#     translations = load_translations(current_locale)
-#     translated_text = translations.get(text, text) # Повертаємо оригінальний текст, якщо переклад не знайдено
-#
-#     # Проста підстановка змінних (якщо є)
-#     try:
-#         return translated_text.format(**kwargs) if kwargs else translated_text
-#     except KeyError as e:
-#         logger.warning(f"Ключ '{e}' для форматування не знайдено в перекладеному рядку: '{translated_text}' для тексту '{text}'")
-#         return translated_text # Повертаємо без форматування, якщо є помилка
-#
-# # Для "лінивих" перекладів (корисних для визначення перекладів на рівні модуля,
-# # коли локаль ще невідома):
-# # lazy_gettext = pengunjung_นิยม # З speaklater або аналогічної бібліотеки
+# Функція перекладу
+def gettext(text_key: str, locale: Optional[str] = None, **kwargs: Any) -> str:
+    """
+    Перекладає рядок (ключ) на поточну або вказану локаль.
+    Якщо переклад не знайдено, повертає сам ключ.
+    """
+    current_locale = locale
+    if current_locale is None:
+        # Якщо викликається поза контекстом запиту, де локаль невідома,
+        # використовуємо мову за замовчуванням.
+        # У контексті запиту FastAPI, локаль має бути встановлена в request.state.locale.
+        # TODO: Потрібен кращий спосіб отримання локалі запиту тут, якщо locale=None.
+        # Можливо, через contextvars або передачу request.
+        current_locale = DEFAULT_LOCALE
+        # logger.trace(f"gettext: локаль не передана, використовується дефолтна: {current_locale}")
 
-# --- Реєстрація Middleware для локалізації (якщо використовується) ---
-# Це робиться в `main.py` при налаштуванні FastAPI додатку.
-#
-# from fastapi import FastAPI
-# from starlette.middleware.locale import LocaleMiddleware # Вбудований в Starlette
-# # Або кастомний middleware, що використовує get_locale
-#
-# app = FastAPI()
-#
-# # Приклад використання LocaleMiddleware (він встановлює request.state.locale)
-# # app.add_middleware(LocaleMiddleware, locales=SUPPORTED_LOCALES, default_locale=DEFAULT_LOCALE)
-# #
-# # Або кастомний middleware:
-# # @app.middleware("http")
-# # async def set_request_locale_middleware(request: Request, call_next):
-# #     locale_code = await get_locale(request=request, accept_language=request.headers.get("accept-language"))
-# #     request.state.locale = locale_code # Зберігаємо локаль в стані запиту
-# #     # Можна також встановити поточну локаль для Babel, якщо використовується
-# #     # from babel.support import Translations
-# #     # translations = Translations.load(LOCALE_DIR, [locale_code], domain='messages')
-# #     # request.state.gettext = translations.gettext
-# #     # request.state.ngettext = translations.ngettext
-# #     response = await call_next(request)
-# #     return response
-#
-# # Тоді в ендпоінтах можна отримати локаль з `request.state.locale`
-# # або функцію перекладу з `request.state.gettext`.
 
-# TODO: Вибрати та налаштувати конкретну бібліотеку/підхід для i18n.
-# Можливі варіанти:
-# 1. `FastAPI-babel`: Інтеграція з Babel, підтримка .po/.mo файлів.
-# 2. `FastAPI-i18n`: Інший підхід, часто з JSON/YAML файлами.
-# 3. Кастомне рішення на основі `LocaleMiddleware` та ручного завантаження перекладів.
+    if current_locale not in SUPPORTED_LOCALES:
+        # logger.warning(f"gettext: непідтримувана локаль '{current_locale}', використовується дефолтна: {DEFAULT_LOCALE}")
+        current_locale = DEFAULT_LOCALE
+
+    translations = load_translations(current_locale) # Ліниве завантаження
+    translated_text = translations.get(text_key, text_key)
+
+    try:
+        return translated_text.format(**kwargs) if kwargs else translated_text
+    except KeyError as e:
+        logger.warning(f"gettext: ключ форматування '{e}' не знайдено в '{translated_text}' для ключа '{text_key}' (локаль: {current_locale})")
+        return translated_text # Повертаємо без форматування при помилці
+
+# Псевдонім для зручності
+_ = gettext
+
+# Middleware для встановлення локалі в стан запиту
+async def set_request_locale_middleware(request: Request, call_next):
+    """
+    Middleware для визначення та встановлення поточної локалі (`request.state.locale`)
+    та функції перекладу (`request.state.gettext`) для кожного запиту.
+    """
+    language_header = request.headers.get("accept-language")
+    locale_code = await get_locale(request=request, accept_language=language_header)
+    request.state.locale = locale_code
+
+    # Робимо функцію gettext доступною через request.state для використання в ендпоінтах
+    # Вона буде автоматично використовувати локаль з request.state.locale
+    # Це потребує модифікації gettext для читання з request.state або передачі локалі.
+    # Простіший варіант - передавати локаль явно в ендпоінтах.
+    # Або ж, якщо використовувати FastAPI-Babel, він це робить автоматично.
+
+    # Поки що, для простоти, gettext вище не залежить від request.state.
+    # Якщо потрібно, щоб gettext в ендпоінтах автоматично використовував локаль запиту:
+    # request.state.gettext = lambda text_key, **kwargs: gettext(text_key, locale=locale_code, **kwargs)
+
+    logger.debug(f"Встановлено локаль для запиту: {locale_code}")
+    response = await call_next(request)
+    return response
+
+# Приклад файлу backend/app/src/locales/uk/translations.json:
+# {
+#   "hello_world": "Привіт, світе!",
+#   "greeting": "Вітаємо, {name}!",
+#   "error_not_found": "Ресурс не знайдено."
+# }
+
+# Приклад файлу backend/app/src/locales/en/translations.json:
+# {
+#   "hello_world": "Hello, World!",
+#   "greeting": "Welcome, {name}!",
+#   "error_not_found": "Resource not found."
+# }
+
+# TODO: Створити ці файли з прикладами.
+# TODO: Розглянути використання бібліотеки типу `python-babel` для компіляції .po файлів,
+#       якщо переклади будуть зберігатися в такому форматі.
+#       Для JSON файлів поточний підхід з `load_translations` є робочим.
+# TODO: Інтегрувати `set_request_locale_middleware` в `main.py`.
 #
-# TODO: Створити каталоги та файли для перекладів (наприклад, `backend/app/src/locales/uk/LC_MESSAGES/messages.po`).
-#
-# TODO: Інтегрувати функцію перекладу (наприклад, `_()`) у всі місця, де є текст,
-# що потребує перекладу (повідомлення про помилки, відповіді API, можливо, дані з БД).
-#
-# На даному етапі цей файл є заглушкою з прикладами та основними концепціями.
-# Функція `get_locale` реалізована для визначення мови.
-# Функція перекладу `_()` є дуже спрощеною і потребує доопрацювання
-# або заміни на рішення з обраної бібліотеки i18n.
-#
-# Все готово для базової структури.
-# Фактична реалізація i18n буде залежати від обраних інструментів.
+# Все виглядає як хороша основа для i18n.
+# `get_locale` реалізовано.
+# `load_translations` та `gettext` (`_`) реалізовані для JSON файлів.
+# Приклад middleware для встановлення локалі запиту.
+# Шлях `LOCALES_DIR` визначено.
+# Створення каталогів для локалей додано в `load_translations`.
 #
 # Все готово.

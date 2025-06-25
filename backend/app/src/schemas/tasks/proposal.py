@@ -44,11 +44,11 @@ class TaskProposalSchema(AuditDatesSchema): # Успадковує id, created_a
     bonus_for_proposal_awarded: bool = Field(..., description="Чи були нараховані бонуси за вдалу пропозицію")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # group: Optional[GroupSimpleSchema] = None
-    proposer: Optional[UserPublicSchema] = None
-    status: Optional[StatusSchema] = None
-    reviewer: Optional[UserPublicSchema] = None
-    # created_task: Optional[TaskSimpleSchema] = None
+    group: Optional[GroupSimpleSchema] = Field(None, description="Група, для якої пропозиція")
+    proposer: Optional[UserPublicSchema] = Field(None, description="Користувач, що запропонував")
+    status: Optional[StatusSchema] = Field(None, description="Статус пропозиції")
+    reviewer: Optional[UserPublicSchema] = Field(None, description="Адміністратор, що розглянув пропозицію")
+    created_task: Optional[TaskSimpleSchema] = Field(None, description="Завдання, створене на основі пропозиції")
 
 
 # --- Схема для створення нової пропозиції завдання ---

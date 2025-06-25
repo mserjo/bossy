@@ -41,10 +41,11 @@ class ReportSchema(AuditDatesSchema): # Успадковує id, created_at, upd
     # file_url: Optional[HttpUrl] = Field(None, description="URL для завантаження файлу звіту") # Може генеруватися
 
     # --- Розгорнуті зв'язки (приклад) ---
-    requester: Optional[UserPublicSchema] = None
-    group: Optional[GroupSimpleSchema] = None
-    status: Optional[StatusSchema] = None
-    # generated_file_info: Optional[FileSchema] = None # Або `file_url`
+    requester: Optional[UserPublicSchema] = Field(None, description="Користувач, який замовив звіт")
+    group: Optional[GroupSimpleSchema] = Field(None, description="Група, для якої звіт")
+    status: Optional[StatusSchema] = Field(None, description="Статус генерації звіту")
+    generated_file_info: Optional[FileSchema] = Field(None, alias="generated_file", description="Інформація про згенерований файл звіту")
+    # `file_url` генерується сервісом і додається до `FileSchema` або окремо.
 
 
 # --- Схема для створення запиту на генерацію звіту ---

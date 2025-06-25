@@ -20,34 +20,31 @@ class IntegrationTypeSchema(BaseDictSchema):
     """
     # `IntegrationModel` має поле `category`.
     category: Optional[str] = Field(None, max_length=100, description="Категорія інтеграції (наприклад, 'messenger', 'calendar', 'task_tracker')")
-
-    # TODO: Якщо `IntegrationModel` буде мати поля `api_docs_url` або `required_settings_schema`,
-    # їх потрібно буде додати сюди.
-    # api_docs_url: Optional[str] = Field(None, max_length=512, description="URL документації API")
-    # required_settings_schema: Optional[dict] = Field(None, description="JSON схема необхідних налаштувань для цієї інтеграції")
+    api_docs_url: Optional[HttpUrl] = Field(None, description="URL документації API для інтеграції")
+    base_api_url: Optional[HttpUrl] = Field(None, description="Базовий URL API для інтеграції")
+    required_settings_schema: Optional[Dict[str, Any]] = Field(None, description="JSON схема необхідних полів для налаштування цієї інтеграції")
 
 # --- Схема для створення нового типу інтеграції ---
 class IntegrationTypeCreateSchema(BaseDictCreateSchema):
     """
     Схема для створення нового типу інтеграції. Успадковує поля від BaseDictCreateSchema.
-    Додає поле `category`.
+    Додає поле `category` та інші специфічні поля.
     """
     category: Optional[str] = Field(None, max_length=100, description="Категорія інтеграції")
-
-    # api_docs_url: Optional[str] = Field(None, max_length=512, description="URL документації API")
-    # required_settings_schema: Optional[dict] = Field(None, description="JSON схема необхідних налаштувань")
-    pass
+    api_docs_url: Optional[HttpUrl] = Field(None, description="URL документації API")
+    base_api_url: Optional[HttpUrl] = Field(None, description="Базовий URL API")
+    required_settings_schema: Optional[Dict[str, Any]] = Field(None, description="JSON схема необхідних налаштувань")
 
 # --- Схема для оновлення існуючого типу інтеграції ---
 class IntegrationTypeUpdateSchema(BaseDictUpdateSchema):
     """
     Схема для оновлення існуючого типу інтеграції. Успадковує поля від BaseDictUpdateSchema.
-    Додає поле `category`.
+    Додає поле `category` та інші специфічні поля.
     """
     category: Optional[str] = Field(None, max_length=100, description="Нова категорія інтеграції")
-
-    # api_docs_url: Optional[str] = Field(None, max_length=512, description="Новий URL документації API")
-    # required_settings_schema: Optional[dict] = Field(None, description="Нова JSON схема необхідних налаштувань")
+    api_docs_url: Optional[HttpUrl] = Field(None, description="Новий URL документації API")
+    base_api_url: Optional[HttpUrl] = Field(None, description="Новий базовий URL API")
+    required_settings_schema: Optional[Dict[str, Any]] = Field(None, description="Нова JSON схема необхідних налаштувань")
     pass
 
 # TODO: Переконатися, що схеми відповідають моделі `IntegrationModel`.

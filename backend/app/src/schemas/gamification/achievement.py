@@ -35,9 +35,9 @@ class AchievementSchema(AuditDatesSchema): # Успадковує id, created_at
     award_reason: Optional[str] = Field(None, description="Причина ручного присудження")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    user: Optional[UserPublicSchema] = None
-    badge: Optional[BadgeSchema] = None # Розгорнута інформація про сам бейдж
-    awarder: Optional[UserPublicSchema] = None # Інформація про того, хто вручну присудив
+    user: Optional[UserPublicSchema] = Field(None, description="Користувач, який отримав досягнення")
+    badge: Optional[BadgeSchema] = Field(None, description="Інформація про отриманий бейдж")
+    awarder: Optional[UserPublicSchema] = Field(None, description="Адміністратор, який вручну присудив досягнення (якщо є)")
 
 
 # --- Схема для створення запису про досягнення (зазвичай внутрішнє використання або адміном) ---

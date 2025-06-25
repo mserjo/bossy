@@ -88,7 +88,7 @@ class UserCreateSchema(BaseSchema):
     last_name: Optional[str] = Field(None, max_length=100)
     patronymic: Optional[str] = Field(None, max_length=100)
 
-    phone_number: Optional[str] = Field(None, description="Номер телефону") # TODO: Додати валідацію формату телефону
+    phone_number: Optional[str] = Field(None, description="Номер телефону")
 
     user_type_code: str = Field(default="user", description="Код типу користувача (за замовчуванням 'user')")
     # state_id: Optional[uuid.UUID] = Field(None, description="Початковий статус користувача (якщо встановлюється при створенні)")
@@ -106,6 +106,19 @@ class UserCreateSchema(BaseSchema):
             raise ValueError("Пароль повинен містити щонайменше 8 символів.")
         return value
 
+    @field_validator('phone_number')
+    @classmethod
+    def validate_phone_number_format(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            # Проста перевірка: складається з цифр, можливо '+' на початку, довжина в розумних межах.
+            # Для більш строгої валідації потрібна бібліотека типу phonenumbers.
+            cleaned_phone = value.lstrip('+')
+            if not cleaned_phone.isdigit():
+                raise ValueError("Номер телефону повинен містити лише цифри та опціональний '+' на початку.")
+            if not (7 <= len(cleaned_phone) <= 15): # Приблизна довжина
+                raise ValueError("Некоректна довжина номера телефону.")
+        return value
+
 # --- Схема для оновлення інформації про користувача (власний профіль) ---
 class UserUpdateSchema(BaseSchema):
     """
@@ -116,10 +129,21 @@ class UserUpdateSchema(BaseSchema):
     last_name: Optional[str] = Field(None, max_length=100)
     patronymic: Optional[str] = Field(None, max_length=100)
 
-    phone_number: Optional[str] = Field(None) # TODO: Валідація формату
+    phone_number: Optional[str] = Field(None)
     birth_date: Optional[datetime] = Field(None)
     description: Optional[str] = Field(None) # Біографія
     notes: Optional[str] = Field(None) # Нотатки (якщо користувач може їх редагувати)
+
+    @field_validator('phone_number')
+    @classmethod
+    def validate_phone_number_format(cls, value: Optional[str]) -> Optional[str]:
+        if value is not None:
+            cleaned_phone = value.lstrip('+')
+            if not cleaned_phone.isdigit():
+                raise ValueError("Номер телефону повинен містити лише цифри та опціональний '+' на початку.")
+            if not (7 <= len(cleaned_phone) <= 15):
+                raise ValueError("Некоректна довжина номера телефону.")
+        return value
 
     # email: Optional[EmailStr] = Field(None, description="Нова електронна пошта (потребуватиме підтвердження)")
     # Зміна email - це окремий процес, зазвичай.

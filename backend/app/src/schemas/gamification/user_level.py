@@ -39,9 +39,9 @@ class UserLevelSchema(AuditDatesSchema): # Успадковує id, created_at, 
     # Поточна модель `UserLevelModel` (після обговорень) МАЄ `is_current`.
 
     # --- Розгорнуті зв'язки (приклад) ---
-    user: Optional[UserPublicSchema] = None
-    group: Optional[GroupSimpleSchema] = None # Для контексту, хоча рівень сам по собі належить групі
-    level: Optional[LevelSchema] = None
+    user: Optional[UserPublicSchema] = Field(None, description="Користувач, який досяг рівня")
+    group: Optional[GroupSimpleSchema] = Field(None, description="Група, в якій досягнуто рівень")
+    level: Optional[LevelSchema] = Field(None, description="Досягнутий рівень")
 
 
 # --- Схема для створення запису про досягнення рівня (зазвичай внутрішнє використання) ---

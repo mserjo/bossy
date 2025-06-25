@@ -82,7 +82,7 @@ __all__ = [
 # Поки що залишаю без явних викликів `model_rebuild`.
 # Якщо виникнуть проблеми з ForwardRef, їх потрібно буде додати.
 # Головне, що всі схеми експортуються через `__all__`.
-#
+
 # `TransactionUpdateSchema` та `BonusAdjustmentUpdateSchema` закоментовані в `__all__`,
 # оскільки ці операції зазвичай не передбачені (транзакції та коригування є незмінними).
 # Якщо вони все ж будуть потрібні, їх можна буде розкоментувати.
@@ -90,3 +90,11 @@ __all__ = [
 #
 # Назва файлу `bonus_adjustment.py` (замість `bonus_rule.py`) була узгоджена.
 # Схеми `BonusAdjustmentSchema` та `BonusAdjustmentCreateSchema` експортуються.
+
+# Виклик model_rebuild для схем, що містять ForwardRef
+# Порядок важливий, якщо є залежності між ними в цьому ж модулі, але тут вони
+# переважно посилаються на схеми з інших модулів, які мають бути вже доступні.
+AccountSchema.model_rebuild()
+TransactionSchema.model_rebuild()
+RewardSchema.model_rebuild()
+BonusAdjustmentSchema.model_rebuild()

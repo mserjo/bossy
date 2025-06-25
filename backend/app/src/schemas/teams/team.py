@@ -39,15 +39,14 @@ class TeamSchema(BaseMainSchema):
     max_members: Optional[int] = Field(None, ge=1, description="Максимальна кількість учасників у команді (NULL - без обмежень)")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    leader: Optional[UserPublicSchema] = None
-    # group: Optional[GroupSimpleSchema] = None # `group_id` вже є
-    # state: Optional[StatusSchema] = None # `state_id` вже є
+    leader: Optional[UserPublicSchema] = Field(None, description="Лідер команди")
+    # group: Optional[GroupSimpleSchema] = Field(None, description="Група, до якої належить команда") # `group_id` вже є
+    state: Optional[ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')] = Field(None, description="Статус команди")
 
-    memberships: List[TeamMembershipSchema] = Field(default_factory=list, description="Список учасників команди та їх ролей (якщо є)")
-    # tasks_assigned: List[TaskSimpleSchema] = [] # Завдання, призначені цій команді (зазвичай отримуються окремо)
+    memberships: List[TeamMembershipSchema] = Field(default_factory=list, description="Список учасників команди")
+    tasks_assigned: List[TaskSimpleSchema] = Field(default_factory=list, description="Завдання, призначені цій команді") # Може бути великим, зазвичай окремо
 
-    # Додаткове поле для зручності: кількість учасників
-    members_count: Optional[int] = Field(None, description="Поточна кількість учасників у команді (обчислюване поле)")
+    members_count: Optional[int] = Field(None, description="Поточна кількість учасників у команді (обчислюване поле, додається сервісом)")
 
 
 # --- Схема для відображення короткої інформації про команду (наприклад, у списку) ---

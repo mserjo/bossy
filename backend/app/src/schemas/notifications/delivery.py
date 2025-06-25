@@ -14,6 +14,7 @@ from datetime import datetime
 from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # Потрібно буде імпортувати схему NotificationSchema для зв'язку
 # from backend.app.src.schemas.notifications.notification import NotificationSchema
+from backend.app.src.core.dicts import NotificationChannelEnum # Імпорт Enum
 
 NotificationSchema = ForwardRef('backend.app.src.schemas.notifications.notification.NotificationSchema')
 
@@ -23,10 +24,10 @@ class NotificationDeliverySchema(AuditDatesSchema): # Успадковує id, c
     Схема для представлення запису про спробу доставки сповіщення.
     """
     notification_id: uuid.UUID = Field(..., description="ID сповіщення, яке доставляється")
-    channel_code: str = Field(..., max_length=50, description="Код каналу доставки (наприклад, 'EMAIL', 'SMS', 'PUSH')")
+    channel_code: NotificationChannelEnum = Field(..., description="Канал доставки")
     recipient_address: str = Field(..., max_length=512, description="Адреса отримувача для цього каналу (email, телефон, device_token)")
 
-    status_code: str = Field(..., max_length=50, description="Статус доставки (наприклад, 'PENDING', 'SENT', 'FAILED')")
+    status_code: str = Field(..., max_length=50, description="Статус доставки (наприклад, 'PENDING', 'SENT', 'FAILED')") # TODO: Enum for status_code
     status_message: Optional[str] = Field(None, description="Деталі статусу або повідомлення про помилку")
 
     sent_at: Optional[datetime] = Field(None, description="Час, коли сповіщення було надіслано через цей канал")
@@ -39,7 +40,7 @@ class NotificationDeliverySchema(AuditDatesSchema): # Успадковує id, c
     next_retry_at: Optional[datetime] = Field(None, description="Час наступної спроби (якщо планується)")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # notification: Optional[NotificationSchema] = None # Зазвичай не розгортаємо, бо в контексті сповіщення
+    notification: Optional[NotificationSchema] = Field(None, description="Сповіщення, що доставляється")
 
 
 # --- Схема для створення запису про спробу доставки (зазвичай внутрішнє використання) ---
@@ -49,10 +50,10 @@ class NotificationDeliveryCreateSchema(BaseSchema):
     Використовується внутрішньою логікою системи сповіщень.
     """
     notification_id: uuid.UUID = Field(..., description="ID сповіщення")
-    channel_code: str = Field(..., max_length=50, description="Код каналу доставки")
+    channel_code: NotificationChannelEnum = Field(..., description="Канал доставки")
     recipient_address: str = Field(..., max_length=512, description="Адреса отримувача для каналу")
 
-    status_code: str = Field(default="PENDING", max_length=50, description="Початковий статус доставки")
+    status_code: str = Field(default="PENDING", max_length=50, description="Початковий статус доставки") # TODO: Enum for status_code
     # status_message: Optional[str] # Встановлюється при зміні статусу
 
     # sent_at, delivered_at, provider_message_id, provider_response - встановлюються пізніше
@@ -68,7 +69,7 @@ class NotificationDeliveryUpdateSchema(BaseSchema):
     Використовується внутрішньою логікою системи при отриманні відповіді від провайдера
     або при плануванні повторних спроб.
     """
-    status_code: str = Field(..., max_length=50, description="Новий статус доставки")
+    status_code: str = Field(..., max_length=50, description="Новий статус доставки") # TODO: Enum for status_code
     status_message: Optional[str] = Field(None, description="Деталі статусу або повідомлення про помилку")
 
     sent_at: Optional[datetime] = Field(None, description="Час відправки (якщо оновлюється)")
@@ -80,8 +81,23 @@ class NotificationDeliveryUpdateSchema(BaseSchema):
     attempt_count: Optional[int] = Field(None, ge=0, description="Оновлена кількість спроб")
     next_retry_at: Optional[datetime] = Field(None, description="Новий час наступної спроби (або NULL, якщо не потрібно)")
 
+    # Додамо channel_code, хоча він зазвичай не змінюється, але для повноти схеми оновлення.
+    channel_code: Optional[NotificationChannelEnum] = Field(None, description="Канал доставки (якщо змінюється, хоча це рідко)")
 
-# NotificationDeliverySchema.model_rebuild() # Для ForwardRef
+    @field_validator('status_code')
+    @classmethod
+    def validate_status_code(cls, value: str) -> str:
+        # TODO: Визначити реальний список статусів доставки (можливо, з Enum)
+        known_statuses = ['PENDING', 'PROCESSING', 'SENT', 'DELIVERED', 'FAILED', 'RETRYING', 'OPENED', 'CLICKED', 'UNSUBSCRIBED', 'INVALID_ADDRESS']
+        if value.upper() not in known_statuses:
+            # logger.warning(f"Спроба встановити невідомий статус доставки: {value}")
+            # Можна або кидати помилку, або дозволяти кастомні статуси
+            pass # Поки що дозволяємо
+        return value.upper()
+
+
+# NotificationDeliverySchema.model_rebuild()
+# NotificationSchema.model_rebuild() # Якщо NotificationSchema посилається сюди
 
 # TODO: Переконатися, що схеми відповідають моделі `NotificationDeliveryModel`.
 # `NotificationDeliveryModel` успадковує від `BaseModel`.

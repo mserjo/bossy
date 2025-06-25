@@ -43,11 +43,11 @@ class GroupInvitationSchema(AuditDatesSchema): # Успадковує id, create
     status_id: Optional[uuid.UUID] = Field(None, description="ID статусу запрошення (надіслано, прийнято, прострочено)")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # group: Optional[GroupSimpleSchema] = None
-    # creator: Optional[UserPublicSchema] = None
-    # invited_user_info: Optional[UserPublicSchema] = None # Поле для інформації про user_id_invited
-    # role_to_assign: Optional[UserRoleSchema] = None
-    # status: Optional[StatusSchema] = None
+    group: Optional[GroupSimpleSchema] = Field(None, description="Інформація про групу, до якої запрошують")
+    creator: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача, який створив запрошення")
+    invited_user_info: Optional[UserPublicSchema] = Field(None, alias="invited_user", description="Інформація про запрошеного користувача (якщо user_id_invited вказано)")
+    role_to_assign: Optional[UserRoleSchema] = Field(None, description="Інформація про роль, яка буде призначена")
+    status: Optional[StatusSchema] = Field(None, description="Інформація про статус запрошення")
 
 
 # --- Схема для створення нового запрошення до групи ---

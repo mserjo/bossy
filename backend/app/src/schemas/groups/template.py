@@ -31,8 +31,14 @@ class GroupTemplateSchema(BaseMainSchema):
     created_by_user_id: Optional[uuid.UUID] = Field(None, description="ID супер-адміністратора, який створив шаблон")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # creator: Optional[UserPublicSchema] = None
-    # status: Optional[StatusSchema] = None # `state` з BaseMainSchema може вже містити це
+    creator: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача, який створив шаблон")
+    state: Optional[StatusSchema] = Field(None, description="Інформація про статус шаблону (успадковано з BaseMainSchema, де state_id)")
+    # `state` тут буде псевдонімом для `status`, якщо `BaseMainSchema` має `state_id`
+    # і ми хочемо розгорнутий об'єкт статусу.
+    # Або ж, якщо `BaseMainSchema` вже має `state: Optional[StatusSchema] = None`,
+    # то тут нічого додавати не потрібно, воно успадкується.
+    # Поточна `BaseMainSchema` не має розгорнутого `state`, лише `state_id`.
+    # Тому додаю `state: Optional[StatusSchema]` сюди.
 
     # `group_id` з `BaseMainSchema` для `GroupTemplateModel` завжди буде `None`.
 

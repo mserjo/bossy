@@ -42,12 +42,11 @@ class NotificationSchema(AuditDatesSchema): # Успадковує id, created_a
     metadata: Optional[Dict[str, Any]] = Field(None, description="Додаткові дані для сповіщення (JSON)")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    recipient: Optional[UserPublicSchema] = None
-    group: Optional[GroupSimpleSchema] = None
+    recipient: Optional[UserPublicSchema] = Field(None, description="Отримувач сповіщення")
+    group: Optional[GroupSimpleSchema] = Field(None, description="Група, пов'язана зі сповіщенням")
 
-    # Список спроб доставки (зазвичай не потрібен при простому читанні сповіщення,
-    # але може бути корисним для адміністрування або детальної інформації).
-    # deliveries: List[NotificationDeliverySchema] = Field(default_factory=list)
+    # Список спроб доставки
+    deliveries: List[NotificationDeliverySchema] = Field(default_factory=list, description="Статуси доставки цього сповіщення")
 
 
 # --- Схема для створення нового сповіщення (зазвичай використовується внутрішньо системою) ---

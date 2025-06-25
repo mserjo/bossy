@@ -63,20 +63,19 @@ class TaskSchema(BaseMainSchema):
     streak_bonus_points: Optional[float] = Field(None, description="Розмір додаткового бонусу за серію")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    task_type: Optional[TaskTypeSchema] = None
-    creator: Optional[UserPublicSchema] = None
-    # parent_task: Optional['TaskSchema'] = None # Рекурсивний зв'язок
-    # child_tasks: List['TaskSchema'] = []
-    # team: Optional[TeamSimpleSchema] = None
-    # streak_bonus_reference_task_info: Optional['TaskSchema'] = None # Інформація про завдання для стрік-бонусу
+    task_type: Optional[TaskTypeSchema] = Field(None, description="Тип завдання/події")
+    creator: Optional[UserPublicSchema] = Field(None, description="Користувач, який створив завдання")
+    parent_task: Optional['TaskSchema'] = Field(None, description="Батьківське завдання (якщо це підзадача)")
+    # child_tasks: List['TaskSchema'] = Field(default_factory=list, description="Список підзадач") # Зазвичай окремий запит
+    team: Optional[ForwardRef('backend.app.src.schemas.teams.team.TeamSimpleSchema')] = Field(None, description="Команда, якій призначено завдання")
+    streak_bonus_reference_task_info: Optional['TaskSchema'] = Field(None, description="Інформація про завдання, за яке нараховується стрік-бонус")
 
     # Списки призначень, виконань, відгуків зазвичай отримуються окремими запитами з пагінацією.
-    # assignments: List[TaskAssignmentSchema] = []
-    # completions: List[TaskCompletionSchema] = []
-    # reviews: List[TaskReviewSchema] = []
+    # assignments: List[TaskAssignmentSchema] = Field(default_factory=list)
+    # completions: List[TaskCompletionSchema] = Field(default_factory=list)
+    # reviews: List[TaskReviewSchema] = Field(default_factory=list)
 
-    # `group_id` та `state_id` вже є в `BaseMainSchema`.
-    # state: Optional[StatusSchema] = None # Для розгорнутого статусу
+    state: Optional[ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')] = Field(None, description="Статус завдання/події")
 
 
 # --- Схема для створення нового завдання/події ---
@@ -118,11 +117,18 @@ class TaskCreateSchema(BaseSchema):
     notes: Optional[str] = Field(None)
 
     # TODO: Додати валідатори:
-    # - `due_date` має бути в майбутньому (якщо встановлено).
-    # - Якщо `is_recurring`=True, то `recurring_interval_description` має бути заповнене.
+    # - Якщо `is_recurring`=True, то `recurring_interval_description` має бути заповнене. (Вже є `validate_recurring_settings`)
     # - Якщо `allow_multiple_assignees`=False, то `first_completes_gets_bonus` не має значення (або має бути True).
-    # - Якщо `streak_bonus_enabled`=True, то `streak_bonus_count` та `streak_bonus_points` мають бути заповнені.
+    # - Якщо `streak_bonus_enabled`=True, то `streak_bonus_count` та `streak_bonus_points` мають бути заповнені. (Вже є `validate_streak_bonus_settings`)
     # - `streak_bonus_ref_task_id` має посилатися на існуюче завдання (перевірка на сервісі).
+
+    @field_validator('due_date')
+    @classmethod
+    def due_date_must_be_in_future(cls, value: Optional[datetime]) -> Optional[datetime]:
+        if value is not None and value <= datetime.utcnow().replace(tzinfo=None): # Або datetime.now(timezone.utc)
+            # Потрібно узгодити часові зони. Припускаємо, що value приходить як naive UTC або вже UTC.
+            raise ValueError("Термін виконання завдання (due_date) не може бути в минулому.")
+        return value
 
     @model_validator(mode='after')
     def validate_recurring_settings(cls, data: 'TaskCreateSchema') -> 'TaskCreateSchema':

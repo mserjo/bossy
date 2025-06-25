@@ -45,12 +45,13 @@ class GroupTypeModel(BaseDictModel):
     # Гарантує, що кожен символьний код типу групи є унікальним.
     __table_args__ = (
         UniqueConstraint('code', name='uq_group_types_code'),
+        # Типи груп зазвичай глобальні, тому group_id тут не використовується для унікальності.
     )
 
-    # TODO: Визначити зв'язок з моделлю GroupModel.
-    # Якщо модель GroupModel має поле group_type_id, що посилається на GroupTypeModel:
-    # groups = relationship("GroupModel", back_populates="group_type")
-    # Це дозволить отримати всі групи певного типу: group_type_object.groups
+    # --- Зворотні зв'язки (Relationships) ---
+    # Зв'язок з GroupModel (групи, що мають цей тип)
+    # TODO: Узгодити back_populates="group_type" з GroupModel
+    groups_of_this_type = relationship("GroupModel", back_populates="group_type", foreign_keys="[GroupModel.group_type_id]")
 
     # TODO: Розглянути можливість додавання булевих прапорців для визначення характеристик типу групи,
     # наприклад:

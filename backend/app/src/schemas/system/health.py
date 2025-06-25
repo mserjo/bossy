@@ -35,13 +35,13 @@ class ServiceHealthStatusCreateSchema(BaseSchema):
     details: Optional[Dict[str, Any]] = Field(None, description="Додаткові деталі (JSON)")
     # `checked_at` (тобто `created_at`) буде встановлено автоматично.
 
-    # TODO: Додати валідатор для `status`, щоб він був з дозволеного списку.
-    # @field_validator('status')
-    # def status_must_be_known(cls, value: str) -> str:
-    #     known_statuses = ['healthy', 'unhealthy', 'degraded', 'unknown']
-    #     if value not in known_statuses:
-    #         raise ValueError(f"Невідомий статус: {value}. Дозволені: {', '.join(known_statuses)}")
-    #     return value
+    @field_validator('status')
+    @classmethod
+    def status_must_be_known(cls, value: str) -> str:
+        known_statuses = ['healthy', 'unhealthy', 'degraded', 'unknown']
+        if value not in known_statuses:
+            raise ValueError(f"Невідомий статус: '{value}'. Дозволені: {', '.join(known_statuses)}.")
+        return value
 
 # --- Схеми для відповіді API Health Check (/health) ---
 

@@ -39,14 +39,12 @@ class TransactionSchema(AuditDatesSchema): # Успадковує id, created_at
     balance_after_transaction: Optional[Decimal] = Field(None, description="Баланс рахунку після цієї транзакції")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # account: Optional[AccountSchema] = None # Зазвичай не розгортаємо, бо транзакції в контексті рахунку
-    related_user: Optional[UserPublicSchema] = None
+    account: Optional[AccountSchema] = Field(None, description="Рахунок, до якого відноситься транзакція")
+    related_user: Optional[UserPublicSchema] = Field(None, description="Пов'язаний користувач (наприклад, для 'подяки')")
 
-    # TODO: Додати поле `bonus_type_code_at_transaction: str` якщо вирішимо, що
-    # `AccountModel` не фіксує тип валюти незмінно, або якщо транзакція може бути
-    # в іншій валюті, ніж поточна валюта рахунку (що малоймовірно).
-    # Наразі, валюта транзакції визначається з `AccountModel.bonus_type_code`
-    # для `account_id`, до якого належить транзакція.
+    # Валюта транзакції визначається з AccountModel.bonus_type_code
+    # для account_id, до якого належить транзакція.
+    # Якщо б AccountModel не мав bonus_type_code, то його треба було б додати сюди.
 
 # --- Схема для створення транзакції (зазвичай використовується внутрішньо системою) ---
 class TransactionCreateSchema(BaseSchema):

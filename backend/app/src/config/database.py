@@ -140,6 +140,27 @@ if not DATABASE_URL or "None" in DATABASE_URL: # PydanticDsn може стати
     # logger.warning("DATABASE_URL не встановлено або має некоректне значення. Перевірте змінні середовища або .env файл.")
     print("ПОПЕРЕДЖЕННЯ: DATABASE_URL не встановлено або має некоректне значення. Перевірте змінні середовища або .env файл.")
 
+# Функція для перевірки з'єднання з БД
+async def check_db_connection() -> bool:
+    """
+    Перевіряє з'єднання з базою даних, виконуючи простий запит.
+    Повертає True при успішному з'єднанні, інакше False.
+    """
+    if not async_engine:
+        logger.error("Перевірка з'єднання з БД неможлива: async_engine не ініціалізовано.")
+        return False
+    try:
+        async with async_engine.connect() as connection:
+            # Виконуємо простий запит, наприклад, SELECT 1
+            # Для SQLAlchemy 2.0, text імпортується з sqlalchemy
+            from sqlalchemy import text # type: ignore
+            await connection.execute(text("SELECT 1"))
+        logger.info("З'єднання з базою даних успішно перевірено.")
+        return True
+    except Exception as e:
+        logger.error(f"Помилка підключення до бази даних під час перевірки: {e}", exc_info=True)
+        return False
+
 # Все виглядає добре для налаштування асинхронної роботи з БД.
 # `get_db_session` - стандартна залежність для FastAPI.
 # Важливо, що `commit` та `rollback` обробляються на рівні бізнес-логіки (сервіси/репозиторії),

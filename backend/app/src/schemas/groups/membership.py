@@ -38,10 +38,10 @@ class GroupMembershipSchema(AuditDatesSchema): # Успадковує id, create
     notes: Optional[str] = Field(None, description="Нотатки щодо членства")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    user: Optional[UserPublicSchema] = None
+    user: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача")
     # group: Optional[GroupSimpleSchema] = None # Зазвичай не потрібно, бо ми вже в контексті групи або користувача
-    role: Optional[UserRoleSchema] = None
-    status_in_group: Optional[StatusSchema] = None
+    role: Optional[UserRoleSchema] = Field(None, description="Інформація про роль користувача в групі")
+    status_in_group: Optional[StatusSchema] = Field(None, description="Інформація про статус користувача в групі")
 
 # --- Схема для створення нового запису про членство (наприклад, адміном) ---
 class GroupMembershipCreateSchema(BaseSchema):

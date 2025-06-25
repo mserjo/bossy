@@ -31,8 +31,8 @@ class AvatarSchema(AuditDatesSchema): # Успадковує id, created_at, upd
     is_current: bool = Field(..., description="Чи є цей аватар поточним (активним) для користувача")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # user: Optional[UserPublicSchema] = None # Зазвичай не потрібно, бо в контексті користувача
-    file: Optional[FileSchema] = None # Розгорнута інформація про файл аватара (включаючи URL)
+    user: Optional[UserPublicSchema] = Field(None, description="Користувач, якому належить аватар") # Може бути корисним для адмінки
+    file: Optional[FileSchema] = Field(None, description="Інформація про файл аватара (включаючи URL)")
 
 
 # --- Схема для створення/встановлення аватара (зазвичай внутрішнє використання) ---

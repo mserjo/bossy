@@ -49,24 +49,27 @@ class IntegrationModel(BaseDictModel):
     # Гарантує, що кожен символьний код типу інтеграції є унікальним.
     __table_args__ = (
         UniqueConstraint('code', name='uq_integrations_code'),
+        # Типи інтеграцій зазвичай глобальні.
     )
 
     # Категорія інтеграції, наприклад, 'messenger', 'calendar', 'task_tracker', 'payment_system'.
     # Допомагає класифікувати типи інтеграцій.
-    category: Column[str | None] = Column(String(100), nullable=True, index=True)
+    category: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True) # SQLAlchemy 2.0 style
 
-    # TODO: Розглянути можливість зберігання URL документації або базового URL API для інтеграції.
-    # api_docs_url: Column[str | None] = Column(String(512), nullable=True)
-    # base_api_url: Column[str | None] = Column(String(255), nullable=True)
+    api_docs_url: Mapped[Optional[str]] = mapped_column(String(512), nullable=True)
+    base_api_url: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
 
-    # TODO: Подумати про зберігання шаблону налаштувань, необхідних для цієї інтеграції (наприклад, у форматі JSON).
-    # Це може допомогти динамічно генерувати форми для налаштування інтеграції користувачем.
-    # required_settings_schema: Column[JSON] = Column(JSON, nullable=True)
+    # Шаблон налаштувань, необхідних для цієї інтеграції (наприклад, JSON схема полів).
+    # Це може допомогти динамічно генерувати форми для налаштування інтеграції.
+    required_settings_schema: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True) # SQLAlchemy 2.0 style, JSONB для PostgreSQL
 
-    # TODO: Визначити зв'язки з іншими моделями, наприклад, з таблицею,
-    # де зберігаються конкретні налаштування інтеграції для користувача або групи.
-    # user_integrations = relationship("UserIntegrationSettingsModel", back_populates="integration_type")
-    # group_integrations = relationship("GroupIntegrationSettingsModel", back_populates="integration_type")
+    # --- Зворотні зв'язки (Relationships) ---
+    # TODO: Визначити моделі для UserIntegrationSettingsModel та GroupIntegrationSettingsModel,
+    #       якщо налаштування інтеграцій зберігатимуться в окремих таблицях.
+    #       Тоді тут будуть відповідні relationships.
+    # Наприклад:
+    # user_integration_settings = relationship("UserIntegrationSettingsModel", back_populates="integration_type")
+    # group_integration_settings = relationship("GroupIntegrationSettingsModel", back_populates="integration_type")
 
     def __repr__(self) -> str:
         """

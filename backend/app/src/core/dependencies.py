@@ -62,40 +62,71 @@ async def get_current_user(
         except ValueError:
             raise credentials_exception # Якщо user_id не валідний UUID
 
-        # Валідація payload за допомогою Pydantic схеми (опціонально, але корисно)
-        # token_data = TokenPayloadSchema(**payload) # Або TokenPayloadSchema.model_validate(payload)
-        # user_id = token_data.sub
+        # Валідація payload за допомогою Pydantic схеми
+        try:
+            token_data = TokenPayloadSchema.model_validate(payload)
+        except ValidationError:
+            raise credentials_exception
+
+        user_id = token_data.sub # user_id тепер є uuid.UUID завдяки валідатору в TokenPayloadSchema
+
+        # Перевірка типу токена (якщо потрібно)
+        if token_data.token_type and token_data.token_type != "access":
+             raise UnauthorizedException(detail="Некоректний тип токена, очікується 'access'")
 
     except JWTError: # Включає ExpiredSignatureError, InvalidTokenError тощо.
         raise credentials_exception
-    except ValidationError: # Якщо використовується TokenPayloadSchema і валідація не пройшла
-        raise credentials_exception
+    # ValidationError вже оброблено вище
 
     # Отримання користувача з БД за user_id
-    # Потрібен UserService для цього. Поки що імітуємо.
+    # TODO: ЗАМІНИТИ ЦЕ НА РЕАЛЬНИЙ ВИКЛИК СЕРВІСУ КОРИСТУВАЧІВ, КОЛИ ВІН БУДЕ ГОТОВИЙ!
     # user_service = UserService(db)
-    # user_orm = await user_service.get_user_by_id(user_id)
+    # user_orm = await user_service.get_active_user_by_id_for_auth(user_id) # Метод сервісу має робити всі перевірки
 
-    # --- Імітація отримання користувача (замінити на реальний виклик сервісу) ---
-    from backend.app.src.models.auth import UserModel # Тимчасовий імпорт для прикладу
+    # --- Поточна імітація отримання та перевірки користувача ---
+    from backend.app.src.models.auth import UserModel # Тимчасовий імпорт
+    from backend.app.src.models.dictionaries.status import StatusModel # Для перевірки статусу
     from sqlalchemy import select # type: ignore
 
-    query = select(UserModel).where(UserModel.id == user_id)
+    query = select(UserModel).where(UserModel.id == user_id).options(
+        # Додаємо завантаження зв'язку зі статусом, якщо він потрібен для перевірки
+        # from sqlalchemy.orm import selectinload # type: ignore
+        # selectinload(UserModel.state) # Припускаючи, що UserModel має зв'язок `state`
+    )
     result = await db.execute(query)
     user_orm: Optional[UserModel] = result.scalar_one_or_none()
     # --- Кінець імітації ---
 
     if user_orm is None:
-        raise credentials_exception # Користувача не знайдено
+        raise credentials_exception # Користувача не знайдено (або був видалений і GC спрацював)
 
-    # Перевірка, чи користувач активний (не заблокований, не видалений тощо)
-    # Це залежить від логіки статусів користувача.
-    # Припустимо, що UserModel має поле is_active або state_id, яке це визначає.
-    # if not user_orm.is_active: # Або перевірка через user_orm.state.code
-    #     raise UnauthorizedException(detail="Користувач неактивний")
-    if user_orm.is_deleted: # Приклад перевірки
-         raise UnauthorizedException(detail="Користувач видалений")
-    # TODO: Додати перевірку статусу користувача (наприклад, не заблокований).
+    # Перевірка, чи користувач "активний" в широкому сенсі
+    if user_orm.is_deleted:
+         raise UnauthorizedException(detail="Обліковий запис користувача видалено.")
+
+    # Перевірка статусу користувача (state_id)
+    # Припускаємо, що UserModel має state_id, і ми можемо отримати код статусу.
+    # Це потребуватиме ще одного запиту до БД для отримання StatusModel.code,
+    # якщо статус не завантажено разом з користувачем.
+    # Краще, щоб сервіс користувачів повертав цю інформацію або робив перевірку.
+    # Поки що, якщо state_id є, і він не відповідає активному статусу, кидаємо помилку.
+    # (Це дуже спрощена перевірка, потребує реального довідника статусів)
+    if user_orm.state_id: # Якщо статус встановлено
+        # Імітація перевірки коду статусу
+        # Потрібно отримати StatusModel.code для user_orm.state_id
+        # status_query = select(StatusModel.code).where(StatusModel.id == user_orm.state_id)
+        # status_result = await db.execute(status_query)
+        # status_code = status_result.scalar_one_or_none()
+        # if status_code and status_code not in [STATUS_ACTIVE_CODE, "інший_активний_статус_користувача"]:
+        #     raise UnauthorizedException(detail=f"Обліковий запис користувача неактивний (статус: {status_code}).")
+        #
+        # Простіша перевірка (якщо є константа для ID активного статусу, що погано):
+        # if user_orm.state_id != ID_АКТИВНОГО_СТАТУСУ:
+        #     raise UnauthorizedException(detail="Обліковий запис користувача неактивний.")
+        #
+        # Поки що цю перевірку залишаю як TODO для реалізації через сервіс,
+        # оскільки вона потребує знання кодів активних статусів.
+        pass # TODO: Реалізувати перевірку state_id користувача на активність
 
     return UserSchema.model_validate(user_orm) # Повертаємо Pydantic схему
 

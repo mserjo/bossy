@@ -58,5 +58,9 @@ __all__ = [
 
 # Поки що залишаю без явних викликів `model_rebuild`.
 # Головне, що всі схеми експортуються через `__all__`.
-#
+
+# Виклик model_rebuild для схем, що містять ForwardRef
+FileSchema.model_rebuild()
+AvatarSchema.model_rebuild()
+
 # Все виглядає добре.

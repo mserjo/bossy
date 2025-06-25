@@ -48,11 +48,16 @@ class TaskTypeModel(BaseDictModel):
     # Поки що робимо `code` унікальним глобально.
     __table_args__ = (
         UniqueConstraint('code', name='uq_task_types_code'),
+        # Типи завдань можуть бути глобальними або специфічними для групи.
+        # Якщо специфічні для групи, то унікальність (group_id, code).
+        # Поки що `code` глобально унікальний.
+        # TODO: Переглянути, якщо типи завдань будуть залежати від груп.
     )
 
-    # TODO: Визначити зв'язок з моделлю TaskModel.
-    # Якщо модель TaskModel має поле task_type_id, що посилається на TaskTypeModel:
-    # tasks = relationship("TaskModel", back_populates="task_type")
+    # --- Зворотні зв'язки (Relationships) ---
+    # Зв'язок з TaskModel (завдання, що мають цей тип)
+    # TODO: Узгодити back_populates="task_type" з TaskModel
+    tasks_of_this_type = relationship("TaskModel", back_populates="task_type", foreign_keys="[TaskModel.task_type_id]")
 
     # TODO: Розглянути додавання булевих прапорців для визначення характеристик типу завдання:
     # is_event (bool): True, якщо це подія (не потребує активного виконання), інакше False (це завдання).

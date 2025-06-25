@@ -1,0 +1,38 @@
+{
+  "hello_world": "Hello, World!",
+  "greeting": "Welcome, {name}!",
+  "error_resource_not_found": "Resource not found.",
+  "error_item_not_found": "{item_name} with ID {item_id} not found.",
+  "error_unauthorized": "Unauthorized access.",
+  "error_forbidden": "Access forbidden.",
+  "error_bad_request": "Bad request.",
+  "error_internal_server": "Internal server error.",
+  "success_resource_created": "{resource_name} created successfully.",
+  "success_resource_updated": "{resource_name} updated successfully.",
+  "success_resource_deleted": "{resource_name} deleted successfully.",
+
+  "role_superadmin": "Super Administrator",
+  "role_group_admin": "Group Administrator",
+  "role_group_user": "Group User",
+
+  "user_login_successful": "Login successful.",
+  "user_logout_successful": "Logout successful.",
+  "user_registration_successful": "Registration successful. Please check your email to verify your account.",
+  "user_password_reset_request_sent": "If an account with this email or phone exists, a password reset link has been sent.",
+  "user_password_reset_successful": "Password has been reset successfully.",
+  "user_email_verified_successfully": "Email verified successfully.",
+  "user_profile_updated": "Profile updated successfully.",
+
+  "group_created": "Group '{group_name}' created.",
+  "group_settings_updated": "Settings for group '{group_name}' updated.",
+  "group_invitation_sent": "Invitation to group '{group_name}' sent.",
+  "group_joined_successfully": "Successfully joined group '{group_name}'.",
+
+  "task_created": "Task '{task_name}' created.",
+  "task_completed_notification_title": "Task Completed: {task_name}",
+  "task_completed_notification_body": "User {user_name} has marked task '{task_name}' as completed and it's awaiting your review.",
+  "task_status_changed_notification_title": "Task Status Updated: {task_name}",
+  "task_status_changed_notification_body": "The status of your task '{task_name}' has been changed to: {new_status}.",
+  "task_deadline_reminder_title": "Task Deadline Reminder: {task_name}",
+  "task_deadline_reminder_body": "This is a reminder that the task '{task_name}' is due on {due_date}."
+}

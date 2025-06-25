@@ -13,18 +13,16 @@ from typing import cast
 from loguru import logger # type: ignore # Loguru не має офіційних стабів, але працює
 
 # Імпорт налаштувань додатку для визначення рівня логування та інших параметрів
-from backend.app.src.config.settings import settings
+from backend.app.src.config.settings import settings # Головний об'єкт settings
+import os # Для роботи зі шляхами та створення каталогів
 
 # --- Конфігурація Loguru ---
 
 # Видаляємо стандартний обробник loguru, щоб налаштувати власні.
 logger.remove(None) # Видаляє всі попередньо налаштовані обробники, якщо є
-                    # Або logger.remove(0) для видалення першого стандартного обробника.
-                    # Якщо `None`, то видаляє всі.
 
-# Рівень логування з налаштувань. Якщо DEBUG=True, то рівень DEBUG, інакше INFO.
-# Можна додати окрему змінну LOG_LEVEL в AppSettings.
-LOG_LEVEL = "DEBUG" if settings.app.DEBUG else "INFO"
+# Рівень логування з налаштувань LoggingSettings.
+LOG_LEVEL = settings.logging.LOG_LEVEL.upper()
 
 # Формат логів
 # Детальний формат, що включає час, рівень, модуль, функцію, рядок та повідомлення.
@@ -63,32 +61,36 @@ logger.add(
     diagnose=settings.app.DEBUG  # Виводити діагностичну інформацію про змінні (лише в DEBUG)
 )
 
-# 2. Обробник для запису логів у файл (опціонально, можна керувати через налаштування)
-# TODO: Додати змінні в AppSettings для керування логуванням у файл:
-# LOG_TO_FILE_ENABLE: bool = False
-# LOG_FILE_PATH: str = "logs/app.log" (шлях відносно кореня проекту або абсолютний)
-# LOG_FILE_LEVEL: str = "INFO"
-# LOG_FILE_ROTATION: str = "10 MB" (ротація файлу за розміром)
-# LOG_FILE_RETENTION: str = "7 days" (зберігання файлів логів)
-# LOG_FILE_COMPRESSION: Optional[str] = "zip" (стиснення старих файлів)
+# 2. Обробник для запису логів у файл (якщо увімкнено в `settings.logging`)
+if settings.logging.LOG_TO_FILE_ENABLE:
+    log_file_path = settings.logging.LOG_FILE_PATH
 
-# Приклад налаштування файлового логгера (якщо увімкнено в settings):
-# if getattr(settings.app, "LOG_TO_FILE_ENABLE", False):
-#     log_file_path = getattr(settings.app, "LOG_FILE_PATH", "logs/app.log")
-#     # Переконуємося, що каталог для логів існує
-#     # import os
-#     # os.makedirs(os.path.dirname(log_file_path), exist_ok=True)
-#
-#     logger.add(
-#         log_file_path,
-#         level=getattr(settings.app, "LOG_FILE_LEVEL", "INFO").upper(),
-#         format=LOG_FORMAT_DETAILED, # Зазвичай у файли пишуть детальні логи
-#         rotation=getattr(settings.app, "LOG_FILE_ROTATION", "10 MB"),
-#         retention=getattr(settings.app, "LOG_FILE_RETENTION", "7 days"),
-#         compression=getattr(settings.app, "LOG_FILE_COMPRESSION", "zip"),
-#         enqueue=True, # Асинхронне логування
-#         encoding="utf-8" # Явне кодування для файлу
-#     )
+    # Переконуємося, що каталог для логів існує
+    try:
+        log_dir = os.path.dirname(log_file_path)
+        if log_dir and not os.path.exists(log_dir): # Створюємо, лише якщо шлях не порожній
+            os.makedirs(log_dir, exist_ok=True)
+            logger.info(f"Створено каталог для логів: {log_dir}")
+    except Exception as e:
+        logger.error(f"Не вдалося створити каталог для логів '{log_dir}': {e}")
+        # Продовжуємо без файлового логування, якщо не вдалося створити каталог
+
+    if not log_dir or os.path.exists(log_dir): # Додаємо обробник, лише якщо каталог існує або не потрібен (файл в поточному)
+        logger.add(
+            log_file_path,
+            level=settings.logging.LOG_FILE_LEVEL.upper(),
+            format=LOG_FORMAT_DETAILED, # Зазвичай у файли пишуть детальні логи
+            rotation=settings.logging.LOG_FILE_ROTATION,
+            retention=settings.logging.LOG_FILE_RETENTION,
+            compression=settings.logging.LOG_FILE_COMPRESSION,
+            enqueue=True, # Асинхронне логування
+            encoding="utf-8", # Явне кодування для файлу
+            backtrace=settings.app.DEBUG, # Також додамо backtrace/diagnose для файлів, якщо DEBUG
+            diagnose=settings.app.DEBUG
+        )
+        logger.info(f"Файловий логгер налаштовано. Шлях: {log_file_path}, Рівень: {settings.logging.LOG_FILE_LEVEL.upper()}")
+    else:
+        logger.warning(f"Файлове логування увімкнено, але не вдалося підготувати каталог. Логування у файл '{log_file_path}' не буде активовано.")
 
 # --- Інтеграція з стандартним модулем logging (для бібліотек, що його використовують) ---
 # Loguru може перехоплювати логи, згенеровані стандартним `logging`.

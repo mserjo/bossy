@@ -30,8 +30,8 @@ class TeamMembershipSchema(AuditDatesSchema): # Успадковує id, created
     role_in_team: Optional[str] = Field(None, max_length=100, description="Роль користувача в команді (якщо є, окрім лідера)")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    user: Optional[UserPublicSchema] = None
-    # team: Optional[TeamSimpleSchema] = None # Зазвичай не потрібно, бо в контексті команди або користувача
+    user: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача-учасника")
+    team: Optional[TeamSimpleSchema] = Field(None, description="Інформація про команду") # Може бути корисним, якщо список членств для користувача
 
 
 # --- Схема для створення нового запису про членство в команді (додавання учасника) ---

@@ -84,3 +84,8 @@ class OverallHealthStatusSchema(BaseSchema):
 # можуть бути корисними для додаткової інформації.
 # `response_time_ms` в `HealthCheckComponentSchema` (закоментоване) - для деталізації продуктивності.
 # Ці схеми готові для використання в Health Check ендпоінті.
+
+ServiceHealthStatusSchema.model_rebuild()
+ServiceHealthStatusCreateSchema.model_rebuild()
+HealthCheckComponentSchema.model_rebuild()
+OverallHealthStatusSchema.model_rebuild()

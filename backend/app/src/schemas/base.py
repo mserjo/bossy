@@ -71,6 +71,8 @@ class BaseMainSchema(AuditDatesSchema):
     # TODO: Додати поля для зв'язків (наприклад, `state: Optional[StatusSchema]`),
     # коли відповідні схеми будуть створені. Це робиться через `model_rebuild()`
     # або визначаючи поля з Optional[ForwardRef('OtherSchema')].
+    # state: Optional["StatusSchema"] = None # Приклад, потребує ForwardRef та model_rebuild
+    # group: Optional["GroupSchema"] = None # Приклад
 
 class PaginatedResponse(BaseSchema, Generic[DataType]):
     """

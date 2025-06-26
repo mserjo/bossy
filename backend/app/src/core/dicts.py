@@ -19,7 +19,7 @@ class NotificationChannelEnum(str, Enum):
     PUSH_FCM = constants.NOTIFICATION_CHANNEL_PUSH_FCM
     PUSH_APNS = constants.NOTIFICATION_CHANNEL_PUSH_APNS
     TELEGRAM_BOT = constants.NOTIFICATION_CHANNEL_TELEGRAM
-    SLACK = constants.NOTIFICATION_CHANNEL_SLACK
+    SLACK = constants.NOTIFICATION_CHANNEL_SLACK # Використовує константу NOTIFICATION_CHANNEL_SLACK
 
     @classmethod
     def get_email_channels(cls) -> List['NotificationChannelEnum']:
@@ -36,28 +36,28 @@ class TransactionTypeEnum(str, Enum):
     THANK_YOU_RECEIVED = constants.TRANSACTION_TYPE_THANK_YOU_RECEIVED
     INITIAL_BALANCE = constants.TRANSACTION_TYPE_INITIAL_BALANCE
     PROPOSAL_BONUS = constants.TRANSACTION_TYPE_PROPOSAL_BONUS
-    STREAK_BONUS = "STREAK_BONUS" # Додано, якщо є в константах (перевірити constants.py)
-    SYSTEM_ADJUSTMENT_CREDIT = "SYSTEM_ADJUSTMENT_CREDIT"
-    SYSTEM_ADJUSTMENT_DEBIT = "SYSTEM_ADJUSTMENT_DEBIT"
+    STREAK_BONUS = constants.TRANSACTION_TYPE_STREAK_BONUS # Використовує константу
+    SYSTEM_ADJUSTMENT_CREDIT = constants.TRANSACTION_TYPE_SYSTEM_ADJUSTMENT_CREDIT # Використовує константу
+    SYSTEM_ADJUSTMENT_DEBIT = constants.TRANSACTION_TYPE_SYSTEM_ADJUSTMENT_DEBIT # Використовує константу
 
 class BadgeConditionTypeEnum(str, Enum):
     """Типи умов для отримання бейджів."""
-    TASK_COUNT_TOTAL = "TASK_COUNT_TOTAL"
-    TASK_COUNT_TYPE = "TASK_COUNT_TYPE"
-    TASK_STREAK = "TASK_STREAK"
-    FIRST_TO_COMPLETE_TASK = "FIRST_TO_COMPLETE_TASK"
-    SPECIFIC_TASK_COMPLETED = "SPECIFIC_TASK_COMPLETED"
-    MANUAL_AWARD = "MANUAL_AWARD"
-    CUSTOM_EVENT = "CUSTOM_EVENT"
-    BONUS_POINTS_EARNED = "BONUS_POINTS_EARNED"
+    TASK_COUNT_TOTAL = constants.BADGE_CONDITION_TASK_COUNT_TOTAL # Використовує константу
+    TASK_COUNT_TYPE = constants.BADGE_CONDITION_TASK_COUNT_TYPE   # Використовує константу
+    TASK_STREAK = constants.BADGE_CONDITION_TASK_STREAK         # Використовує константу
+    FIRST_TO_COMPLETE_TASK = constants.BADGE_CONDITION_FIRST_TO_COMPLETE_TASK # Використовує константу
+    SPECIFIC_TASK_COMPLETED = constants.BADGE_CONDITION_SPECIFIC_TASK_COMPLETED # Використовує константу
+    MANUAL_AWARD = constants.BADGE_CONDITION_MANUAL_AWARD        # Використовує константу
+    CUSTOM_EVENT = constants.BADGE_CONDITION_CUSTOM_EVENT       # Використовує константу
+    BONUS_POINTS_EARNED = constants.BADGE_CONDITION_BONUS_POINTS_EARNED # Використовує константу
 
 class RatingTypeEnum(str, Enum):
     """Типи рейтингів користувачів."""
-    BY_TASKS_COMPLETED_OVERALL = constants.RATING_TYPE_BY_TASKS_COMPLETED_OVERALL # Виправлено на використання константи
-    BY_BONUS_POINTS_EARNED_OVERALL = constants.RATING_TYPE_BY_BONUS_POINTS_EARNED_OVERALL # Виправлено
-    BY_CURRENT_BALANCE = constants.RATING_TYPE_BY_CURRENT_BALANCE # Виправлено
-    BY_TASKS_COMPLETED_PERIOD = constants.RATING_TYPE_BY_TASKS_COMPLETED_PERIOD # Виправлено
-    BY_BONUS_POINTS_EARNED_PERIOD = constants.RATING_TYPE_BY_BONUS_POINTS_EARNED_PERIOD # Виправлено
+    BY_TASKS_COMPLETED_OVERALL = constants.RATING_TYPE_BY_TASKS_COMPLETED_OVERALL
+    BY_BONUS_POINTS_EARNED_OVERALL = constants.RATING_TYPE_BY_BONUS_POINTS_EARNED_OVERALL
+    BY_CURRENT_BALANCE = constants.RATING_TYPE_BY_CURRENT_BALANCE
+    BY_TASKS_COMPLETED_PERIOD = constants.RATING_TYPE_BY_TASKS_COMPLETED_PERIOD
+    BY_BONUS_POINTS_EARNED_PERIOD = constants.RATING_TYPE_BY_BONUS_POINTS_EARNED_PERIOD
 
 class ReportCodeEnum(str, Enum):
     """Коди (типи) звітів, що генеруються системою."""
@@ -94,13 +94,24 @@ class FileCategoryEnum(str, Enum):
     TASK_ATTACHMENT = constants.FILE_CATEGORY_TASK_ATTACHMENT
     REPORT_FILE = constants.FILE_CATEGORY_REPORT_FILE
 
+class NotificationDeliveryStatusEnum(str, Enum):
+    """Статуси доставки сповіщень."""
+    PENDING = constants.DELIVERY_STATUS_PENDING
+    PROCESSING = constants.DELIVERY_STATUS_PROCESSING
+    SENT = constants.DELIVERY_STATUS_SENT
+    DELIVERED = constants.DELIVERY_STATUS_DELIVERED
+    FAILED = constants.DELIVERY_STATUS_FAILED
+    RETRYING = constants.DELIVERY_STATUS_RETRYING
+    OPENED = constants.DELIVERY_STATUS_OPENED
+    CLICKED = constants.DELIVERY_STATUS_CLICKED
+    UNSUBSCRIBED = constants.DELIVERY_STATUS_UNSUBSCRIBED
+
 # Перевірка констант (деякі могли бути пропущені в constants.py або тут)
 # Для RatingTypeEnum я додав використання констант, припускаючи, що вони є в constants.py.
 # Якщо ні, їх треба буде додати в constants.py або залишити рядкові літерали тут.
 #
 # Узгодження TransactionTypeEnum з constants.py:
-# STREAK_BONUS та SYSTEM_ADJUSTMENT_* не були в constants.py, додав їх сюди як рядки.
-# Потрібно буде додати їх в constants.py для повної консистентності.
+# STREAK_BONUS та SYSTEM_ADJUSTMENT_* тепер мають відповідні константи.
 #
 # Аналогічно для NotificationTypeEnum та FileCategoryEnum - значення взяті з відповідних констант.
 #

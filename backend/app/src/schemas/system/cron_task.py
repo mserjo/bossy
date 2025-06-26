@@ -168,3 +168,7 @@ class CronTaskUpdateSchema(BaseSchema):
 # оскільки SQLAlchemy зазвичай коректно обробляє тип `Interval` в `timedelta`.
 # Якщо ні, його можна буде розкоментувати та адаптувати.
 # Все виглядає добре.
+
+CronTaskSchema.model_rebuild()
+CronTaskCreateSchema.model_rebuild()
+CronTaskUpdateSchema.model_rebuild()

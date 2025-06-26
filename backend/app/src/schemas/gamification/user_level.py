@@ -98,3 +98,6 @@ class UserLevelCreateSchema(BaseSchema):
 # `updated_at` - якщо поле `is_current` змінюється.
 #
 # Все виглядає добре.
+
+UserLevelSchema.model_rebuild()
+UserLevelCreateSchema.model_rebuild()

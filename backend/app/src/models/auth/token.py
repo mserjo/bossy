@@ -78,6 +78,14 @@ class RefreshTokenModel(BaseModel):
     # `created_at` з BaseModel використовується як час видачі токена (`issued_at`).
     # `updated_at` з BaseModel може оновлюватися при зміні `last_used_at` або `is_revoked`.
 
+    # Зворотний зв'язок до SessionModel
+    session_info: Mapped[Optional["SessionModel"]] = relationship(
+        "SessionModel",
+        back_populates="refresh_token_details",
+        foreign_keys="[SessionModel.refresh_token_id]", # Це поле в SessionModel
+        uselist=False
+    )
+
     def __repr__(self) -> str:
         """
         Повертає рядкове представлення об'єкта моделі RefreshTokenModel.

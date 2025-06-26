@@ -6,12 +6,15 @@
 Він створює асинхронний `engine` та фабрику асинхронних сесій `AsyncSessionLocal`.
 """
 
-from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker # type: ignore
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker, AsyncEngine # type: ignore
 from sqlalchemy.orm import declarative_base # type: ignore
-import logging # Для логування SQL запитів, якщо потрібно
+# import logging # Для логування SQL запитів, якщо потрібно - вже є через get_logger
+from backend.app.src.config.logging import get_logger # Імпорт нашого логгера
 
 # Імпорт налаштувань бази даних з settings.py
 from backend.app.src.config.settings import settings
+
+logger = get_logger(__name__)
 
 # Отримання URL бази даних з налаштувань
 DATABASE_URL = str(settings.db.DATABASE_URL) # Переконуємося, що це рядок
@@ -103,24 +106,6 @@ async def get_db_session() -> AsyncSession:
     finally:
         # Завжди закриваємо сесію після використання.
         await session.close()
-
-# TODO: Додати функцію для перевірки з'єднання з БД при старті додатку.
-# async def check_db_connection():
-#     try:
-#         async with async_engine.connect() as connection:
-#             # Можна виконати простий запит, наприклад, SELECT 1
-#             # result = await connection.execute(text("SELECT 1"))
-#             # scalar_result = result.scalar_one()
-#             # if scalar_result == 1:
-#             #     logger.info("Успішне підключення до бази даних.")
-#             # else:
-#             #     logger.error("Помилка перевірки підключення до бази даних: неочікуваний результат.")
-#             pass # Просто спроба підключення
-#         logger.info("З'єднання з базою даних успішно перевірено.")
-#         return True
-#     except Exception as e:
-#         logger.error(f"Помилка підключення до бази даних: {e}")
-#         return False
 
 # TODO: Подумати про ініціалізацію таблиць (Alembic міграції).
 # Створення таблиць зазвичай виконується через Alembic (`alembic upgrade head`).

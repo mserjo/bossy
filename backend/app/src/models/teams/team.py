@@ -74,6 +74,10 @@ class TeamModel(BaseMainModel):
     # TODO: Узгодити back_populates з FileModel
     icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="team_icon_for")
 
+    __table_args__ = (
+        CheckConstraint('group_id IS NOT NULL', name='ck_team_group_id_not_null'),
+    )
+
     def __repr__(self) -> str:
         """
         Повертає рядкове представлення об'єкта моделі TeamModel.

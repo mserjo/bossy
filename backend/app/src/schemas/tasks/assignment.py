@@ -127,3 +127,7 @@ class TaskAssignmentUpdateSchema(BaseSchema):
 # Поки що залишаю `task` закоментованим, оскільки `task_id` вже є.
 #
 # Все виглядає добре.
+
+TaskAssignmentSchema.model_rebuild()
+TaskAssignmentCreateSchema.model_rebuild()
+TaskAssignmentUpdateSchema.model_rebuild()

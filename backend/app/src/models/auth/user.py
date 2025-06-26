@@ -282,14 +282,15 @@ class UserModel(BaseMainModel):
     # Поле `group_id` з BaseMainModel для користувача завжди буде NULL.
     # Це поле не використовується для визначення приналежності до груп.
 
-    # TODO: Додати інші зв'язки згідно з `technical-task.md` та `structure-claude-v3.md`:
-    # - TaskAssignmentModel (призначені завдання)
-    # - TaskCompletionModel (виконання завдань)
-    # - AchievementModel (досягнення)
-    # - TaskProposalModel (запропоновані завдання)
-    # - TaskReviewModel (відгуки на завдання, залишені користувачем)
-    # - PollVoteModel (голоси в опитуваннях)
-    # - SystemEventLogModel (логи, пов'язані з користувачем)
+    # TODO: Додати інші зв'язки згідно з `technical-task.md` та `structure-claude-v3.md` (більшість вже є).
+    # - SystemEventLogModel (логи, пов'язані з користувачем) - додано.
+
+    __table_args__ = (
+        # Додаткові індекси для полів, за якими може здійснюватися пошук або фільтрація
+        Index('ix_users_first_name', 'first_name'),
+        Index('ix_users_last_name', 'last_name'),
+        # Index('ix_users_user_type_code', 'user_type_code'), # user_type_code вже має index=True
+    )
 
     def __repr__(self) -> str:
         """

@@ -75,6 +75,12 @@ class GroupTemplateModel(BaseMainModel):
     # Поточний BaseMainModel.state: Mapped[Optional["StatusModel"]] = relationship("StatusModel", foreign_keys=[state_id], lazy="selectin")
     # Це має працювати.
 
+    # Зворотний зв'язок до груп, створених з цього шаблону
+    groups_created_from_this_template: Mapped[List["GroupModel"]] = relationship(
+        back_populates="created_from_template",
+        foreign_keys="[GroupModel.created_from_template_id]"
+    )
+
     # `group_id` з BaseMainModel тут завжди буде NULL.
 
     def __repr__(self) -> str:

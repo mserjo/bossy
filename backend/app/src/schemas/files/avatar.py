@@ -88,3 +88,7 @@ class AvatarUpdateSchema(BaseSchema):
 # `AvatarCreateSchema` не має `is_current`, бо сервіс це встановлює.
 # `AvatarUpdateSchema` дозволяє змінити `is_current`, що може бути використано сервісом.
 # Це виглядає коректно.
+
+AvatarSchema.model_rebuild()
+AvatarCreateSchema.model_rebuild()
+AvatarUpdateSchema.model_rebuild()

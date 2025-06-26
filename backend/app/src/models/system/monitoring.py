@@ -79,6 +79,9 @@ class SystemEventLogModel(BaseModel):
     # TODO: Додати індекси для полів, за якими часто буде відбуватися пошук (наприклад, level, timestamp, user_id).
     # `created_at` (якщо використовується як timestamp) вже має індекс з BaseModel.
 
+    # Зв'язок з користувачем
+    user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[user_id], back_populates="system_event_logs")
+
     def __repr__(self) -> str:
         """
         Повертає рядкове представлення об'єкта моделі SystemEventLogModel.

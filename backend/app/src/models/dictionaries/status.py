@@ -111,13 +111,15 @@ class StatusModel(BaseDictModel):
     # Якщо FileModel матиме status_id:
     # files_with_this_status = relationship("FileModel", back_populates="status", foreign_keys="[FileModel.status_id]")
 
-    # TODO: Розглянути додавання поля `order` (Integer) для можливості сортування статусів
-    # у визначеному порядку (наприклад, для відображення у випадаючих списках).
-    # order: Column[int] = Column(Integer, default=0, nullable=False)
+    # Зв'язок зі статусами звітів (з ReportModel.status_id)
+    report_statuses: Mapped[List["ReportModel"]] = relationship(back_populates="status", foreign_keys="[ReportModel.status_id]")
 
-    # TODO: Розглянути додавання поля `color` (String) для зберігання кольору статусу
-    # (наприклад, для візуального виділення в інтерфейсі).
-    # color: Column[str] = Column(String(7), nullable=True)  # Формат #RRGGBB
+    # Поле для сортування статусів у визначеному порядку (наприклад, для UI).
+    display_order: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)
+
+    # Поле для зберігання кольору статусу (наприклад, для візуального виділення в UI).
+    # Формат кольору, наприклад, HEX (#RRGGBB) або назва кольору.
+    color_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True) # Збільшено довжину для назв кольорів
 
     def __repr__(self) -> str:
         """

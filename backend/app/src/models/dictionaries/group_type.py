@@ -53,10 +53,11 @@ class GroupTypeModel(BaseDictModel):
     # TODO: Узгодити back_populates="group_type" з GroupModel
     groups_of_this_type = relationship("GroupModel", back_populates="group_type", foreign_keys="[GroupModel.group_type_id]")
 
-    # TODO: Розглянути можливість додавання булевих прапорців для визначення характеристик типу групи,
-    # наприклад:
-    # can_have_hierarchy: Column[bool] = Column(Boolean, default=False, nullable=False)
-    # max_members: Column[int] = Column(Integer, nullable=True) # Максимальна кількість учасників
+    # Прапорець, що вказує, чи можуть групи цього типу мати ієрархічну структуру (підгрупи).
+    can_have_hierarchy: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+
+    # TODO: Розглянути можливість додавання інших характеристик типу групи,
+    # наприклад, max_members: Column[int] = Column(Integer, nullable=True) # Максимальна кількість учасників
 
     def __repr__(self) -> str:
         """

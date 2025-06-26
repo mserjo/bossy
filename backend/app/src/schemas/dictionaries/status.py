@@ -21,33 +21,24 @@ class StatusSchema(BaseDictSchema):
     # Наприклад, якщо було б поле `color`:
     # color: Optional[str] = Field(None, description="Колір, що асоціюється зі статусом (наприклад, у форматі #RRGGBB)")
     # Наразі StatusModel не має додаткових полів, окрім успадкованих.
-    pass
+    display_order: Optional[int] = Field(None, description="Порядок сортування статусу")
+    color_code: Optional[str] = Field(None, max_length=20, description="Колір статусу (HEX або назва)")
 
 # --- Схема для створення нового статусу ---
 class StatusCreateSchema(BaseDictCreateSchema):
     """
     Схема для створення нового статусу. Успадковує поля від BaseDictCreateSchema.
     """
-    # Тут можна додати специфічні поля або валідатори для створення статусу,
-    # якщо вони відрізняються від базових для довідників.
-    # Наприклад, якщо `code` для статусів має особливий формат.
-    # Але базовий валідатор `code_alphanumeric_underscore` вже є.
-
-    # Якщо StatusModel мав би поле `color`, воно б додавалося сюди:
-    # color: Optional[str] = Field(None, pattern=r"^#(?:[0-9a-fA-F]{3}){1,2}$", description="Колір статусу (#RRGGBB)")
-    pass
+    display_order: Optional[int] = Field(0, description="Порядок сортування статусу (за замовчуванням 0)")
+    color_code: Optional[str] = Field(None, max_length=20, description="Колір статусу (HEX або назва)")
 
 # --- Схема для оновлення існуючого статусу ---
 class StatusUpdateSchema(BaseDictUpdateSchema):
     """
     Схема для оновлення існуючого статусу. Успадковує поля від BaseDictUpdateSchema.
     """
-    # Тут можна додати специфічні поля або валідатори для оновлення статусу.
-    # Наприклад, якщо деякі поля статусів не можна змінювати після створення.
-
-    # Якщо StatusModel мав би поле `color`:
-    # color: Optional[str] = Field(None, pattern=r"^#(?:[0-9a-fA-F]{3}){1,2}$", description="Новий колір статусу (#RRGGBB)")
-    pass
+    display_order: Optional[int] = Field(None, description="Новий порядок сортування статусу")
+    color_code: Optional[str] = Field(None, max_length=20, description="Новий колір статусу (HEX або назва)")
 
 # --- Схема для фільтрації списку статусів (якщо потрібно) ---
 # class StatusFilterSchema(BaseSchema):

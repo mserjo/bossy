@@ -124,3 +124,6 @@ class SystemEventLogCreateSchema(BaseSchema):
 # `ip_address` в схемі представлений як `str`, що відповідає тому, як SQLAlchemy зазвичай повертає тип `INET`.
 # `details` як `Dict[str, Any]` для JSON даних.
 # Все виглядає добре.
+
+SystemEventLogSchema.model_rebuild()
+SystemEventLogCreateSchema.model_rebuild()

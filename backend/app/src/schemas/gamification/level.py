@@ -113,3 +113,7 @@ class LevelUpdateSchema(BaseSchema):
 # Валідація унікальності `level_number` та `name` в межах `group_id` - на рівні БД/сервісу.
 #
 # Все виглядає добре.
+
+LevelSchema.model_rebuild()
+LevelCreateSchema.model_rebuild()
+LevelUpdateSchema.model_rebuild()

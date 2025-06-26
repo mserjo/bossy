@@ -107,3 +107,6 @@ class RatingCreateSchema(BaseSchema):
 # `period_start_date` та `snapshot_date` (як кінець періоду) важливі для контексту рейтингу.
 #
 # Все виглядає добре.
+
+RatingSchema.model_rebuild()
+RatingCreateSchema.model_rebuild()

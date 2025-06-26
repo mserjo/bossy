@@ -124,3 +124,8 @@ class TeamUpdateSchema(BaseSchema):
 # `state_id` для статусу команди.
 # `group_id` для прив'язки до групи.
 # Все виглядає добре.
+
+TeamSchema.model_rebuild()
+TeamSimpleSchema.model_rebuild()
+TeamCreateSchema.model_rebuild()
+TeamUpdateSchema.model_rebuild()

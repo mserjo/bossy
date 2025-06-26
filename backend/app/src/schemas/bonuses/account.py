@@ -107,3 +107,7 @@ class AccountUpdateSchema(BaseSchema):
 # дозволить розгорнути інформацію про цей тип бонусу, якщо потрібно.
 #
 # Все виглядає добре.
+
+AccountSchema.model_rebuild()
+AccountCreateSchema.model_rebuild()
+AccountUpdateSchema.model_rebuild()

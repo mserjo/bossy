@@ -79,3 +79,7 @@ class TeamMembershipUpdateSchema(BaseSchema):
 # Якщо таких ролей немає, то `role_in_team` може бути завжди `None` або не використовуватися.
 #
 # Все виглядає добре.
+
+TeamMembershipSchema.model_rebuild()
+TeamMembershipCreateSchema.model_rebuild()
+TeamMembershipUpdateSchema.model_rebuild()

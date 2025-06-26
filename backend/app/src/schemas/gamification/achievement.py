@@ -96,3 +96,6 @@ class AchievementCreateSchema(BaseSchema):
 # Поля для ручного нагородження (`awarded_by_user_id`, `award_reason`) передбачені.
 #
 # Все виглядає добре.
+
+AchievementSchema.model_rebuild()
+AchievementCreateSchema.model_rebuild()

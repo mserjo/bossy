@@ -220,3 +220,7 @@ class TaskUpdateSchema(BaseSchema):
 # Також за перевірку існування `parent_task_id`, `team_id`, `task_type_id` тощо.
 #
 # Все виглядає добре.
+
+TaskSchema.model_rebuild()
+TaskCreateSchema.model_rebuild()
+TaskUpdateSchema.model_rebuild()

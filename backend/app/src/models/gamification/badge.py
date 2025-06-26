@@ -76,21 +76,23 @@ class BadgeModel(BaseMainModel):
 
 
     # --- Зв'язки (Relationships) ---
-    # group успадковано з BaseMainModel.
-    group = relationship("GroupModel", foreign_keys="BadgeModel.group_id") # back_populates="badges" буде в GroupModel
+    # group: Mapped["GroupModel"] - успадковано з BaseMainModel, якщо там є back_populates="badges_in_group" або подібне.
+    # Оскільки BaseMainModel.group є загальним, тут може знадобитися явне визначення,
+    # якщо потрібен специфічний back_populates.
+    # Поки що припускаємо, що успадкованого достатньо, якщо GroupModel не має явного `badges` relationship.
+    # Якщо GroupModel матиме `badges = relationship("BadgeModel", back_populates="group")`, то успадкований зв'язок спрацює.
 
-    # icon_file = relationship("FileModel", foreign_keys=[icon_file_id]) # back_populates="badge_icon_for" буде в FileModel
+    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="badge_icon_for")
 
     # Досягнення (хто і коли отримав цей бейдж)
-    achievements = relationship("AchievementModel", back_populates="badge", cascade="all, delete-orphan")
+    achievements: Mapped[List["AchievementModel"]] = relationship(back_populates="badge", cascade="all, delete-orphan")
 
     # `state_id` з BaseMainModel використовується для статусу налаштування бейджа.
-    # state = relationship("StatusModel", foreign_keys=[state_id])
+    # state: Mapped[Optional["StatusModel"]] - успадковано
 
     __table_args__ = (
-        # Коментар для Alembic:
-        # Додати в міграцію:
-        # op.create_unique_constraint('uq_badge_group_name', 'badges', ['group_id', 'name'])
+        CheckConstraint('group_id IS NOT NULL', name='ck_badge_group_id_not_null'),
+        UniqueConstraint('group_id', 'name', name='uq_badge_group_name'),
     )
 
     def __repr__(self) -> str:

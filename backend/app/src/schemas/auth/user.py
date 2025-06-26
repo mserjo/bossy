@@ -91,6 +91,12 @@ class UserPublicSchema(IdentifiedSchema): # Тільки id + публічні �
     # TODO: Визначити, які саме поля є публічними.
     # Поки що тільки `id` та `name`.
     # `name` з `BaseMainModel` використовується як основне відображуване ім'я.
+    first_name: Optional[str] = Field(None, description="Ім'я користувача (публічне, якщо заповнене)")
+    last_name: Optional[str] = Field(None, description="Прізвище користувача (публічне, якщо заповнене)")
+    # Поточний аватар може бути представлений як URL або як вкладена схема AvatarSchema.
+    # Для публічного профілю URL може бути кращим.
+    current_avatar_url: Optional[str] = Field(None, description="URL поточного аватара користувача")
+    # TODO: Поле `current_avatar_url` має формуватися на сервісному рівні.
 
 # --- Схема для створення нового користувача (наприклад, адміном або при реєстрації) ---
 class UserCreateSchema(BaseSchema):
@@ -118,7 +124,13 @@ class UserCreateSchema(BaseSchema):
     @field_validator('password')
     @classmethod
     def validate_password_strength(cls, value: str) -> str:
-        # TODO: Додати більш складну валідацію надійності пароля (великі/маленькі літери, цифри, символи).
+        # TODO: Додати більш складну валідацію надійності пароля,
+        # наприклад, використовуючи функцію is_strong_password з backend.app.src.core.validators (якщо вона там буде).
+        # Поточна перевірка min_length=8 виконується Pydantic.
+        # Приклад:
+        # from backend.app.src.core.validators import is_strong_password
+        # if not is_strong_password(value):
+        #     raise ValueError("Пароль недостатньо надійний.")
         if len(value) < 8: # Ця перевірка вже є через min_length, але для прикладу.
             raise ValueError("Пароль повинен містити щонайменше 8 символів.")
         return value
@@ -237,3 +249,10 @@ class UserAdminUpdateSchema(UserUpdateSchema):
 # `ge=0` для `failed_login_attempts`.
 # `min_length` для пароля.
 # Все виглядає добре.
+
+UserSchema.model_rebuild()
+UserPublicSchema.model_rebuild()
+UserCreateSchema.model_rebuild()
+UserUpdateSchema.model_rebuild()
+UserPasswordUpdateSchema.model_rebuild()
+UserAdminUpdateSchema.model_rebuild()

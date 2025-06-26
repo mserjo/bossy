@@ -43,6 +43,10 @@ class PollModel(BaseMainModel):
     options: Mapped[List["PollOptionModel"]] = relationship(back_populates="poll", cascade="all, delete-orphan", order_by="PollOptionModel.order_num")
     votes: Mapped[List["PollVoteModel"]] = relationship(back_populates="poll", cascade="all, delete-orphan")
 
+    __table_args__ = (
+        CheckConstraint('group_id IS NOT NULL', name='ck_poll_group_id_not_null'),
+    )
+
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(id='{self.id}', name='{self.name}', group_id='{self.group_id}')>"
 

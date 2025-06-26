@@ -6,7 +6,7 @@
 через різні канали. Записи зазвичай створюються та оновлюються системою.
 """
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from typing import Optional, List, Any, ForwardRef, Dict # Додано Dict
 import uuid
 from datetime import datetime
@@ -14,7 +14,7 @@ from datetime import datetime
 from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # Потрібно буде імпортувати схему NotificationSchema для зв'язку
 # from backend.app.src.schemas.notifications.notification import NotificationSchema
-from backend.app.src.core.dicts import NotificationChannelEnum # Імпорт Enum
+from backend.app.src.core.dicts import NotificationChannelEnum, NotificationDeliveryStatusEnum # Імпорт Enum
 
 NotificationSchema = ForwardRef('backend.app.src.schemas.notifications.notification.NotificationSchema')
 
@@ -27,7 +27,7 @@ class NotificationDeliverySchema(AuditDatesSchema): # Успадковує id, c
     channel_code: NotificationChannelEnum = Field(..., description="Канал доставки")
     recipient_address: str = Field(..., max_length=512, description="Адреса отримувача для цього каналу (email, телефон, device_token)")
 
-    status_code: str = Field(..., max_length=50, description="Статус доставки (наприклад, 'PENDING', 'SENT', 'FAILED')") # TODO: Enum for status_code
+    status_code: NotificationDeliveryStatusEnum = Field(..., description="Статус доставки")
     status_message: Optional[str] = Field(None, description="Деталі статусу або повідомлення про помилку")
 
     sent_at: Optional[datetime] = Field(None, description="Час, коли сповіщення було надіслано через цей канал")
@@ -53,7 +53,7 @@ class NotificationDeliveryCreateSchema(BaseSchema):
     channel_code: NotificationChannelEnum = Field(..., description="Канал доставки")
     recipient_address: str = Field(..., max_length=512, description="Адреса отримувача для каналу")
 
-    status_code: str = Field(default="PENDING", max_length=50, description="Початковий статус доставки") # TODO: Enum for status_code
+    status_code: NotificationDeliveryStatusEnum = Field(default=NotificationDeliveryStatusEnum.PENDING, description="Початковий статус доставки")
     # status_message: Optional[str] # Встановлюється при зміні статусу
 
     # sent_at, delivered_at, provider_message_id, provider_response - встановлюються пізніше
@@ -69,7 +69,7 @@ class NotificationDeliveryUpdateSchema(BaseSchema):
     Використовується внутрішньою логікою системи при отриманні відповіді від провайдера
     або при плануванні повторних спроб.
     """
-    status_code: str = Field(..., max_length=50, description="Новий статус доставки") # TODO: Enum for status_code
+    status_code: NotificationDeliveryStatusEnum = Field(..., description="Новий статус доставки")
     status_message: Optional[str] = Field(None, description="Деталі статусу або повідомлення про помилку")
 
     sent_at: Optional[datetime] = Field(None, description="Час відправки (якщо оновлюється)")
@@ -86,14 +86,11 @@ class NotificationDeliveryUpdateSchema(BaseSchema):
 
     @field_validator('status_code')
     @classmethod
-    def validate_status_code(cls, value: str) -> str:
-        # TODO: Визначити реальний список статусів доставки (можливо, з Enum)
-        known_statuses = ['PENDING', 'PROCESSING', 'SENT', 'DELIVERED', 'FAILED', 'RETRYING', 'OPENED', 'CLICKED', 'UNSUBSCRIBED', 'INVALID_ADDRESS']
-        if value.upper() not in known_statuses:
-            # logger.warning(f"Спроба встановити невідомий статус доставки: {value}")
-            # Можна або кидати помилку, або дозволяти кастомні статуси
-            pass # Поки що дозволяємо
-        return value.upper()
+    def validate_status_code(cls, value: NotificationDeliveryStatusEnum) -> NotificationDeliveryStatusEnum:
+        # Валідація вже відбувається через Enum, але можна додати кастомну логіку, якщо потрібно
+        # Наприклад, перевірити, чи статус є допустимим для оновлення.
+        # Цей валідатор тепер просто повертає значення, оскільки Enum вже гарантує валідність.
+        return value
 
 
 # NotificationDeliverySchema.model_rebuild()
@@ -121,3 +118,7 @@ class NotificationDeliveryUpdateSchema(BaseSchema):
 # `provider_response` (JSONB/Dict) для зберігання необробленої відповіді від сервісу доставки.
 #
 # Все виглядає добре.
+
+NotificationDeliverySchema.model_rebuild()
+NotificationDeliveryCreateSchema.model_rebuild()
+NotificationDeliveryUpdateSchema.model_rebuild()

@@ -121,3 +121,7 @@ class TaskProposalUpdateSchema(BaseSchema):
 # Ці перевірки виконуються на сервісному рівні.
 #
 # Все виглядає добре.
+
+TaskProposalSchema.model_rebuild()
+TaskProposalCreateSchema.model_rebuild()
+TaskProposalUpdateSchema.model_rebuild()

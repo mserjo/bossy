@@ -49,6 +49,9 @@ class TransactionModel(BaseModel):
     # І тут:
     source_adjustment: Mapped[Optional["BonusAdjustmentModel"]] = relationship(back_populates="transaction")
 
+    __table_args__ = (
+        Index('ix_transactions_source_entity', 'source_entity_type', 'source_entity_id'),
+    )
 
     def __repr__(self) -> str:
         return f"<{self.__class__.__name__}(id='{self.id}', account_id='{self.account_id}', amount='{self.amount}', type='{self.transaction_type_code}')>"

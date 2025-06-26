@@ -110,3 +110,7 @@ class TaskReviewUpdateSchema(BaseSchema):
 # Схеми готові для підтримки цих операцій.
 #
 # Все виглядає добре.
+
+TaskReviewSchema.model_rebuild()
+TaskReviewCreateSchema.model_rebuild()
+TaskReviewUpdateSchema.model_rebuild()

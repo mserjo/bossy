@@ -79,56 +79,39 @@ async def get_current_user(
     # ValidationError вже оброблено вище
 
     # Отримання користувача з БД за user_id
-    # TODO: ЗАМІНИТИ ЦЕ НА РЕАЛЬНИЙ ВИКЛИК СЕРВІСУ КОРИСТУВАЧІВ, КОЛИ ВІН БУДЕ ГОТОВИЙ!
-    # user_service = UserService(db)
-    # user_orm = await user_service.get_active_user_by_id_for_auth(user_id) # Метод сервісу має робити всі перевірки
+    # user_service = UserService(db) # TODO: Розкоментувати та ініціалізувати UserService
+    user_schema: Optional[UserSchema] = None
+    try:
+        # user_schema = await user_service.get_active_user_by_id_for_auth(user_id) # TODO: Розкоментувати
+        # Метод сервісу має робити всі перевірки (is_deleted, state_id).
+        # Якщо користувач не знайдений або не активний, сервіс має кидати NotFoundException або ForbiddenException.
 
-    # --- Поточна імітація отримання та перевірки користувача ---
-    from backend.app.src.models.auth import UserModel # Тимчасовий імпорт
-    from backend.app.src.models.dictionaries.status import StatusModel # Для перевірки статусу
-    from sqlalchemy import select # type: ignore
+        # --- Поточна імітація отримання та перевірки користувача (ЗАМІНИТИ НА ВИКЛИК СЕРВІСУ) ---
+        from backend.app.src.models.auth import UserModel # Тимчасовий імпорт
+        from sqlalchemy import select # type: ignore
+        query = select(UserModel).where(UserModel.id == user_id)
+        result = await db.execute(query)
+        user_orm: Optional[UserModel] = result.scalar_one_or_none()
+        if user_orm is None:
+            raise NotFoundException(detail="Користувача не знайдено.")
+        if user_orm.is_deleted:
+            raise ForbiddenException(detail="Обліковий запис користувача видалено.")
+        # TODO: Реалізувати перевірку state_id користувача на активність (має робити сервіс)
+        # if user_orm.state_id ... (перевірка на активний статус)
+        #     raise ForbiddenException(detail="Обліковий запис користувача неактивний.")
+        user_schema = UserSchema.model_validate(user_orm)
+        # --- Кінець імітації ---
 
-    query = select(UserModel).where(UserModel.id == user_id).options(
-        # Додаємо завантаження зв'язку зі статусом, якщо він потрібен для перевірки
-        # from sqlalchemy.orm import selectinload # type: ignore
-        # selectinload(UserModel.state) # Припускаючи, що UserModel має зв'язок `state`
-    )
-    result = await db.execute(query)
-    user_orm: Optional[UserModel] = result.scalar_one_or_none()
-    # --- Кінець імітації ---
+    except NotFoundException: # Якщо сервіс кидає NotFoundException
+        raise credentials_exception # Перетворюємо на Unauthorized для автентифікації
+    except ForbiddenException as e: # Якщо сервіс кидає ForbiddenException (наприклад, неактивний)
+        raise UnauthorizedException(detail=e.detail) # Перетворюємо на Unauthorized
 
-    if user_orm is None:
-        raise credentials_exception # Користувача не знайдено (або був видалений і GC спрацював)
+    if user_schema is None: # Якщо з якоїсь причини user_schema не встановлено (після розкоментування сервісу)
+        # Це не повинно статися, якщо сервіс працює правильно, але для безпеки.
+        raise credentials_exception
 
-    # Перевірка, чи користувач "активний" в широкому сенсі
-    if user_orm.is_deleted:
-         raise UnauthorizedException(detail="Обліковий запис користувача видалено.")
-
-    # Перевірка статусу користувача (state_id)
-    # Припускаємо, що UserModel має state_id, і ми можемо отримати код статусу.
-    # Це потребуватиме ще одного запиту до БД для отримання StatusModel.code,
-    # якщо статус не завантажено разом з користувачем.
-    # Краще, щоб сервіс користувачів повертав цю інформацію або робив перевірку.
-    # Поки що, якщо state_id є, і він не відповідає активному статусу, кидаємо помилку.
-    # (Це дуже спрощена перевірка, потребує реального довідника статусів)
-    if user_orm.state_id: # Якщо статус встановлено
-        # Імітація перевірки коду статусу
-        # Потрібно отримати StatusModel.code для user_orm.state_id
-        # status_query = select(StatusModel.code).where(StatusModel.id == user_orm.state_id)
-        # status_result = await db.execute(status_query)
-        # status_code = status_result.scalar_one_or_none()
-        # if status_code and status_code not in [STATUS_ACTIVE_CODE, "інший_активний_статус_користувача"]:
-        #     raise UnauthorizedException(detail=f"Обліковий запис користувача неактивний (статус: {status_code}).")
-        #
-        # Простіша перевірка (якщо є константа для ID активного статусу, що погано):
-        # if user_orm.state_id != ID_АКТИВНОГО_СТАТУСУ:
-        #     raise UnauthorizedException(detail="Обліковий запис користувача неактивний.")
-        #
-        # Поки що цю перевірку залишаю як TODO для реалізації через сервіс,
-        # оскільки вона потребує знання кодів активних статусів.
-        pass # TODO: Реалізувати перевірку state_id користувача на активність
-
-    return UserSchema.model_validate(user_orm) # Повертаємо Pydantic схему
+    return user_schema
 
 async def get_current_active_user(
     current_user: UserSchema = Depends(get_current_user)
@@ -193,28 +176,13 @@ async def get_optional_current_user(
     if token is None: # Якщо токен не передано (наприклад, для публічного доступу або в тестах)
         return None
     try:
-        # Використовуємо логіку з get_current_user, але перехоплюємо винятки.
-        # Це дублювання коду, краще винести спільну частину.
-        # Поки що для простоти:
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id_str: Optional[str] = payload.get("sub")
-        if user_id_str is None: return None
-        try: user_id = uuid.UUID(user_id_str)
-        except ValueError: return None
-
-        from backend.app.src.models.auth import UserModel # Тимчасовий імпорт
-        from sqlalchemy import select # type: ignore
-        query = select(UserModel).where(UserModel.id == user_id)
-        result = await db.execute(query)
-        user_orm: Optional[UserModel] = result.scalar_one_or_none()
-
-        if user_orm is None or user_orm.is_deleted: # Додамо перевірку is_deleted
-            return None
-
-        return UserSchema.model_validate(user_orm)
-    except (JWTError, ValidationError, UnauthorizedException, ForbiddenException):
-        # Будь-яка помилка валідації токена або отримання користувача означає,
-        # що користувач не автентифікований (або токен невалідний).
+        # Намагаємося отримати користувача через get_current_user
+        # Передаємо db явно, оскільки Depends не викликається тут напряму для get_db_session
+        return await get_current_user(token=token, db=db)
+    except HTTPException:
+        # Якщо get_current_user кидає будь-який HTTPException (включаючи UnauthorizedException, ForbiddenException),
+        # це означає, що токен невалідний або користувач неактивний.
+        # Для get_optional_current_user ми просто повертаємо None в такому випадку.
         return None
 
 # --- Залежність для API ключа (якщо використовується) ---
@@ -228,15 +196,11 @@ async def get_optional_current_user(
 #     else:
 #         raise UnauthorizedException(detail="Невалідний або відсутній API ключ")
 
-# TODO: Реалізувати `TokenPayloadSchema` в `schemas.auth.token`, якщо ще не створено.
-# Вона має містити поля, які очікуються в JWT payload (sub, exp, iat, type тощо).
-# Наразі `get_current_user` перевіряє лише `sub`.
-#
-# TODO: Замінити імітацію отримання користувача в `get_current_user` та `get_optional_current_user`
-# на реальні виклики відповідного сервісу (наприклад, `UserService.get_active_user_by_id`).
+# TODO: Замінити імітацію отримання користувача в `get_current_user`
+# на реальні виклики відповідного сервісу (наприклад, `UserService.get_active_user_by_id_for_auth`).
 # Це потребуватиме створення `UserService`.
 #
-# TODO: Розширити перевірку активності користувача в `get_current_user`
+# TODO: Розширити перевірку активності користувача в `get_current_user` (має робити сервіс)
 # (наприклад, перевірка `state_id` на відповідність активному статусу).
 #
 # TODO: Реалізувати залежності для перевірки ролей в контексті групи

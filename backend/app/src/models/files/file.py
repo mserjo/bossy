@@ -115,6 +115,8 @@ class FileModel(BaseModel):
     level_icon_for: Mapped[Optional["LevelModel"]] = relationship(back_populates="icon_file", foreign_keys="[LevelModel.icon_file_id]")
     # Для ReportModel.file_id
     report_file_for: Mapped[Optional["ReportModel"]] = relationship(back_populates="generated_file", foreign_keys="[ReportModel.file_id]")
+    # Для TeamModel.icon_file_id
+    team_icon_for: Mapped[Optional["TeamModel"]] = relationship(back_populates="icon_file", foreign_keys="[TeamModel.icon_file_id]")
 
     # Для AvatarModel.file_id (один файл може бути пов'язаний з одним записом аватара)
     # Зв'язок з AvatarModel, де цей файл використовується.

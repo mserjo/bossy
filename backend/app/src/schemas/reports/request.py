@@ -12,6 +12,7 @@ import uuid
 from datetime import date # Використовуємо date для діапазонів дат без часу
 
 from backend.app.src.schemas.base import BaseSchema
+from backend.app.src.core.dicts import ReportCodeEnum # Імпорт Enum
 
 # --- Базова схема для параметрів запиту на звіт (може бути спільною) ---
 class BaseReportRequestParams(BaseSchema):
@@ -87,7 +88,7 @@ class ReportGenerationRequestSchema(BaseSchema):
     Загальна схема для запиту на генерацію звіту.
     Використовується API ендпоінтом для ініціювання генерації звіту.
     """
-    report_code: str = Field(..., max_length=100, description="Код типу звіту, який потрібно згенерувати")
+    report_code: ReportCodeEnum = Field(..., description="Код типу звіту, який потрібно згенерувати")
     # Параметри, специфічні для `report_code`.
     # Можуть бути представлені як словник, або ж можна використовувати Union[...SpecificReportParams]
     # для строгої типізації, але це ускладнить API.
@@ -146,3 +147,9 @@ class ReportGenerationRequestSchema(BaseSchema):
 # Назва файлу `request.py` - підходить.
 #
 # Все виглядає добре.
+
+BaseReportRequestParams.model_rebuild()
+UserActivityReportRequestParams.model_rebuild()
+TaskPopularityReportRequestParams.model_rebuild()
+BonusDynamicsReportRequestParams.model_rebuild()
+ReportGenerationRequestSchema.model_rebuild()

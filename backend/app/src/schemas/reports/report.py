@@ -108,3 +108,7 @@ class ReportUpdateSchema(BaseSchema):
 # (наприклад, в `response.py`).
 #
 # Все виглядає добре.
+
+ReportSchema.model_rebuild()
+ReportCreateSchema.model_rebuild()
+ReportUpdateSchema.model_rebuild()

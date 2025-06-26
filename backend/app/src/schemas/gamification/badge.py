@@ -113,3 +113,7 @@ class BadgeUpdateSchema(BaseSchema):
 # Поки що `condition_details` приймається як загальний `Dict`.
 #
 # Все виглядає добре.
+
+BadgeSchema.model_rebuild()
+BadgeCreateSchema.model_rebuild()
+BadgeUpdateSchema.model_rebuild()

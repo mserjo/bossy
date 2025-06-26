@@ -12,8 +12,7 @@ import uuid
 from datetime import datetime
 
 from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema # IdentifiedSchema, TimestampedSchema
-# Потрібно імпортувати схему користувача для зв'язку в RefreshTokenSchema (якщо розгортаємо)
-# from backend.app.src.schemas.auth.user import UserPublicSchema (приклад)
+from backend.app.src.schemas.auth.user import UserPublicSchema
 
 # --- Схема для відповіді API з токенами ---
 class TokenResponseSchema(BaseSchema):
@@ -102,3 +101,8 @@ class TokenPayloadSchema(BaseSchema):
 # `created_at` тут фактично є часом видачі (`issued_at`) refresh токена.
 # `updated_at` оновлюється при зміні `last_used_at` або `is_revoked`.
 # Це коректно.
+
+TokenResponseSchema.model_rebuild()
+RefreshTokenSchema.model_rebuild()
+RefreshTokenRequestSchema.model_rebuild()
+TokenPayloadSchema.model_rebuild()

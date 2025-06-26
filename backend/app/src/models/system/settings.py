@@ -66,6 +66,8 @@ class SystemSettingModel(BaseModel): # успадковуємо від BaseModel
 
     # TODO: Подумати про механізм кешування цих налаштувань, оскільки вони можуть часто читатися.
 
+    category: Column[str | None] = Column(String(100), nullable=True, index=True, comment="Категорія для групування налаштувань в UI")
+
     def __repr__(self) -> str:
         """
         Повертає рядкове представлення об'єкта моделі SystemSettingModel.

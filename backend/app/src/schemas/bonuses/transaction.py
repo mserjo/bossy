@@ -115,3 +115,6 @@ class TransactionCreateSchema(BaseSchema):
 # `metadata` для додаткової інформації.
 # `transaction_type_code` для класифікації операції.
 # Все виглядає добре.
+
+TransactionSchema.model_rebuild()
+TransactionCreateSchema.model_rebuild()

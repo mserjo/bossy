@@ -188,3 +188,7 @@ class TaskModel(BaseMainModel):
 # Поки що залишаю як є, покладаючись на логіку сервісу.
 # `lazy="joined"` для `parent_task` може бути корисним.
 # Для `child_tasks` та інших списків за замовчуванням `lazy="select"`.
+
+    __table_args__ = (
+        CheckConstraint('group_id IS NOT NULL', name='ck_task_group_id_not_null'),
+    )

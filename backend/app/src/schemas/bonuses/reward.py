@@ -120,3 +120,7 @@ class RewardUpdateSchema(BaseSchema):
 # `icon_url` (закоментоване) - похідне поле, яке може генеруватися сервісом на основі `icon_file_id`.
 # Зв'язок `bonus_type` з `BonusTypeSchema` дозволить отримати деталі про валюту вартості.
 # Все виглядає добре.
+
+RewardSchema.model_rebuild()
+RewardCreateSchema.model_rebuild()
+RewardUpdateSchema.model_rebuild()

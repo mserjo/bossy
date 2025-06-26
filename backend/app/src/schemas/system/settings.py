@@ -217,3 +217,7 @@ class SystemSettingUpdateSchema(BaseSchema):
 # Це прийнятний підхід.
 # `AuditDatesSchema` надає `id, created_at, updated_at`.
 # Все виглядає коректно.
+
+SystemSettingSchema.model_rebuild()
+SystemSettingCreateSchema.model_rebuild()
+SystemSettingUpdateSchema.model_rebuild()

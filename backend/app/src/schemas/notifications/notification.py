@@ -117,3 +117,8 @@ class NotificationBulkReadSchema(BaseSchema):
 # для коректної обробки та відображення сповіщень на клієнті.
 #
 # Все виглядає добре.
+
+NotificationSchema.model_rebuild()
+NotificationCreateSchema.model_rebuild()
+NotificationUpdateSchema.model_rebuild()
+NotificationBulkReadSchema.model_rebuild()

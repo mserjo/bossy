@@ -167,6 +167,14 @@ class NotificationTemplateModel(BaseMainModel):
 # Якщо не знайдено - використовується дефолтний.
 # Це виглядає більш гнучким.
 # Унікальність `template_code` вже є.
-# Додаткові унікальні обмеження на комбінацію полів поки не додаю,
-# покладаючись на логіку сервісу та унікальність `template_code`.
-# Це спрощує модель.
+
+    __table_args__ = (
+        # Унікальний шаблон для групи, типу, каналу та мови
+        UniqueConstraint('notification_type_code', 'channel_code', 'language_code', 'group_id',
+                         name='uq_notif_template_group_key',
+                         postgresql_where=(group_id.isnot(None))),
+        # Унікальний глобальний шаблон для типу, каналу та мови
+        UniqueConstraint('notification_type_code', 'channel_code', 'language_code',
+                         name='uq_notif_template_global_key',
+                         postgresql_where=(group_id.is_(None))),
+    )

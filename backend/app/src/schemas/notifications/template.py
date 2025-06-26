@@ -59,9 +59,10 @@ class NotificationTemplateCreateSchema(BaseSchema):
     @field_validator('language_code')
     @classmethod
     def validate_language_code(cls, value: str) -> str:
-        # TODO: Використовувати SUPPORTED_LOCALES з i18n.py або settings
-        # from backend.app.src.core.i18n import SUPPORTED_LOCALES
-        supported_languages = ["uk", "en"] # Тимчасово
+        # from backend.app.src.core.i18n import SUPPORTED_LOCALES # TODO: Розкоментувати, коли i18n буде налаштовано
+        # if value.lower() not in SUPPORTED_LOCALES:
+        #     raise ValueError(f"Непідтримуваний код мови: '{value}'. Дозволені: {', '.join(SUPPORTED_LOCALES)}.")
+        supported_languages = ["uk", "en"] # Тимчасовий список, поки SUPPORTED_LOCALES не доступний
         if value.lower() not in supported_languages:
             raise ValueError(f"Непідтримуваний код мови: '{value}'. Дозволені: {', '.join(supported_languages)}.")
         return value.lower()
@@ -122,3 +123,7 @@ class NotificationTemplateUpdateSchema(BaseSchema):
 # типу сповіщення, каналу, мови та групи (з логікою пріоритетів: груповий -> глобальний).
 #
 # Все виглядає добре.
+
+NotificationTemplateSchema.model_rebuild()
+NotificationTemplateCreateSchema.model_rebuild()
+NotificationTemplateUpdateSchema.model_rebuild()

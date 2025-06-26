@@ -137,3 +137,7 @@ class FileUpdateSchema(BaseSchema):
 # та/або переміщення в "кошик" у сховищі, а не через поле в БД.
 # Або через статус.
 # Залишаю як є.
+
+FileSchema.model_rebuild()
+FileCreateSchema.model_rebuild()
+FileUpdateSchema.model_rebuild()

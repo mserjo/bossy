@@ -20,8 +20,7 @@ class GroupTypeSchema(BaseDictSchema):
     # GroupTypeModel наразі не має додаткових специфічних полів,
     # окрім успадкованих від BaseDictModel.
     # Якщо б були, наприклад, поле `can_have_hierarchy: bool`, воно б додавалося тут.
-    # can_have_hierarchy: Optional[bool] = Field(None, description="Чи може група цього типу мати ієрархію")
-    pass
+    can_have_hierarchy: bool = Field(False, description="Чи може група цього типу мати ієрархію")
 
 # --- Схема для створення нового типу групи ---
 class GroupTypeCreateSchema(BaseDictCreateSchema):
@@ -30,10 +29,7 @@ class GroupTypeCreateSchema(BaseDictCreateSchema):
     """
     # `name` та `code` є обов'язковими.
     # `description`, `state_id`, `notes` - опціональні.
-    #
-    # Якщо б були специфічні поля для створення GroupType, наприклад, `can_have_hierarchy`:
-    # can_have_hierarchy: bool = Field(default=False, description="Чи може група цього типу мати ієрархію")
-    pass
+    can_have_hierarchy: bool = Field(default=False, description="Чи може група цього типу мати ієрархію")
 
 # --- Схема для оновлення існуючого типу групи ---
 class GroupTypeUpdateSchema(BaseDictUpdateSchema):
@@ -41,9 +37,7 @@ class GroupTypeUpdateSchema(BaseDictUpdateSchema):
     Схема для оновлення існуючого типу групи. Успадковує поля від BaseDictUpdateSchema.
     """
     # Всі поля опціональні.
-    #
-    # can_have_hierarchy: Optional[bool] = Field(None, description="Нове значення для можливості ієрархії")
-    pass
+    can_have_hierarchy: Optional[bool] = Field(None, description="Нове значення для можливості ієрархії")
 
 # TODO: Переконатися, що схеми відповідають моделі `GroupTypeModel`.
 # `GroupTypeModel` успадковує від `BaseDictModel`.

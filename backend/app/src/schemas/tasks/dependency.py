@@ -102,3 +102,7 @@ class TaskDependencyUpdateSchema(BaseSchema):
 # Схема сама по собі не може перевірити циклічність без доступу до всіх залежностей.
 #
 # Все виглядає добре.
+
+TaskDependencySchema.model_rebuild()
+TaskDependencyCreateSchema.model_rebuild()
+TaskDependencyUpdateSchema.model_rebuild()

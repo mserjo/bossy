@@ -86,6 +86,9 @@ class AccountModel(BaseModel):
         # UniqueConstraint('user_id', 'group_id', 'bonus_type_code', name='uq_user_group_bonus_type_account'),
     )
 
+    # Зворотний зв'язок для ручних коригувань цього рахунку
+    adjustments: Mapped[List["BonusAdjustmentModel"]] = relationship(back_populates="account", cascade="all, delete-orphan")
+
     def __repr__(self) -> str:
         """
         Повертає рядкове представлення об'єкта моделі AccountModel.

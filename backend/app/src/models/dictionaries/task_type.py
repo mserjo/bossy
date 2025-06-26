@@ -59,13 +59,18 @@ class TaskTypeModel(BaseDictModel):
     # TODO: Узгодити back_populates="task_type" з TaskModel
     tasks_of_this_type = relationship("TaskModel", back_populates="task_type", foreign_keys="[TaskModel.task_type_id]")
 
-    # TODO: Розглянути додавання булевих прапорців для визначення характеристик типу завдання:
-    # is_event (bool): True, якщо це подія (не потребує активного виконання), інакше False (це завдання).
-    # is_penalty (bool): True, якщо цей тип передбачає штраф (негативні бонуси).
-    # can_have_subtasks (bool): True, якщо завдання цього типу може мати підзавдання.
-    # from sqlalchemy import Boolean, Column
-    # is_event: Column[bool] = Column(Boolean, default=False, nullable=False)
-    # default_bonus_type: Column[str] = Column(String, nullable=True) # Наприклад, 'positive', 'negative'
+    # Прапорець, що вказує, чи є цей тип "подією" (true) або "завданням" (false).
+    # Події не потребують активного виконання з боку користувача, вони "настають".
+    is_event: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+
+    # Прапорець, що вказує, чи передбачає цей тип завдання/події штраф (негативні бонуси) за замовчуванням.
+    is_penalty_type: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+
+    # Прапорець, що вказує, чи можуть завдання цього типу мати підзавдання.
+    can_have_subtasks: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, server_default="false")
+
+    # TODO: Розглянути default_bonus_type: Column[str] = Column(String, nullable=True) # Наприклад, 'positive', 'negative'
+    # або посилання на BonusTypeModel для визначення типових бонусів/штрафів.
 
     def __repr__(self) -> str:
         """

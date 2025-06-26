@@ -25,7 +25,9 @@ class TaskTypeSchema(BaseDictSchema):
     #
     # Поки що `TaskTypeModel` не має таких полів, але якщо вони будуть додані,
     # їх потрібно буде відобразити тут.
-    pass
+    is_event: bool = Field(False, description="True, якщо це подія")
+    is_penalty_type: bool = Field(False, description="True, якщо цей тип передбачає штраф")
+    can_have_subtasks: bool = Field(False, description="True, якщо завдання цього типу може мати підзавдання")
 
 # --- Схема для створення нового типу завдання/події ---
 class TaskTypeCreateSchema(BaseDictCreateSchema):
@@ -34,10 +36,9 @@ class TaskTypeCreateSchema(BaseDictCreateSchema):
     """
     # `name` та `code` є обов'язковими.
     # `description`, `state_id`, `notes` - опціональні.
-    #
-    # Додаткові поля, якщо є в моделі:
-    # is_event: bool = Field(default=False, description="Чи є цей тип подією")
-    pass
+    is_event: bool = Field(default=False, description="Чи є цей тип подією")
+    is_penalty_type: bool = Field(default=False, description="Чи передбачає цей тип штраф")
+    can_have_subtasks: bool = Field(default=False, description="Чи можуть завдання цього типу мати підзавдання")
 
 # --- Схема для оновлення існуючого типу завдання/події ---
 class TaskTypeUpdateSchema(BaseDictUpdateSchema):
@@ -45,9 +46,9 @@ class TaskTypeUpdateSchema(BaseDictUpdateSchema):
     Схема для оновлення існуючого типу завдання/події. Успадковує поля від BaseDictUpdateSchema.
     """
     # Всі поля опціональні.
-    #
-    # is_event: Optional[bool] = Field(None, description="Нове значення для прапорця 'is_event'")
-    pass
+    is_event: Optional[bool] = Field(None, description="Нове значення для прапорця 'is_event'")
+    is_penalty_type: Optional[bool] = Field(None, description="Нове значення для прапорця 'is_penalty_type'")
+    can_have_subtasks: Optional[bool] = Field(None, description="Нове значення для прапорця 'can_have_subtasks'")
 
 # TODO: Переконатися, що схеми відповідають моделі `TaskTypeModel`.
 # `TaskTypeModel` успадковує від `BaseDictModel`.

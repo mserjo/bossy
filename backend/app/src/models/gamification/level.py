@@ -71,11 +71,9 @@ class LevelModel(BaseMainModel):
     # state: Mapped[Optional["StatusModel"]] - успадковано з BaseMainModel
 
     __table_args__ = (
-        # Коментар для Alembic:
-        # Додати в міграцію:
-        # op.create_unique_constraint('uq_level_group_level_number', 'levels', ['group_id', 'level_number'])
-        # op.create_unique_constraint('uq_level_group_name', 'levels', ['group_id', 'name'])
-        # Ці обмеження важливі для коректності даних.
+        CheckConstraint('group_id IS NOT NULL', name='ck_level_group_id_not_null'),
+        UniqueConstraint('group_id', 'level_number', name='uq_level_group_level_number'),
+        UniqueConstraint('group_id', 'name', name='uq_level_group_name'),
     )
 
     def __repr__(self) -> str:

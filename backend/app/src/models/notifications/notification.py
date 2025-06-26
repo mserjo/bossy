@@ -82,6 +82,10 @@ class NotificationModel(BaseModel):
 
     deliveries: Mapped[List["NotificationDeliveryModel"]] = relationship(back_populates="notification", cascade="all, delete-orphan")
 
+    __table_args__ = (
+        Index('ix_notifications_source_entity', 'source_entity_type', 'source_entity_id'),
+    )
+
 
     def __repr__(self) -> str:
         """

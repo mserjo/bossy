@@ -14,7 +14,7 @@ from loguru import logger # type: ignore # Loguru не має офіційних
 
 # Імпорт налаштувань додатку для визначення рівня логування та інших параметрів
 from backend.app.src.config.settings import settings # Головний об'єкт settings
-import os # Для роботи зі шляхами та створення каталогів
+from pathlib import Path # Для роботи зі шляхами
 
 # --- Конфігурація Loguru ---
 
@@ -63,21 +63,30 @@ logger.add(
 
 # 2. Обробник для запису логів у файл (якщо увімкнено в `settings.logging`)
 if settings.logging.LOG_TO_FILE_ENABLE:
-    log_file_path = settings.logging.LOG_FILE_PATH
+    log_file_path_str = settings.logging.LOG_FILE_PATH
+    log_file_path = Path(log_file_path_str)
 
-    # Переконуємося, що каталог для логів існує
+    # Якщо шлях не абсолютний, робимо його відносним до BASE_DIR
+    if not log_file_path.is_absolute():
+        log_file_path = settings.app.BASE_DIR / log_file_path
+
+    log_dir = log_file_path.parent
+    log_file_created_successfully = False
     try:
-        log_dir = os.path.dirname(log_file_path)
-        if log_dir and not os.path.exists(log_dir): # Створюємо, лише якщо шлях не порожній
-            os.makedirs(log_dir, exist_ok=True)
-            logger.info(f"Створено каталог для логів: {log_dir}")
-    except Exception as e:
-        logger.error(f"Не вдалося створити каталог для логів '{log_dir}': {e}")
-        # Продовжуємо без файлового логування, якщо не вдалося створити каталог
+        if not log_dir.exists():
+            logger.info(f"Спроба створити каталог для логів: {log_dir}")
+            log_dir.mkdir(parents=True, exist_ok=True)
+            logger.info(f"Каталог для логів створено: {log_dir}")
+        log_file_created_successfully = True
+    except OSError as e:
+        # Використовуємо print, оскільки логгер може ще не писати у файл
+        print(f"ПОМИЛКА КОНФІГУРАЦІЇ ЛОГУВАННЯ: Не вдалося створити каталог для лог-файлів '{log_dir}': {e}")
+        logger.error(f"Не вдалося створити каталог для лог-файлів '{log_dir}': {e}")
 
-    if not log_dir or os.path.exists(log_dir): # Додаємо обробник, лише якщо каталог існує або не потрібен (файл в поточному)
+
+    if log_file_created_successfully:
         logger.add(
-            log_file_path,
+            log_file_path, # Тепер це об'єкт Path
             level=settings.logging.LOG_FILE_LEVEL.upper(),
             format=LOG_FORMAT_DETAILED, # Зазвичай у файли пишуть детальні логи
             rotation=settings.logging.LOG_FILE_ROTATION,

@@ -96,6 +96,9 @@ class RewardModel(BaseMainModel):
     # )
     # TODO: Визначити, чи потрібен такий явний зв'язок, чи достатньо фільтрувати транзакції.
 
+    __table_args__ = (
+        CheckConstraint('group_id IS NOT NULL', name='ck_reward_group_id_not_null'),
+    )
 
     def __repr__(self) -> str:
         """

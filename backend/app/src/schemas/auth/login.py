@@ -68,7 +68,12 @@ class PasswordResetConfirmSchema(BaseSchema):
     def check_passwords_match(cls, data: 'PasswordResetConfirmSchema') -> 'PasswordResetConfirmSchema':
         if data.new_password != data.confirm_new_password:
             raise ValueError("Новий пароль та його підтвердження не співпадають.")
-        # TODO: Додати більш складну валідацію надійності пароля (is_strong_password з core.validators)
+        # TODO: Додати більш складну валідацію надійності нового пароля,
+        # наприклад, використовуючи функцію is_strong_password з backend.app.src.core.validators.
+        # Приклад:
+        # from backend.app.src.core.validators import is_strong_password
+        # if not is_strong_password(data.new_password):
+        #     raise ValueError("Новий пароль недостатньо надійний.")
         if len(data.new_password) < 8: # Базова перевірка, вже є в min_length
              raise ValueError("Новий пароль повинен містити щонайменше 8 символів.")
         return data

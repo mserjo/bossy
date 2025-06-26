@@ -68,15 +68,8 @@ class UserLevelModel(BaseModel):
 
 
     __table_args__ = (
-        UniqueConstraint('user_id', 'level_id', name='uq_user_level_achieved'),
-        # Коментар для Alembic, якщо потрібен унікальний поточний рівень для користувача в групі:
-        # op.create_unique_constraint(
-        #     'uq_user_group_current_level',
-        #     'user_levels',
-        #     ['user_id', 'group_id'],
-        #     postgresql_where=sa.text('is_current = TRUE')
-        # )
-        # Це гарантує, що для пари (user_id, group_id) може бути лише один запис з is_current=True.
+        UniqueConstraint('user_id', 'level_id', name='uq_user_level_achieved'), # Користувач досягає кожного рівня лише один раз
+        UniqueConstraint('user_id', 'group_id', name='uq_user_group_current_level', postgresql_where=(is_current == True)), # Лише один поточний рівень на користувача в групі
     )
 
     def __repr__(self) -> str:

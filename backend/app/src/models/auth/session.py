@@ -74,7 +74,13 @@ class SessionModel(BaseModel):
     user = relationship("UserModel", back_populates="sessions")
 
     # Зв'язок з Refresh токеном (один-до-одного, оскільки refresh_token_id є unique)
-    refresh_token = relationship("RefreshTokenModel", backref="session", uselist=False) # uselist=False для один-до-одного
+    # Використовуємо back_populates для узгодженості
+    refresh_token_details: Mapped[Optional["RefreshTokenModel"]] = relationship(
+        "RefreshTokenModel",
+        back_populates="session_info", # Має відповідати назві зв'язку в RefreshTokenModel
+        foreign_keys=[refresh_token_id],
+        uselist=False
+    )
 
     # `created_at` з BaseModel використовується як час початку сесії (входу).
     # `updated_at` з BaseModel може оновлюватися при зміні `last_activity_at` або `is_active`.

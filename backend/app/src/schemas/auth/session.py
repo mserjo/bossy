@@ -80,3 +80,5 @@ class SessionSchema(AuditDatesSchema): # Успадковує id, created_at, up
 # окремий ендпоінт для отримання списку сесій, але це можна реалізувати
 # і за допомогою стандартної `PaginatedResponse[SessionSchema]`.
 # Поки що окрема `SessionListSchema` не потрібна.
+
+SessionSchema.model_rebuild()

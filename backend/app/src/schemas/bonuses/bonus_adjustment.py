@@ -98,3 +98,6 @@ class BonusAdjustmentCreateSchema(BaseSchema):
 # відповідають моделі `BonusAdjustmentModel`.
 #
 # Все виглядає добре.
+
+BonusAdjustmentSchema.model_rebuild()
+BonusAdjustmentCreateSchema.model_rebuild()

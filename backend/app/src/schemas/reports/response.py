@@ -139,3 +139,12 @@ class ReportDataResponseSchema(BaseSchema):
 # Назва файлу `response.py` відповідає `structure-claude-v3.md`.
 #
 # Все виглядає добре.
+
+ReportDataItemSchema.model_rebuild()
+UserActivityDataItemSchema.model_rebuild()
+UserActivityReportDataSchema.model_rebuild()
+TaskPopularityDataItemSchema.model_rebuild()
+TaskPopularityReportDataSchema.model_rebuild()
+BonusDynamicsDataItemSchema.model_rebuild()
+BonusDynamicsReportDataSchema.model_rebuild()
+ReportDataResponseSchema.model_rebuild()

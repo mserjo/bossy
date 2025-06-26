@@ -70,6 +70,9 @@ class GroupModel(BaseMainModel):
     # Іконка групи (посилання на модель файлів)
     icon_file_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("files.id", name="fk_groups_icon_file_id", ondelete="SET NULL"), nullable=True)
 
+    # Шаблон, з якого була створена група (якщо є)
+    created_from_template_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("group_templates.id", name="fk_groups_template_id", ondelete="SET NULL"), nullable=True, index=True)
+
     # --- Зв'язки (Relationships) ---
 
     # Зв'язок для ієрархії груп (батьківська група)
@@ -103,13 +106,43 @@ class GroupModel(BaseMainModel):
     invitations: Mapped[List["GroupInvitationModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
 
     # Зв'язок з файлом іконки
-    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], lazy="selectin")
-    # TODO: Додати back_populates="group_icon_for" в FileModel, якщо потрібен зворотний зв'язок
+    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="group_icon_for", lazy="selectin") # Додано back_populates
+
+    # Зв'язок з шаблоном, з якого створена група
+    created_from_template: Mapped[Optional["GroupTemplateModel"]] = relationship(
+        foreign_keys=[created_from_template_id],
+        back_populates="groups_created_from_this_template", # Назва зворотного зв'язку в GroupTemplateModel
+        lazy="selectin"
+    )
 
     # Поле `group_id` з `BaseMainModel` для самої `GroupModel` не використовується і буде `NULL`.
     # Це поле призначене для сутностей, які належать до певної групи.
     # `state_id` з `BaseMainModel` використовується для статусу групи.
     # state = relationship("StatusModel", foreign_keys=[state_id]) # Вже є в BaseMainModel, якщо там розкоментовано
+
+    # Зв'язок з файлами, що належать до контексту цієї групи
+    context_files: Mapped[List["FileModel"]] = relationship(
+        back_populates="group_context",
+        foreign_keys="[FileModel.group_context_id]" # Вказуємо зовнішній ключ з FileModel
+    )
+
+    # Зв'язок з пропозиціями завдань для цієї групи
+    task_proposals: Mapped[List["TaskProposalModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
+
+    # Зв'язок з досягненнями рівнів користувачами в цій групі
+    user_level_achievements: Mapped[List["UserLevelModel"]] = relationship(back_populates="group", foreign_keys="[UserLevelModel.group_id]", cascade="all, delete-orphan")
+
+    # Зв'язок з налаштуваннями бейджів для цієї групи
+    badges: Mapped[List["BadgeModel"]] = relationship(back_populates="group", foreign_keys="[BadgeModel.group_id]", cascade="all, delete-orphan")
+
+    # Зв'язок з історією рейтингів в цій групі
+    ratings_history: Mapped[List["RatingModel"]] = relationship(back_populates="group", foreign_keys="[RatingModel.group_id]", cascade="all, delete-orphan")
+
+    # Зв'язок зі сповіщеннями, що стосуються цієї групи
+    notifications: Mapped[List["NotificationModel"]] = relationship(back_populates="group", foreign_keys="[NotificationModel.group_id]", cascade="all, delete-orphan")
+
+    # Зв'язок зі звітами, що стосуються цієї групи
+    reports: Mapped[List["ReportModel"]] = relationship(back_populates="group", foreign_keys="[ReportModel.group_id]", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         """

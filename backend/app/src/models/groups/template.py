@@ -83,6 +83,11 @@ class GroupTemplateModel(BaseMainModel):
 
     # `group_id` з BaseMainModel тут завжди буде NULL.
 
+    __table_args__ = (
+        UniqueConstraint('name', 'version', name='uq_group_template_name_version'),
+        # name - це успадковане поле з BaseMainModel, яке використовується як назва/код шаблону.
+    )
+
     def __repr__(self) -> str:
         """
         Повертає рядкове представлення об'єкта моделі GroupTemplateModel.

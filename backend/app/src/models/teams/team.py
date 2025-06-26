@@ -76,6 +76,7 @@ class TeamModel(BaseMainModel):
 
     __table_args__ = (
         CheckConstraint('group_id IS NOT NULL', name='ck_team_group_id_not_null'),
+        UniqueConstraint('group_id', 'name', name='uq_team_group_name'),
     )
 
     def __repr__(self) -> str:

@@ -44,7 +44,7 @@ class RefreshTokenSchema(AuditDatesSchema): # Успадковує id, created_a
 
     # `created_at` з AuditDatesSchema використовується як час видачі токена (`issued_at`).
 
-    # user: Optional[UserPublicSchema] = None # Інформація про користувача, якому належить токен
+    user: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача, якому належить токен")
 
 # --- Схема для запиту на оновлення access токена за допомогою refresh токена ---
 class RefreshTokenRequestSchema(BaseSchema):

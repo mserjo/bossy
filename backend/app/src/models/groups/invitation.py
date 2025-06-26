@@ -44,43 +44,35 @@ class GroupInvitationModel(BaseModel):
     """
     __tablename__ = "group_invitations"
 
-    group_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True)
+    group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    # Унікальний код запрошення, який буде частиною посилання.
-    invitation_code: Column[str] = Column(String(100), nullable=False, unique=True, index=True)
+    invitation_code: Mapped[str] = mapped_column(String(100), nullable=False, unique=True, index=True)
 
-    # Якщо запрошення на конкретну пошту (новий або існуючий користувач)
-    email_invited: Column[str | None] = Column(String(255), nullable=True, index=True)
-    # Якщо запрошення для конкретного існуючого користувача
-    user_id_invited: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_group_invitations_user_invited_id"), nullable=True, index=True)
+    email_invited: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    user_id_invited: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_group_invitations_user_invited_id", ondelete="SET NULL"), nullable=True, index=True)
 
-    # Хто створив запрошення (адмін групи)
-    user_id_creator: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_group_invitations_user_creator_id"), nullable=False, index=True)
+    user_id_creator: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_group_invitations_user_creator_id", ondelete="CASCADE"), nullable=False, index=True) # Якщо автор видаляється, його запрошення теж
 
-    # Роль, яка буде призначена користувачу після прийняття запрошення.
-    # TODO: Замінити "user_roles.id" на константу або імпорт моделі UserRoleModel.
-    role_to_assign_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("user_roles.id", name="fk_group_invitations_role_id"), nullable=False)
+    role_to_assign_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("user_roles.id", name="fk_group_invitations_role_id", ondelete="RESTRICT"), nullable=False)
 
-    expires_at: Column[DateTime | None] = Column(DateTime(timezone=True), nullable=True, index=True)
-    max_uses: Column[int | None] = Column(Integer, nullable=True) # NULL для необмеженого використання
-    current_uses: Column[int] = Column(Integer, default=0, nullable=False)
+    expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    max_uses: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    current_uses: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
-    # Чи активне запрошення. Адмін може деактивувати посилання.
-    is_active: Column[bool] = Column(Boolean, default=True, nullable=False, index=True)
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
 
-    # Статус запрошення.
-    # TODO: Замінити "statuses.id" на константу або імпорт моделі StatusModel.
-    status_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("statuses.id", name="fk_group_invitations_status_id"), nullable=True, index=True)
+    status_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("statuses.id", name="fk_group_invitations_status_id", ondelete="SET NULL"), nullable=True, index=True)
 
     # --- Зв'язки (Relationships) ---
-    group = relationship("GroupModel", back_populates="invitations")
+    group: Mapped["GroupModel"] = relationship(back_populates="invitations")
 
-    creator = relationship("UserModel", foreign_keys=[user_id_creator]) # back_populates="created_group_invitations" буде в UserModel
-    invited_user = relationship("UserModel", foreign_keys=[user_id_invited]) # back_populates="received_group_invitations" буде в UserModel
+    # TODO: Узгодити back_populates з UserModel
+    creator: Mapped["UserModel"] = relationship(foreign_keys=[user_id_creator], back_populates="created_group_invitations")
+    invited_user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[user_id_invited], back_populates="received_group_invitations")
 
-    role_to_assign = relationship("UserRoleModel", foreign_keys=[role_to_assign_id]) # back_populates="group_invitations_with_this_role" буде в UserRoleModel
+    role_to_assign: Mapped["UserRoleModel"] = relationship(foreign_keys=[role_to_assign_id], back_populates="group_invitations_assigning_this_role")
 
-    status = relationship("StatusModel", foreign_keys=[status_id]) # back_populates="group_invitations_with_this_status" буде в StatusModel
+    status: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[status_id], back_populates="group_invitations_with_this_status")
 
 
     def __repr__(self) -> str:

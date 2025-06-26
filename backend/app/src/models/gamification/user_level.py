@@ -60,31 +60,23 @@ class UserLevelModel(BaseModel):
     # Поки що залишаю для можливості зберігання історії.
 
     # --- Зв'язки (Relationships) ---
-    user = relationship("UserModel", foreign_keys=[user_id]) # back_populates="achieved_levels" буде в UserModel
-    group = relationship("GroupModel", foreign_keys=[group_id]) # back_populates="user_level_achievements" буде в GroupModel
-    level = relationship("LevelModel", back_populates="user_levels")
+    # TODO: Узгодити back_populates="achieved_user_levels" з UserModel
+    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="achieved_user_levels")
+    # TODO: Узгодити back_populates="user_level_achievements" з GroupModel
+    group: Mapped["GroupModel"] = relationship(foreign_keys=[group_id], back_populates="user_level_achievements")
+    level: Mapped["LevelModel"] = relationship(back_populates="user_levels")
 
 
-    # Обмеження унікальності:
-    # 1. Якщо зберігається лише поточний рівень користувача в групі: (user_id, group_id) має бути унікальним.
-    # 2. Якщо зберігається історія, але лише один запис може бути `is_current=True` для (user_id, group_id).
-    #    Це складніше реалізувати на рівні БД (потрібен частковий унікальний індекс).
-    # 3. Якщо користувач не може досягти того самого рівня двічі (навіть якщо is_current=False потім):
-    #    (user_id, level_id) має бути унікальним. Оскільки level_id вже прив'язаний до group_id,
-    #    то (user_id, level_id) достатньо.
-    # Поки що, для історії, (user_id, level_id) виглядає логічним.
     __table_args__ = (
         UniqueConstraint('user_id', 'level_id', name='uq_user_level_achieved'),
-        # Якщо is_current використовується для позначення активного рівня:
-        # UniqueConstraint('user_id', 'group_id', name='uq_user_current_level_in_group', postgresql_where=(is_current == True)),
-        # Це для випадку, якщо is_current=True може бути лише в одному записі для user+group.
-        # Або ж, якщо таблиця зберігає лише поточний рівень, тоді:
-        # UniqueConstraint('user_id', 'group_id', name='uq_user_group_current_level'),
-        # і поле is_current не потрібне.
-        #
-        # Поточне рішення: `UniqueConstraint('user_id', 'level_id')` - користувач досягає кожного рівня лише один раз.
-        # Поле `is_current` показує, який з досягнутих рівнів є поточним найвищим.
-        # Це вимагає логіки для оновлення `is_current` для попередніх рівнів.
+        # Коментар для Alembic, якщо потрібен унікальний поточний рівень для користувача в групі:
+        # op.create_unique_constraint(
+        #     'uq_user_group_current_level',
+        #     'user_levels',
+        #     ['user_id', 'group_id'],
+        #     postgresql_where=sa.text('is_current = TRUE')
+        # )
+        # Це гарантує, що для пари (user_id, group_id) може бути лише один запис з is_current=True.
     )
 
     def __repr__(self) -> str:

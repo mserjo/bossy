@@ -77,65 +77,28 @@ class NotificationTemplateModel(BaseMainModel):
     template_content: Column[str] = Column(Text, nullable=False)
 
     # `group_id` з BaseMainModel дозволяє створювати кастомні шаблони для груп.
+    # `group_id` з BaseMainModel дозволяє створювати кастомні шаблони для груп.
     # Якщо `group_id` = NULL, шаблон є глобальним.
 
+    template_code: Mapped[str] = mapped_column(String(255), nullable=False, unique=True, index=True)
+
     # --- Зв'язки (Relationships) ---
-    # group успадковано з BaseMainModel.
-    group = relationship("GroupModel", foreign_keys="NotificationTemplateModel.group_id") # back_populates="notification_templates" буде в GroupModel
+    # group: Mapped[Optional["GroupModel"]] - успадковано з BaseMainModel
+    # state: Mapped[Optional["StatusModel"]] - успадковано з BaseMainModel
 
-    # `state_id` з BaseMainModel використовується для статусу шаблону.
-    # state = relationship("StatusModel", foreign_keys=[state_id])
-
-    # Унікальність: комбінація (name (код шаблону), channel_code, language_code, group_id (якщо є))
-    # має бути унікальною. Або (notification_type_code, channel_code, language_code, group_id).
-    # `name` з BaseMainModel вже є, і він має бути унікальним кодом шаблону.
-    # Тоді: (name, language_code) має бути унікальним, якщо `name` вже включає тип і канал.
-    # Або, якщо `name` - це просто назва для адмінки, а унікальність за функціональними полями:
-    # (notification_type_code, channel_code, language_code, group_id (якщо group_id IS NOT NULL))
-    # (notification_type_code, channel_code, language_code) (якщо group_id IS NULL)
-    # Це складно для одного UniqueConstraint.
-    #
-    # Простіше, якщо `name` - це унікальний ключ типу "TASK_COMPLETED_EMAIL_BODY_HTML_EN".
-    # Тоді `notification_type_code`, `channel_code`, `language_code` можуть бути окремими полями для фільтрації,
-    # але не частиною ключа унікальності, якщо `name` вже все це кодує.
-    #
-    # Якщо `name` - це "TASK_COMPLETED", то унікальність має бути по
-    # (`name`, `channel_code`, `language_code`, `group_id` (з урахуванням NULL)).
-    # Поки що, `name` з `BaseMainModel` буде унікальним ідентифікатором шаблону,
-    # а інші поля - для класифікації.
-    # Це означає, що для кожного каналу/мови/типу буде свій запис зі своїм унікальним `name`.
-    # Наприклад:
-    # name="task_completed_email_subject_uk", notification_type_code="TASK_COMPLETED", channel_code="EMAIL_SUBJECT", language_code="uk"
-    # name="task_completed_email_body_uk", notification_type_code="TASK_COMPLETED", channel_code="EMAIL_BODY_HTML", language_code="uk"
-    # Це робить поле `name` головним ключем для пошуку.
-    # У `BaseMainModel` `name` індексований, але не унікальний. Потрібно додати унікальність.
-    # Або ж, якщо `name` - це "friendly name", то потрібен окремий `template_code`.
-    #
-    # Нехай `name` з `BaseMainModel` буде унікальним кодом шаблону.
-    # Додамо UniqueConstraint на `name`.
-    # І для зручності пошуку, унікальність на комбінацію:
-    # (notification_type_code, channel_code, language_code, group_id)
-    # `group_id` може бути NULL, тому UniqueConstraint має це враховувати.
-    #
-    # __table_args__ = (
-    #     UniqueConstraint('name', name='uq_notification_template_name'), # `name` має бути унікальним кодом
-    #     # Це обмеження складне через nullable group_id.
-    #     # UniqueConstraint('notification_type_code', 'channel_code', 'language_code', 'group_id', name='uq_notification_template_key_group'),
-    #     # UniqueConstraint('notification_type_code', 'channel_code', 'language_code', name='uq_notification_template_key_global', postgresql_where=(group_id.is_(None))),
-    # )
-    # Поки що покладаємося на унікальність `name` як коду шаблону.
-    # Сервіс буде відповідати за пошук потрібного шаблону за типом, каналом, мовою, групою.
-    # Це означає, що логіка вибору шаблону буде складнішою, якщо `name` не містить всієї цієї інформації.
-    #
-    # Найкраще: `name` (з BaseMainModel) - це просто назва для адмінки.
-    # А унікальність забезпечується комбінацією `(notification_type_code, channel_code, language_code, group_id)`.
-    # Це потребує перевизначення `name` як `nullable=True` або використання іншого поля для коду.
-    #
-    # Залишаю `name` як є з `BaseMainModel` (тобто `nullable=False, index=True`, але не `unique`).
-    # Додаю `template_code` як унікальний ідентифікатор.
-    template_code: Column[str] = Column(String(255), nullable=False, unique=True, index=True)
-    # Тоді `name` - це просто опис для адмінки.
-
+    # Коментар для Alembic щодо унікальності комбінації:
+    # Для забезпечення унікальності функціонального ключа шаблону (тип, канал, мова, група)
+    # можна додати наступні обмеження через міграції:
+    # 1. Для групових шаблонів:
+    #    UniqueConstraint('notification_type_code', 'channel_code', 'language_code', 'group_id',
+    #                     name='uq_notif_template_group_key',
+    #                     postgresql_where=sa.text('group_id IS NOT NULL'))
+    # 2. Для глобальних шаблонів:
+    #    UniqueConstraint('notification_type_code', 'channel_code', 'language_code',
+    #                     name='uq_notif_template_global_key',
+    #                     postgresql_where=sa.text('group_id IS NULL'))
+    # Це гарантує, що не буде двох однакових шаблонів для однієї ситуації.
+    # Поле `template_code` залишається головним унікальним ключем для програмного доступу.
 
     def __repr__(self) -> str:
         """

@@ -48,8 +48,9 @@ class TeamMembershipModel(BaseModel):
     # `created_at` з BaseModel може слугувати як `joined_at`.
 
     # --- Зв'язки (Relationships) ---
-    user = relationship("UserModel", foreign_keys=[user_id]) # back_populates="team_memberships" буде в UserModel
-    team = relationship("TeamModel", back_populates="memberships") # memberships - назва зв'язку в TeamModel
+    # TODO: Узгодити back_populates="team_memberships" з UserModel
+    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="team_memberships")
+    team: Mapped["TeamModel"] = relationship(back_populates="memberships")
 
     # Обмеження унікальності: один користувач може бути членом однієї команди лише один раз.
     __table_args__ = (

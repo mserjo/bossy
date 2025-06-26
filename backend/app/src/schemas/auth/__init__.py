@@ -84,3 +84,10 @@ __all__ = [
 # припускаючи, що це буде оброблено в самих файлах схем, якщо потрібно,
 # або що порядок імпорту буде достатнім.
 # Головне - це експорт назв схем.
+
+# Виклик model_rebuild для схем, що містять ForwardRef
+# (UserSchema може посилатися на багато інших, тому її варто оновити)
+UserSchema.model_rebuild()
+RefreshTokenSchema.model_rebuild() # Може посилатися на UserPublicSchema
+SessionSchema.model_rebuild() # Може посилатися на UserPublicSchema або RefreshTokenSchema
+# Інші схеми в цьому пакеті (Create/Update) зазвичай не мають складних ForwardRef.

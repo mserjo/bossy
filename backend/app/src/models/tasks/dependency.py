@@ -49,16 +49,14 @@ class TaskDependencyModel(BaseModel):
 
 
     # --- Зв'язки (Relationships) ---
-    dependent_task = relationship(
-        "TaskModel",
+    dependent_task: Mapped["TaskModel"] = relationship(
         foreign_keys=[dependent_task_id],
-        back_populates="prerequisite_links" # Зворотний зв'язок в TaskModel для отримання списку передумов
+        back_populates="prerequisite_links"
     )
 
-    prerequisite_task = relationship(
-        "TaskModel",
+    prerequisite_task: Mapped["TaskModel"] = relationship(
         foreign_keys=[prerequisite_task_id],
-        back_populates="dependent_tasks" # Зворотний зв'язок в TaskModel для отримання списку завдань, що залежать від нього
+        back_populates="dependent_tasks"
     )
 
     # Обмеження унікальності: одна й та сама пара залежності не повинна існувати двічі.

@@ -61,18 +61,19 @@ class AccountModel(BaseModel):
     # Або `bonus_type_id = Column(UUID, ForeignKey("bonus_types.id"))`
 
     # --- Зв'язки (Relationships) ---
-    user = relationship("UserModel", back_populates="accounts")
-    group = relationship("GroupModel", back_populates="accounts_in_group") # `accounts_in_group` в GroupModel
+    user: Mapped["UserModel"] = relationship(back_populates="accounts")
+    group: Mapped["GroupModel"] = relationship(back_populates="accounts_in_group")
 
-    # Транзакції по цьому рахунку
-    transactions = relationship("TransactionModel", back_populates="account", cascade="all, delete-orphan")
+    transactions: Mapped[List["TransactionModel"]] = relationship(back_populates="account", cascade="all, delete-orphan")
 
-    # # Зв'язок з типом бонусу (якщо bonus_type_code є ForeignKey до BonusTypeModel.code)
-    # bonus_type = relationship("BonusTypeModel",
-    #                           primaryjoin="foreign(AccountModel.bonus_type_code) == remote(BonusTypeModel.code)",
-    #                           uselist=False)
-    # Або якщо використовуємо bonus_type_id:
-    # bonus_type = relationship("BonusTypeModel", foreign_keys=[bonus_type_id])
+    # Зв'язок з BonusTypeModel через bonus_type_code
+    # TODO: Узгодити back_populates="accounts_with_this_type" з BonusTypeModel
+    bonus_type_details: Mapped["BonusTypeModel"] = relationship( # Назва зв'язку тут
+        "BonusTypeModel",
+        primaryjoin="foreign(AccountModel.bonus_type_code) == remote(BonusTypeModel.code)",
+        uselist=False, # Один тип бонусу на рахунок
+        back_populates="accounts_with_this_type"
+    )
 
     # Обмеження унікальності: один користувач може мати лише один рахунок певного типу валюти в одній групі.
     # Оскільки ТЗ каже "створюється автоматично для кожного користувача (в рамках кожної групи)",

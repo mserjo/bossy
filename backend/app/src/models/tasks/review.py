@@ -40,23 +40,23 @@ class TaskReviewModel(BaseModel):
     """
     __tablename__ = "task_reviews"
 
-    task_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True)
-    user_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_task_reviews_user_id", ondelete="CASCADE"), nullable=False, index=True)
+    task_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_task_reviews_user_id", ondelete="CASCADE"), nullable=False, index=True)
 
-    # Рейтинг, наприклад, від 1 до 5. Може бути NULL, якщо користувач залишив лише коментар.
-    # TODO: Визначити діапазон для rating (наприклад, CHECK constraint 1-5).
-    rating: Column[int | None] = Column(Integer, nullable=True)
-    # CHECK (rating >= 1 AND rating <= 5) - додавати через міграції.
+    rating: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    # Коментар для Alembic:
+    # Додати в міграцію:
+    # op.create_check_constraint('ck_task_review_rating_range', 'task_reviews', '(rating >= 1 AND rating <= 5) OR rating IS NULL')
 
-    comment: Column[str | None] = Column(Text, nullable=True)
+    comment: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    # Якщо потрібна модерація відгуків:
-    # status_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("statuses.id"), nullable=True, index=True)
+    # status_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("statuses.id", ondelete="SET NULL"), nullable=True, index=True) # Якщо буде модерація
 
     # --- Зв'язки (Relationships) ---
-    task = relationship("TaskModel", back_populates="reviews")
-    user = relationship("UserModel", foreign_keys=[user_id]) # back_populates="task_reviews" буде в UserModel
-    # status = relationship("StatusModel", foreign_keys=[status_id]) # Якщо є модерація
+    task: Mapped["TaskModel"] = relationship(back_populates="reviews")
+    # TODO: Узгодити back_populates="task_reviews_left" з UserModel
+    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="task_reviews_left")
+    # status: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[status_id], back_populates="task_reviews_with_this_status") # Якщо буде модерація
 
     # Обмеження унікальності: один користувач може залишити лише один відгук на одне завдання.
     __table_args__ = (

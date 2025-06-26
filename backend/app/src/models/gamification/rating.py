@@ -65,8 +65,10 @@ class RatingModel(BaseModel):
 
 
     # --- Зв'язки (Relationships) ---
-    user = relationship("UserModel", foreign_keys=[user_id]) # back_populates="ratings" буде в UserModel
-    group = relationship("GroupModel", foreign_keys=[group_id]) # back_populates="user_ratings" буде в GroupModel
+    # TODO: Узгодити back_populates="ratings_history" з UserModel
+    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="ratings_history")
+    # TODO: Узгодити back_populates="ratings_history" (або схоже) з GroupModel
+    group: Mapped["GroupModel"] = relationship(foreign_keys=[group_id], back_populates="ratings_history")
 
     # Обмеження та індекси
     # Забезпечує, що для користувача, групи, типу рейтингу та дати зрізу є лише один запис.

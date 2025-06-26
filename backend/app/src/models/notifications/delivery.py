@@ -80,7 +80,7 @@ class NotificationDeliveryModel(BaseModel):
 
 
     # --- Зв'язки (Relationships) ---
-    notification = relationship("NotificationModel", back_populates="deliveries")
+    notification: Mapped["NotificationModel"] = relationship(back_populates="deliveries")
 
 
     def __repr__(self) -> str:

@@ -81,91 +81,74 @@ class TaskModel(BaseMainModel):
     __tablename__ = "tasks"
 
     # group_id успадковано і має бути NOT NULL.
-    # ForeignKey("groups.id") вже є в BaseMainModel.
 
-    # Тип завдання/події
-    # TODO: Замінити "task_types.id" на константу або імпорт моделі TaskTypeModel.
-    task_type_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("task_types.id", name="fk_tasks_task_type_id"), nullable=False, index=True)
-
-    # Хто створив завдання/подію
-    # TODO: Замінити "users.id" на константу або імпорт моделі UserModel.
-    created_by_user_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_tasks_creator_id"), nullable=False, index=True)
+    task_type_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("task_types.id", name="fk_tasks_task_type_id", ondelete="RESTRICT"), nullable=False, index=True)
+    created_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_tasks_creator_id", ondelete="SET NULL"), nullable=False, index=True) # Завдання може існувати, якщо автор видалений
 
     # --- Параметри бонусів/штрафів ---
-    bonus_points: Column[Numeric | None] = Column(Numeric(10, 2), nullable=True)
-    penalty_points: Column[Numeric | None] = Column(Numeric(10, 2), nullable=True) # Може бути від'ємним або додатнім, що віднімається
+    bonus_points: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2), nullable=True)
+    penalty_points: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2), nullable=True)
 
     # --- Параметри виконання ---
-    due_date: Column[DateTime | None] = Column(DateTime(timezone=True), nullable=True, index=True)
-    is_recurring: Column[bool] = Column(Boolean, default=False, nullable=False, index=True)
-    recurring_interval: Column[Interval | None] = Column(Interval, nullable=True) # Наприклад, timedelta(days=1)
-    max_occurrences: Column[int | None] = Column(Integer, nullable=True) # Для обмеження кількості повторень
+    due_date: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    is_recurring: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    recurring_interval: Mapped[Optional[timedelta]] = mapped_column(Interval, nullable=True)
+    max_occurrences: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
-    is_mandatory: Column[bool] = Column(Boolean, default=False, nullable=False)
+    is_mandatory: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     # --- Параметри для кількох виконавців ---
-    allow_multiple_assignees: Column[bool] = Column(Boolean, default=False, nullable=False)
-    # Якщо True, бонус отримує перший, хто виконав. Якщо False, бонус отримують усі, хто виконав.
-    # Застосовується, якщо allow_multiple_assignees = True.
-    first_completes_gets_bonus: Column[bool] = Column(Boolean, default=True, nullable=False)
+    allow_multiple_assignees: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    first_completes_gets_bonus: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # --- Ієрархія завдань ---
-    parent_task_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("tasks.id", name="fk_tasks_parent_task_id"), nullable=True, index=True)
+    parent_task_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("tasks.id", name="fk_tasks_parent_task_id", ondelete="CASCADE"), nullable=True, index=True) # Якщо батьківське видаляється, дочірні теж
 
     # --- Командні завдання ---
-    # TODO: Замінити "teams.id" на константу або імпорт моделі TeamModel.
-    team_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("teams.id", name="fk_tasks_team_id"), nullable=True, index=True)
+    team_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("teams.id", name="fk_tasks_team_id", ondelete="SET NULL"), nullable=True, index=True) # Якщо команда видаляється, завдання може стати індивідуальним або без виконавця
 
     # --- Додаткові бонуси за серію ---
-    streak_bonus_enabled: Column[bool] = Column(Boolean, default=False, nullable=False)
-    # Посилання на завдання, за послідовне виконання якого дається бонус.
-    # Може посилатися на себе ж (this task) або на інше завдання.
-    # Якщо NULL, то мається на увазі це ж завдання.
-    streak_bonus_ref_task_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("tasks.id", name="fk_tasks_streak_bonus_ref_task_id"), nullable=True)
-    streak_bonus_count: Column[int | None] = Column(Integer, nullable=True) # Наприклад, 5 разів поспіль
-    streak_bonus_points: Column[Numeric | None] = Column(Numeric(10, 2), nullable=True)
+    streak_bonus_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    streak_bonus_ref_task_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("tasks.id", name="fk_tasks_streak_bonus_ref_task_id", ondelete="SET NULL"), nullable=True)
+    streak_bonus_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    streak_bonus_points: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2), nullable=True)
 
     # --- Зв'язки (Relationships) ---
-    # group успадковано з BaseMainModel, якщо там є relationship.
-    # group = relationship("GroupModel", foreign_keys=[group_id], back_populates="tasks")
-    # Потрібно переконатися, що foreign_keys=[group_id] не конфліктує, якщо group_id є в BaseMainModel.
-    # Оскільки group_id в BaseMainModel вже є ForeignKey, можна просто:
-    group = relationship("GroupModel", foreign_keys="TaskModel.group_id", back_populates="tasks")
+    # group: Mapped["GroupModel"] - успадковано з BaseMainModel
 
+    task_type: Mapped["TaskTypeModel"] = relationship(foreign_keys=[task_type_id], back_populates="tasks_of_this_type")
+    creator: Mapped["UserModel"] = relationship(foreign_keys=[created_by_user_id], back_populates="created_tasks")
 
-    task_type = relationship("TaskTypeModel", foreign_keys=[task_type_id]) # back_populates="tasks" буде в TaskTypeModel
-    creator = relationship("UserModel", foreign_keys=[created_by_user_id]) # back_populates="created_tasks" буде в UserModel
+    parent_task: Mapped[Optional["TaskModel"]] = relationship(remote_side="TaskModel.id", back_populates="child_tasks", lazy="selectin")
+    child_tasks: Mapped[List["TaskModel"]] = relationship(back_populates="parent_task", cascade="all, delete-orphan")
 
-    parent_task = relationship("TaskModel", remote_side=[id], back_populates="child_tasks", lazy="joined")
-    child_tasks = relationship("TaskModel", back_populates="parent_task", cascade="all, delete-orphan") # lazy="joined" можна додати
+    assignments: Mapped[List["TaskAssignmentModel"]] = relationship(back_populates="task", cascade="all, delete-orphan")
+    completions: Mapped[List["TaskCompletionModel"]] = relationship(back_populates="task", cascade="all, delete-orphan")
+    reviews: Mapped[List["TaskReviewModel"]] = relationship(back_populates="task", cascade="all, delete-orphan")
 
-    assignments = relationship("TaskAssignmentModel", back_populates="task", cascade="all, delete-orphan")
-    completions = relationship("TaskCompletionModel", back_populates="task", cascade="all, delete-orphan")
-    reviews = relationship("TaskReviewModel", back_populates="task", cascade="all, delete-orphan")
+    team: Mapped[Optional["TeamModel"]] = relationship(foreign_keys=[team_id], back_populates="tasks_assigned")
 
-    team = relationship("TeamModel", foreign_keys=[team_id]) # back_populates="tasks" буде в TeamModel
+    streak_bonus_reference_task: Mapped[Optional["TaskModel"]] = relationship(remote_side="TaskModel.id", foreign_keys=[streak_bonus_ref_task_id])
 
-    # Зв'язок для streak_bonus_ref_task_id
-    streak_bonus_reference_task = relationship("TaskModel", remote_side=[id], foreign_keys=[streak_bonus_ref_task_id])
+    # state: Mapped[Optional["StatusModel"]] - успадковано з BaseMainModel
 
-    # Зв'язок зі статусом (успадкований з BaseMainModel, якщо там визначено relationship `state`)
-    # state = relationship("StatusModel", foreign_keys=[state_id])
-
-    # Залежності (зв'язок "багато-до-багатьох" через TaskDependencyModel)
-    # `dependent_tasks` - завдання, які залежать від цього завдання (це завдання є передумовою для них)
-    dependent_tasks = relationship(
-        "TaskDependencyModel",
+    dependent_tasks: Mapped[List["TaskDependencyModel"]] = relationship(
         foreign_keys="[TaskDependencyModel.prerequisite_task_id]",
         back_populates="prerequisite_task",
         cascade="all, delete-orphan"
     )
-    # `prerequisite_tasks` - завдання, від яких залежить це завдання (вони є передумовами для цього завдання)
-    prerequisite_links = relationship(
-        "TaskDependencyModel",
+    prerequisite_links: Mapped[List["TaskDependencyModel"]] = relationship(
         foreign_keys="[TaskDependencyModel.dependent_task_id]",
         back_populates="dependent_task",
         cascade="all, delete-orphan"
     )
+
+    # Зв'язок з TaskProposalModel (якщо це завдання створено з пропозиції)
+    # Потрібно додати source_proposal_id в TaskModel, якщо зв'язок один-до-одного з боку TaskModel
+    # Або в TaskProposalModel є created_task_id
+    # Поточна TaskProposalModel.created_task_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("tasks.id"))
+    # Отже, зворотний зв'язок:
+    source_proposal: Mapped[Optional["TaskProposalModel"]] = relationship(back_populates="created_task")
 
 
     def __repr__(self) -> str:

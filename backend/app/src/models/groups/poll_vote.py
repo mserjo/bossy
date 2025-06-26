@@ -36,24 +36,16 @@ class PollVoteModel(BaseModel):
     """
     __tablename__ = "poll_votes"
 
-    poll_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("polls.id", ondelete="CASCADE"), nullable=False, index=True)
-    option_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("poll_options.id", ondelete="CASCADE"), nullable=False, index=True)
+    poll_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("polls.id", ondelete="CASCADE"), nullable=False, index=True)
+    option_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("poll_options.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    # Користувач, який проголосував.
-    # `nullable=True`, оскільки голосування може бути анонімним (визначається в PollModel.is_anonymous).
-    # Якщо анонімне, user_id не зберігається.
-    # TODO: Замінити "users.id" на константу або імпорт моделі UserModel.
-    user_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_poll_votes_user_id", ondelete="SET NULL"), nullable=True, index=True)
-    # `ondelete="SET NULL"` для user_id: якщо користувач видаляється, його голос стає анонімним,
-    # але сам голос залишається (якщо це бажана поведінка). Або "CASCADE", якщо голоси видалених користувачів не потрібні.
-    # Поки що SET NULL, щоб зберегти цілісність кількості голосів.
-
-    # `created_at` з BaseModel може слугувати як `voted_at`.
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_poll_votes_user_id", ondelete="SET NULL"), nullable=True, index=True)
 
     # --- Зв'язки (Relationships) ---
-    poll = relationship("PollModel", back_populates="votes")
-    option = relationship("PollOptionModel", back_populates="votes")
-    user = relationship("UserModel", foreign_keys=[user_id]) # back_populates="poll_votes" буде в UserModel
+    poll: Mapped["PollModel"] = relationship(back_populates="votes")
+    option: Mapped["PollOptionModel"] = relationship(back_populates="votes")
+    # TODO: Узгодити back_populates="poll_votes_made" з UserModel
+    user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[user_id], back_populates="poll_votes_made")
 
     # Обмеження унікальності:
     # 1. Якщо голосування не анонімне і дозволено лише один вибір: (poll_id, user_id) має бути унікальним.

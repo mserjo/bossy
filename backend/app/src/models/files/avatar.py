@@ -52,17 +52,11 @@ class AvatarModel(BaseModel):
     # Має бути лише один запис з `is_current=True` для кожного `user_id`.
 
     # --- Зв'язки (Relationships) ---
-    # Зв'язок з користувачем. Один користувач може мати багато записів AvatarModel (історія),
-    # але лише один з is_current=True.
-    user = relationship("UserModel", foreign_keys=[user_id]) # back_populates="avatars" або "avatar_history" буде в UserModel
-                                                            # Якщо UserModel.avatar - це один-до-одного до поточного,
-                                                            # то потрібен інший зв'язок для історії.
+    # TODO: Узгодити back_populates="avatars" з UserModel
+    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="avatars")
 
-    # Зв'язок з файлом. Один файл може бути пов'язаний з одним записом AvatarModel.
-    # Якщо файл видаляється, відповідний запис AvatarModel також має бути видалений (ondelete="CASCADE" на file_id).
-    file = relationship("FileModel", foreign_keys=[file_id]) # back_populates="avatar_links" (або схоже) буде в FileModel
-                                                            # Якщо FileModel.file_category_code = "USER_AVATAR",
-                                                            # то цей зв'язок логічний.
+    # TODO: Узгодити back_populates="avatar_entry" з FileModel
+    file: Mapped["FileModel"] = relationship(foreign_keys=[file_id], back_populates="avatar_entry")
 
     # Обмеження унікальності:
     # Для кожного user_id може бути лише один аватар з is_current = True.

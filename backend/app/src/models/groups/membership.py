@@ -41,34 +41,25 @@ class GroupMembershipModel(BaseModel):
     """
     __tablename__ = "group_memberships"
 
-    user_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    group_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True)
 
     # Роль користувача в цій конкретній групі.
-    # TODO: Замінити "user_roles.id" на константу або імпорт моделі UserRoleModel.
-    user_role_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("user_roles.id", name="fk_group_memberships_user_role_id"), nullable=False, index=True)
+    user_role_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("user_roles.id", name="fk_group_memberships_user_role_id", ondelete="RESTRICT"), nullable=False, index=True)
 
     # `created_at` з BaseModel може слугувати як `joined_at`.
-    # Якщо потрібне окреме поле, можна додати:
-    # joined_at: Column[DateTime] = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
 
-    # Статус користувача саме в цій групі (якщо відрізняється від його глобального статусу або ролі).
-    # Наприклад, користувач може бути "активним" в системі, але "тимчасово відсутнім" в конкретній групі.
-    # TODO: Замінити "statuses.id" на константу або імпорт моделі StatusModel.
-    status_in_group_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("statuses.id", name="fk_group_memberships_status_id"), nullable=True, index=True)
+    # Статус користувача саме в цій групі.
+    status_in_group_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("statuses.id", name="fk_group_memberships_status_id", ondelete="SET NULL"), nullable=True, index=True)
 
-    # Нотатки, специфічні для цього членства.
-    notes: Column[str | None] = Column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # --- Зв'язки (Relationships) ---
-    user = relationship("UserModel", back_populates="group_memberships")
-    group = relationship("GroupModel", back_populates="memberships") # memberships - назва зв'язку в GroupModel
+    user: Mapped["UserModel"] = relationship(back_populates="group_memberships")
+    group: Mapped["GroupModel"] = relationship(back_populates="memberships")
 
-    # Зв'язок з роллю користувача
-    role = relationship("UserRoleModel", foreign_keys=[user_role_id]) # back_populates="group_memberships" буде в UserRoleModel
-
-    # Зв'язок зі статусом членства в групі
-    status_in_group = relationship("StatusModel", foreign_keys=[status_in_group_id]) # back_populates="group_member_statuses" буде в StatusModel
+    role: Mapped["UserRoleModel"] = relationship(foreign_keys=[user_role_id], back_populates="group_memberships_with_this_role")
+    status_in_group: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[status_in_group_id], back_populates="group_memberships_with_this_status")
 
     # Обмеження унікальності: один користувач може мати лише одну роль в одній групі.
     __table_args__ = (

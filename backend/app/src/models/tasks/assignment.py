@@ -46,29 +46,25 @@ class TaskAssignmentModel(BaseModel):
     task_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True)
 
     # Виконавець - або користувач, або команда. Одне з цих полів має бути заповнене.
-    user_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_task_assignments_user_id", ondelete="CASCADE"), nullable=True, index=True)
-    team_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("teams.id", name="fk_task_assignments_team_id", ondelete="CASCADE"), nullable=True, index=True)
-    # TODO: Додати CHECK constraint, щоб гарантувати, що або user_id, або team_id заповнене, але не обидва одночасно.
-    # Або ж це контролюється логікою.
+    user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_task_assignments_user_id", ondelete="CASCADE"), nullable=True, index=True)
+    team_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("teams.id", name="fk_task_assignments_team_id", ondelete="CASCADE"), nullable=True, index=True)
 
-    # Хто призначив завдання. Може бути NULL, якщо завдання "відкрите для всіх" або автоматично призначене.
-    assigned_by_user_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_task_assignments_assigner_id", ondelete="SET NULL"), nullable=True, index=True)
+    assigned_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_task_assignments_assigner_id", ondelete="SET NULL"), nullable=True, index=True)
 
-    # `created_at` з BaseModel може слугувати як `assigned_at`.
+    status_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("statuses.id", name="fk_task_assignments_status_id", ondelete="SET NULL"), nullable=True, index=True)
 
-    # Статус конкретного призначення. Наприклад, якщо користувач взяв завдання в роботу.
-    # TODO: Замінити "statuses.id" на константу або імпорт моделі StatusModel.
-    status_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("statuses.id", name="fk_task_assignments_status_id"), nullable=True, index=True)
-
-    notes: Column[str | None] = Column(Text, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
     # --- Зв'язки (Relationships) ---
-    task = relationship("TaskModel", back_populates="assignments")
-    user = relationship("UserModel", foreign_keys=[user_id]) # back_populates="task_assignments" буде в UserModel
-    team = relationship("TeamModel", foreign_keys=[team_id]) # back_populates="task_assignments" буде в TeamModel
-    assigner = relationship("UserModel", foreign_keys=[assigned_by_user_id]) # back_populates="made_task_assignments" буде в UserModel
-    status = relationship("StatusModel", foreign_keys=[status_id]) # back_populates="task_assignment_statuses" буде в StatusModel
+    task: Mapped["TaskModel"] = relationship(back_populates="assignments")
+    # TODO: Узгодити back_populates="task_assignments" з UserModel
+    user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[user_id], back_populates="task_assignments")
+    # TODO: Узгодити back_populates="task_assignments" з TeamModel
+    team: Mapped[Optional["TeamModel"]] = relationship(foreign_keys=[team_id], back_populates="task_assignments") # Припускаючи, що в TeamModel є tasks_assigned, а не task_assignments
+    # TODO: Узгодити back_populates="made_task_assignments" з UserModel
+    assigner: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[assigned_by_user_id], back_populates="made_task_assignments")
+    status: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[status_id], back_populates="task_assignments_with_this_status")
 
     # Обмеження унікальності:
     # Одне завдання не може бути призначене одному й тому ж користувачеві двічі.
@@ -77,18 +73,22 @@ class TaskAssignmentModel(BaseModel):
     # Поки що, якщо обидва NULL, це може означати "відкрите для взяття" завдання, але це краще реалізувати інакше.
     # Це таблиця саме призначень.
     __table_args__ = (
-        UniqueConstraint('task_id', 'user_id', name='uq_task_user_assignment', postgresql_where=(user_id.isnot(None))),
-        UniqueConstraint('task_id', 'team_id', name='uq_task_team_assignment', postgresql_where=(team_id.isnot(None))),
-        # CheckConstraint(
-        #     or_(user_id.isnot(None), team_id.isnot(None)),
-        #     name='cc_task_assignment_assignee_present'
-        # ),
-        # CheckConstraint(
-        #     not_(and_(user_id.isnot(None), team_id.isnot(None))),
-        #     name='cc_task_assignment_assignee_exclusive'
+        UniqueConstraint('task_id', 'user_id', name='uq_task_user_assignment', postgresql_where=(user_id.isnot(None))), # type: ignore
+        UniqueConstraint('task_id', 'team_id', name='uq_task_team_assignment', postgresql_where=(team_id.isnot(None))), # type: ignore
+        # Коментар для Alembic:
+        # Додати в міграцію для забезпечення, що або user_id, або team_id заповнене, але не обидва:
+        # op.create_check_constraint(
+        #     'cc_task_assignment_assignee_exclusive_present',
+        #     'task_assignments',
+        #     "((user_id IS NOT NULL AND team_id IS NULL) OR (user_id IS NULL AND team_id IS NOT NULL))"
         # )
-        # TODO: Check constraints краще додавати через міграції Alembic, оскільки SQLAlchemy ORM може мати обмеження
-        # з ними, особливо з `postgresql_where` в UniqueConstraint.
+        # Або, якщо завдання може бути не призначене нікому (що не логічно для цієї таблиці):
+        # op.create_check_constraint(
+        #     'cc_task_assignment_assignee_not_both',
+        #     'task_assignments',
+        #     "NOT (user_id IS NOT NULL AND team_id IS NOT NULL)"
+        # )
+        # Поточна логіка передбачає, що призначення завжди або користувачу, або команді.
     )
 
     def __repr__(self) -> str:

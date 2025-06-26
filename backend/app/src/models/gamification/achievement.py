@@ -44,27 +44,21 @@ class AchievementModel(BaseModel):
     """
     __tablename__ = "achievements"
 
-    user_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    badge_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("badges.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    badge_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("badges.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    # `created_at` з BaseModel може слугувати як `achieved_at`.
-    # Якщо потрібне окреме поле:
-    # achieved_at: Column[DateTime] = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    context_details: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
 
-    # Додатковий контекст, якщо бейдж може бути отриманий кілька разів з різним контекстом.
-    # Наприклад, для бейджа "Переможець змагання" тут може бути ID змагання.
-    # Якщо BadgeModel.is_repeatable = False, це поле зазвичай не використовується або NULL.
-    context_details: Column[JSONB | None] = Column(JSONB, nullable=True)
-
-    # Інформація про ручне присудження
-    awarded_by_user_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_achievements_awarder_id", ondelete="SET NULL"), nullable=True, index=True)
-    award_reason: Column[str | None] = Column(Text, nullable=True)
+    awarded_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_achievements_awarder_id", ondelete="SET NULL"), nullable=True, index=True)
+    award_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
 
     # --- Зв'язки (Relationships) ---
-    user = relationship("UserModel", foreign_keys=[user_id]) # back_populates="achievements" буде в UserModel
-    badge = relationship("BadgeModel", back_populates="achievements")
-    awarder = relationship("UserModel", foreign_keys=[awarded_by_user_id]) # back_populates="awarded_achievements" буде в UserModel
+    # TODO: Узгодити back_populates="achievements_earned" з UserModel
+    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="achievements_earned")
+    badge: Mapped["BadgeModel"] = relationship(back_populates="achievements")
+    # TODO: Узгодити back_populates="awarded_achievements_by_admin" з UserModel
+    awarder: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[awarded_by_user_id], back_populates="awarded_achievements_by_admin")
 
 
     # Обмеження унікальності:

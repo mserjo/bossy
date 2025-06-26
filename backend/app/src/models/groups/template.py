@@ -61,14 +61,19 @@ class GroupTemplateModel(BaseMainModel):
     version: Column[int] = Column(Integer, default=1, nullable=False)
 
     # Ідентифікатор користувача (супер-адміна), який створив цей шаблон.
-    # TODO: Замінити "users.id" на константу або імпорт моделі UserModel.
-    created_by_user_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_group_templates_creator_id"), nullable=True) # Може бути NULL, якщо є системні шаблони
+    created_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_group_templates_creator_id", ondelete="SET NULL"), nullable=True, index=True) # Системні шаблони можуть не мати автора
 
     # --- Зв'язки (Relationships) ---
-    creator = relationship("UserModel", foreign_keys=[created_by_user_id]) # back_populates="created_group_templates" буде в UserModel
+    # TODO: Узгодити back_populates="created_group_templates" з UserModel
+    creator: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[created_by_user_id], back_populates="created_group_templates")
 
-    # Зв'язок зі статусом (успадкований з BaseMainModel, якщо там визначено relationship `state`)
-    # state = relationship("StatusModel", foreign_keys=[state_id])
+    # Зв'язок зі статусом (успадкований з BaseMainModel)
+    # state: Mapped[Optional["StatusModel"]] = relationship(foreign_keys="GroupTemplateModel.state_id") # Вже є в BaseMainModel
+    # Потрібно переконатися, що foreign_keys=[state_id] в BaseMainModel.state не конфліктує.
+    # Або, якщо state в BaseMainModel визначено як relationship("StatusModel", foreign_keys=[BaseMainModel.state_id])
+    # (з використанням BaseMainModel.state_id), то тут нічого не потрібно.
+    # Поточний BaseMainModel.state: Mapped[Optional["StatusModel"]] = relationship("StatusModel", foreign_keys=[state_id], lazy="selectin")
+    # Це має працювати.
 
     # `group_id` з BaseMainModel тут завжди буде NULL.
 

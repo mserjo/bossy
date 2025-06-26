@@ -52,39 +52,27 @@ class TeamModel(BaseMainModel):
     __tablename__ = "teams"
 
     # group_id успадковано і має бути NOT NULL.
-    # ForeignKey("groups.id") вже є в BaseMainModel.
 
-    # Лідер (капітан) команди. Може бути необов'язковим.
-    # TODO: Замінити "users.id" на константу або імпорт моделі UserModel.
-    leader_user_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_teams_leader_id"), nullable=True, index=True)
-
-    # Іконка команди (посилання на модель файлів)
-    # TODO: Замінити "files.id" на константу або імпорт моделі FileModel.
-    icon_file_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("files.id", name="fk_teams_icon_file_id"), nullable=True)
-
-    max_members: Column[int | None] = Column(Integer, nullable=True) # NULL означає без обмежень
+    leader_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_teams_leader_id", ondelete="SET NULL"), nullable=True, index=True)
+    icon_file_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("files.id", name="fk_teams_icon_file_id", ondelete="SET NULL"), nullable=True)
+    max_members: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
     # --- Зв'язки (Relationships) ---
-    # group успадковано з BaseMainModel.
-    # group = relationship("GroupModel", foreign_keys=[group_id], back_populates="teams")
-    # Потрібно переконатися, що foreign_keys=[group_id] не конфліктує.
-    # Оскільки group_id в BaseMainModel вже є ForeignKey, можна просто:
-    group = relationship("GroupModel", foreign_keys="TeamModel.group_id") # back_populates="teams" буде в GroupModel
+    # group: Mapped["GroupModel"] - успадковано з BaseMainModel
 
+    # TODO: Узгодити back_populates="led_teams" з UserModel
+    leader: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[leader_user_id], back_populates="led_teams")
 
-    leader = relationship("UserModel", foreign_keys=[leader_user_id]) # back_populates="led_teams" буде в UserModel
+    memberships: Mapped[List["TeamMembershipModel"]] = relationship(back_populates="team", cascade="all, delete-orphan")
 
-    # Учасники команди через проміжну таблицю TeamMembershipModel
-    memberships = relationship("TeamMembershipModel", back_populates="team", cascade="all, delete-orphan")
+    # Зв'язок з TaskModel.team_id
+    # TODO: Узгодити back_populates="team" в TaskModel з назвою тут (tasks_assigned)
+    tasks_assigned: Mapped[List["TaskModel"]] = relationship(back_populates="team")
 
-    # Завдання, призначені цій команді
-    # Це буде зворотний зв'язок від TaskModel.team_id
-    tasks_assigned = relationship("TaskModel", back_populates="team") # foreign_keys=[TaskModel.team_id]
+    # state: Mapped[Optional["StatusModel"]] - успадковано з BaseMainModel
 
-    # Зв'язок зі статусом (успадкований з BaseMainModel, якщо там визначено relationship `state`)
-    # state = relationship("StatusModel", foreign_keys=[state_id])
-
-    # icon_file = relationship("FileModel", foreign_keys=[icon_file_id]) # back_populates="team_icon_for" буде в FileModel
+    # TODO: Узгодити back_populates з FileModel
+    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="team_icon_for")
 
     def __repr__(self) -> str:
         """

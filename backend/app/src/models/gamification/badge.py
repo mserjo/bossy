@@ -87,11 +87,11 @@ class BadgeModel(BaseMainModel):
     # `state_id` з BaseMainModel використовується для статусу налаштування бейджа.
     # state = relationship("StatusModel", foreign_keys=[state_id])
 
-    # TODO: Додати UniqueConstraint для ('group_id', 'name').
-    # __table_args__ = (
-    #     UniqueConstraint('group_id', 'name', name='uq_badge_group_name'),
-    # )
-    # Це потрібно буде додати через міграції або після створення всіх моделей.
+    __table_args__ = (
+        # Коментар для Alembic:
+        # Додати в міграцію:
+        # op.create_unique_constraint('uq_badge_group_name', 'badges', ['group_id', 'name'])
+    )
 
     def __repr__(self) -> str:
         """

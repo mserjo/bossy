@@ -55,34 +55,28 @@ class LevelModel(BaseMainModel):
 
     # group_id успадковано і має бути NOT NULL.
 
-    level_number: Column[int] = Column(Integer, nullable=False, index=True) # Унікальний в межах групи?
-    # TODO: Додати UniqueConstraint('group_id', 'level_number', name='uq_group_level_number')
-
-    required_points: Column[Numeric | None] = Column(Numeric(12, 2), nullable=True)
-    required_tasks_completed: Column[int | None] = Column(Integer, nullable=True)
-
-    # Іконка рівня
-    # TODO: Замінити "files.id" на константу або імпорт моделі FileModel.
-    icon_file_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("files.id", name="fk_levels_icon_file_id"), nullable=True)
+    level_number: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    required_points: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
+    required_tasks_completed: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    icon_file_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("files.id", name="fk_levels_icon_file_id", ondelete="SET NULL"), nullable=True)
 
     # --- Зв'язки (Relationships) ---
-    # group успадковано з BaseMainModel.
-    group = relationship("GroupModel", foreign_keys="LevelModel.group_id") # back_populates="levels" буде в GroupModel
+    # group: Mapped["GroupModel"] - успадковано з BaseMainModel
 
-    # icon_file = relationship("FileModel", foreign_keys=[icon_file_id]) # back_populates="level_icon_for" буде в FileModel
+    # TODO: Узгодити back_populates з FileModel
+    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="level_icon_for")
 
-    # Користувачі, які досягли цього рівня (через проміжну таблицю UserLevelModel)
-    user_levels = relationship("UserLevelModel", back_populates="level", cascade="all, delete-orphan")
+    user_levels: Mapped[List["UserLevelModel"]] = relationship(back_populates="level", cascade="all, delete-orphan")
 
-    # `state_id` з BaseMainModel використовується для статусу налаштування рівня.
-    # state = relationship("StatusModel", foreign_keys=[state_id])
+    # state: Mapped[Optional["StatusModel"]] - успадковано з BaseMainModel
 
-    # TODO: Додати UniqueConstraint для ('group_id', 'level_number') та ('group_id', 'name').
-    # __table_args__ = (
-    #     UniqueConstraint('group_id', 'level_number', name='uq_level_group_level_number'),
-    #     UniqueConstraint('group_id', 'name', name='uq_level_group_name'),
-    # )
-    # Це потрібно буде додати через міграції або після створення всіх моделей.
+    __table_args__ = (
+        # Коментар для Alembic:
+        # Додати в міграцію:
+        # op.create_unique_constraint('uq_level_group_level_number', 'levels', ['group_id', 'level_number'])
+        # op.create_unique_constraint('uq_level_group_name', 'levels', ['group_id', 'name'])
+        # Ці обмеження важливі для коректності даних.
+    )
 
     def __repr__(self) -> str:
         """

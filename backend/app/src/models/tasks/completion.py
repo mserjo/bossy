@@ -73,32 +73,32 @@ class TaskCompletionModel(BaseModel):
     # Для подій, які не мають виконавця, обидва можуть бути NULL.
 
     # Статус виконання завдання
-    # TODO: Замінити "statuses.id" на константу або імпорт моделі StatusModel.
-    status_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("statuses.id", name="fk_task_completions_status_id"), nullable=False, index=True)
+    status_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("statuses.id", name="fk_task_completions_status_id", ondelete="RESTRICT"), nullable=False, index=True)
 
-    started_at: Column[DateTime | None] = Column(DateTime(timezone=True), nullable=True)
-    submitted_for_review_at: Column[DateTime | None] = Column(DateTime(timezone=True), nullable=True)
-    completed_at: Column[DateTime | None] = Column(DateTime(timezone=True), nullable=True, index=True) # Час підтвердження
+    started_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    submitted_for_review_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
 
-    reviewed_by_user_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_task_completions_reviewer_id", ondelete="SET NULL"), nullable=True, index=True)
-    reviewed_at: Column[DateTime | None] = Column(DateTime(timezone=True), nullable=True)
-    review_notes: Column[str | None] = Column(Text, nullable=True)
+    reviewed_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_task_completions_reviewer_id", ondelete="SET NULL"), nullable=True, index=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    review_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
-    bonus_points_awarded: Column[Numeric | None] = Column(Numeric(10, 2), nullable=True)
-    penalty_points_applied: Column[Numeric | None] = Column(Numeric(10, 2), nullable=True)
+    bonus_points_awarded: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2), nullable=True)
+    penalty_points_applied: Mapped[Optional[Decimal]] = mapped_column(Numeric(10, 2), nullable=True)
 
-    completion_notes: Column[str | None] = Column(Text, nullable=True)
-    # Список ID файлів або метаданих файлів, пов'язаних з виконанням
-    # TODO: Визначити структуру JSON для attachments. Наприклад, [{"file_id": "...", "filename": "...", "uploaded_at": "..."}]
-    attachments: Column[JSONB | None] = Column(JSONB, nullable=True)
+    completion_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    attachments: Mapped[Optional[List[Dict[str, Any]]]] = mapped_column(JSONB, nullable=True) # JSONB для списку словників
 
 
     # --- Зв'язки (Relationships) ---
-    task = relationship("TaskModel", back_populates="completions")
-    user = relationship("UserModel", foreign_keys=[user_id]) # back_populates="task_completions" буде в UserModel
-    team = relationship("TeamModel", foreign_keys=[team_id]) # back_populates="task_completions" буде в TeamModel
-    status = relationship("StatusModel", foreign_keys=[status_id]) # back_populates="task_completion_statuses" буде в StatusModel
-    reviewer = relationship("UserModel", foreign_keys=[reviewed_by_user_id]) # back_populates="reviewed_task_completions" буде в UserModel
+    task: Mapped["TaskModel"] = relationship(back_populates="completions")
+    # TODO: Узгодити back_populates="task_completions" з UserModel
+    user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[user_id], back_populates="task_completions")
+    # TODO: Узгодити back_populates="task_completions" з TeamModel
+    team: Mapped[Optional["TeamModel"]] = relationship(foreign_keys=[team_id], back_populates="task_completions") # Припускаючи, що в TeamModel є task_completions
+    status: Mapped["StatusModel"] = relationship(foreign_keys=[status_id], back_populates="task_completions_with_this_status")
+    # TODO: Узгодити back_populates="reviewed_task_completions" з UserModel
+    reviewer: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[reviewed_by_user_id], back_populates="reviewed_task_completions")
 
     # Обмеження унікальності:
     # Зазвичай, один користувач може мати один "активний" запис про виконання для одного завдання.

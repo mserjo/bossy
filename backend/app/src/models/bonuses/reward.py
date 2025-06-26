@@ -61,49 +61,32 @@ class RewardModel(BaseMainModel):
     __tablename__ = "rewards"
 
     # group_id успадковано і має бути NOT NULL.
-    # ForeignKey("groups.id") вже є в BaseMainModel.
 
-    cost_points: Column[Numeric] = Column(Numeric(12, 2), nullable=False)
+    cost_points: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
+    bonus_type_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True) # Посилається на BonusTypeModel.code
 
-    # Код типу бонусів, в яких вказана вартість. Має відповідати типу бонусів групи.
-    # TODO: Замінити "bonus_types.code" на константу або імпорт моделі BonusTypeModel.
-    # Або, якщо вартість завжди у валюті групи, то це поле може бути непотрібним,
-    # а тип валюти береться з налаштувань групи.
-    # Проте, якщо нагорода може бути глобальною, а потім додаватися до груп,
-    # то вказання типу валюти тут має сенс.
-    # ТЗ: "належить до якоїсь групи", "можна обрати нагороду з доступного списку (і обміняти на бонуси на своєму рахунку)".
-    # Це означає, що вартість має бути в валюті рахунку користувача, тобто валюті групи.
-    # Тому `bonus_type_code` тут, ймовірно, денормалізація або має відповідати `AccountModel.bonus_type_code`.
-    # Залишаю його, припускаючи, що він фіксує, в якій валюті ця вартість.
-    bonus_type_code: Column[str] = Column(String(50), nullable=False, index=True)
-    # TODO: Додати ForeignKey до `bonus_types.code` або `bonus_types.id`.
+    quantity_available: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    max_per_user: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    is_recurring_purchase: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    quantity_available: Column[int | None] = Column(Integer, nullable=True) # NULL = нескінченно
-    max_per_user: Column[int | None] = Column(Integer, nullable=True) # NULL = без обмежень
-
-    is_recurring_purchase: Column[bool] = Column(Boolean, default=True, nullable=False) # Чи можна купувати багато разів
-
-    # Іконка нагороди
-    # TODO: Замінити "files.id" на константу або імпорт моделі FileModel.
-    icon_file_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("files.id", name="fk_rewards_icon_file_id"), nullable=True)
+    icon_file_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("files.id", name="fk_rewards_icon_file_id", ondelete="SET NULL"), nullable=True)
 
     # --- Зв'язки (Relationships) ---
-    # group успадковано з BaseMainModel.
-    # group = relationship("GroupModel", foreign_keys=[group_id], back_populates="rewards")
-    # Потрібно переконатися, що foreign_keys=[group_id] не конфліктує.
-    group = relationship("GroupModel", foreign_keys="RewardModel.group_id", back_populates="rewards")
+    # group: Mapped["GroupModel"] - успадковано з BaseMainModel
 
-    # icon_file = relationship("FileModel", foreign_keys=[icon_file_id]) # back_populates="reward_icon_for" буде в FileModel
+    # TODO: Узгодити back_populates з FileModel
+    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="reward_icon_for")
 
-    # Зв'язок з BonusTypeModel, щоб знати деталі про валюту.
-    # bonus_type = relationship("BonusTypeModel",
-    #                           primaryjoin="foreign(RewardModel.bonus_type_code) == remote(BonusTypeModel.code)",
-    #                           uselist=False)
-    # TODO: Реалізувати зв'язок з BonusTypeModel, якщо bonus_type_code використовується як ключ.
-    # Або якщо буде bonus_type_id.
+    # Зв'язок з BonusTypeModel через bonus_type_code
+    # TODO: Узгодити back_populates="rewards_costed_in_this_type" з BonusTypeModel
+    bonus_type_details: Mapped["BonusTypeModel"] = relationship(
+        "BonusTypeModel",
+        primaryjoin="foreign(RewardModel.bonus_type_code) == remote(BonusTypeModel.code)",
+        uselist=False, # Одна нагорода має один тип валюти для вартості
+        back_populates="rewards_costed_in_this_type"
+    )
 
-    # `state_id` з BaseMainModel використовується для статусу нагороди.
-    # state = relationship("StatusModel", foreign_keys=[state_id])
+    # state: Mapped[Optional["StatusModel"]] - успадковано з BaseMainModel
 
     # Зв'язок з транзакціями, де ця нагорода була куплена (якщо source_entity_id в TransactionModel посилається сюди)
     # purchases = relationship(

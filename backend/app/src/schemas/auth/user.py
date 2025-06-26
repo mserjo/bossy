@@ -15,8 +15,14 @@ from backend.app.src.schemas.base import BaseMainSchema, BaseSchema, AuditDatesS
 # Потрібно буде імпортувати схеми для зв'язків, коли вони будуть готові, наприклад:
 # from backend.app.src.schemas.groups.membership import GroupMembershipSchema
 # from backend.app.src.schemas.bonuses.account import AccountSchema
-# from backend.app.src.schemas.files.avatar import AvatarSchema # (або просто URL аватара)
-# from backend.app.src.schemas.dictionaries.status import StatusSchema
+from backend.app.src.schemas.files.avatar import AvatarSchema
+from backend.app.src.schemas.dictionaries.status import StatusSchema
+from backend.app.src.schemas.groups.membership import GroupMembershipSchema
+from backend.app.src.schemas.bonuses.account import AccountSchema
+from backend.app.src.schemas.tasks.task import TaskSimpleSchema # Для created_tasks
+from backend.app.src.schemas.gamification.achievement import AchievementSchema # Для achievements_earned
+from backend.app.src.schemas.gamification.user_level import UserLevelSchema # Для achieved_user_levels
+
 
 # --- Схема для відображення повної інформації про користувача (для адмінів або власного профілю) ---
 class UserSchema(BaseMainSchema):
@@ -48,12 +54,23 @@ class UserSchema(BaseMainSchema):
     is_2fa_enabled: bool = Field(..., description="Чи ввімкнена двофакторна автентифікація")
     # otp_secret_encrypted та otp_backup_codes_hashed не повинні віддаватися через API.
 
-    # --- Зв'язки (приклад, потребують відповідних схем) ---
-    # state: Optional[StatusSchema] = None # Статус користувача (розгорнутий)
-    # avatar_url: Optional[str] = Field(None, description="URL аватара користувача") # Або повна AvatarSchema
+    # --- Розгорнуті зв'язки ---
+    state: Optional[StatusSchema] = Field(None, description="Статус користувача (розгорнутий)")
+    # Для аватара: UserModel має зв'язок `avatars: Mapped[List["AvatarModel"]]`.
+    # Потрібно вибрати поточний аватар. Це краще робити на сервісному рівні
+    # і додавати поле `current_avatar: Optional[AvatarSchema]` або `avatar_url: Optional[HttpUrl]`.
+    # Поки що додаю список всіх аватарів (історія), або можна зробити поле для поточного.
+    current_avatar: Optional[AvatarSchema] = Field(None, description="Поточний аватар користувача")
+    # avatars_history: List[AvatarSchema] = Field(default_factory=list, description="Історія аватарів користувача")
 
-    # group_memberships: List[Any] = [] # TODO: Замінити Any на GroupMembershipSchema
-    # accounts: List[Any] = [] # TODO: Замінити Any на AccountSchema
+
+    group_memberships: List[GroupMembershipSchema] = Field(default_factory=list, description="Членство користувача в групах")
+    accounts: List[AccountSchema] = Field(default_factory=list, description="Рахунки користувача в групах")
+
+    # Приклади інших зв'язків (можуть бути не всі потрібні для кожної відповіді)
+    # created_tasks: List[TaskSimpleSchema] = Field(default_factory=list, description="Завдання, створені користувачем")
+    # achievements_earned: List[AchievementSchema] = Field(default_factory=list, description="Отримані бейджі/досягнення")
+    # achieved_user_levels: List[UserLevelSchema] = Field(default_factory=list, description="Досягнуті рівні")
 
     # `group_id` з `BaseMainSchema` для `UserModel` завжди буде `None`.
     # Це поле не використовується для визначення приналежності до груп.

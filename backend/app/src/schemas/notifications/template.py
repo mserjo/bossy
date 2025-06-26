@@ -15,9 +15,7 @@ from backend.app.src.schemas.base import BaseMainSchema, BaseSchema
 # Потрібно буде імпортувати схеми для зв'язків:
 # from backend.app.src.schemas.groups.group import GroupSimpleSchema (group_id вже є)
 # from backend.app.src.schemas.dictionaries.status import StatusSchema (state_id вже є)
-from backend.app.src.core.dicts import NotificationChannelEnum # Імпорт Enum для каналів
-# TODO: Імпортувати Enum для notification_type_code, коли він буде створений в core.dicts
-# from backend.app.src.core.dicts import NotificationTypeEnum
+from backend.app.src.core.dicts import NotificationChannelEnum, NotificationTypeEnum # Імпорт Enum
 
 GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema')
 StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')
@@ -31,8 +29,7 @@ class NotificationTemplateSchema(BaseMainSchema):
     від `BaseMainSchema`.
     """
     template_code: str = Field(..., max_length=255, description="Унікальний програмний код шаблону")
-    # notification_type_code: NotificationTypeEnum = Field(..., description="Тип сповіщення, для якого призначений шаблон") # Використання Enum
-    notification_type_code: str = Field(..., max_length=100, description="Код типу сповіщення, для якого призначений шаблон") # Поки що рядок
+    notification_type_code: NotificationTypeEnum = Field(..., description="Тип сповіщення, для якого призначений шаблон")
     channel_code: NotificationChannelEnum = Field(..., description="Канал доставки")
     language_code: str = Field(..., max_length=10, description="Код мови шаблону (наприклад, 'uk', 'en')")
     template_content: str = Field(..., description="Вміст шаблону (може містити плейсхолдери)")
@@ -53,8 +50,7 @@ class NotificationTemplateCreateSchema(BaseSchema):
     group_id: Optional[uuid.UUID] = Field(None, description="ID групи (якщо шаблон специфічний для групи)")
 
     template_code: str = Field(..., min_length=1, max_length=255, description="Унікальний програмний код шаблону")
-    # notification_type_code: NotificationTypeEnum = Field(..., description="Тип сповіщення") # Використання Enum
-    notification_type_code: str = Field(..., max_length=100, description="Код типу сповіщення") # Поки що рядок
+    notification_type_code: NotificationTypeEnum = Field(..., description="Тип сповіщення")
     channel_code: NotificationChannelEnum = Field(..., description="Канал доставки")
     language_code: str = Field(..., max_length=10, description="Код мови шаблону")
     template_content: str = Field(..., description="Вміст шаблону")

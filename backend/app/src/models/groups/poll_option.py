@@ -42,26 +42,14 @@ class PollOptionModel(BaseModel):
     """
     __tablename__ = "poll_options"
 
-    poll_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("polls.id", ondelete="CASCADE"), nullable=False, index=True)
+    poll_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("polls.id", ondelete="CASCADE"), nullable=False, index=True)
 
-    # Текст варіанту відповіді.
-    option_text: Column[str] = Column(Text, nullable=False)
-
-    # Порядковий номер для сортування варіантів відповідей.
-    order_num: Column[int] = Column(Integer, default=0, nullable=False)
-
-    # Лічильник голосів. Може бути корисним для швидкого відображення результатів,
-    # але потребує синхронізації при додаванні/видаленні голосів.
-    # Або ж можна обчислювати динамічно через `len(poll_option.votes)`.
-    # Поки що не додаємо, щоб уникнути денормалізації.
-    # votes_count: Column[int] = Column(Integer, default=0, nullable=False)
-
+    option_text: Mapped[str] = mapped_column(Text, nullable=False)
+    order_num: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True) # Додав index=True для order_num
 
     # --- Зв'язки (Relationships) ---
-    poll = relationship("PollModel", back_populates="options")
-
-    # Голоси, подані за цей конкретний варіант відповіді
-    votes = relationship("PollVoteModel", back_populates="option", cascade="all, delete-orphan")
+    poll: Mapped["PollModel"] = relationship(back_populates="options")
+    votes: Mapped[List["PollVoteModel"]] = relationship(back_populates="option", cascade="all, delete-orphan")
 
 
     def __repr__(self) -> str:

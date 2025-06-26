@@ -95,19 +95,31 @@ class FileModel(BaseModel):
 
 
     # --- Зв'язки (Relationships) ---
-    uploader = relationship("UserModel", foreign_keys=[uploaded_by_user_id]) # back_populates="uploaded_files" буде в UserModel
-    group_context = relationship("GroupModel", foreign_keys=[group_context_id]) # back_populates="context_files" буде в GroupModel
-    # status = relationship("StatusModel", foreign_keys=[status_id])
+    # TODO: Узгодити back_populates="uploaded_files" з UserModel
+    uploader: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[uploaded_by_user_id], back_populates="uploaded_files")
+    # TODO: Узгодити back_populates="context_files" з GroupModel (або specific, e.g., group_icons)
+    group_context: Mapped[Optional["GroupModel"]] = relationship(foreign_keys=[group_context_id], back_populates="context_files")
+    # status: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[status_id]) # Якщо буде status_id
 
-    # Зворотні зв'язки для полів типу `icon_file_id` в інших моделях:
-    # Наприклад, якщо GroupModel.icon_file_id посилається на FileModel.id:
-    # group_icon_for = relationship("GroupModel", back_populates="icon_file", foreign_keys="[GroupModel.icon_file_id]")
-    # Це потрібно, якщо ми хочемо з FileModel отримати, для якої групи це іконка.
-    # Аналогічно для RewardModel, BadgeModel, LevelModel, ReportModel.
-    # Або ж, якщо FileModel є більш загальною, то ці зв'язки не потрібні тут,
-    # а `file_category_code` та `metadata` (де може бути `related_entity_id`) використовуються для контексту.
-    # Поки що залишаю без цих зворотних зв'язків для простоти FileModel.
-    # Зв'язок з AvatarModel буде визначено в AvatarModel (вона матиме file_id).
+    # Зворотні зв'язки від моделей, що використовують цей файл як іконку/аватар/звіт
+    # Ці зв'язки є один-до-одного (або один-до-багатьох, якщо файл може бути кількома аватарами, що малоймовірно для унікального file_id в AvatarModel)
+    # `uselist=False` вказує на один-до-одного з боку "один".
+
+    # Для GroupModel.icon_file_id
+    group_icon_for: Mapped[Optional["GroupModel"]] = relationship(back_populates="icon_file", foreign_keys="[GroupModel.icon_file_id]")
+    # Для RewardModel.icon_file_id
+    reward_icon_for: Mapped[Optional["RewardModel"]] = relationship(back_populates="icon_file", foreign_keys="[RewardModel.icon_file_id]")
+    # Для BadgeModel.icon_file_id
+    badge_icon_for: Mapped[Optional["BadgeModel"]] = relationship(back_populates="icon_file", foreign_keys="[BadgeModel.icon_file_id]")
+    # Для LevelModel.icon_file_id
+    level_icon_for: Mapped[Optional["LevelModel"]] = relationship(back_populates="icon_file", foreign_keys="[LevelModel.icon_file_id]")
+    # Для ReportModel.file_id
+    report_file_for: Mapped[Optional["ReportModel"]] = relationship(back_populates="generated_file", foreign_keys="[ReportModel.file_id]")
+
+    # Для AvatarModel.file_id (один файл може бути пов'язаний з одним записом аватара)
+    # Зв'язок з AvatarModel, де цей файл використовується.
+    # В AvatarModel є file = relationship("FileModel"), тому тут має бути зворотний.
+    avatar_entry: Mapped[Optional["AvatarModel"]] = relationship(back_populates="file")
 
     def __repr__(self) -> str:
         """

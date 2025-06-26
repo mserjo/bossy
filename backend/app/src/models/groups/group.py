@@ -65,49 +65,46 @@ class GroupModel(BaseMainModel):
     parent_group_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("groups.id", name="fk_groups_parent_group_id"), nullable=True, index=True)
 
     # Тип групи (з довідника GroupTypeModel)
-    # TODO: Замінити "group_types.id" на константу або імпорт моделі GroupTypeModel після її створення.
-    group_type_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("group_types.id", name="fk_groups_group_type_id"), nullable=True, index=True) # Може бути nullable, якщо є тип за замовчуванням
+    group_type_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("group_types.id", name="fk_groups_group_type_id", ondelete="SET NULL"), nullable=True, index=True)
 
-    # Іконка групи (посилання на модель файлів, яка буде створена пізніше)
-    # TODO: Замінити "files.id" на константу або імпорт моделі FileModel після її створення.
-    icon_file_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("files.id", name="fk_groups_icon_file_id"), nullable=True)
+    # Іконка групи (посилання на модель файлів)
+    icon_file_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("files.id", name="fk_groups_icon_file_id", ondelete="SET NULL"), nullable=True)
 
     # --- Зв'язки (Relationships) ---
 
     # Зв'язок для ієрархії груп (батьківська група)
-    parent_group = relationship("GroupModel", remote_side=[id], back_populates="child_groups", lazy="joined")
-    # `remote_side=[id]` вказує, що `parent_group_id` посилається на `id` цієї ж таблиці.
+    parent_group: Mapped[Optional["GroupModel"]] = relationship(remote_side="GroupModel.id", back_populates="child_groups", lazy="selectin") # SQLAlchemy 2.0 style
 
     # Зв'язок для ієрархії груп (дочірні групи)
-    child_groups = relationship("GroupModel", back_populates="parent_group", cascade="all, delete-orphan", lazy="joined")
+    child_groups: Mapped[List["GroupModel"]] = relationship(back_populates="parent_group", cascade="all, delete-orphan", lazy="selectin")
 
     # Зв'язок з типом групи
-    group_type = relationship("GroupTypeModel", foreign_keys=[group_type_id], lazy="joined") # back_populates="groups" буде в GroupTypeModel
+    group_type: Mapped[Optional["GroupTypeModel"]] = relationship(foreign_keys=[group_type_id], back_populates="groups_of_this_type", lazy="selectin")
 
     # Зв'язок з учасниками групи через проміжну таблицю GroupMembershipModel
-    memberships = relationship("GroupMembershipModel", back_populates="group", cascade="all, delete-orphan")
+    memberships: Mapped[List["GroupMembershipModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
 
     # Зв'язок з налаштуваннями групи (один-до-одного)
-    settings = relationship("GroupSettingsModel", back_populates="group", uselist=False, cascade="all, delete-orphan")
+    settings: Mapped[Optional["GroupSettingsModel"]] = relationship(back_populates="group", uselist=False, cascade="all, delete-orphan")
 
     # Зв'язок із завданнями, що належать цій групі
-    tasks = relationship("TaskModel", back_populates="group", cascade="all, delete-orphan")
+    tasks: Mapped[List["TaskModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
 
     # Зв'язок з нагородами, доступними в цій групі
-    rewards = relationship("RewardModel", back_populates="group", cascade="all, delete-orphan")
+    rewards: Mapped[List["RewardModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
 
-    # Зв'язок з рахунками користувачів у цій групі (опосередковано, основний зв'язок user.accounts -> account.group)
-    # Прямий зв'язок group.accounts може бути корисним для отримання всіх рахунків групи.
-    accounts_in_group = relationship("AccountModel", back_populates="group", cascade="all, delete-orphan")
+    # Зв'язок з рахунками користувачів у цій групі
+    accounts_in_group: Mapped[List["AccountModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
 
     # Зв'язок з опитуваннями/голосуваннями в групі
-    polls = relationship("PollModel", back_populates="group", cascade="all, delete-orphan")
+    polls: Mapped[List["PollModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
 
     # Зв'язок із запрошеннями до групи
-    invitations = relationship("GroupInvitationModel", back_populates="group", cascade="all, delete-orphan")
+    invitations: Mapped[List["GroupInvitationModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
 
     # Зв'язок з файлом іконки
-    # icon_file = relationship("FileModel", foreign_keys=[icon_file_id], lazy="joined") # back_populates="group_icon_for" буде в FileModel
+    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], lazy="selectin")
+    # TODO: Додати back_populates="group_icon_for" в FileModel, якщо потрібен зворотний зв'язок
 
     # Поле `group_id` з `BaseMainModel` для самої `GroupModel` не використовується і буде `NULL`.
     # Це поле призначене для сутностей, які належать до певної групи.

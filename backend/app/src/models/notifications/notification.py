@@ -55,41 +55,32 @@ class NotificationModel(BaseModel):
     """
     __tablename__ = "notifications"
 
-    # Отримувач сповіщення
-    # TODO: Замінити "users.id" на константу або імпорт моделі UserModel.
-    recipient_user_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_notifications_recipient_id", ondelete="CASCADE"), nullable=False, index=True)
+    recipient_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_notifications_recipient_id", ondelete="CASCADE"), nullable=False, index=True)
+    group_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("groups.id", name="fk_notifications_group_id", ondelete="CASCADE"), nullable=True, index=True)
 
-    # Група, в контексті якої виникло сповіщення (якщо є)
-    # TODO: Замінити "groups.id" на константу або імпорт моделі GroupModel.
-    group_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("groups.id", name="fk_notifications_group_id", ondelete="CASCADE"), nullable=True, index=True)
+    title: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    body: Mapped[str] = mapped_column(Text, nullable=False)
+    notification_type_code: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
 
-    title: Column[str | None] = Column(String(255), nullable=True)
-    body: Column[str] = Column(Text, nullable=False)
+    source_entity_type: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    source_entity_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    # Коментар для Alembic:
+    # Додати в міграцію:
+    # op.create_index('ix_notifications_source_entity', 'notifications', ['source_entity_type', 'source_entity_id'], unique=False)
 
-    # Тип сповіщення, наприклад, 'TASK_COMPLETED', 'NEW_MESSAGE', 'BIRTHDAY_REMINDER'.
-    # TODO: Створити Enum або довідник для NotificationType.
-    notification_type_code: Column[str] = Column(String(100), nullable=False, index=True)
 
-    # --- Інформація про джерело сповіщення ---
-    source_entity_type: Column[str | None] = Column(String(100), nullable=True, index=True)
-    source_entity_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), nullable=True, index=True)
-    # TODO: Додати індекс на (source_entity_type, source_entity_id).
-
-    # --- Статус прочитання ---
-    is_read: Column[bool] = Column(Boolean, default=False, nullable=False, index=True)
-    read_at: Column[DateTime | None] = Column(DateTime(timezone=True), nullable=True)
-
-    # --- Додаткові дані ---
-    # Наприклад, URL для переходу, або дані для побудови інтерактивних елементів.
-    metadata: Column[JSONB | None] = Column(JSONB, nullable=True)
+    is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
 
 
     # --- Зв'язки (Relationships) ---
-    recipient = relationship("UserModel", foreign_keys=[recipient_user_id], back_populates="notifications_received")
-    group = relationship("GroupModel", foreign_keys=[group_id]) # back_populates="notifications" буде в GroupModel
+    # TODO: Узгодити back_populates="notifications_received" з UserModel
+    recipient: Mapped["UserModel"] = relationship(foreign_keys=[recipient_user_id], back_populates="notifications_received")
+    # TODO: Узгодити back_populates="notifications" з GroupModel
+    group: Mapped[Optional["GroupModel"]] = relationship(foreign_keys=[group_id], back_populates="notifications")
 
-    # Спроби доставки цього сповіщення (email, SMS, push тощо)
-    deliveries = relationship("NotificationDeliveryModel", back_populates="notification", cascade="all, delete-orphan")
+    deliveries: Mapped[List["NotificationDeliveryModel"]] = relationship(back_populates="notification", cascade="all, delete-orphan")
 
 
     def __repr__(self) -> str:

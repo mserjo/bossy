@@ -118,34 +118,166 @@ class UserModel(BaseMainModel):
 
     # --- Зв'язки (Relationships) ---
     # Зв'язок з токенами оновлення
-    refresh_tokens = relationship("RefreshTokenModel", back_populates="user", cascade="all, delete-orphan")
+    refresh_tokens: Mapped[List["RefreshTokenModel"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
     # Зв'язок з сесіями користувача
-    sessions = relationship("SessionModel", back_populates="user", cascade="all, delete-orphan")
+    sessions: Mapped[List["SessionModel"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
-    # Зв'язок з аватаром користувача (один-до-одного або один-до-багатьох, якщо історія аватарів)
-    # Поки що припускаємо один активний аватар, тому один-до-одного.
-    # Це буде реалізовано через модель AvatarModel, яка матиме user_id.
-    # avatar = relationship("AvatarModel", back_populates="user", uselist=False, cascade="all, delete-orphan")
-    # TODO: Реалізувати зв'язок з AvatarModel. Поки що user_id буде в AvatarModel.
+    # Зв'язок з аватарами користувача (один користувач може мати багато записів AvatarModel для історії)
+    avatars: Mapped[List["AvatarModel"]] = relationship(back_populates="user", cascade="all, delete-orphan", foreign_keys="[AvatarModel.user_id]")
+    # Поточний аватар можна буде отримати через фільтр is_current=True або окремим полем/методом.
 
     # Зв'язок з членством у групах (таблиця GroupMembershipModel)
-    group_memberships = relationship("GroupMembershipModel", back_populates="user", cascade="all, delete-orphan")
+    group_memberships: Mapped[List["GroupMembershipModel"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
     # Зв'язок з рахунками користувача (таблиця AccountModel)
-    accounts = relationship("AccountModel", back_populates="user", cascade="all, delete-orphan")
+    accounts: Mapped[List["AccountModel"]] = relationship(back_populates="user", cascade="all, delete-orphan")
 
-    # Зв'язок з нотифікаціями користувача (таблиця NotificationModel)
-    notifications_received = relationship(
-        "NotificationModel",
-        foreign_keys="[NotificationModel.recipient_user_id]", # Явно вказуємо foreign_keys
-        back_populates="recipient_user",
+    # Зв'язок з отриманими сповіщеннями (таблиця NotificationModel)
+    notifications_received: Mapped[List["NotificationModel"]] = relationship(
+        back_populates="recipient", # Узгоджено з NotificationModel
+        foreign_keys="[NotificationModel.recipient_user_id]",
         cascade="all, delete-orphan"
     )
 
-    # Якщо UserModel успадковує від BaseMainModel, то поле `state_id` вже є.
-    # state = relationship("StatusModel", foreign_keys=[state_id]) # Зв'язок для стану користувача
-    # TODO: Додати foreign_keys=[state_id] до state в BaseMainModel або тут, якщо є конфлікти.
+    # Зв'язок з створеними завданнями/подіями
+    created_tasks: Mapped[List["TaskModel"]] = relationship(
+        back_populates="creator",
+        foreign_keys="[TaskModel.created_by_user_id]",
+        cascade="all, delete-orphan" # Або SET NULL, якщо завдання можуть існувати без автора
+    )
+
+    # Зв'язок з призначеннями завдань (де цей користувач є виконавцем)
+    task_assignments: Mapped[List["TaskAssignmentModel"]] = relationship(
+        back_populates="user", # Виконавець
+        foreign_keys="[TaskAssignmentModel.user_id]",
+        cascade="all, delete-orphan"
+    )
+    # Зв'язок з призначеннями завдань (де цей користувач є тим, хто призначив)
+    made_task_assignments: Mapped[List["TaskAssignmentModel"]] = relationship(
+        back_populates="assigner",
+        foreign_keys="[TaskAssignmentModel.assigned_by_user_id]",
+        cascade="all, delete-orphan" # Або SET NULL
+    )
+
+    # Зв'язок з виконаннями завдань
+    task_completions: Mapped[List["TaskCompletionModel"]] = relationship(
+        back_populates="user", # Виконавець
+        foreign_keys="[TaskCompletionModel.user_id]",
+        cascade="all, delete-orphan"
+    )
+    # Зв'язок з перевірками завдань (де цей користувач є тим, хто перевірив)
+    reviewed_task_completions: Mapped[List["TaskCompletionModel"]] = relationship(
+        back_populates="reviewer",
+        foreign_keys="[TaskCompletionModel.reviewed_by_user_id]",
+        cascade="all, delete-orphan" # Або SET NULL
+    )
+
+    # Зв'язок з пропозиціями завдань (де цей користувач є автором пропозиції)
+    task_proposals_made: Mapped[List["TaskProposalModel"]] = relationship(
+        back_populates="proposer",
+        foreign_keys="[TaskProposalModel.proposed_by_user_id]",
+        cascade="all, delete-orphan"
+    )
+    # Зв'язок з пропозиціями завдань (де цей користувач є тим, хто розглянув)
+    task_proposals_reviewed: Mapped[List["TaskProposalModel"]] = relationship(
+        back_populates="reviewer",
+        foreign_keys="[TaskProposalModel.reviewed_by_user_id]",
+        cascade="all, delete-orphan" # Або SET NULL
+    )
+
+    # Зв'язок з відгуками на завдання, залишеними цим користувачем
+    task_reviews_left: Mapped[List["TaskReviewModel"]] = relationship(
+        back_populates="user",
+        foreign_keys="[TaskReviewModel.user_id]",
+        cascade="all, delete-orphan"
+    )
+
+    # Зв'язок з голосами в опитуваннях
+    poll_votes_made: Mapped[List["PollVoteModel"]] = relationship(
+        back_populates="user",
+        foreign_keys="[PollVoteModel.user_id]",
+        cascade="all, delete-orphan" # Або SET NULL, якщо голоси анонімізуються при видаленні юзера
+    )
+
+    # Зв'язок з системними логами, пов'язаними з цим користувачем
+    system_event_logs: Mapped[List["SystemEventLogModel"]] = relationship(
+        back_populates="user", # Потрібно додати "user" в SystemEventLogModel
+        foreign_keys="[SystemEventLogModel.user_id]",
+        cascade="SET NULL" # Якщо лог важливий, навіть якщо користувач видалений
+    )
+
+    # Зв'язок з створеними шаблонами груп (якщо created_by_user_id в GroupTemplateModel)
+    created_group_templates: Mapped[List["GroupTemplateModel"]] = relationship(
+        back_populates="creator",
+        foreign_keys="[GroupTemplateModel.created_by_user_id]",
+        cascade="SET NULL"
+    )
+
+    # Зв'язок з створеними опитуваннями (якщо created_by_user_id в PollModel)
+    created_polls: Mapped[List["PollModel"]] = relationship(
+        back_populates="creator",
+        foreign_keys="[PollModel.created_by_user_id]",
+        cascade="SET NULL" # Або CASCADE, якщо опитування не можуть існувати без автора
+    )
+
+    # Зв'язок з командами, де користувач є лідером
+    led_teams: Mapped[List["TeamModel"]] = relationship(
+        back_populates="leader",
+        foreign_keys="[TeamModel.leader_user_id]",
+        cascade="SET NULL" # Якщо команда може існувати без лідера
+    )
+
+    # Зв'язок з членством в командах
+    team_memberships: Mapped[List["TeamMembershipModel"]] = relationship(
+        back_populates="user",
+        foreign_keys="[TeamMembershipModel.user_id]",
+        cascade="all, delete-orphan"
+    )
+
+    # Зв'язок з ручними коригуваннями бонусів, зробленими цим адміном
+    made_bonus_adjustments: Mapped[List["BonusAdjustmentModel"]] = relationship(
+        back_populates="admin",
+        foreign_keys="[BonusAdjustmentModel.adjusted_by_user_id]",
+        cascade="SET NULL"
+    )
+
+    # Зв'язок з запитами на звіти, зробленими цим користувачем
+    requested_reports: Mapped[List["ReportModel"]] = relationship(
+        back_populates="requester",
+        foreign_keys="[ReportModel.requested_by_user_id]",
+        cascade="SET NULL"
+    )
+
+    # Зв'язок з досягненнями (отриманими бейджами та рівнями)
+    achieved_user_levels: Mapped[List["UserLevelModel"]] = relationship(back_populates="user", foreign_keys="[UserLevelModel.user_id]", cascade="all, delete-orphan")
+    achievements_earned: Mapped[List["AchievementModel"]] = relationship(back_populates="user", foreign_keys="[AchievementModel.user_id]", cascade="all, delete-orphan")
+    # Зв'язок з досягненнями, які цей користувач (адмін) вручну присудив
+    awarded_achievements_by_admin: Mapped[List["AchievementModel"]] = relationship(back_populates="awarder", foreign_keys="[AchievementModel.awarded_by_user_id]", cascade="SET NULL")
+
+    # Зв'язок з рейтингами цього користувача
+    ratings_history: Mapped[List["RatingModel"]] = relationship(back_populates="user", foreign_keys="[RatingModel.user_id]", cascade="all, delete-orphan")
+
+    # Зв'язок з файлами, завантаженими цим користувачем
+    uploaded_files: Mapped[List["FileModel"]] = relationship(back_populates="uploader", foreign_keys="[FileModel.uploaded_by_user_id]", cascade="SET NULL")
+
+    # Зв'язок зі статусом (успадковано з BaseMainModel)
+    # state: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[state_id]) # Вже є в BaseMainModel, якщо там розкоментовано
+    # Тут foreign_keys=[state_id] не потрібен, бо state_id вже є ForeignKey в BaseMainModel.
+    # Потрібно лише переконатися, що в BaseMainModel є `state = relationship("StatusModel")`
+    # і в StatusModel є `users_with_this_state = relationship("UserModel", back_populates="state")`.
+    # Я додав `state` в `BaseMainModel`.
+
+    # Зв'язки created_by/updated_by з BaseModel
+    # created_records: Mapped[List["SQLABaseModel"]] = relationship( # Потребує більш складної реалізації з primaryjoin
+    #     foreign_keys="[SQLABaseModel.created_by_user_id]",
+    #     backref="created_by_user"
+    # )
+    # updated_records: Mapped[List["SQLABaseModel"]] = relationship(
+    #     foreign_keys="[SQLABaseModel.updated_by_user_id]",
+    #     backref="updated_by_user"
+    # )
+    # Це складно реалізувати для базового класу, тому ці зворотні зв'язки зазвичай не визначаються.
 
     # Поле `group_id` з BaseMainModel для користувача завжди буде NULL.
     # Це поле не використовується для визначення приналежності до груп.

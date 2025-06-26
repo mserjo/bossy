@@ -51,38 +51,35 @@ class TaskProposalModel(BaseModel):
     """
     __tablename__ = "task_proposals"
 
-    group_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True)
-    proposed_by_user_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_task_proposals_proposer_id", ondelete="CASCADE"), nullable=False, index=True)
+    group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True)
+    proposed_by_user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_task_proposals_proposer_id", ondelete="CASCADE"), nullable=False, index=True)
 
-    title: Column[str] = Column(String(255), nullable=False)
-    description: Column[str] = Column(Text, nullable=False)
+    title: Mapped[str] = mapped_column(String(255), nullable=False)
+    description: Mapped[str] = mapped_column(Text, nullable=False)
 
-    # Запропоновані параметри для завдання (можна зберігати в JSON або окремими полями)
-    # Використаємо JSONB для гнучкості, щоб зберігати різні запропоновані атрибути завдання.
-    # Наприклад: {"task_type_code": "chore", "bonus_points": 10, "due_date": "2024-12-31T23:59:00Z"}
-    proposed_task_details: Column[JSONB | None] = Column(JSONB, nullable=True)
+    proposed_task_details: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
 
-    # Статус пропозиції
-    # TODO: Замінити "statuses.id" на константу або імпорт моделі StatusModel.
-    status_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("statuses.id", name="fk_task_proposals_status_id"), nullable=False, index=True)
+    status_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("statuses.id", name="fk_task_proposals_status_id", ondelete="RESTRICT"), nullable=False, index=True)
 
-    admin_review_notes: Column[str | None] = Column(Text, nullable=True)
-    reviewed_by_user_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_task_proposals_reviewer_id", ondelete="SET NULL"), nullable=True, index=True)
-    reviewed_at: Column[DateTime | None] = Column(DateTime(timezone=True), nullable=True)
+    admin_review_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    reviewed_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_task_proposals_reviewer_id", ondelete="SET NULL"), nullable=True, index=True)
+    reviewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
-    # Посилання на завдання, створене на основі цієї пропозиції (якщо прийнято)
-    created_task_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("tasks.id", name="fk_task_proposals_created_task_id", ondelete="SET NULL"), nullable=True, index=True, unique=True)
-    # `unique=True` тут означає, що одне завдання може бути створене лише з однієї пропозиції.
+    created_task_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("tasks.id", name="fk_task_proposals_created_task_id", ondelete="SET NULL"), nullable=True, index=True, unique=True)
 
-    bonus_for_proposal_awarded: Column[bool] = Column(Boolean, default=False, nullable=False)
+    bonus_for_proposal_awarded: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
 
     # --- Зв'язки (Relationships) ---
-    group = relationship("GroupModel") # back_populates="task_proposals" буде в GroupModel
-    proposer = relationship("UserModel", foreign_keys=[proposed_by_user_id]) # back_populates="task_proposals" буде в UserModel
-    status = relationship("StatusModel", foreign_keys=[status_id]) # back_populates="task_proposal_statuses" буде в StatusModel
-    reviewer = relationship("UserModel", foreign_keys=[reviewed_by_user_id]) # back_populates="reviewed_task_proposals" буде в UserModel
-    created_task = relationship("TaskModel", foreign_keys=[created_task_id]) # back_populates="source_proposal" буде в TaskModel (якщо потрібен зворотний зв'язок)
+    # TODO: Узгодити back_populates з GroupModel
+    group: Mapped["GroupModel"] = relationship(foreign_keys=[group_id], back_populates="task_proposals")
+    # TODO: Узгодити back_populates="task_proposals_made" з UserModel
+    proposer: Mapped["UserModel"] = relationship(foreign_keys=[proposed_by_user_id], back_populates="task_proposals_made")
+    status: Mapped["StatusModel"] = relationship(foreign_keys=[status_id], back_populates="task_proposals_with_this_status")
+    # TODO: Узгодити back_populates="task_proposals_reviewed" з UserModel
+    reviewer: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[reviewed_by_user_id], back_populates="task_proposals_reviewed")
+    # TODO: Узгодити back_populates="source_proposal" з TaskModel
+    created_task: Mapped[Optional["TaskModel"]] = relationship(foreign_keys=[created_task_id], back_populates="source_proposal")
 
     def __repr__(self) -> str:
         """

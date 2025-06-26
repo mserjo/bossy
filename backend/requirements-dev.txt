@@ -1,0 +1,41 @@
+# This file includes dependencies for development and testing,
+# in addition to those in requirements.txt.
+# It's recommended to install these in a virtual environment.
+
+# Testing
+pytest
+pytest-asyncio # For testing async code with pytest
+pytest-cov # For test coverage
+httpx # Already in requirements.txt, but good to have here for clarity as a dev/test tool
+
+# Linters and Formatters
+ruff # All-in-one: linter (Flake8, Pylint, etc.), formatter (like Black, isort)
+black # Explicitly, even if ruff can format, some projects prefer to run black separately or have it as a pre-commit hook.
+# If ruff handles formatting 만족스럽게, black може бути опціональним.
+
+# Type Checking
+mypy
+
+# Pre-commit hooks
+pre-commit
+
+# For Alembic offline mode or advanced scripting (if needed)
+# python-dotenv # Already in requirements.txt, useful for loading .env in scripts
+
+# Debugging (optional)
+# ipython # Enhanced Python shell
+# pdbpp # Enhanced PDB debugger
+
+# Faker for generating mock data for tests (optional)
+# Faker
+
+# IDE integration / Stubs (optional)
+# sqlalchemy-stubs # For mypy, if not sufficiently covered by SQLAlchemy 2.0's own typing
+# pydantic-stubs # For mypy, if needed for Pydantic v1 (Pydantic v2 has better built-in typing)
+
+# To install all dependencies for development:
+# pip install -r requirements.txt -r requirements-dev.txt
+# Or, if requirements-dev.txt includes -r requirements.txt:
+# pip install -r requirements-dev.txt
+# Let's include the main requirements file here for simplicity.
+-r requirements.txt

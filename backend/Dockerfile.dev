@@ -1,0 +1,87 @@
+# backend/Dockerfile.dev
+# -*- coding: utf-8 -*-
+# Dockerfile для development середовища
+
+# Використовуємо офіційний образ Python.
+# Версія має відповідати тій, що використовується в production (або бути сумісною).
+FROM python:3.11-slim
+
+# Встановлюємо робочий каталог
+WORKDIR /opt/app
+
+# Змінні середовища
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
+ENV APP_ENV development # Вказуємо середовище розробки
+
+# Оновлюємо pip та встановлюємо wheel
+RUN pip install --upgrade pip wheel
+
+# Копіюємо файли requirements для встановлення залежностей
+# Встановлюємо і основні, і dev-залежності
+COPY requirements.txt .
+COPY requirements-dev.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements-dev.txt
+
+# Копіюємо весь код проекту (або лише необхідні частини для запуску)
+# Для розробки, зазвичай, код монтується як volume в docker-compose.yml,
+# тому цей крок COPY може бути мінімальним або навіть відсутнім,
+# якщо всі залежності встановлені і код монтується.
+# Однак, для можливості зібрати образ, який може запуститися самостійно (без volumes),
+# краще скопіювати код.
+COPY . /opt/app
+# Якщо структура проекту `backend/app/src`, то `COPY app /opt/app/app`
+# або якщо Dockerfile в `backend/`, а код в `backend/app/`, то `COPY ./app /opt/app/app`.
+# Припускаючи, що Dockerfile.dev в `backend/`, а код в `backend/app/`
+# COPY app /opt/app/app # Копіює backend/app -> /opt/app/app
+# COPY alembic /opt/app/alembic
+# COPY alembic.ini /opt/app/alembic.ini
+# Якщо .env файл потрібен всередині образу для якихось скриптів (не для uvicorn --reload),
+# то його можна було б копіювати, але .env зазвичай не додається в образ.
+
+# Порт, який додаток буде слухати (може бути той самий, що й у production)
+# EXPOSE ${APP_PORT:-8000} # Визначення порту краще робити в docker-compose
+
+# Команда запуску для розробки
+# Використовуємо Uvicorn з --reload для автоматичного перезавантаження при змінах коду.
+# --host 0.0.0.0, щоб додаток був доступний ззовні контейнера.
+# Шлях `app.main:app` має відповідати структурі проекту та WORKDIR.
+# Якщо WORKDIR /opt/app, а main.py в /opt/app/app/main.py, то шлях `app.main:app`.
+#
+# Важливо: для --reload Uvicorn має "бачити" зміни файлів.
+# Це забезпечується монтуванням коду як volume в docker-compose.dev.yml.
+#
+# CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "${APP_PORT:-8000}", "--reload"]
+#
+# Якщо потрібно запускати скрипти (наприклад, міграції) перед запуском сервера,
+# можна використовувати entrypoint скрипт.
+#
+# ENTRYPOINT ["/opt/app/docker-entrypoint.dev.sh"] # Приклад
+# CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "${APP_PORT:-8000}", "--reload"]
+
+# Для простоти, поки що без entrypoint. Команду запуску можна буде перевизначити
+# в docker-compose.dev.yml, якщо потрібно.
+# Залишимо CMD тут для можливості запуску образу напряму.
+# Припускаючи, що main.py знаходиться в /opt/app/app/main.py
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+# TODO: Переконатися, що шлях до `app.main:app` правильний.
+# TODO: Якщо використовуються pre-commit хуки або інші інструменти, що потребують налаштування git,
+#       можливо, потрібно буде додати встановлення git в образ, але це зазвичай не потрібно для dev Dockerfile.
+# TODO: Розглянути можливість використання того ж користувача без root-прав, що й у production Dockerfile,
+#       але для розробки це може ускладнити роботу з файлами, якщо є проблеми з правами на монтованих томах.
+#       Тому для dev часто залишають root, або налаштовують користувача з UID/GID хоста.
+#       Поки що залишаю запуск від root для простоти розробки.
+# TODO: Переконатися, що `requirements-dev.txt` включає `-r requirements.txt` або встановлювати обидва.
+#       (Я додав `-r requirements.txt` в `requirements-dev.txt`).
+# TODO: Перевірити, чи потрібні якісь системні залежності для dev-інструментів.
+#       Наприклад, для деяких розширень mypy або для компіляції певних пакетів.
+#       Для стандартних Python інструментів зазвичай ні.
+
+# Коментар щодо структури:
+# Якщо `Dockerfile.dev` в `backend/`, а код в `backend/app/`:
+# `COPY . /opt/app` скопіює весь вміст `backend/` до `/opt/app/`.
+# Тоді `app/main.py` буде в `/opt/app/app/main.py`.
+# Команда `uvicorn app.main:app` з `WORKDIR /opt/app` буде коректною.
+# Це відповідає поточній структурі.

@@ -1,0 +1,50 @@
+# docker-compose.prod.yml
+# Конфігурація Docker Compose для production середовища.
+# Може розширювати або перевизначати налаштування з `docker-compose.yml`.
+# Запускати за допомогою: `docker-compose -f docker-compose.yml -f docker-compose.prod.yml up -d`
+
+version: '3.8'
+
+services:
+  backend:
+    environment:
+      - APP_ENV=production
+      - APP_DEBUG=False
+      # Можна додати або перевизначити інші змінні середовища для production,
+      # наприклад, більш строгі налаштування CORS, URL до production БД (якщо відрізняється),
+      # ключі до зовнішніх сервісів для production.
+      # - BACKEND_CORS_ORIGINS='["https://your.production.frontend.domain", "https://api.your.domain"]'
+      # - LOG_LEVEL=INFO # Або WARNING, ERROR для менш детальних логів у production
+    # Команда запуску для production зазвичай визначена в Dockerfile.
+    # Якщо потрібно більше воркерів Uvicorn, це можна налаштувати тут або в Dockerfile через змінні середовища.
+    # command: uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-8000} --workers ${APP_WORKERS_PROD:-4}
+    # Healthcheck вже має бути в основному docker-compose.yml або Dockerfile.
+
+  # postgres_db:
+    # Для production можуть бути інші налаштування для postgres_db,
+    # наприклад, інші шляхи до томів (якщо використовуються зовнішні сховища),
+    # або специфічні параметри PostgreSQL.
+    # Зазвичай, основні налаштування (image, environment, volumes, ports) залишаються ті ж.
+    # restart: always # Можна змінити політику перезапуску для production.
+
+  # redis_cache:
+    # Аналогічно для Redis.
+    # restart: always
+
+  # Тут можна додати сервіси, специфічні для production, наприклад:
+  # - nginx (якщо використовується як reverse proxy перед backend)
+  # - certbot (для SSL сертифікатів)
+  # - Моніторингові агенти (Prometheus node exporter, etc.)
+
+# Томи (volumes) та мережі (networks) зазвичай визначаються в основному `docker-compose.yml`
+# і використовуються тут без змін, якщо не потрібні специфічні налаштування для production.
+
+# TODO: Визначити, чи потрібні специфічні перевизначення для production на даному етапі.
+#       Поки що файл мінімальний і в основному встановлює APP_ENV=production та APP_DEBUG=False.
+# TODO: Розглянути можливість використання змінних середовища для налаштування кількості воркерів Uvicorn
+#       (наприклад, `APP_WORKERS_PROD`) та передачі їх в команду запуску.
+# TODO: Якщо використовуються секрети Docker Swarm або Kubernetes Secrets для чутливих даних
+#       (паролі БД, SECRET_KEY), їх інтеграція буде відбуватися на рівні оркестратора,
+#       а не безпосередньо в цьому файлі (хоча docker-compose підтримує `secrets`).
+#       Для простоти, поки що покладаємося на .env файл, який НЕ повинен потрапляти в production в такому вигляді.
+#       У production змінні середовища мають надаватися безпечним способом.

@@ -6,7 +6,7 @@
 а також для представлення даних з моделі `RefreshTokenModel`.
 """
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from typing import Optional, Any
 import uuid
 from datetime import datetime

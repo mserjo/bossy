@@ -6,10 +6,12 @@
 конкретним користувачем (`UserModel`) або командою. Вона також відстежує
 статус перевірки та підтвердження виконання.
 """
+from decimal import Decimal
+from typing import Optional, List, Dict, Any
 
 from sqlalchemy import Column, ForeignKey, DateTime, Text, UniqueConstraint, Numeric, LargeBinary # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 

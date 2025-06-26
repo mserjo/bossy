@@ -6,7 +6,7 @@
 та відображенні залежностей між завданнями.
 """
 
-from pydantic import Field, model_validator
+from pydantic import Field, model_validator, field_validator
 from typing import Optional, List, Any, ForwardRef
 import uuid
 from datetime import datetime

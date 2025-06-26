@@ -13,7 +13,7 @@
 
 from sqlalchemy import UniqueConstraint, Column, Boolean # type: ignore
 # from sqlalchemy.orm import relationship # type: ignore # Для визначення зв'язків, наприклад, з GroupSettingsModel
-from sqlalchemy.orm import Mapped, mapped_column # Для SQLAlchemy 2.0 стилю
+from sqlalchemy.orm import Mapped, mapped_column, relationship  # Для SQLAlchemy 2.0 стилю
 
 from backend.app.src.models.dictionaries.base import BaseDictModel # Імпорт базової моделі для довідників
 

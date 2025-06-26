@@ -4,10 +4,11 @@
 Цей модуль визначає модель SQLAlchemy `GroupInvitationModel` для зберігання запрошень
 користувачів до груп. Запрошення можуть бути у вигляді унікального посилання або QR-коду.
 """
+from typing import Optional
 
 from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Integer # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
 from datetime import datetime, timedelta # Для роботи з датами та часом
 

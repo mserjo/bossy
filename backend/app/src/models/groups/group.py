@@ -5,10 +5,11 @@
 Групи є ключовим елементом системи, дозволяючи об'єднувати користувачів для спільних завдань,
 нарахування бонусів, спілкування тощо. Групи можуть мати ієрархічну структуру.
 """
+from typing import Optional, List
 
 from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Integer # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
 
 from backend.app.src.models.base import BaseMainModel # Успадковуємо від BaseMainModel

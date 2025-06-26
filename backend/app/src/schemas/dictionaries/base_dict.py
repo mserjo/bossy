@@ -8,6 +8,7 @@
 
 from pydantic import Field, field_validator
 from typing import Optional, List
+from datetime import datetime
 import uuid
 
 from backend.app.src.schemas.base import BaseMainSchema, BaseSchema

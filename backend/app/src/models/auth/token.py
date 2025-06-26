@@ -5,10 +5,11 @@
 Refresh токени використовуються для отримання нових Access токенів без необхідності
 повторного введення облікових даних користувачем, поки Refresh токен є дійсним.
 """
+from typing import Optional
 
 from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Text # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, INET # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped  # type: ignore
 import uuid # Для роботи з UUID
 from datetime import datetime, timedelta # Для роботи з датами та часом
 

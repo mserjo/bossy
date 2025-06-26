@@ -17,7 +17,9 @@ Pydantic вже надає потужні інструменти для валі
 """
 
 import re
-from typing import Any, Optional
+from typing import Any, Optional, List
+
+
 # from phonenumbers import parse as parse_phone_number, is_valid_number, NumberParseException # type: ignore # Приклад з бібліотекою
 
 # Імпорт логгера (якщо потрібне логування під час валідації)

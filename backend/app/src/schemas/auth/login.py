@@ -4,7 +4,7 @@
 Цей модуль визначає Pydantic схеми для процесу входу користувача (логіну).
 """
 
-from pydantic import BaseModel as PydanticBaseModel, Field, EmailStr
+from pydantic import BaseModel as PydanticBaseModel, Field, EmailStr, field_validator, model_validator
 from typing import Optional, Union
 
 from backend.app.src.schemas.base import BaseSchema

@@ -12,7 +12,7 @@ from fastapi.encoders import jsonable_encoder # Для конвертації Py
 from pydantic import BaseModel as PydanticBaseModel
 from sqlalchemy import select, delete, update, func # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession # type: ignore
-from sqlalchemy.sql.expression importExecutable # type: ignore # Для type hint в _apply_filters
+from sqlalchemy.sql.expression import Executable # type: ignore # Для type hint в _apply_filters
 
 from backend.app.src.models.base import BaseModel as SQLAlchemyBaseModel # Базова модель SQLAlchemy
 from backend.app.src.schemas.base import PaginatedResponse # Схема для пагінованої відповіді

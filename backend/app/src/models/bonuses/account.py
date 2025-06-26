@@ -5,10 +5,11 @@
 На рахунках накопичуються зароблені бонуси (або борг) в межах конкретної групи.
 Кожен користувач має окремий рахунок для кожної групи, до якої він належить.
 """
+from typing import List
 
-from sqlalchemy import Column, ForeignKey, Numeric, UniqueConstraint # type: ignore
+from sqlalchemy import Column, ForeignKey, Numeric, UniqueConstraint, String  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped  # type: ignore
 import uuid # Для роботи з UUID
 
 # Використовуємо BaseModel, оскільки рахунок - це, по суті, запис з балансом,

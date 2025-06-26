@@ -5,10 +5,11 @@
 Ця модель представляє зв'язок "багато-до-багатьох" між користувачами (`UserModel`)
 та групами (`GroupModel`), а також зберігає роль користувача в конкретній групі.
 """
+from typing import Optional
 
 from sqlalchemy import Column, ForeignKey, DateTime, UniqueConstraint, Text # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 

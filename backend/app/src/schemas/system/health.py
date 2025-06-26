@@ -6,7 +6,7 @@
 та для відповіді API ендпоінта Health Check.
 """
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from typing import Optional, Dict, Any, List
 import uuid
 from datetime import datetime

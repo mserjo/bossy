@@ -5,10 +5,11 @@
 в опитуваннях. Кожен запис представляє голос одного користувача за один або декілька
 (якщо дозволено) варіантів відповіді в конкретному опитуванні.
 """
+from typing import Optional
 
 from sqlalchemy import Column, ForeignKey, DateTime, UniqueConstraint # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 

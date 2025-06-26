@@ -5,10 +5,13 @@
 Це може включати системні логи, метрики продуктивності, записи про помилки тощо.
 Ці дані допомагають відстежувати стан системи, діагностувати проблеми та аналізувати її роботу.
 """
+from typing import Optional
 
 from sqlalchemy import Column, String, Text, DateTime, JSON, Integer, Float, ForeignKey # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, INET # type: ignore
 import uuid # Для роботи з UUID
+
+from sqlalchemy.orm import Mapped, relationship
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel, оскільки це записи логів/метрик
 

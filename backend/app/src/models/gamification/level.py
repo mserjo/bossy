@@ -6,10 +6,13 @@
 накопичення певної кількості бонусів або виконання заданої кількості завдань.
 Рівні налаштовуються адміністратором групи.
 """
+from decimal import Decimal
+from typing import Optional, List
 
-from sqlalchemy import Column, String, Text, ForeignKey, Integer, Numeric # type: ignore
+from sqlalchemy import Column, String, Text, ForeignKey, Integer, Numeric, CheckConstraint, \
+    UniqueConstraint  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
 
 # Використовуємо BaseMainModel, оскільки рівень має назву (наприклад, "Новачок", "Експерт"),

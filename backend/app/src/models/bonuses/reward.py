@@ -5,10 +5,13 @@
 які користувачі можуть "купувати" або отримувати за накопичені бонуси.
 Нагороди належать до певної групи та налаштовуються адміністратором групи.
 """
+from decimal import Decimal
+from typing import Optional
 
-from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Integer, Numeric # type: ignore
+from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Integer, Numeric, \
+    CheckConstraint  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
 
 # Використовуємо BaseMainModel, оскільки нагорода має назву, опис, статус (доступна/недоступна),

@@ -8,7 +8,7 @@
 
 from sqlalchemy import Column, ForeignKey, Boolean, UniqueConstraint # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped  # type: ignore
 import uuid # Для роботи з UUID
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel

@@ -5,10 +5,11 @@
 Ця модель дозволяє користувачам залишати відгуки та ставити рейтинги
 на завдання або події в групі. Ця можливість налаштовується адміністратором групи.
 """
+from typing import Optional
 
 from sqlalchemy import Column, ForeignKey, DateTime, Text, Integer, UniqueConstraint # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 

@@ -5,10 +5,12 @@
 Бейджі надаються користувачам за виконання певних умов або досягнень і слугують для престижу.
 Бейджі налаштовуються адміністратором групи.
 """
+from typing import Optional, List
 
-from sqlalchemy import Column, String, Text, ForeignKey, Integer, UniqueConstraint # type: ignore
+from sqlalchemy import Column, String, Text, ForeignKey, Integer, UniqueConstraint, Boolean, \
+    CheckConstraint  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped  # type: ignore
 import uuid # Для роботи з UUID
 
 # Використовуємо BaseMainModel, оскільки бейдж має назву, опис, статус (активний/неактивний для налаштування),

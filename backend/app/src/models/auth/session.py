@@ -7,10 +7,11 @@
 2.  Можливості для користувача переглядати свої активні сесії та примусово завершувати їх (відкликати Refresh токени, пов'язані з сесією).
 3.  Збору аудиторської інформації про входи в систему.
 """
+from typing import Optional
 
-from sqlalchemy import Column, String, DateTime, ForeignKey, Text # type: ignore
+from sqlalchemy import Column, String, DateTime, ForeignKey, Text, Boolean  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, INET # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped  # type: ignore
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 

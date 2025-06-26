@@ -5,10 +5,12 @@
 специфічних налаштувань для кожної окремої групи.
 Ці налаштування керують поведінкою та функціоналом в межах конкретної групи.
 """
+from decimal import Decimal
+from typing import Optional, Dict, Any
 
 from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Integer, Numeric, Time # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
 
 from backend.app.src.models.base import BaseModel # Успадковуємо від BaseModel, оскільки це налаштування, а не основна сутність з ім'ям/описом.

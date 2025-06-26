@@ -11,7 +11,9 @@
 та функціональність.
 """
 
-from sqlalchemy import UniqueConstraint # type: ignore # Для визначення обмежень унікальності
+from sqlalchemy import UniqueConstraint, Boolean  # type: ignore # Для визначення обмежень унікальності
+from sqlalchemy.orm import relationship, Mapped, mapped_column
+
 # from sqlalchemy.orm import relationship # type: ignore # Для визначення зв'язків, наприклад, з GroupModel
 
 from backend.app.src.models.dictionaries.base import BaseDictModel # Імпорт базової моделі для довідників

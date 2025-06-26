@@ -6,7 +6,7 @@
 та відображенні завдань та подій.
 """
 
-from pydantic import Field, model_validator
+from pydantic import Field, model_validator, field_validator
 from typing import Optional, List, Any, ForwardRef, Union # Додано Union
 import uuid
 from datetime import datetime, timedelta # Додано timedelta

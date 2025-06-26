@@ -6,10 +6,11 @@
 адміністратору групи. Адміністратор може на основі пропозиції створити
 реальне завдання/подію та, за бажанням, нарахувати бонуси за вдалу пропозицію.
 """
+from typing import Optional, Dict, Any
 
-from sqlalchemy import Column, ForeignKey, DateTime, Text, String # type: ignore
+from sqlalchemy import Column, ForeignKey, DateTime, Text, String, Boolean  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 

@@ -5,10 +5,12 @@
 Шаблони груп дозволяють супер-адміністраторам створювати передвизначені конфігурації груп
 (з налаштуваннями, типами завдань, нагородами тощо) для швидкого розгортання нових схожих груп.
 """
+from typing import Optional, List
 
-from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, JSON # type: ignore
+from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, JSON, Integer, \
+    UniqueConstraint  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
 
 # Використовуємо BaseMainModel, оскільки шаблон має назву, опис, і потенційно статус (активний/неактивний шаблон).

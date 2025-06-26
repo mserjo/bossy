@@ -6,7 +6,7 @@
 нарахування бонусів за завдання, списання за нагороди, штрафи, перекази тощо.
 """
 
-from sqlalchemy import Column, ForeignKey, Numeric, Text, String, DateTime # type: ignore # Для mapped_column
+from sqlalchemy import Column, ForeignKey, Numeric, Text, String, DateTime, Index  # type: ignore # Для mapped_column
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
 from sqlalchemy.orm import relationship, Mapped, mapped_column # type: ignore
 from typing import Optional, Dict, Any, List # Додано List

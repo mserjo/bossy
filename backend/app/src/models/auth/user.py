@@ -5,10 +5,11 @@
 Користувач є центральною сутністю для автентифікації, авторизації та взаємодії з системою.
 Модель включає поля для ідентифікації, автентифікаційних даних, особистої інформації та зв'язків з іншими сутностями.
 """
+from typing import List
 
-from sqlalchemy import Column, String, Text, DateTime, Boolean, LargeBinary, ForeignKey, Integer # type: ignore
+from sqlalchemy import Column, String, Text, DateTime, Boolean, LargeBinary, ForeignKey, Integer, Index  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped  # type: ignore
 import uuid # Для роботи з UUID
 
 from backend.app.src.models.base import BaseMainModel # Успадковуємо від BaseMainModel для отримання name, description, state_id тощо.

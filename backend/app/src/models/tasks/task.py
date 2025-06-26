@@ -4,12 +4,15 @@
 Цей модуль визначає модель SQLAlchemy `TaskModel` для представлення завдань та подій в системі.
 Завдання/події належать до певної групи, мають тип, можуть мати виконавців, терміни, бонуси/штрафи.
 """
+from decimal import Decimal
+from typing import Optional, List
 
-from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Integer, Numeric, Interval # type: ignore
+from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Integer, Numeric, Interval, \
+    CheckConstraint  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
-from datetime import datetime # Для роботи з датами та часом
+from datetime import datetime, timedelta  # Для роботи з датами та часом
 
 # Використовуємо BaseMainModel, оскільки завдання/подія має назву, опис, статус, належить до групи.
 from backend.app.src.models.base import BaseMainModel

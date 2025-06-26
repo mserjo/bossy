@@ -7,10 +7,11 @@
 Самі файли зберігаються в файловій системі або хмарному сховищі,
 а ця модель містить посилання на них та їх метадані.
 """
+from typing import Optional
 
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Boolean # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped  # type: ignore
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 

@@ -6,7 +6,7 @@
 (якщо дозволено) та відображенні відгуків та рейтингів на завдання/події.
 """
 
-from pydantic import Field, conint
+from pydantic import Field, conint, model_validator
 from typing import Optional, List, Any, ForwardRef
 import uuid
 from datetime import datetime

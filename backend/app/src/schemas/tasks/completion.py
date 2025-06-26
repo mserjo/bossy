@@ -6,7 +6,7 @@
 оновленні статусу перевірки та відображенні інформації про виконання.
 """
 
-from pydantic import Field
+from pydantic import Field, model_validator
 from typing import Optional, List, Any, ForwardRef, Dict # Додано Dict
 import uuid
 from datetime import datetime

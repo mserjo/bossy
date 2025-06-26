@@ -8,7 +8,7 @@
 
 from sqlalchemy import Column, String, Text, ForeignKey, UniqueConstraint # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
 
 # Використовуємо BaseMainModel, оскільки шаблон має назву (ідентифікатор), опис,

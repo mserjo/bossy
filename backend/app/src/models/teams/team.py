@@ -5,10 +5,11 @@
 в межах групи. Команди можуть використовуватися для виконання спільних завдань
 або участі у змаганнях.
 """
+from typing import Optional, List
 
-from sqlalchemy import Column, String, Text, ForeignKey, Integer # type: ignore
+from sqlalchemy import Column, String, Text, ForeignKey, Integer, CheckConstraint, UniqueConstraint  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
 
 # Використовуємо BaseMainModel, оскільки команда має назву, опис, статус (активна/неактивна),

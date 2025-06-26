@@ -5,7 +5,8 @@
 в межах групи. Користувачі групи можуть брати участь у голосуванні.
 """
 
-from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Integer # type: ignore # String, Text etc. for mapped_column
+from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Integer, \
+    CheckConstraint  # type: ignore # String, Text etc. for mapped_column
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
 from sqlalchemy.orm import relationship, Mapped, mapped_column # type: ignore
 from typing import Optional, List

@@ -8,9 +8,9 @@
 в конкретній групі та коли.
 """
 
-from sqlalchemy import Column, ForeignKey, DateTime, UniqueConstraint # type: ignore
+from sqlalchemy import Column, ForeignKey, DateTime, UniqueConstraint, Boolean  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped  # type: ignore
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 

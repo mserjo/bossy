@@ -9,6 +9,7 @@
 
 import uuid  # Для генерації унікальних ідентифікаторів
 from datetime import datetime  # Для роботи з датами та часом
+from typing import Optional
 
 from sqlalchemy import Column, DateTime, ForeignKey, String, Text, func, Boolean, Integer # Додано Integer для version
 from sqlalchemy.dialects.postgresql import UUID  # Специфічний для PostgreSQL тип UUID

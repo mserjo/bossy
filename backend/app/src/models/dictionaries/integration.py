@@ -9,8 +9,12 @@
 (id, name, description, code, state_id, group_id, created_at, updated_at, deleted_at, is_deleted, notes)
 та функціональність.
 """
+from typing import Optional, Dict, Any
 
 from sqlalchemy import UniqueConstraint, Column, String # type: ignore
+from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy.orm import Mapped, mapped_column
+
 # from sqlalchemy.orm import relationship # type: ignore # Для визначення зв'язків
 
 from backend.app.src.models.dictionaries.base import BaseDictModel # Імпорт базової моделі для довідників

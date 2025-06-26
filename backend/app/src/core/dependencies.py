@@ -5,6 +5,7 @@
 в ендпоінтах для отримання спільних ресурсів (наприклад, сесії БД)
 або для виконання перевірок (наприклад, автентифікація, авторизація).
 """
+import uuid
 
 from fastapi import Depends, HTTPException, Security
 from fastapi.security import OAuth2PasswordBearer, APIKeyHeader
@@ -19,7 +20,7 @@ from backend.app.src.config.settings import settings
 from backend.app.src.config.security import ALGORITHM, SECRET_KEY # Параметри JWT
 from backend.app.src.core.exceptions import UnauthorizedException, ForbiddenException, NotFoundException
 # Імпорт констант для ролей (якщо перевірка ролей тут)
-from backend.app.src.core.constants import ROLE_SUPERADMIN_CODE, ROLE_ADMIN_CODE, ROLE_USER_CODE
+from backend.app.src.core.constants import ROLE_SUPERADMIN_CODE, ROLE_ADMIN_CODE, ROLE_USER_CODE, USER_TYPE_SUPERADMIN
 # Імпорт схем для токенів та користувачів
 from backend.app.src.schemas.auth.token import TokenPayloadSchema
 from backend.app.src.schemas.auth.user import UserSchema

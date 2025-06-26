@@ -4,10 +4,11 @@
 Цей модуль визначає модель SQLAlchemy `PollOptionModel` для зберігання варіантів відповідей
 для опитувань (`PollModel`). Кожне опитування може мати декілька варіантів відповідей.
 """
+from typing import List
 
 from sqlalchemy import Column, String, Text, ForeignKey, Integer # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
 
 # Використовуємо BaseModel, оскільки варіант відповіді - це проста сутність,

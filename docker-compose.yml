@@ -1,0 +1,161 @@
+# docker-compose.yml
+# Базова конфігурація Docker Compose для запуску проекту.
+# За замовчуванням використовує production-like налаштування.
+# Для розробки використовуйте `docker-compose -f docker-compose.yml -f docker-compose.dev.yml up`
+
+version: '3.8' # Або новіша версія Docker Compose
+
+services:
+  postgres_db:
+    image: postgres:16-alpine # Використовуємо PostgreSQL 16 з Alpine Linux (менший розмір)
+    container_name: bossy_postgres_db
+    hostname: postgres_db # Для доступу з backend сервісу
+    environment:
+      POSTGRES_USER: ${DB_USER:-bossy_user} # Значення з .env або дефолтне
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-bossy_password}
+      POSTGRES_DB: ${DB_NAME:-bossy_db}
+      # PGDATA: /var/lib/postgresql/data/pgdata # Можна вказати, якщо потрібно змінити шлях всередині контейнера
+    volumes:
+      - bossy_postgres_data:/var/lib/postgresql/data # Зберігання даних БД між перезапусками
+      # Можна додати скрипти для ініціалізації БД, якщо потрібно:
+      # - ./scripts/db_init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "${DB_PORT_HOST:-5433}:${DB_PORT:-5432}" # ${DB_PORT_HOST} для можливості зміни порту на хості, ${DB_PORT} для внутрішнього
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-bossy_user} -d ${DB_NAME:-bossy_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bossy_network
+
+  redis_cache:
+    image: redis:7-alpine # Redis 7 з Alpine
+    container_name: bossy_redis_cache
+    hostname: redis_cache
+    # command: redis-server --requirepass ${REDIS_PASSWORD} # Якщо потрібен пароль
+    ports:
+      - "${REDIS_PORT_HOST:-6380}:${REDIS_PORT:-6379}" # ${REDIS_PORT_HOST} для хоста, ${REDIS_PORT} для контейнера
+    volumes:
+      - bossy_redis_data:/data # Зберігання даних Redis (якщо потрібно)
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - bossy_network
+
+  backend:
+    build:
+      context: ./backend # Шлях до каталогу з Dockerfile
+      dockerfile: Dockerfile # Використовуємо Dockerfile для production за замовчуванням
+    container_name: bossy_backend
+    hostname: backend
+    env_file:
+      - ./backend/.env # Завантажуємо змінні середовища з .env файлу в backend/
+    environment:
+      # Можна перевизначити або додати змінні тут, якщо потрібно
+      - APP_ENV=${APP_ENV:-production}
+    depends_on:
+      postgres_db:
+        condition: service_healthy # Запускати backend тільки після успішного healthcheck БД
+      redis_cache:
+        condition: service_healthy # Аналогічно для Redis
+    ports:
+      - "${APP_PORT_HOST:-8000}:${APP_PORT:-8000}" # ${APP_PORT_HOST} для хоста, ${APP_PORT} для контейнера
+    volumes:
+      # Для production, зазвичай, код вже в образі.
+      # Але якщо потрібен доступ до логів або статичних файлів, що генеруються:
+      - bossy_backend_logs:/opt/app/logs # Приклад для логів, якщо вони пишуться в /opt/app/logs
+      - bossy_backend_static:/opt/app/static/uploads # Приклад для завантажених файлів
+    restart: unless-stopped
+    # Healthcheck для backend (використовує ендпоінт, визначений в Dockerfile)
+    # healthcheck:
+    #   test: ["CMD", "curl", "-f", "http://localhost:${APP_PORT:-8000}/api/v1/system/health"] # Або wget
+    #   interval: 30s
+    #   timeout: 10s
+    #   retries: 3
+    #   start_period: 30s # Даємо час на запуск додатку
+    networks:
+      - bossy_network
+    # command: uvicorn app.main:app --host 0.0.0.0 --port ${APP_PORT:-8000} --workers ${APP_WORKERS:-1}
+    # Команда запуску зазвичай визначена в Dockerfile (CMD або ENTRYPOINT)
+
+  # celery_worker: # Приклад сервісу для Celery worker
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile # Може використовувати той самий Dockerfile, що й backend
+  #   container_name: bossy_celery_worker
+  #   hostname: celery_worker
+  #   env_file:
+  #     - ./backend/.env
+  #   depends_on:
+  #     - redis_cache
+  #     - postgres_db # Якщо worker взаємодіє з БД
+  #   command: celery -A app.celery_app.celery_app worker -l info -Q main-queue # Приклад команди
+  #   # volumes: # Якщо потрібен доступ до коду для hot-reload (не для production)
+  #   #   - ./backend:/opt/app
+  #   restart: unless-stopped
+  #   networks:
+  #     - bossy_network
+
+  # celery_beat: # Приклад сервісу для Celery beat (планувальник)
+  #   build:
+  #     context: ./backend
+  #     dockerfile: Dockerfile
+  #   container_name: bossy_celery_beat
+  #   hostname: celery_beat
+  #   env_file:
+  #     - ./backend/.env
+  #   depends_on:
+  #     - redis_cache
+  #     - postgres_db
+  #   command: celery -A app.celery_app.celery_app beat -l info --scheduler django_celery_beat.schedulers:DatabaseScheduler # Або інший шедулер
+  #   restart: unless-stopped
+  #   networks:
+  #     - bossy_network
+
+volumes:
+  bossy_postgres_data:
+    driver: local
+  bossy_redis_data:
+    driver: local
+  bossy_backend_logs:
+    driver: local
+  bossy_backend_static:
+    driver: local
+
+networks:
+  bossy_network:
+    driver: bridge
+
+# TODO: Уточнити змінні середовища для портів (DB_PORT_HOST, REDIS_PORT_HOST, APP_PORT_HOST)
+#       та їх дефолтні значення, щоб уникнути конфліктів портів на хост-машині.
+#       Наприклад, 5433 для БД на хості, 6380 для Redis, 8000 для backend.
+# TODO: Розкоментувати та налаштувати Healthcheck для backend, коли ендпоінт буде готовий.
+# TODO: Розкоментувати та налаштувати сервіси для Celery (worker, beat), якщо вони будуть використовуватися.
+#       Потрібно буде створити `app.celery_app` в коді backend.
+# TODO: Перевірити шляхи до .env файлу (`./backend/.env`). Docker Compose запускається з кореня проекту.
+# TODO: Переконатися, що назви томів (volumes) та мереж (networks) унікальні та зрозумілі.
+# TODO: Для production, розглянути можливість використання більш специфічних налаштувань для restart policy.
+# TODO: Перевірити команду запуску для `backend` - вона має бути визначена в `Dockerfile`.
+#       Якщо потрібно перевизначити або додати параметри (наприклад, кількість воркерів),
+#       це можна зробити через `command` в docker-compose.yml.
+#       Поточний `Dockerfile` вже має CMD.
+# TODO: Для `postgres_db`, `environment` змінні `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB`
+#       мають відповідати тим, що використовуються в `DATABASE_URL` в `.env` файлі backend.
+#       Використання `${VAR_NAME:-default_value}` дозволяє брати значення з .env хоста
+#       (якщо docker-compose завантажує їх) або використовувати дефолтні.
+#       Для передачі значень з `.env` файлу проекту в контейнери, `env_file` в сервісі `backend`
+#       є хорошим підходом. Для `postgres_db` та `redis_cache` змінні середовища
+#       встановлюються напряму, і їх значення можуть бути взяті з `.env` файлу,
+#       що завантажується `docker-compose` (якщо він існує в тому ж каталозі, що й `docker-compose.yml`).
+#       Або ж, вони мають бути визначені в середовищі, де запускається `docker-compose`.
+#       Поточний підхід з `${DB_USER:-bossy_user}` є гнучким.
+#       Переконатися, що .env файл (не .env.example) існує в корені проекту, якщо
+#       docker-compose буде покладатися на нього для змінних типу ${DB_USER}.
+#       Або ж ці змінні мають бути експортовані в середовищі запуску.
+#       Файл `backend/.env` в `env_file` для `backend` сервісу - це правильно.

@@ -17,43 +17,126 @@ venv.bak/
 
 # Файли IDE
 .idea/
-.vscode/
+# .vscode/* # Замінено на більш гранульовані правила нижче
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+.vscode/* # Ігнорувати все інше в .vscode
 *.sublime-project
 *.sublime-workspace
+.project # Eclipse
+.pydevproject # Eclipse
+.settings/ # Eclipse
+nbproject/ # Netbeans
+*.iml # PyCharm
 
 # Файли операційної системи
 .DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
 Thumbs.db
+desktop.ini
+# NTUSER.POL # Зазвичай не потрібно ігнорувати глобально
+# NTUSER.DAT* # Зазвичай не потрібно ігнорувати глобально
+.AppleDouble
+.LSOverride
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
 
 # Файли конфігурації середовища
 .env
 .env.*
-!/.env.example
+!/.env.example # Переконатися, що .env.example НЕ ігнорується
+local.env # Можливий локальний .env, який не має комітитися
 
 # Файли журналів та баз даних
-*.log
-*.sql
-*.sqlite3
-local_database.db
+# *.log # Вже є, але можна зробити більш специфічним, якщо потрібно
+# backend/logs/ # Для логів, що генеруються додатком в backend/logs
+# *.sql # Вже є
+# *.sqlite3 # Вже є
+# local_database.db # Вже є
 
-# Файли збірки та дистрибуції
-build/
-dist/
-*.egg-info/
-*.egg
+# C extensions
+*.so
 
-# Файли тестів
-.pytest_cache/
-.coverage
-htmlcov/
-nosetests.xml
-coverage.xml
-*.cover
+# Distribution / packaging
+.Python
+# build/ # Вже є
+develop-eggs/ # Додано
+# dist/ # Вже є
+downloads/ # Додано
+eggs/ # Додано
+.eggs/ # Додано
+lib/ # Додано
+lib64/ # Додано
+parts/ # Додано
+sdist/ # Додано
+var/ # Додано
+wheels/ # Додано
+pip-wheel-metadata/ # Додано
+share/python-wheels/ # Додано
+# *.egg-info/ # Вже є
+.installed.cfg # Додано
+# *.egg # Вже є
+MANIFEST # Додано
 
-# Файли Jupyter Notebook
-.ipynb_checkpoints
+# Installer logs
+pip-log.txt # Додано
+pip-delete-this-directory.txt # Додано
+
+# Unit test / coverage reports
+# htmlcov/ # Вже є
+.tox/ # Додано
+.nox/ # Додано
+# .coverage # Вже є
+.coverage.* # Додано
+.cache # Додано
+# nosetests.xml # Вже є
+# coverage.xml # Вже є
+# *.cover # Вже є
+*.py,cover # Додано
+.hypothesis/ # Додано
+# .pytest_cache/ # Вже є
+pytestdebug.log # Додано
+.pytest_sessions/ # Додано
+
+# Translations
+*.mo # Додано
+*.pot # Додано
+*.po~ # Додано
+
+# mkdocs documentation
+/site # Додано
+
+# PyBuilder
+target/ # Додано
+
+# IPython
+ipython_notebook_config.py # Стара назва, додано
+.python_history # Додано
+
+# PEP 582; __pypackages__ directory
+__pypackages__/ # Додано
+
+# Celery stuff
+celerybeat-schedule # Додано
+celerybeat.pid # Додано
+
+# Docker
+docker-compose.override.yml # Додано
+
+# Проектні специфічні логи та завантаження
+backend/logs/
+backend/app/src/static/uploads/
 
 # Файли тимчасових файлів
-*.tmp
-*.swp
-*~
+# *.tmp # Вже є
+# *.swp # Вже є
+# *~ # Вже є

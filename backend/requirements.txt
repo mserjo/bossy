@@ -1,0 +1,46 @@
+# FastAPI and related
+fastapi
+uvicorn[standard] # Includes standard dependencies like websockets, http-parser
+
+# Database - SQLAlchemy and PostgreSQL driver
+sqlalchemy[asyncio] # For async support
+asyncpg # PostgreSQL driver for asyncio
+alembic # For database migrations
+
+# Pydantic - Data validation and settings management
+pydantic
+pydantic-settings # For loading settings from .env and environment variables
+
+# Authentication - JWT, password hashing
+python-jose[cryptography] # For JWT creation and validation
+passlib[bcrypt] # For password hashing
+
+# Background Tasks - Celery
+celery
+redis # Broker for Celery (can also be used for caching)
+
+# Logging
+loguru
+
+# GraphQL (Strawberry as an example, can be replaced with Ariadne or other)
+strawberry-graphql[fastapi]
+
+# API Limiting
+fastapi-limiter
+
+# Environment variables
+python-dotenv
+
+# HTTPX for testing and async HTTP requests (if needed by services)
+httpx
+
+# Asyncio (uvloop is mentioned in tech task, but it's an event loop policy, not a direct requirement here)
+# Uvloop installation is OS-dependent and usually done separately or via OS package manager.
+# We can add a note about it in documentation.
+# For now, standard asyncio included with Python will be used.
+
+# Other utilities if needed later
+# email-validator # For stricter email validation in Pydantic if default is not enough
+# psycopg2-binary # If synchronous SQLAlchemy operations are ever needed (unlikely with FastAPI)
+# sentry-sdk # For error tracking (optional)
+# opentelemetry-instrumentation-fastapi # For tracing (optional)

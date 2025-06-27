@@ -186,9 +186,30 @@ MAX_PAGE_SIZE: int = 100    # Максимальна кількість елем
 # Наприклад, максимальна довжина певних полів, формати дат,
 # ключі для кешування Redis, назви черг Celery тощо.
 
+# --- Константи для статусів пропозицій завдань (коди) ---
+TASK_PROPOSAL_STATUS_PENDING_CODE: str = "proposal_pending_review" # На розгляді
+TASK_PROPOSAL_STATUS_APPROVED_CODE: str = "proposal_approved"     # Прийнято (можливо, створено завдання)
+TASK_PROPOSAL_STATUS_REJECTED_CODE: str = "proposal_rejected"     # Відхилено
+TASK_PROPOSAL_STATUS_IMPLEMENTED_CODE: str = "proposal_implemented" # Реалізовано (завдання створено і завершено) - опціонально
+
 # --- Константи для статусів доставки сповіщень (коди) ---
 # Використовуються в `NotificationDeliveryModel.status_code` та `NotificationDeliveryStatusEnum` в `dicts.py`.
 DELIVERY_STATUS_PENDING: str = "PENDING"        # В очікуванні відправки
+DELIVERY_STATUS_PROCESSING: str = "PROCESSING"    # Обробляється системою перед відправкою
+DELIVERY_STATUS_SENT: str = "SENT"            # Надіслано провайдеру доставки
+DELIVERY_STATUS_DELIVERED: str = "DELIVERED"      # Доставлено отримувачу (підтверджено провайдером)
+DELIVERY_STATUS_FAILED: str = "FAILED"          # Не вдалося доставити
+DELIVERY_STATUS_RETRYING: str = "RETRYING"       # Запланована повторна спроба
+DELIVERY_STATUS_OPENED: str = "OPENED"          # Відкрито (наприклад, email або push)
+DELIVERY_STATUS_CLICKED: str = "CLICKED"         # Клікнуто посилання в сповіщенні
+DELIVERY_STATUS_UNSUBSCRIBED: str = "UNSUBSCRIBED" # Користувач відписався від цього типу сповіщень/каналу
+
+# --- Константи для статусів генерації звітів (коди) ---
+REPORT_STATUS_QUEUED: str = "report_queued"          # В черзі на генерацію
+REPORT_STATUS_PROCESSING: str = "report_processing"    # В процесі генерації
+REPORT_STATUS_COMPLETED: str = "report_completed"     # Генерацію успішно завершено
+REPORT_STATUS_FAILED: str = "report_failed"          # Помилка під час генерації
+REPORT_STATUS_CANCELLED: str = "report_cancelled"     # Запит на генерацію скасовано (опціонально)
 DELIVERY_STATUS_PROCESSING: str = "PROCESSING"    # Обробляється системою перед відправкою
 DELIVERY_STATUS_SENT: str = "SENT"            # Надіслано провайдеру доставки
 DELIVERY_STATUS_DELIVERED: str = "DELIVERED"      # Доставлено отримувачу (підтверджено провайдером)

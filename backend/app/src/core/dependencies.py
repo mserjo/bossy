@@ -80,54 +80,40 @@ async def get_current_user(
     # ValidationError вже оброблено вище
 
     # Отримання користувача з БД за user_id
-    # user_service = UserService(db) # TODO: Розкоментувати та ініціалізувати UserService
-    user_schema: Optional[UserSchema] = None
+    from backend.app.src.services.auth.user_service import userService # Імпортуємо екземпляр сервісу
+
+    user: Optional[UserModel] = None # Тепер це буде UserModel, а не UserSchema
     try:
-        # user_schema = await user_service.get_active_user_by_id_for_auth(user_id) # TODO: Розкоментувати
-        # Метод сервісу має робити всі перевірки (is_deleted, state_id).
-        # Якщо користувач не знайдений або не активний, сервіс має кидати NotFoundException або ForbiddenException.
+        # Викликаємо метод сервісу, який повертає UserModel та кидає винятки
+        user = await userService.get_active_user_by_id_for_auth(db, user_id=user_id)
+        # Цей метод вже має робити всі перевірки (is_deleted, state_id на активність).
+        # Якщо користувач не знайдений або не активний, сервіс кидає NotFoundException або ForbiddenException.
+    except NotFoundException:
+        raise credentials_exception
+    except ForbiddenException as e:
+        raise UnauthorizedException(detail=e.detail)
 
-        # --- Поточна імітація отримання та перевірки користувача (ЗАМІНИТИ НА ВИКЛИК СЕРВІСУ) ---
-        from backend.app.src.models.auth import UserModel # Тимчасовий імпорт
-        from sqlalchemy import select # type: ignore
-        query = select(UserModel).where(UserModel.id == user_id)
-        result = await db.execute(query)
-        user_orm: Optional[UserModel] = result.scalar_one_or_none()
-        if user_orm is None:
-            raise NotFoundException(detail="Користувача не знайдено.")
-        if user_orm.is_deleted:
-            raise ForbiddenException(detail="Обліковий запис користувача видалено.")
-        # TODO: Реалізувати перевірку state_id користувача на активність (має робити сервіс)
-        # if user_orm.state_id ... (перевірка на активний статус)
-        #     raise ForbiddenException(detail="Обліковий запис користувача неактивний.")
-        user_schema = UserSchema.model_validate(user_orm)
-        # --- Кінець імітації ---
-
-    except NotFoundException: # Якщо сервіс кидає NotFoundException
-        raise credentials_exception # Перетворюємо на Unauthorized для автентифікації
-    except ForbiddenException as e: # Якщо сервіс кидає ForbiddenException (наприклад, неактивний)
-        raise UnauthorizedException(detail=e.detail) # Перетворюємо на Unauthorized
-
-    if user_schema is None: # Якщо з якоїсь причини user_schema не встановлено (після розкоментування сервісу)
-        # Це не повинно статися, якщо сервіс працює правильно, але для безпеки.
+    if user is None: # Додаткова перевірка, хоча сервіс мав би кинути виняток
         raise credentials_exception
 
-    return user_schema
+    # Конвертуємо UserModel в UserSchema для повернення з залежності
+    return UserSchema.model_validate(user)
 
-async def get_current_active_user(
-    current_user: UserSchema = Depends(get_current_user)
-) -> UserSchema:
+async def get_current_active_user( # Ця залежність тепер може бути спрощена або видалена,
+                                 # оскільки get_current_user вже перевіряє активність через сервіс.
+    current_user_schema: UserSchema = Depends(get_current_user) # Змінено назву параметра
+) -> UserSchema: # Повертає UserSchema, як і раніше
     """
     Залежність, що перевіряє, чи поточний користувач активний.
-    (Додаткова перевірка, якщо get_current_user її не робить повністю).
-    Наразі, `get_current_user` вже має робити базові перевірки.
-    Це може бути корисно для більш специфічних перевірок активності.
+    `get_current_user` тепер вже викликає `userService.get_active_user_by_id_for_auth`,
+    який має виконувати всі необхідні перевірки активності.
+    Ця функція може залишитися для семантичної ясності або для майбутніх
+    додаткових перевірок, специфічних для "активного" користувача в контексті API.
     """
-    # Приклад: якщо UserSchema має поле is_active або state.code
-    # if not current_user.is_active: # Або current_user.state.code != STATUS_ACTIVE_CODE
-    #     raise ForbiddenException(detail="Неактивний користувач") # Або Unauthorized
-    # Поки що просто повертаємо користувача, якщо get_current_user пройшов.
-    return current_user
+    # Наразі, якщо get_current_user успішно повернув користувача, він вважається активним.
+    # Додаткові перевірки тут можуть бути зайвими, якщо сервіс все робить.
+    # self.logger.debug(f"get_current_active_user: User {current_user_schema.id} is considered active.")
+    return current_user_schema
 
 
 # --- Залежності для перевірки ролей ---
@@ -179,11 +165,10 @@ async def get_optional_current_user(
     try:
         # Намагаємося отримати користувача через get_current_user
         # Передаємо db явно, оскільки Depends не викликається тут напряму для get_db_session
-        return await get_current_user(token=token, db=db)
-    except HTTPException:
-        # Якщо get_current_user кидає будь-який HTTPException (включаючи UnauthorizedException, ForbiddenException),
-        # це означає, що токен невалідний або користувач неактивний.
-        # Для get_optional_current_user ми просто повертаємо None в такому випадку.
+        # get_current_user повертає UserSchema
+        user_schema = await get_current_user(token=token, db=db)
+        return user_schema # Повертаємо UserSchema або None, якщо get_current_user кинув виняток
+    except HTTPException: # Ловимо UnauthorizedException та ForbiddenException, які кидає get_current_user
         return None
 
 # --- Залежність для API ключа (якщо використовується) ---

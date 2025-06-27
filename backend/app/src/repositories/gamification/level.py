@@ -58,10 +58,10 @@ class LevelRepository(BaseRepository[LevelModel, LevelCreateSchema, LevelUpdateS
     # `create` успадкований. `LevelCreateSchema` має містити необхідні поля.
     # `group_id` встановлюється сервісом.
     async def create_level_for_group(
-        self, db: AsyncSession, *, obj_in: LevelCreateSchema, group_id: uuid.UUID
+        self, db: AsyncSession, *, obj_in_data: Dict[str, Any], group_id: uuid.UUID, creator_id: Optional[uuid.UUID] = None
     ) -> LevelModel:
-        obj_in_data = obj_in.model_dump(exclude_unset=True)
-        db_obj = self.model(group_id=group_id, **obj_in_data)
+        # obj_in_data - це вже словник зі схеми
+        db_obj = self.model(group_id=group_id, created_by_user_id=creator_id, **obj_in_data) # Додано creator_id
         db.add(db_obj)
         await db.commit()
         await db.refresh(db_obj)

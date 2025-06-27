@@ -94,6 +94,13 @@ class FileCategoryEnum(str, Enum):
     TASK_ATTACHMENT = constants.FILE_CATEGORY_TASK_ATTACHMENT
     REPORT_FILE = constants.FILE_CATEGORY_REPORT_FILE
 
+class TaskProposalStatusEnum(str, Enum):
+    """Статуси пропозицій завдань."""
+    PENDING_REVIEW = constants.TASK_PROPOSAL_STATUS_PENDING_CODE
+    APPROVED = constants.TASK_PROPOSAL_STATUS_APPROVED_CODE
+    REJECTED = constants.TASK_PROPOSAL_STATUS_REJECTED_CODE
+    IMPLEMENTED = constants.TASK_PROPOSAL_STATUS_IMPLEMENTED_CODE
+
 class NotificationDeliveryStatusEnum(str, Enum):
     """Статуси доставки сповіщень."""
     PENDING = constants.DELIVERY_STATUS_PENDING
@@ -105,6 +112,14 @@ class NotificationDeliveryStatusEnum(str, Enum):
     OPENED = constants.DELIVERY_STATUS_OPENED
     CLICKED = constants.DELIVERY_STATUS_CLICKED
     UNSUBSCRIBED = constants.DELIVERY_STATUS_UNSUBSCRIBED
+
+class ReportStatusEnum(str, Enum):
+    """Статуси генерації звітів."""
+    QUEUED = constants.REPORT_STATUS_QUEUED
+    PROCESSING = constants.REPORT_STATUS_PROCESSING
+    COMPLETED = constants.REPORT_STATUS_COMPLETED
+    FAILED = constants.REPORT_STATUS_FAILED
+    CANCELLED = constants.REPORT_STATUS_CANCELLED
 
 # Перевірка констант (деякі могли бути пропущені в constants.py або тут)
 # Для RatingTypeEnum я додав використання констант, припускаючи, що вони є в constants.py.

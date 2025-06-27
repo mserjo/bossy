@@ -7,7 +7,7 @@
 
 from typing import Optional, List
 import uuid
-from sqlalchemy import select, and_ # type: ignore
+from sqlalchemy import select, and_, func # type: ignore # Додано func
 from sqlalchemy.ext.asyncio import AsyncSession # type: ignore
 from sqlalchemy.orm import selectinload # type: ignore
 
@@ -96,4 +96,10 @@ team_membership_repository = TeamMembershipRepository(TeamMembershipModel)
 #       Якщо `team_id` є частиною схеми, то можна використовувати успадкований `create`.
 #       Поточна `TeamMembershipCreateSchema` не має `team_id`.
 #
+    async def count_members_in_team(self, db: AsyncSession, *, team_id: uuid.UUID) -> int:
+        """Підраховує кількість учасників у команді."""
+        statement = select(func.count(self.model.id)).where(self.model.team_id == team_id) # type: ignore
+        result = await db.execute(statement)
+        return result.scalar_one() or 0
+
 # Все виглядає добре. Надано необхідні методи для роботи з членством у командах.

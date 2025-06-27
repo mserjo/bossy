@@ -13,110 +13,200 @@
 Також може включати ендпоінти для учасників групи для голосування.
 """
 
-from fastapi import APIRouter, Depends, status
-from typing import List
+from fastapi import APIRouter, Depends, HTTPException, status, Path, Query, Body, Response
+from typing import List, Optional
+
 from backend.app.src.config.logging import get_logger
-# TODO: Імпортувати схеми (PollSchema, PollCreateSchema, PollVoteSchema тощо).
-# TODO: Імпортувати сервіс PollService.
-# TODO: Імпортувати залежності.
+from backend.app.src.schemas.groups.poll import (
+    PollSchema,
+    PollCreateSchema,
+    PollUpdateSchema,
+    PollVoteSchema, # Для голосування
+    PollWithResultsSchema # Для відображення результатів
+)
+from backend.app.src.services.groups.poll_service import PollService
+from backend.app.src.api.dependencies import DBSession, CurrentActiveUser
+from backend.app.src.api.v1.groups.groups import group_admin_permission, group_member_permission
+from backend.app.src.models.auth.user import UserModel
+from backend.app.src.models.groups.poll import PollModel # Для type hint
 
 logger = get_logger(__name__)
 router = APIRouter()
 
+# Залежність для перевірки прав на опитування (адмін групи для CRUD, учасник для голосування/перегляду)
+async def check_poll_permissions(
+    group_id: int = Path(...),
+    poll_id: int = Path(...),
+    access_check: dict = Depends(group_member_permission), # Перевіряє членство в групі
+    db_session: DBSession = Depends()
+) -> dict: # Повертає опитування, поточного користувача та group_id
+    poll_service = PollService(db_session)
+    poll = await poll_service.get_poll_by_id_and_group_id(poll_id=poll_id, group_id=group_id)
+    if not poll:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Опитування не знайдено в цій групі.")
+    return {"poll": poll, "current_user": access_check["current_user"], "group_id": group_id}
+
+
 @router.post(
-    "/{group_id}/polls",
-    # response_model=PollSchema,
+    "", # Відповідає /groups/{group_id}/polls
+    response_model=PollSchema,
     status_code=status.HTTP_201_CREATED,
     tags=["Groups", "Group Polls"],
-    summary="Створити нове опитування в групі (заглушка)"
-    # dependencies=[Depends(group_admin_permission)]
+    summary="Створити нове опитування в групі (адміністратор групи)"
 )
-async def create_group_poll(
-    group_id: int,
-    # poll_data: PollCreateSchema
+async def create_group_poll_endpoint(
+    group_id: int = Path(..., description="ID групи"),
+    poll_in: PollCreateSchema,
+    group_with_admin_rights: dict = Depends(group_admin_permission),
+    db_session: DBSession = Depends()
 ):
-    logger.info(f"Адмін групи {group_id} створює нове опитування (заглушка).")
-    # TODO: Реалізувати логіку створення опитування
-    return {"poll_id": "poll_xyz", "group_id": group_id, "question": "Ваше питання?", "message": "Опитування створено"}
+    current_admin: UserModel = group_with_admin_rights["current_user"]
+    logger.info(f"Адмін {current_admin.email} створює нове опитування '{poll_in.question}' для групи {group_id}.")
+
+    if poll_in.group_id != group_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Невідповідність ID групи.")
+
+    poll_service = PollService(db_session)
+    try:
+        new_poll = await poll_service.create_poll(
+            poll_create_data=poll_in,
+            creator_id=current_admin.id
+        )
+        return new_poll
+    except HTTPException as e:
+        raise e
+    except Exception as e_gen:
+        logger.error(f"Помилка створення опитування в групі {group_id}: {e_gen}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Помилка сервера.")
 
 @router.get(
-    "/{group_id}/polls",
-    # response_model=List[PollSchema],
+    "",
+    response_model=List[PollSchema], # Може бути PollWithResultsSchema, якщо показувати результати адміну
     tags=["Groups", "Group Polls"],
-    summary="Отримати список опитувань в групі (заглушка)"
-    # dependencies=[Depends(group_member_or_admin_permission)] # Учасники та адміни можуть бачити
+    summary="Отримати список опитувань в групі"
 )
-async def list_group_polls(
-    group_id: int
+async def list_group_polls_endpoint(
+    group_id: int = Path(..., description="ID групи"),
+    access_check: dict = Depends(group_member_permission), # Учасники бачать список
+    db_session: DBSession = Depends(),
+    is_open: Optional[bool] = Query(None, description="Фільтр за статусом відкритості опитування")
 ):
-    logger.info(f"Запит списку опитувань для групи ID {group_id} (заглушка).")
-    # TODO: Реалізувати логіку отримання списку опитувань
-    return [
-        {"poll_id": "poll_xyz", "question": "Перше питання?", "is_open": True},
-        {"poll_id": "poll_abc", "question": "Друге питання?", "is_open": False, "results": "..."}
-    ]
+    current_user: UserModel = access_check["current_user"]
+    logger.info(f"Користувач {current_user.email} запитує список опитувань для групи {group_id}.")
+    poll_service = PollService(db_session)
+    polls = await poll_service.get_polls_for_group(group_id=group_id, is_open_filter=is_open)
+    return polls
 
 @router.get(
-    "/{group_id}/polls/{poll_id}",
-    # response_model=PollSchema, # Можливо, з результатами
+    "/{poll_id}",
+    response_model=PollWithResultsSchema, # Показуємо результати, якщо опитування закрите або користувач - адмін
     tags=["Groups", "Group Polls"],
-    summary="Отримати деталі та результати опитування (заглушка)"
+    summary="Отримати деталі та результати опитування"
 )
-async def get_group_poll_details(
-    group_id: int,
-    poll_id: str # Або int
+async def get_group_poll_details_endpoint(
+    poll_context: dict = Depends(check_poll_permissions) # Залежність повертає опитування
 ):
-    logger.info(f"Запит деталей опитування ID {poll_id} в групі {group_id} (заглушка).")
-    # TODO: Реалізувати логіку
-    return {"poll_id": poll_id, "question": "Деталі питання?", "options": [], "results": {}}
+    poll: PollModel = poll_context["poll"]
+    current_user: UserModel = poll_context["current_user"]
+    # is_admin = await PollService(DBSessionManager.get_session()).is_user_group_admin(user_id=current_user.id, group_id=poll.group_id)
+    # TODO: Логіка відображення результатів (PollService має повернути PollWithResultsSchema)
+    # Наприклад, якщо опитування закрите, або користувач адмін - показувати результати.
+    # Інакше - лише питання та опції.
+    logger.info(f"Користувач {current_user.email} запитує деталі опитування ID {poll.id}.")
+    # Потрібно, щоб сервіс повернув дані у форматі PollWithResultsSchema
+    # або тут конвертувати PollModel в PollWithResultsSchema
+    return poll # Припускаємо, що сервіс повертає вже збагачену модель або Pydantic валідує
 
 
 @router.post(
-    "/{group_id}/polls/{poll_id}/vote",
-    # response_model=VoteConfirmationSchema,
+    "/{poll_id}/vote",
+    response_model=PollSchema, # Повертаємо оновлене опитування (можливо, без результатів для користувача)
     tags=["Groups", "Group Polls"],
-    summary="Проголосувати в опитуванні (заглушка)"
-    # dependencies=[Depends(group_member_permission)] # Лише учасники групи
+    summary="Проголосувати в опитуванні"
 )
-async def vote_in_group_poll(
-    group_id: int,
-    poll_id: str, # Або int
-    # vote_data: PollVoteSchema # Наприклад, { "option_id": "opt_1" }
+async def vote_in_group_poll_endpoint(
+    vote_in: PollVoteSchema, # Містить poll_option_id
+    poll_context: dict = Depends(check_poll_permissions),
+    db_session: DBSession = Depends()
 ):
-    logger.info(f"Користувач (ID TODO) голосує в опитуванні {poll_id} групи {group_id} (заглушка).")
-    # TODO: Реалізувати логіку голосування. Перевірити, чи опитування відкрите, чи користувач ще не голосував (якщо одне голосування).
-    return {"message": "Ваш голос зараховано!", "poll_id": poll_id}
+    poll: PollModel = poll_context["poll"]
+    current_user: UserModel = poll_context["current_user"]
+
+    if poll.id != vote_in.poll_id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Невідповідність ID опитування.")
+
+    logger.info(f"Користувач {current_user.email} голосує в опитуванні ID {poll.id} за опцію {vote_in.poll_option_id}.")
+    poll_service = PollService(db_session)
+    try:
+        updated_poll = await poll_service.submit_vote(
+            poll_id=poll.id,
+            user_id=current_user.id,
+            poll_option_id=vote_in.poll_option_id
+        )
+        return updated_poll # Або тільки статус успіху
+    except HTTPException as e:
+        raise e
+    except ValueError as ve: # Напр., опитування закрите, вже голосував, невірна опція
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
 
 @router.put(
-    "/{group_id}/polls/{poll_id}/close", # Або загальний PUT для оновлення стану
-    # response_model=PollSchema,
+    "/{poll_id}",
+    response_model=PollSchema,
     tags=["Groups", "Group Polls"],
-    summary="Закрити опитування (заглушка)"
-    # dependencies=[Depends(group_admin_permission)]
+    summary="Оновити опитування (напр., закрити) (адміністратор групи)"
 )
-async def close_group_poll(
-    group_id: int,
-    poll_id: str # Або int
+async def update_group_poll_endpoint( # Перейменовано з close_group_poll
+    poll_update_data: PollUpdateSchema, # Може містити is_open, question, options
+    poll_context: dict = Depends(check_poll_permissions), # Використовуємо загальну перевірку
+    db_session: DBSession = Depends()
 ):
-    logger.info(f"Адмін групи {group_id} закриває опитування {poll_id} (заглушка).")
-    # TODO: Реалізувати логіку закриття опитування
-    return {"poll_id": poll_id, "message": "Опитування закрито"}
+    poll: PollModel = poll_context["poll"]
+    current_user: UserModel = poll_context["current_user"]
+
+    # Додаткова перевірка, що це адмін, якщо оновлення дозволено тільки адміну
+    is_admin = await PollService(db_session).is_user_group_admin(user_id=current_user.id, group_id=poll.group_id)
+    if not is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Лише адміністратор групи може оновлювати опитування.")
+
+    logger.info(f"Адміністратор {current_user.email} оновлює опитування ID {poll.id}.")
+    poll_service = PollService(db_session)
+    try:
+        updated_poll = await poll_service.update_poll(
+            poll_id=poll.id,
+            poll_update_data=poll_update_data,
+            actor_id=current_user.id
+        )
+        return updated_poll
+    except HTTPException as e:
+        raise e
+    except ValueError as ve:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
 
 
 @router.delete(
-    "/{group_id}/polls/{poll_id}",
+    "/{poll_id}",
     status_code=status.HTTP_204_NO_CONTENT,
     tags=["Groups", "Group Polls"],
-    summary="Видалити опитування (заглушка)"
-    # dependencies=[Depends(group_admin_permission)]
+    summary="Видалити опитування (адміністратор групи)"
 )
-async def delete_group_poll(
-    group_id: int,
-    poll_id: str # Або int
+async def delete_group_poll_endpoint(
+    poll_context: dict = Depends(check_poll_permissions),
+    db_session: DBSession = Depends()
 ):
-    logger.info(f"Адмін групи {group_id} видаляє опитування {poll_id} (заглушка).")
-    # TODO: Реалізувати логіку видалення опитування
-    return
+    poll: PollModel = poll_context["poll"]
+    current_user: UserModel = poll_context["current_user"]
+
+    is_admin = await PollService(db_session).is_user_group_admin(user_id=current_user.id, group_id=poll.group_id)
+    if not is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Лише адміністратор групи може видаляти опитування.")
+
+    logger.info(f"Адміністратор {current_user.email} видаляє опитування ID {poll.id}.")
+    poll_service = PollService(db_session)
+    success = await poll_service.delete_poll(poll_id=poll.id, actor_id=current_user.id)
+    if not success:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Опитування не знайдено або не вдалося видалити.")
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 # Роутер буде підключений в backend/app/src/api/v1/groups/__init__.py
+# з префіксом /{group_id}/polls

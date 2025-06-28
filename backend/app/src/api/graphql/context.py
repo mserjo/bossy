@@ -111,7 +111,82 @@ from fastapi import Request
 #     return {"request": request} # Заглушка
 
 
-# Важливо: вибір реалізації залежить від обраної GraphQL бібліотеки (Strawberry, Ariadne тощо).
-# Наведений вище код є прикладом і потребує адаптації.
+import strawberry
+from strawberry.fastapi import BaseContext
+from sqlalchemy.ext.asyncio import AsyncSession
+from fastapi import Request, Response, Depends, HTTPException
 
-pass # Щоб уникнути помилки порожнього файлу.
+from backend.app.src.models.auth.user import UserModel
+from backend.app.src.api.dependencies import get_async_session, get_current_active_user # Використовуємо існуючі
+
+# DataLoader'и поки що не додаємо для простоти
+# from backend.app.src.api.graphql.dataloaders import create_dataloaders, AppDataLoaders
+
+
+@strawberry.type
+class GraphQLContext(BaseContext):
+    db_session: AsyncSession
+    current_user: Optional[UserModel]
+    # dataloaders: AppDataLoaders # Якщо DataLoader'и будуть використовуватися
+
+    def __init__(
+        self,
+        db_session: AsyncSession,
+        current_user: Optional[UserModel],
+        # dataloaders: AppDataLoaders,
+        request: Request,
+        response: Response,
+    ):
+        super().__init__(request=request, response=response) # Передаємо request та response до BaseContext
+        self.db_session = db_session
+        self.current_user = current_user
+        # self.dataloaders = dataloaders
+
+
+async def get_graphql_context(
+    request: Request,
+    response: Response,
+    db_session: AsyncSession = Depends(get_async_session),
+    # Використовуємо try-except для get_current_active_user, щоб отримати None, якщо не автентифіковано
+    # Це спрощення; краще мати окрему залежність get_current_user_or_none
+) -> GraphQLContext:
+    """
+    Асинхронна функція для створення та повернення GraphQL контексту.
+    """
+    current_user: Optional[UserModel] = None
+    try:
+        auth_header = request.headers.get("Authorization")
+        token = None
+        if auth_header and auth_header.startswith("Bearer "):
+            token = auth_header.split(" ")[1]
+
+        if token:
+            from backend.app.src.services.auth.token_service import TokenService # Імпорт тут, щоб уникнути циклів
+            from backend.app.src.services.auth.user_service import UserService
+
+            token_service = TokenService(db_session)
+            payload = await token_service.decode_access_token(token_str=token) # Може кинути HTTPException
+
+            if payload and payload.get("user_id"):
+                user_id = payload.get("user_id")
+                user_service = UserService(db_session)
+                # Використовуємо get_active_user_by_id_for_auth, який вже перевіряє активність
+                current_user = await user_service.get_active_user_by_id_for_auth(user_id=user_id)
+    except HTTPException as e: # Перехоплюємо помилки від decode_access_token або get_active_user_by_id_for_auth
+        if e.status_code == 401 or e.status_code == 403 or e.status_code == 404:
+            current_user = None # Не вдалося отримати користувача, залишаємо None
+        else:
+            raise # Інші HTTP винятки (наприклад, 500)
+    except Exception: # Інші непередбачені помилки
+        current_user = None
+
+
+    # dataloaders = create_dataloaders(db_session=db_session) # Якщо будуть використовуватися
+
+    return GraphQLContext(
+        db_session=db_session,
+        current_user=current_user, # Буде None, якщо не реалізовано отримання
+        # dataloaders=dataloaders,
+        request=request,
+        response=response
+    )

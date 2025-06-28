@@ -5,9 +5,9 @@
 Користувач є центральною сутністю для автентифікації, авторизації та взаємодії з системою.
 Модель включає поля для ідентифікації, автентифікаційних даних, особистої інформації та зв'язків з іншими сутностями.
 """
-from typing import List
+from typing import List, TYPE_CHECKING
 
-from sqlalchemy import Column, String, Text, DateTime, Boolean, LargeBinary, ForeignKey, Integer, Index  # type: ignore
+from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Integer, Index  # type: ignore  # Removed LargeBinary as it's not used
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
 from sqlalchemy.orm import relationship, Mapped  # type: ignore
 import uuid # Для роботи з UUID
@@ -20,6 +20,33 @@ from backend.app.src.models.base import BaseMainModel # Успадковуємо
 
 # TODO: Імпортувати Enum UserTypeEnum, коли він буде створений (в `backend/app/src/core/dicts.py` або схожому місці)
 # from backend.app.src.core.dicts import UserTypeEnum (приклад)
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.token import RefreshTokenModel
+    from backend.app.src.models.auth.session import SessionModel
+    from backend.app.src.models.files.avatar import AvatarModel
+    from backend.app.src.models.groups.membership import GroupMembershipModel
+    from backend.app.src.models.bonuses.account import AccountModel
+    from backend.app.src.models.notifications.notification import NotificationModel
+    from backend.app.src.models.tasks.task import TaskModel
+    from backend.app.src.models.tasks.assignment import TaskAssignmentModel
+    from backend.app.src.models.tasks.completion import TaskCompletionModel
+    from backend.app.src.models.tasks.proposal import TaskProposalModel
+    from backend.app.src.models.tasks.review import TaskReviewModel
+    from backend.app.src.models.groups.poll_vote import PollVoteModel
+    from backend.app.src.models.system.monitoring import SystemEventLogModel # Припускаючи, що це модель для логів
+    from backend.app.src.models.groups.template import GroupTemplateModel
+    from backend.app.src.models.groups.poll import PollModel
+    from backend.app.src.models.teams.team import TeamModel
+    from backend.app.src.models.teams.membership import TeamMembershipModel
+    from backend.app.src.models.bonuses.bonus import BonusAdjustmentModel # Припускаючи, що це модель для BonusAdjustment
+    from backend.app.src.models.reports.report import ReportModel
+    from backend.app.src.models.gamification.user_level import UserLevelModel
+    from backend.app.src.models.gamification.achievement import AchievementModel
+    from backend.app.src.models.gamification.rating import RatingModel
+    from backend.app.src.models.files.file import FileModel
+    # from backend.app.src.models.dictionaries.status import StatusModel # StatusModel вже має бути доступний через BaseMainModel
+
 
 class UserModel(BaseMainModel):
     """
@@ -68,19 +95,12 @@ class UserModel(BaseMainModel):
         notes (str | None): Додаткові нотатки (успадковано).
 
     Зв'язки:
-        # TODO: Додати зв'язки, коли відповідні моделі будуть створені:
-        # tokens (relationship): Зв'язок з RefreshTokenModel.
-        # sessions (relationship): Зв'язок з SessionModel.
-        # avatar (relationship): Зв'язок з AvatarModel (один-до-одного).
-        # memberships (relationship): Зв'язок з GroupMembershipModel (один-до-багатьох).
-        # created_tasks (relationship): Завдання, створені цим користувачем (якщо є така логіка).
-        # assigned_tasks (relationship): Завдання, призначені цьому користувачеві (через TaskAssignmentModel).
-        # task_completions (relationship): Виконання завдань цим користувачем (через TaskCompletionModel).
-        # accounts (relationship): Рахунки користувача в різних групах (через AccountModel).
-        # achievements (relationship): Досягнення користувача (через AchievementModel).
-        # notifications (relationship): Сповіщення для цього користувача (через NotificationModel).
-        # created_system_settings (relationship): Якщо created_by/updated_by в BaseModel розкоментовані.
-        # ... та інші
+        Більшість необхідних зв'язків вже визначено нижче.
+        Потрібно переконатися в коректності `back_populates` при роботі з відповідними моделями.
+        # TODO: Розглянути необхідність зв'язку для `created_system_settings`, якщо `created_by_user_id`
+        #       в `BaseModel` буде активно використовуватися для відстеження змін системних налаштувань.
+        # TODO: (Функціонал майбутнього) Реалізувати налаштування приватності профілю та активності.
+        #       Це може потребувати окремої моделі `UserPrivacySettingsModel` або додаткових полів тут.
     """
     __tablename__ = "users"
 

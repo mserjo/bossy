@@ -6,16 +6,24 @@
 включаючи специфічні методи пошуку користувачів.
 """
 
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TYPE_CHECKING
 import uuid
 from sqlalchemy import select, update # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession # type: ignore
 from sqlalchemy.orm import selectinload # type: ignore
 
 from backend.app.src.models.auth.user import UserModel
-from backend.app.src.schemas.auth.user import UserCreateSchema, UserUpdateSchema, UserAdminUpdateSchema # Використовуємо різні схеми для оновлення
+from backend.app.src.schemas.auth.user import UserCreateSchema, UserAdminUpdateSchema # UserUpdateSchema не використовується в типі репозиторію
 from backend.app.src.repositories.base import BaseRepository
 from backend.app.src.core.constants import USER_TYPE_SUPERADMIN # Для перевірки is_superuser
+
+if TYPE_CHECKING:
+    from backend.app.src.models.groups.membership import GroupMembershipModel
+    from backend.app.src.models.dictionaries.user_role import UserRoleModel
+    from backend.app.src.models.groups.group import GroupModel
+    from backend.app.src.models.dictionaries.status import StatusModel
+    # from backend.app.src.models.files.avatar import AvatarModel # Якщо будемо завантажувати аватар
+
 
 class UserRepository(BaseRepository[UserModel, UserCreateSchema, UserAdminUpdateSchema]): # UpdateSchema тут - UserAdminUpdateSchema для повноти
     """
@@ -102,14 +110,35 @@ class UserRepository(BaseRepository[UserModel, UserCreateSchema, UserAdminUpdate
     #       якщо це часто потрібно (наприклад, для формування JWT з розширеними claims).
     #       Це може вимагати складних JOIN'ів або кількох запитів.
     #       Приклад:
-    # async def get_user_with_details(self, db: AsyncSession, id: uuid.UUID) -> Optional[UserModel]:
-    #     statement = select(self.model).where(self.model.id == id).options(
-    #         selectinload(self.model.group_memberships).selectinload(GroupMembershipModel.role),
-    #         selectinload(self.model.group_memberships).selectinload(GroupMembershipModel.group),
-    #         selectinload(self.model.state) # Якщо є зв'язок state
-    #     )
-    #     result = await db.execute(statement)
-    #     return result.scalar_one_or_none()
+    async def get_user_with_details(self, db: AsyncSession, user_id: uuid.UUID) -> Optional[UserModel]:
+        """
+        Отримує користувача за ID з усіма важливими пов'язаними даними для автентифікації/авторизації.
+        Включає: state, group_memberships (з group та role в membership).
+        """
+        # Потрібно імпортувати GroupMembershipModel, якщо використовується всередині options
+        # from backend.app.src.models.groups.membership import GroupMembershipModel
+        # from backend.app.src.models.dictionaries.user_role import UserRoleModel
+        # from backend.app.src.models.groups.group import GroupModel
+
+        statement = (
+            select(self.model)
+            .where(self.model.id == user_id)
+            .options(
+                selectinload(self.model.state), # Завантажуємо об'єкт статусу користувача
+                selectinload(self.model.group_memberships).selectinload(
+                    UserModel.group_memberships.property.mapper.class_.group # Завантажуємо групу для кожного членства
+                ),
+                selectinload(self.model.group_memberships).selectinload(
+                    UserModel.group_memberships.property.mapper.class_.role # Завантажуємо роль для кожного членства
+                ),
+                # TODO: Додати selectinload для UserTypeModel, якщо user_type_code буде замінено на user_type_id
+                # selectinload(self.model.user_type),
+                # TODO: Додати selectinload для поточного аватара, якщо це потрібно тут
+                # selectinload(self.model.avatars.and_where(AvatarModel.is_current == True)) # Потребує AvatarModel
+            )
+        )
+        result = await db.execute(statement)
+        return result.scalar_one_or_none()
 
     # TODO: Розглянути, чи потрібен метод `authenticate` тут, чи це логіка сервісу.
     #       Зазвичай, репозиторій лише отримує дані, а сервіс перевіряє пароль.

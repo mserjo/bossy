@@ -11,14 +11,15 @@
 """
 
 # sqlalchemy.ext.asyncio.AsyncSession не потрібен тут напряму
+from fastapi import APIRouter, Depends, HTTPException, status # Додано APIRouter, HTTPException, status
 
-from backend.app.src.config.logging import get_logger
-from backend.app.src.schemas.auth.user import UserPublicSchema, UserProfileUpdateSchema, PasswordChangeSchema # Реальні схеми
+from backend.app.src.config.logging import logger # Змінено імпорт get_logger на logger
+from backend.app.src.schemas.auth.user import UserPublicSchema, UserUpdateSchema, UserPasswordUpdateSchema # Виправлено імена схем
 from backend.app.src.services.auth.user_service import UserService # Реальний сервіс
 from backend.app.src.api.dependencies import DBSession, CurrentActiveUser # Реальні залежності
 from backend.app.src.models.auth.user import UserModel # Для type hint
 
-logger = get_logger(__name__)
+# logger = get_logger(__name__) # logger тепер імпортується напряму
 router = APIRouter()
 
 

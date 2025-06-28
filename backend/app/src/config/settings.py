@@ -261,30 +261,17 @@ if settings.app.ENVIRONMENT == EnvironmentEnum.PRODUCTION and settings.app.DEBUG
     # Можна кинути виняток або автоматично вимкнути DEBUG.
     # settings.app.DEBUG = False # Не спрацює, бо settings вже створено.
 
-# TODO: Перевірити шляхи .env. Pydantic-settings шукає .env у поточному каталозі запуску
-# та у батьківських. Якщо запускати з `bossy/backend/`, то `.env` у `backend/` буде знайдено.
-# Якщо з `bossy/`, то `.env` у `bossy/` буде знайдено.
-# Можна створити `.env.example` для кожного рівня.
-# Поточна конфігурація `env_file=".env"` в кожному підкласі та в головному `Settings`
-# означає, що кожен намагається завантажити свій `.env` (або той самий).
-# Це нормально, Pydantic об'єднає значення.
-# `env_nested_delimiter='__'` в `Settings.model_config` дозволяє задавати вкладені змінні
-# середовища, наприклад `AUTH__SECRET_KEY=mysecret`.
-#
-# Додано `BASE_DIR` в `AppSettings`.
-# Створено `AuthSettings` та перенесено відповідні поля.
-# `init_optional_settings` тепер більш явно обробляє випадки, коли опціональні сервіси не налаштовані.
-# Шлях до лог-файлу в `LoggingSettings` тепер може бути відносним до `BASE_DIR`.
-# Все виглядає значно краще.
-#
-# TODO: Переконатися, що `BASE_DIR` правильно визначається.
-# `Path(__file__).resolve()` дасть шлях до поточного файлу (`settings.py`).
-# `.parent.parent.parent` підніметься на три рівні:
-# 1. `config/` -> `src/`
-# 2. `src/` -> `app/`
-# 3. `app/` -> `backend/`
-# Отже, `BASE_DIR` буде вказувати на каталог `backend/`. Це правильно.
-#
-# Важливо: `SUPERUSER_PASSWORD` в `AuthSettings` позначено як `...` (обов'язкове без дефолту),
-# що означає, воно *повинно* бути надане через змінну середовища `AUTH_SUPERUSER_PASSWORD`.
-# Це добре для безпеки.
+# Примітки щодо конфігурації:
+# - Pydantic-settings шукає .env у поточному каталозі запуску та у батьківських.
+#   Поточна конфігурація `env_file=".env"` в кожному підкласі та в головному `Settings`
+#   означає, що кожен намагається завантажити свій `.env` (або той самий), і Pydantic об'єднає значення.
+# - `env_nested_delimiter='__'` в `Settings.model_config` дозволяє задавати вкладені змінні
+#   середовища, наприклад `AUTH__SECRET_KEY=mysecret`.
+# - `BASE_DIR` в `AppSettings` визначається як каталог `backend/` (шлях: `settings.py` -> `config/` -> `src/` -> `app/` -> `backend/`).
+#   Це коректно для визначення шляхів відносно кореня backend-додатку.
+# - `SUPERUSER_PASSWORD` в `AuthSettings` позначено як `...` (обов'язкове без дефолту),
+#   що означає, воно *повинно* бути надане через змінну середовища `AUTH_SUPERUSER_PASSWORD`.
+#   Це важливо для безпеки.
+# - `init_optional_settings` тепер більш явно обробляє випадки, коли опціональні сервіси не налаштовані,
+#   базуючись на прапорцях `USE_...` з `AppSettings`.
+# - Шлях до лог-файлу в `LoggingSettings` може бути відносним до `BASE_DIR`.

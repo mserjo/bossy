@@ -13,18 +13,24 @@ from backend.app.src.config.settings import settings
 from backend.app.src.config.logging import logger
 from backend.app.src.core.constants import (
     ROLE_SUPERADMIN_CODE, ROLE_ADMIN_CODE, ROLE_USER_CODE,
-    USER_TYPE_SUPERADMIN, USER_TYPE_BOT, # Додано USER_TYPE_BOT
-    SYSTEM_USER_ODIN_USERNAME, SYSTEM_USER_SHADOW_USERNAME, # Додано SHADOW
+    USER_TYPE_SUPERADMIN, USER_TYPE_BOT,
+    SYSTEM_USER_ODIN_USERNAME, SYSTEM_USER_SHADOW_USERNAME,
+    # Загальні статуси
     STATUS_CREATED_CODE, STATUS_ACTIVE_CODE, STATUS_INACTIVE_CODE, STATUS_PENDING_CODE,
     STATUS_COMPLETED_CODE, STATUS_REJECTED_CODE, STATUS_CANCELLED_CODE, STATUS_BLOCKED_CODE,
+    # Статуси завдань (деякі можуть збігатися з загальними, але для ясності можна використовувати специфічні префікси)
     TASK_STATUS_NEW_CODE, TASK_STATUS_IN_PROGRESS_CODE, TASK_STATUS_PENDING_REVIEW_CODE,
-    TASK_STATUS_COMPLETED_CODE as TASK_STATUS_COMPLETED_SPECIFIC_CODE,
-    TASK_STATUS_REJECTED_CODE as TASK_STATUS_REJECTED_SPECIFIC_CODE,
-    TASK_STATUS_CANCELLED_CODE as TASK_STATUS_CANCELLED_SPECIFIC_CODE,
-    TASK_STATUS_BLOCKED_CODE as TASK_STATUS_BLOCKED_SPECIFIC_CODE,
+    # Використовуємо загальний STATUS_COMPLETED_CODE для виконаних завдань, або специфічний, якщо є відмінності
+    # TASK_STATUS_COMPLETED_CODE, # Вже є як STATUS_COMPLETED_CODE
+    # TASK_STATUS_REJECTED_CODE,  # Вже є як STATUS_REJECTED_CODE
+    # TASK_STATUS_CANCELLED_CODE, # Вже є як STATUS_CANCELLED_CODE
+    # TASK_STATUS_BLOCKED_CODE,   # Вже є як STATUS_BLOCKED_CODE
+    # Статуси запрошень
     INVITATION_STATUS_PENDING_CODE, INVITATION_STATUS_ACCEPTED_CODE, INVITATION_STATUS_REJECTED_CODE,
     INVITATION_STATUS_EXPIRED_CODE, INVITATION_STATUS_CANCELLED_CODE,
+    # Типи груп
     GROUP_TYPE_FAMILY_CODE, GROUP_TYPE_DEPARTMENT_CODE, GROUP_TYPE_ORGANIZATION_CODE, GROUP_TYPE_GENERIC_CODE,
+    # Типи завдань
     TASK_TYPE_TASK_CODE, TASK_TYPE_EVENT_CODE, TASK_TYPE_PENALTY_CODE,
     TASK_TYPE_SUBTASK_CODE, TASK_TYPE_COMPLEX_TASK_CODE, TASK_TYPE_TEAM_TASK_CODE, # Додано типи завдань
     BONUS_TYPE_POINTS_CODE, BONUS_TYPE_STARS_CODE,
@@ -91,18 +97,29 @@ class InitializationService:
         }
 
         statuses_to_init = [
-            (STATUS_CREATED_CODE, "Створено"), (STATUS_ACTIVE_CODE, "Активний"), (STATUS_INACTIVE_CODE, "Неактивний"),
-            (STATUS_PENDING_CODE, "В очікуванні"), (STATUS_COMPLETED_CODE, "Завершено/Підтверджено"),
-            (STATUS_REJECTED_CODE, "Відхилено"), (STATUS_CANCELLED_CODE, "Скасовано"), (STATUS_BLOCKED_CODE, "Заблоковано"),
-            (TASK_STATUS_NEW_CODE, "Нове (завдання)"), (TASK_STATUS_IN_PROGRESS_CODE, "В роботі (завдання)"),
+            (STATUS_CREATED_CODE, "Створено"),
+            (STATUS_ACTIVE_CODE, "Активний"),
+            (STATUS_INACTIVE_CODE, "Неактивний"),
+            (STATUS_PENDING_CODE, "В очікуванні"),
+            (STATUS_COMPLETED_CODE, "Завершено/Підтверджено"), # Може використовуватися для завдань, пропозицій тощо.
+            (STATUS_REJECTED_CODE, "Відхилено"),    # Може використовуватися для завдань, пропозицій тощо.
+            (STATUS_CANCELLED_CODE, "Скасовано"),   # Може використовуватися для завдань, запрошень тощо.
+            (STATUS_BLOCKED_CODE, "Заблоковано"),   # Може використовуватися для завдань, користувачів тощо.
+            # Специфічні статуси для завдань (якщо вони відрізняються від загальних або для більшої ясності)
+            (TASK_STATUS_NEW_CODE, "Нове (завдання)"),
+            (TASK_STATUS_IN_PROGRESS_CODE, "В роботі (завдання)"),
             (TASK_STATUS_PENDING_REVIEW_CODE, "На перевірці (завдання)"),
-            (TASK_STATUS_COMPLETED_SPECIFIC_CODE, "Виконано (завдання)"),
-            (TASK_STATUS_REJECTED_SPECIFIC_CODE, "Відхилено (завдання)"),
-            (TASK_STATUS_CANCELLED_SPECIFIC_CODE, "Скасовано (завдання)"),
-            (TASK_STATUS_BLOCKED_SPECIFIC_CODE, "Заблоковано (завдання)"),
-            (INVITATION_STATUS_PENDING_CODE, "Надіслано (запрошення)"), (INVITATION_STATUS_ACCEPTED_CODE, "Прийнято (запрошення)"),
-            (INVITATION_STATUS_REJECTED_CODE, "Відхилено (запрошення)"), (INVITATION_STATUS_EXPIRED_CODE, "Прострочено (запрошення)"),
+            # Для виконаних, відхилених, скасованих, заблокованих завдань можна використовувати загальні статуси
+            # STATUS_COMPLETED_CODE, STATUS_REJECTED_CODE, STATUS_CANCELLED_CODE, STATUS_BLOCKED_CODE
+            # або створити нові, якщо потрібна гранулярність (наприклад, TASK_STATUS_VERIFIED_BY_ADMIN)
+
+            # Статуси запрошень
+            (INVITATION_STATUS_PENDING_CODE, "Надіслано (запрошення)"),
+            (INVITATION_STATUS_ACCEPTED_CODE, "Прийнято (запрошення)"),
+            (INVITATION_STATUS_REJECTED_CODE, "Відхилено (запрошення)"),
+            (INVITATION_STATUS_EXPIRED_CODE, "Прострочено (запрошення)"),
             (INVITATION_STATUS_CANCELLED_CODE, "Скасовано (запрошення)"),
+            # Статуси звітів
             (REPORT_STATUS_QUEUED, "В черзі (звіт)"), (REPORT_STATUS_PROCESSING, "Генерується (звіт)"),
             (REPORT_STATUS_COMPLETED, "Готовий (звіт)"), (REPORT_STATUS_FAILED, "Помилка (звіт)"),
             (TASK_PROPOSAL_STATUS_PENDING_CODE, "На розгляді (пропозиція)"),
@@ -206,7 +223,10 @@ class InitializationService:
                 name=SYSTEM_USER_SHADOW_USERNAME,
                 first_name="System", last_name="Bot",
                 user_type_code=USER_TYPE_BOT,
-                role_code=ROLE_USER_CODE, # Або спеціальна роль "bot_role"
+                role_code=ROLE_USER_CODE, # TODO: Розглянути створення спеціальної ролі "bot" або "system"
+                                          # для більшого контролю над правами системного бота,
+                                          # якщо ROLE_USER_CODE надає занадто багато або занадто мало прав
+                                          # для виконання системних завдань.
                 is_active=True, is_email_verified=True # Боти активні та верифіковані за замовчуванням
             )
             await self.user_service.create_user(obj_in=shadow_in)

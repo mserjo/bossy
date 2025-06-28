@@ -5,11 +5,12 @@
 Користувач є центральною сутністю для автентифікації, авторизації та взаємодії з системою.
 Модель включає поля для ідентифікації, автентифікаційних даних, особистої інформації та зв'язків з іншими сутностями.
 """
-from typing import List, TYPE_CHECKING
+from datetime import datetime # Додано імпорт datetime
+from typing import List, TYPE_CHECKING, Optional
 
-from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Integer, Index  # type: ignore  # Removed LargeBinary as it's not used
+from sqlalchemy import String, Text, DateTime, Boolean, ForeignKey, Integer, Index  # type: ignore  # Removed LargeBinary as it's not used, Column
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship, Mapped  # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore # Додано mapped_column
 import uuid # Для роботи з UUID
 
 from backend.app.src.models.base import BaseMainModel # Успадковуємо від BaseMainModel для отримання name, description, state_id тощо.
@@ -105,36 +106,36 @@ class UserModel(BaseMainModel):
     """
     __tablename__ = "users"
 
-    email: Column[str] = Column(String(255), unique=True, index=True, nullable=False)
-    phone_number: Column[str | None] = Column(String(30), unique=True, index=True, nullable=True) # Може бути унікальним
-    hashed_password: Column[str] = Column(String(255), nullable=False) # Зберігає результат хешування
+    email: Mapped[str] = mapped_column(String(255), unique=True, index=True, nullable=False)
+    phone_number: Mapped[Optional[str]] = mapped_column(String(30), unique=True, index=True, nullable=True) # Може бути унікальним
+    hashed_password: Mapped[str] = mapped_column(String(255), nullable=False) # Зберігає результат хешування
 
-    first_name: Column[str | None] = Column(String(100), nullable=True)
-    last_name: Column[str | None] = Column(String(100), nullable=True)
-    patronymic: Column[str | None] = Column(String(100), nullable=True) # По батькові
+    first_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    last_name: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    patronymic: Mapped[Optional[str]] = mapped_column(String(100), nullable=True) # По батькові
 
-    birth_date: Column[DateTime | None] = Column(DateTime, nullable=True)
+    birth_date: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
 
     # Тип користувача: 'superadmin', 'admin' (загальний адмін, якщо є), 'user', 'bot'.
     # 'group_admin' - це роль в контексті групи, а не тип користувача.
     # TODO: Узгодити з довідником UserRoleModel та можливим Enum UserType.
     # Тип користувача визначається через ForeignKey до таблиці user_types.
-    user_type_id: Mapped[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("user_types.id", name="fk_users_user_type_id"), nullable=True, index=True) # Зроблено nullable=True, щоб можна було створити юзера, а потім тип
+    user_type_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("user_types.id", name="fk_users_user_type_id"), nullable=True, index=True) # Зроблено nullable=True, щоб можна було створити юзера, а потім тип
 
-    is_email_verified: Column[bool] = Column(Boolean, default=False, nullable=False)
-    is_phone_verified: Column[bool] = Column(Boolean, default=False, nullable=False)
+    is_email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    is_phone_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
-    last_login_at: Column[DateTime | None] = Column(DateTime(timezone=True), nullable=True)
-    failed_login_attempts: Column[int] = Column(Integer, default=0, nullable=False)
-    locked_until: Column[DateTime | None] = Column(DateTime(timezone=True), nullable=True) # Час, до якого акаунт заблокований
+    last_login_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    failed_login_attempts: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    locked_until: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True) # Час, до якого акаунт заблокований
 
     # --- Поля для 2FA ---
-    is_2fa_enabled: Column[bool] = Column(Boolean, default=False, nullable=False)
+    is_2fa_enabled: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     # Секрет для TOTP, зазвичай шифрується перед збереженням або зберігається в захищеному сховищі.
     # Тут для простоти - рядок, але в реальній системі потребує уваги до безпеки.
-    otp_secret_encrypted: Column[str | None] = Column(String(255), nullable=True) # Зашифрований OTP секрет
+    otp_secret_encrypted: Mapped[Optional[str]] = mapped_column(String(255), nullable=True) # Зашифрований OTP секрет
     # Резервні коди, зазвичай надаються користувачу один раз. Зберігати їх хеші.
-    otp_backup_codes_hashed: Column[Text | None] = Column(Text, nullable=True) # Список хешів резервних кодів
+    otp_backup_codes_hashed: Mapped[Optional[str]] = mapped_column(Text, nullable=True) # Список хешів резервних кодів
 
     # --- Зв'язки (Relationships) ---
     # Зв'язок з токенами оновлення
@@ -297,7 +298,7 @@ class UserModel(BaseMainModel):
     # Потрібно в StatusModel додати `users_with_this_state: Mapped[List["UserModel"]] = relationship(back_populates="state")`
 
     # Зв'язок з типом користувача
-    user_type: Mapped["UserTypeModel" | None] = relationship("UserTypeModel", back_populates="users", foreign_keys=[user_type_id])
+    user_type: Mapped[Optional["UserTypeModel"]] = relationship("UserTypeModel", back_populates="users", foreign_keys=[user_type_id])
 
     # Зв'язок з транзакціями, де цей користувач є "пов'язаним" (наприклад, для подяки)
     related_transactions: Mapped[List["TransactionModel"]] = relationship(

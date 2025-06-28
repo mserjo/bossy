@@ -192,6 +192,36 @@ async def startup_event() -> None:
     #   else: logger.warning(...)
     # else: logger.info(...)
 
+    # Ініціалізація Elasticsearch (якщо увімкнено та налаштовано)
+    if settings.app.USE_ELASTICSEARCH:
+        if settings.elasticsearch and settings.elasticsearch.ELASTICSEARCH_HOSTS:
+            # TODO: Додати реальну ініціалізацію клієнта Elasticsearch
+            # from backend.app.src.config.elasticsearch import init_elasticsearch, get_elasticsearch_client
+            # app.state.elasticsearch = await init_elasticsearch(settings.elasticsearch)
+            # es_client = await get_elasticsearch_client(app_state=app.state)
+            # if await es_client.ping(): logger.info("Elasticsearch ping успішний.")
+            logger.info(f"Elasticsearch (теоретично) налаштовано. Хости: {settings.elasticsearch.ELASTICSEARCH_HOSTS}") # Заглушка
+        else:
+            # app.state.elasticsearch = None
+            logger.warning("Elasticsearch увімкнено (settings.app.USE_ELASTICSEARCH=True), але налаштування Elasticsearch (settings.elasticsearch) або ELASTICSEARCH_HOSTS відсутні. Ініціалізація Elasticsearch пропущена.")
+    else:
+        # app.state.elasticsearch = None
+        logger.info("Використання Elasticsearch вимкнено (settings.app.USE_ELASTICSEARCH=False). Ініціалізація Elasticsearch пропущена.")
+
+    # Ініціалізація Firebase (якщо увімкнено та налаштовано)
+    if settings.app.USE_FIREBASE:
+        if settings.firebase and settings.firebase.FIREBASE_CREDENTIALS_PATH:
+            # TODO: Додати реальну ініціалізацію Firebase Admin SDK
+            # from backend.app.src.config.firebase import init_firebase_app
+            # app.state.firebase_app = init_firebase_app(settings.firebase) # Зазвичай синхронна
+            logger.info(f"Firebase (теоретично) налаштовано. Шлях до credentials: {settings.firebase.FIREBASE_CREDENTIALS_PATH}") # Заглушка
+        else:
+            # app.state.firebase_app = None
+            logger.warning("Firebase увімкнено (settings.app.USE_FIREBASE=True), але налаштування Firebase (settings.firebase) або FIREBASE_CREDENTIALS_PATH відсутні. Ініціалізація Firebase пропущена.")
+    else:
+        # app.state.firebase_app = None
+        logger.info("Використання Firebase вимкнено (settings.app.USE_FIREBASE=False). Ініціалізація Firebase пропущена.")
+
 
     # 4. Перевірка та ініціалізація початкових даних системи (довідники, системні користувачі)
     logger.info("Запуск перевірки та ініціалізації початкових даних системи...")
@@ -255,7 +285,25 @@ async def shutdown_event() -> None:
     else:
         logger.info("Використання Celery вимкнено (USE_CELERY=False). Зупинка Celery пропущена.")
 
-    # TODO: Додати аналогічні перевірки для Elasticsearch та Firebase.
+    # Зупинка/очищення Elasticsearch (якщо увімкнено та було ініціалізовано)
+    if settings.app.USE_ELASTICSEARCH:
+        # TODO: Додати реальну логіку закриття клієнта Elasticsearch
+        # if hasattr(app.state, 'elasticsearch') and app.state.elasticsearch:
+        #     await app.state.elasticsearch.close()
+        #     logger.info("Підключення до Elasticsearch закрито.")
+        logger.info("Elasticsearch (теоретично) зупинено (заглушка).") # Заглушка
+    else:
+        logger.info("Використання Elasticsearch вимкнено (settings.app.USE_ELASTICSEARCH=False). Зупинка Elasticsearch пропущена.")
+
+    # Зупинка/очищення Firebase (якщо увімкнено та було ініціалізовано)
+    if settings.app.USE_FIREBASE:
+        # TODO: Додати реальну логіку очищення Firebase (якщо потрібно, наприклад, firebase_admin.delete_app(app_instance))
+        # if hasattr(app.state, 'firebase_app') and app.state.firebase_app:
+        #     # firebase_admin.delete_app(app.state.firebase_app)
+        #     logger.info("Додаток Firebase закрито/очищено.")
+        logger.info("Firebase (теоретично) зупинено/очищено (заглушка).") # Заглушка
+    else:
+        logger.info("Використання Firebase вимкнено (settings.app.USE_FIREBASE=False). Зупинка Firebase пропущена.")
 
     logger.info(f"Додаток '{settings.app.APP_NAME}' успішно зупинено.")
 

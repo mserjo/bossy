@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Імпортуємо функцію для отримання сесії БД з core.dependencies або config.database
 # Припускаємо, що get_db_session визначено в backend.app.src.config.database, як у health.py
+from jose import jwt # Додано для обробки JWTError
 from backend.app.src.config.database import get_db_session as core_get_db_session
 from backend.app.src.config.logging import get_logger
 from backend.app.src.models.auth.user import UserModel
@@ -71,8 +72,18 @@ async def get_current_user(
             logger.warning("Не вдалося декодувати токен або токен порожній.")
             raise credentials_exception
         token_data = TokenPayloadSchema(**payload_dict)
-    except Exception as e: # TODO: конкретизувати виняток для JWT (наприклад, JWTError з python-jose)
-        logger.warning(f"Помилка валідації токена: {e}")
+    except jwt.ExpiredSignatureError:
+        logger.warning("Термін дії токена закінчився.")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Термін дії токена закінчився",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except jwt.JWTError as e: # Більш загальний виняток JWT з python-jose
+        logger.warning(f"Помилка валідації JWT токена: {e}")
+        raise credentials_exception
+    except Exception as e: # Інші можливі винятки (наприклад, при розборі payload_dict в TokenPayloadSchema)
+        logger.error(f"Неочікувана помилка під час обробки токена: {e}", exc_info=True)
         raise credentials_exception
 
     user_service = UserService(db_session)

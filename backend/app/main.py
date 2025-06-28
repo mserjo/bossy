@@ -147,17 +147,29 @@ async def startup_event() -> None:
     if settings.app.USE_REDIS:
         if settings.redis and settings.redis.REDIS_URL:
             app.state.redis = await init_redis_pool(str(settings.redis.REDIS_URL))
-            logger.info(f"Підключення до Redis ({settings.redis.REDIS_URL}) встановлено (пул створено).")
-            try:
-                redis_client_instance: "AsyncRedisClient" = await get_redis_client(request=None, app_state=app.state) # type: ignore
-                if await redis_client_instance.ping():
-                    logger.info("Redis ping успішний. З'єднання з Redis активне.")
-                else:
-                    logger.warning("Redis ping не повернув очікуваного результату, але не кинув виняток.")
-            except ConnectionRefusedError:
-                 logger.error(f"Помилка підключення до Redis: ConnectionRefusedError. Перевірте, чи запущено Redis сервер за адресою {settings.redis.REDIS_URL} та чи доступний він.")
-            except Exception as e:
-                logger.error(f"Не вдалося виконати ping до Redis або інша помилка Redis: {e}", exc_info=True)
+            # app.state.redis тепер містить клієнта або None
+            if app.state.redis:
+                logger.info(f"Клієнт Redis ({settings.redis.REDIS_URL}) ініціалізовано та збережено в app.state.redis.")
+                # Пінгуємо через app.state.redis, оскільки get_redis_client очікує Request
+                # і на етапі startup об'єкта Request ще немає.
+                try:
+                    # Переконуємося, що app.state.redis це не None перед викликом ping
+                    if await app.state.redis.ping(): # type: ignore
+                        logger.info("Redis ping успішний. З'єднання з Redis активне.")
+                    else:
+                        logger.warning("Redis ping не повернув очікуваного результату (False), але не кинув виняток.")
+                except ConnectionRefusedError: # Конкретний виняток для відмови у з'єднанні
+                    logger.error(f"Помилка підключення до Redis: ConnectionRefusedError. Перевірте, чи запущено Redis сервер за адресою {settings.redis.REDIS_URL} та чи доступний він.")
+                    app.state.redis = None # Якщо ping не вдався, вважаємо, що Redis недоступний
+                except AttributeError: # Якщо app.state.redis is None і ми намагаємося викликати .ping()
+                    logger.error(f"Спроба викликати ping на None об'єкті Redis. Можливо, init_redis_pool повернув None.")
+                    # app.state.redis вже None в цьому випадку
+                except Exception as e: # Інші можливі винятки під час пінгу
+                    logger.error(f"Не вдалося виконати ping до Redis або інша помилка Redis: {e}", exc_info=True)
+                    app.state.redis = None # Якщо ping не вдався, вважаємо, що Redis недоступний
+            else:
+                # Це означає, що init_redis_pool повернув None (помилка підключення всередині init_redis_pool)
+                logger.warning(f"init_redis_pool для {settings.redis.REDIS_URL} повернув None. Redis не буде використовуватися.")
         else:
             app.state.redis = None
             logger.warning("Redis увімкнено (settings.app.USE_REDIS=True), але налаштування Redis (settings.redis) або REDIS_URL відсутні. Підключення до Redis пропущено.")

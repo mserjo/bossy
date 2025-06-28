@@ -10,7 +10,7 @@ asyncpg # PostgreSQL driver for asyncio
 alembic # For database migrations
 
 # Pydantic - Data validation and settings management
-pydantic
+pydantic[email]
 pydantic-settings # For loading settings from .env and environment variables
 
 # Authentication - JWT, password hashing
@@ -20,6 +20,8 @@ passlib[bcrypt] # For password hashing
 # Background Tasks - Celery
 celery
 redis # Broker for Celery (can also be used for caching)
+elasticsearch
+firebase-admin
 
 # Logging
 loguru

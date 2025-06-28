@@ -223,29 +223,30 @@ class UserModel(BaseMainModel):
     # Зв'язок з системними логами, пов'язаними з цим користувачем
     system_event_logs: Mapped[List["SystemEventLogModel"]] = relationship(
         back_populates="user", # Потрібно додати "user" в SystemEventLogModel
-        foreign_keys="[SystemEventLogModel.user_id]",
-        cascade="SET NULL" # Якщо лог важливий, навіть якщо користувач видалений
+        foreign_keys="[SystemEventLogModel.user_id]"
+        # ondelete='SET NULL' має бути на ForeignKey в SystemEventLogModel.user_id
+        # cascade тут не потрібен для SET NULL
     )
 
     # Зв'язок з створеними шаблонами груп (якщо created_by_user_id в GroupTemplateModel)
     created_group_templates: Mapped[List["GroupTemplateModel"]] = relationship(
         back_populates="creator",
-        foreign_keys="[GroupTemplateModel.created_by_user_id]",
-        cascade="SET NULL"
+        foreign_keys="[GroupTemplateModel.created_by_user_id]"
+        # ondelete='SET NULL' має бути на ForeignKey в GroupTemplateModel.created_by_user_id
     )
 
     # Зв'язок з створеними опитуваннями (якщо created_by_user_id в PollModel)
     created_polls: Mapped[List["PollModel"]] = relationship(
         back_populates="creator",
-        foreign_keys="[PollModel.created_by_user_id]",
-        cascade="SET NULL" # Або CASCADE, якщо опитування не можуть існувати без автора
+        foreign_keys="[PollModel.created_by_user_id]"
+        # ondelete='SET NULL' або 'CASCADE' має бути на ForeignKey в PollModel.created_by_user_id
     )
 
     # Зв'язок з командами, де користувач є лідером
     led_teams: Mapped[List["TeamModel"]] = relationship(
         back_populates="leader",
-        foreign_keys="[TeamModel.leader_user_id]",
-        cascade="SET NULL" # Якщо команда може існувати без лідера
+        foreign_keys="[TeamModel.leader_user_id]"
+        # ondelete='SET NULL' має бути на ForeignKey в TeamModel.leader_user_id
     )
 
     # Зв'язок з членством в командах
@@ -258,28 +259,36 @@ class UserModel(BaseMainModel):
     # Зв'язок з ручними коригуваннями бонусів, зробленими цим адміном
     made_bonus_adjustments: Mapped[List["BonusAdjustmentModel"]] = relationship(
         back_populates="admin",
-        foreign_keys="[BonusAdjustmentModel.adjusted_by_user_id]",
-        cascade="SET NULL"
+        foreign_keys="[BonusAdjustmentModel.adjusted_by_user_id]"
+        # ondelete='SET NULL' має бути на ForeignKey в BonusAdjustmentModel.adjusted_by_user_id
     )
 
     # Зв'язок з запитами на звіти, зробленими цим користувачем
     requested_reports: Mapped[List["ReportModel"]] = relationship(
         back_populates="requester",
-        foreign_keys="[ReportModel.requested_by_user_id]",
-        cascade="SET NULL"
+        foreign_keys="[ReportModel.requested_by_user_id]"
+        # ondelete='SET NULL' має бути на ForeignKey в ReportModel.requested_by_user_id
     )
 
     # Зв'язок з досягненнями (отриманими бейджами та рівнями)
     achieved_user_levels: Mapped[List["UserLevelModel"]] = relationship(back_populates="user", foreign_keys="[UserLevelModel.user_id]", cascade="all, delete-orphan")
     achievements_earned: Mapped[List["AchievementModel"]] = relationship(back_populates="user", foreign_keys="[AchievementModel.user_id]", cascade="all, delete-orphan")
     # Зв'язок з досягненнями, які цей користувач (адмін) вручну присудив
-    awarded_achievements_by_admin: Mapped[List["AchievementModel"]] = relationship(back_populates="awarder", foreign_keys="[AchievementModel.awarded_by_user_id]", cascade="SET NULL")
+    awarded_achievements_by_admin: Mapped[List["AchievementModel"]] = relationship(
+        back_populates="awarder",
+        foreign_keys="[AchievementModel.awarded_by_user_id]"
+        # ondelete='SET NULL' має бути на ForeignKey в AchievementModel.awarded_by_user_id
+    )
 
     # Зв'язок з рейтингами цього користувача
     ratings_history: Mapped[List["RatingModel"]] = relationship(back_populates="user", foreign_keys="[RatingModel.user_id]", cascade="all, delete-orphan")
 
     # Зв'язок з файлами, завантаженими цим користувачем
-    uploaded_files: Mapped[List["FileModel"]] = relationship(back_populates="uploader", foreign_keys="[FileModel.uploaded_by_user_id]", cascade="SET NULL")
+    uploaded_files: Mapped[List["FileModel"]] = relationship(
+        back_populates="uploader",
+        foreign_keys="[FileModel.uploaded_by_user_id]"
+        # ondelete='SET NULL' має бути на ForeignKey в FileModel.uploaded_by_user_id
+    )
 
     # Зв'язок зі статусом (успадковано з BaseMainModel)
     # state: Mapped[Optional["StatusModel"]] = relationship("StatusModel", foreign_keys="[UserModel.state_id]", back_populates="users_with_this_state")

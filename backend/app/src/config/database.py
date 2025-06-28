@@ -79,7 +79,8 @@ else:
 # Base = declarative_base() # Це вже зроблено в backend.app.src.models.base
 
 # Функція-залежність для FastAPI для отримання асинхронної сесії БД.
-async def get_db_session() -> AsyncSession:
+# Перейменовано з get_db_session на get_async_session для відповідності імпорту в main.py
+async def get_async_session() -> AsyncSession:
     """
     Залежність FastAPI для отримання асинхронної сесії бази даних.
     Забезпечує відкриття та закриття сесії для кожного запиту.
@@ -146,8 +147,40 @@ async def check_db_connection() -> bool:
         logger.error(f"Помилка підключення до бази даних під час перевірки: {e}", exc_info=True)
         return False
 
+async def connect_to_db() -> None:
+    """
+    Ініціалізує з'єднання з базою даних (створює async_engine).
+    Ця функція викликається при старті додатку.
+    По суті, створення `async_engine` вище вже є ініціалізацією.
+    Ця функція може бути використана для додаткових перевірок або логування.
+    """
+    if async_engine:
+        logger.info("Асинхронний рушій SQLAlchemy вже створено.")
+        # Можна додати перевірку з'єднання тут, якщо потрібно
+        # await check_db_connection()
+    else:
+        # Це не повинно статися, якщо DATABASE_URL коректний,
+        # але на випадок, якщо async_engine не створився з якоїсь причини.
+        logger.error("Асинхронний рушій SQLAlchemy не було створено. Перевірте конфігурацію БД.")
+        # Тут можна спробувати створити його знову або кинути виняток,
+        # щоб запобігти запуску додатку без БД.
+        # Однак, основне створення відбувається при імпорті модуля.
+
+async def close_db_connection() -> None:
+    """
+    Закриває пул з'єднань асинхронного рушія бази даних.
+    Ця функція викликається при зупинці додатку.
+    """
+    if async_engine:
+        logger.info("Закриття пулу з'єднань SQLAlchemy (async_engine.dispose())...")
+        await async_engine.dispose()
+        logger.info("Пул з'єднань SQLAlchemy успішно закрито.")
+    else:
+        logger.warning("Асинхронний рушій SQLAlchemy не був ініціалізований, тому закриття пулу не потрібне.")
+
+
 # Все виглядає добре для налаштування асинхронної роботи з БД.
-# `get_db_session` - стандартна залежність для FastAPI.
+# `get_async_session` (раніше get_db_session) - стандартна залежність для FastAPI.
 # Важливо, що `commit` та `rollback` обробляються на рівні бізнес-логіки (сервіси/репозиторії),
 # а не в самій залежності `get_db_session` (окрім rollback при винятках).
 # `expire_on_commit=False` важливе для FastAPI.

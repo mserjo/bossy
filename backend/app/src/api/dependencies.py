@@ -23,7 +23,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 # Імпортуємо функцію для отримання сесії БД з core.dependencies або config.database
 # Припускаємо, що get_db_session визначено в backend.app.src.config.database, як у health.py
 from jose import jwt # Додано для обробки JWTError
-from backend.app.src.config.database import get_db_session as core_get_db_session
+# Змінено імпорт на get_async_session, оскільки так тепер називається функція в database.py
+from backend.app.src.config.database import get_async_session as core_get_async_session
 from backend.app.src.config.logging import get_logger
 from backend.app.src.models.auth.user import UserModel
 from backend.app.src.services.auth.user_service import UserService
@@ -38,8 +39,17 @@ async def get_async_session() -> AsyncGenerator[AsyncSession, None]:
     Асинхронна залежність для отримання сесії бази даних.
     Використовує основну функцію отримання сесії.
     """
-    async with core_get_db_session() as session:
-        yield session
+    # Використовуємо імпортовану core_get_async_session
+    async for session in core_get_async_session(): # Ітеруємо по генератору
+        try:
+            yield session
+        finally:
+            # Генератор core_get_async_session сам має закривати сесію,
+            # але для безпеки можна додати close, хоча це може бути зайвим,
+            # якщо core_get_async_session правильно реалізований з try/finally.
+            # Наразі, припускаючи, що core_get_async_session закриває сесію,
+            # тут додаткове закриття не потрібне.
+            pass # Або await session.close(), якщо core_get_async_session не гарантує закриття
 
 DBSession = Annotated[AsyncSession, Depends(get_async_session)]
 

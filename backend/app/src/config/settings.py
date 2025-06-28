@@ -49,6 +49,8 @@ class AppSettings(BaseSettings):
 
     FRONTEND_URL: HttpUrl = Field(default="http://localhost:3000", description="Базовий URL фронтенд додатку")
 
+    SECRET_KEY: str = Field(default="your-default-secret-key-for-development", description="Секретний ключ додатку. ПОВИНЕН БУТИ ЗМІНЕНИЙ В PRODUCTION!")
+
     # Налаштування для .env файлу. Pydantic-settings шукає .env у поточному каталозі або батьківських.
     # Якщо .env файл знаходиться, наприклад, в корені проекту `bossy/.env`,
     # а додаток запускається з `bossy/backend/`, то шлях має бути `../.env`.

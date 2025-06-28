@@ -18,8 +18,10 @@ from backend.app.src.config.settings import settings
 from backend.app.src.config.database import (
     async_engine,         # Асинхронний SQLAlchemy engine
     AsyncSessionLocal,    # Фабрика асинхронних сесій
-    get_db_session,       # Залежність FastAPI для отримання сесії БД
-    # check_db_connection,  # Функція для перевірки з'єднання (якщо потрібна)
+    get_async_session,       # Залежність FastAPI для отримання сесії БД (перейменовано з get_db_session)
+    connect_to_db,        # Функція для ініціалізації підключення до БД
+    close_db_connection,  # Функція для закриття підключення до БД
+    check_db_connection,  # Функція для перевірки з'єднання (якщо потрібна)
 )
 
 # Імпорт логгера (Loguru logger вже глобально налаштований в logging.py)
@@ -27,8 +29,8 @@ from backend.app.src.config.logging import logger
 
 # Імпорт функцій для роботи з Redis (якщо використовується)
 from backend.app.src.config.redis import (
-    get_redis_connection, # Функція для отримання/ініціалізації з'єднання
-    close_redis_connection, # Функція для закриття з'єднання
+    init_redis_pool,      # Функція для ініціалізації пулу/клієнта Redis
+    close_redis_pool,     # Функція для закриття пулу/клієнта Redis
     get_redis_client,     # Залежність FastAPI для отримання клієнта Redis
 )
 
@@ -65,15 +67,17 @@ __all__ = [
     # Database
     "async_engine",
     "AsyncSessionLocal",
-    "get_db_session",
-    # "check_db_connection",
+    "get_async_session", # Перейменовано з get_db_session
+    "connect_to_db",
+    "close_db_connection",
+    "check_db_connection",
 
     # Logging
     "logger",
 
     # Redis
-    "get_redis_connection",
-    "close_redis_connection",
+    "init_redis_pool",
+    "close_redis_pool",
     "get_redis_client",
 
     # Celery

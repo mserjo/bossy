@@ -172,3 +172,20 @@ logger.info("Loguru налаштовано. Стандартні логи Python
 # І потім використовувати `serialize=settings.logging.LOG_FILE_SERIALIZE` для файлового обробника.
 
 # Все готово для цього файлу.
+
+def get_logger(name: str | None = None) -> "logger": # type: ignore
+    """
+    Повертає налаштований екземпляр логера Loguru.
+
+    Args:
+        name (str, optional): Ім'я логера. Якщо передано, може бути використано
+                              для біндінгу до логера, хоча в поточній конфігурації
+                              Loguru глобально налаштований.
+                              За замовчуванням None.
+
+    Returns:
+        logger: Екземпляр логера Loguru.
+    """
+    if name:
+        return logger.bind(name=name)
+    return logger

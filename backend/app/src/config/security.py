@@ -30,11 +30,12 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-# --- Параметри JWT токенів (взяті з settings.app) ---
-SECRET_KEY = settings.app.SECRET_KEY
-ALGORITHM = settings.app.JWT_ALGORITHM
-ACCESS_TOKEN_EXPIRE_MINUTES = settings.app.ACCESS_TOKEN_EXPIRE_MINUTES
-REFRESH_TOKEN_EXPIRE_DAYS = settings.app.REFRESH_TOKEN_EXPIRE_DAYS
+# --- Параметри JWT токенів (взяті з settings.auth, оскільки вони стосуються автентифікації) ---
+# SECRET_KEY для JWT береться з AuthSettings
+SECRET_KEY = settings.auth.SECRET_KEY
+ALGORITHM = settings.auth.JWT_ALGORITHM
+ACCESS_TOKEN_EXPIRE_MINUTES = settings.auth.ACCESS_TOKEN_EXPIRE_MINUTES
+REFRESH_TOKEN_EXPIRE_DAYS = settings.auth.REFRESH_TOKEN_EXPIRE_DAYS
 # JWT_AUDIENCE = settings.app.JWT_AUDIENCE # Якщо використовується
 # JWT_ISSUER = settings.app.JWT_ISSUER # Якщо використовується
 

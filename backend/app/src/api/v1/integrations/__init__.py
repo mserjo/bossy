@@ -1,31 +1,43 @@
 # backend/app/src/api/v1/integrations/__init__.py
 # -*- coding: utf-8 -*-
 """
-Ініціалізаційний файл для пакету ендпоінтів управління інтеграціями API v1.
+Ініціалізаційний файл для пакету 'integrations' API v1.
 
-Цей пакет містить роутери для налаштування інтеграцій з зовнішніми сервісами:
-- Календарі (`calendars.py`).
-- Месенджери (`messengers.py`).
-- Таск-трекери (`trackers.py`).
+Цей пакет містить ендпоінти для управління інтеграціями з зовнішніми
+сервісами через API v1. Наприклад:
+- Налаштування синхронізації з календарями (`calendars.py`).
+- Налаштування сповіщень через месенджери (`messengers.py`).
+- Налаштування інтеграції з таск-трекерами (`trackers.py`).
+
+Цей файл робить каталог 'integrations' пакетом Python та експортує
+агрегований роутер `router` для всіх ендпоінтів інтеграцій.
 """
 
 from fastapi import APIRouter
 
-from backend.app.src.api.v1.integrations.calendars import router as calendars_router
-from backend.app.src.api.v1.integrations.messengers import router as messengers_router
-from backend.app.src.api.v1.integrations.trackers import router as trackers_router
+# TODO: Імпортувати окремі роутери з модулів цього пакету, коли вони будуть створені.
+# from backend.app.src.api.v1.integrations.calendars import router as calendars_integration_router
+# from backend.app.src.api.v1.integrations.messengers import router as messengers_integration_router
+# from backend.app.src.api.v1.integrations.trackers import router as trackers_integration_router
 
-# Агрегуючий роутер для всіх ендпоінтів інтеграцій.
-integrations_router = APIRouter()
+# Агрегуючий роутер для всіх ендпоінтів інтеграцій API v1.
+router = APIRouter(tags=["v1 :: Integrations"])
 
-# Префікси для цих роутерів будуть визначені при підключенні integrations_router
-# до головного v1_router. Наприклад, /api/v1/integrations/calendars, ...
-# Або, якщо це персональні налаштування: /api/v1/users/me/integrations/calendars
+# TODO: Розкоментувати та підключити окремі роутери.
+# Префікси тут будуть відносні до шляху, з яким цей `router` підключається
+# (наприклад, `/integrations` або `/users/me/integrations`).
 
-integrations_router.include_router(calendars_router, prefix="/calendars", tags=["Integrations"])
-integrations_router.include_router(messengers_router, prefix="/messengers", tags=["Integrations"])
-integrations_router.include_router(trackers_router, prefix="/trackers", tags=["Integrations"])
+# router.include_router(calendars_integration_router, prefix="/calendars")
+# router.include_router(messengers_integration_router, prefix="/messengers")
+# router.include_router(trackers_integration_router, prefix="/trackers")
 
-__all__ = (
-    "integrations_router",
-)
+
+# Експорт агрегованого роутера.
+__all__ = [
+    "router",
+]
+
+# TODO: Узгодити назву експортованого роутера ("router") з імпортом
+# в `backend.app.src.api.v1.router.py` (очікує `integrations_v1_router`).
+# TODO: Визначити, чи ці налаштування є глобальними, на рівні групи чи користувача,
+# та відповідно адаптувати шляхи та префікси.

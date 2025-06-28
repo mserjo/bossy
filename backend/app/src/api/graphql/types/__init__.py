@@ -1,37 +1,50 @@
 # backend/app/src/api/graphql/types/__init__.py
 # -*- coding: utf-8 -*-
 """
-Ініціалізаційний файл для пакету GraphQL типів.
+Ініціалізаційний файл для пакету 'types' GraphQL API.
 
-Цей пакет містить визначення GraphQL типів (`ObjectType`, `InputType`,
-`InterfaceType`, `UnionType`, `EnumType`), які використовуються у схемі.
-Кожен файл у цьому каталозі зазвичай відповідає за типи, пов'язані
-з певною доменною сутністю (наприклад, `user.py`, `group.py`, `task.py`).
+Цей пакет призначений для визначення всіх GraphQL типів, що використовуються в схемі.
+Це включає:
+- Об'єктні типи (`ObjectType`): представляють ресурси системи (наприклад, UserType, GroupType, TaskType).
+  Кожен такий тип зазвичай визначається у власному файлі (наприклад, `user.py`, `group.py`).
+- Вхідні типи (`InputType`): використовуються для аргументів мутацій (наприклад, `UserCreateInput`).
+- Перелічення (`EnumType`): для полів, що можуть приймати обмежений набір значень (наприклад, `UserRoleEnum`).
+- Інтерфейси (`InterfaceType`): для визначення спільних полів між типами (наприклад, `Node` для Relay).
+- Об'єднання (`UnionType`): для полів, що можуть повертати один з декількох типів.
+- Скалярні типи (`ScalarType`): якщо потрібні кастомні скаляри, хоча вони частіше визначаються
+  в окремому файлі `graphql/scalars.py` і імпортуються сюди або безпосередньо в схему.
 
-Цей `__init__.py` може експортувати всі типи для зручного імпорту в
-`schema.py` або в інші файли типів (для уникнення циклічних залежностей
-можуть використовуватися forward references або `strawberry.LazyType`).
+Цей файл робить каталог 'types' пакетом Python. Він може також використовуватися
+для агрегації та експорту всіх визначених типів для зручного імпорту в
+`graphql/schema.py` або в файлах резолверів (`queries/`, `mutations/`).
+Це допомагає уникнути циклічних залежностей та спрощує управління імпортами.
 """
 
-# TODO: Імпортувати та експортувати GraphQL типи, коли вони будуть створені.
-# Приклади:
-# from backend.app.src.api.graphql.types.user import UserType, UserCreateInputType # Приклад для Strawberry
-# from backend.app.src.api.graphql.types.group import GroupType
-# from backend.app.src.api.graphql.types.task import TaskType
-# ... і так далі для всіх файлів з типами ...
+# TODO: Імпортувати та експортувати GraphQL типи, коли вони будуть визначені
+# у відповідних файлах цього пакету (наприклад, user.py, group.py, task.py тощо).
+# Це робиться для того, щоб Strawberry або інша GraphQL бібліотека могла їх знайти
+# під час компіляції схеми, або просто для зручності імпортів в інших частинах GraphQL API.
 
-# Можна визначити __all__ для контролю над тим, що експортується:
-# __all__ = (
+# Приклад експорту (для Strawberry):
+# from .base import Node # Якщо є базовий інтерфейс/тип
+# from .user import UserType, UserCreateInputType, UserRoleEnumType
+# from .group import GroupType, GroupCreateInputType
+# from .task import TaskType, TaskStatusEnumType
+# # ... та інші типи з відповідних файлів ...
+#
+# __all__ = [
+#     "Node",
 #     "UserType",
 #     "UserCreateInputType",
+#     "UserRoleEnumType",
 #     "GroupType",
+#     "GroupCreateInputType",
 #     "TaskType",
-#     # ...
-# )
+#     "TaskStatusEnumType",
+#     # ... та інші експортовані типи ...
+# ]
 
-# Також тут може бути імпортований базовий тип або інтерфейс, якщо він є.
-# from backend.app.src.api.graphql.types.base import NodeInterface # Приклад
-
-# На даному етапі, поки конкретні типи не визначені, файл може
-# містити переважно документацію.
+# На даний момент, поки конкретні типи не визначені у відповідних файлах,
+# цей файл може залишатися таким. Головне, щоб він існував для позначення пакету
+# і був готовий до додавання імпортів та експортів.
 pass

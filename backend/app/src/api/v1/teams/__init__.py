@@ -1,32 +1,48 @@
 # backend/app/src/api/v1/teams/__init__.py
 # -*- coding: utf-8 -*-
 """
-Ініціалізаційний файл для пакету ендпоінтів управління командами API v1.
+Ініціалізаційний файл для пакету 'teams' API v1.
 
-Цей пакет містить роутери для:
-- Основного управління командами (CRUD операції з командами).
-- Управління членством у командах.
+Цей пакет містить ендпоінти для управління командами в системі через API v1.
+Команди зазвичай створюються в контексті певної групи.
+
+Операції можуть включати:
+- Створення, перегляд, редагування та видалення команд (`team.py`).
+- Управління членством в команді (`membership.py`).
+
+Шляхи до ендпоінтів команд часто є вкладеними в групи:
+`/groups/{group_id}/teams/...`
+
+Цей файл робить каталог 'teams' пакетом Python та експортує
+агрегований роутер `router` для всіх ендпоінтів команд.
+Цей `router` призначений для підключення в контексті конкретної групи.
 """
 
 from fastapi import APIRouter
 
-from backend.app.src.api.v1.teams.teams import router as main_teams_router
-from backend.app.src.api.v1.teams.members import router as team_members_router
+# TODO: Імпортувати окремі роутери з модулів цього пакету, коли вони будуть створені.
+# from backend.app.src.api.v1.teams.team import router as crud_teams_router
+# from backend.app.src.api.v1.teams.membership import router as team_membership_router
 
-# Агрегуючий роутер для всіх ендпоінтів, пов'язаних з командами.
-# Цей роутер буде підключатися до головного роутера API v1 з префіксом,
-# що включає group_id, наприклад, /groups/{group_id}/teams
-teams_router = APIRouter()
+# Агрегуючий роутер для всіх ендпоінтів команд API v1.
+router = APIRouter(tags=["v1 :: Teams"])
 
-# Основні операції з командами
-teams_router.include_router(main_teams_router) # Без додаткового префіксу тут
+# TODO: Розкоментувати та підключити окремі роутери.
+# Приклад структури підключення:
 
-# Вкладений роутер для управління учасниками команди (під /groups/{group_id}/teams/{team_id}/members)
-team_specific_router = APIRouter()
-team_specific_router.include_router(team_members_router, prefix="/{team_id}/members", tags=["Teams"])
+# Основні CRUD операції з командами (наприклад, /groups/{group_id}/teams/, /groups/{group_id}/teams/{team_id})
+# router.include_router(crud_teams_router) # Шляхи визначаються всередині crud_teams_router
 
-teams_router.include_router(team_specific_router)
+# Членство в команді (наприклад, /groups/{group_id}/teams/{team_id}/members)
+# router.include_router(team_membership_router, prefix="/{team_id}/members")
 
-__all__ = (
-    "teams_router",
-)
+
+# Експорт агрегованого роутера.
+__all__ = [
+    "router",
+]
+
+# TODO: Узгодити назву експортованого роутера ("router") з імпортом
+# в `backend.app.src.api.v1.router.py` (очікує `teams_v1_router`) або
+# в `backend.app.src.api.v1.groups.__init__.py` (якщо підключається там).
+# TODO: Переконатися, що шляхи та префікси коректно обробляють `group_id` та `team_id`.

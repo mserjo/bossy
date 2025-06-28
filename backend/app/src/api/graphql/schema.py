@@ -3,71 +3,106 @@
 """
 Головний файл GraphQL схеми.
 
-Цей файл відповідає за визначення та агрегацію кореневих типів GraphQL:
-`Query`, `Mutation`, та, за потреби, `Subscription`.
-Він імпортує та об'єднує типи, резолвери запитів, мутацій та підписок
-з відповідних підкаталогів (`types/`, `queries/`, `mutations/`, `subscriptions/`).
+Цей модуль відповідає за визначення та компіляцію головної GraphQL схеми додатку,
+використовуючи бібліотеку Strawberry.
 
-Тут створюється екземпляр схеми, який потім використовується для створення
-GraphQL додатку (наприклад, за допомогою Strawberry або Ariadne), що підключається
-до FastAPI.
+Він виконує наступні завдання:
+1.  Імпортує кореневі типи `Query` (з `queries/__init__.py`), `Mutation` (з `mutations/__init__.py`)
+    та, опціонально, `Subscription` (з `subscriptions/__init__.py`).
+2.  Збирає всі необхідні GraphQL типи (ObjectTypes, InputTypes, Enums, Scalars, Interfaces, Unions)
+    з підкаталогу `types/` або вони автоматично знаходяться Strawberry, якщо правильно імпортовані
+    в резолверах.
+3.  Створює та експортує екземпляр скомпільованої схеми `strawberry.Schema`.
+
+Скомпільована схема (`schema`) потім імпортується в `backend.app.src.api.graphql.__init__.py`
+для створення екземпляра `GraphQLRouter`, який підключається до FastAPI.
 """
 
-# import strawberry # Приклад для Strawberry
-#
-# # TODO: Імпортувати кореневі типи Query, Mutation, Subscription, коли вони будуть створені.
-# # from backend.app.src.api.graphql.queries import Query
-# # from backend.app.src.api.graphql.mutations import Mutation
-# # from backend.app.src.api.graphql.subscriptions import Subscription # Якщо використовуються підписки
-#
-# # TODO: Імпортувати кастомні скаляри та директиви, якщо вони визначені.
-# # from backend.app.src.api.graphql.scalars import DateTimeScalar, UUIDScalar
-# # from backend.app.src.api.graphql.directives import IsAuthenticatedDirective
-#
-# # TODO: Визначити тимчасові плейсхолдери для Query, Mutation, Subscription,
-# # якщо вони ще не реалізовані, щоб уникнути помилок імпорту.
-#
-# # @strawberry.type
-# # class Query:
-# #     @strawberry.field
-# #     def hello(self) -> str:
-# #         return "Hello, GraphQL world!"
-#
-# # @strawberry.type
-# # class Mutation:
-# #     @strawberry.mutation
-# #     def example_mutation(self, input_str: str) -> str:
-# #         return f"Received: {input_str}"
-#
-# # Створення GraphQL схеми (приклад для Strawberry)
-# # schema = strawberry.Schema(
-# #     query=Query,
-# #     mutation=Mutation,
-#     # subscription=Subscription, # Розкоментувати, якщо є підписки
-#     # types=[DateTimeScalar, UUIDScalar], # Додати кастомні скаляри, якщо є
-#     # directives=[IsAuthenticatedDirective], # Додати кастомні директиви, якщо є
-# # )
-#
-# # TODO: Для Ariadne структура буде іншою:
-# # from ariadne import QueryType, MutationType, make_executable_schema
-# # query = QueryType()
-# # mutation = MutationType()
-# # @query.field("hello")
-# # def resolve_hello(_, info):
-# #    return "Hello, GraphQL world!"
-# # type_defs = """
-# #    type Query {
-# #        hello: String!
-# #    }
-# #    type Mutation {
-# #        exampleMutation(inputStr: String!): String!
-# #    }
-# # """
-# # schema = make_executable_schema(type_defs, query, mutation)
+import strawberry
 
-# На даному етапі файл містить переважно коментарі та структуру,
-# яка буде заповнюватися в міру реалізації інших частин GraphQL API.
-# Необхідно обрати конкретну бібліотеку (Strawberry або Ariadne) та
-# реалізувати відповідно до її вимог.
+# TODO: Імпортувати кореневі типи Query, Mutation, Subscription, коли вони будуть реалізовані.
+# Ці файли (`queries/__init__.py`, `mutations/__init__.py`, `subscriptions/__init__.py`)
+# повинні визначати відповідні класи, декоровані `@strawberry.type`.
 
-pass # Щоб уникнути помилки порожнього файлу, поки реалізація не додана.
+# from backend.app.src.api.graphql.queries import Query
+# from backend.app.src.api.graphql.mutations import Mutation
+# # from backend.app.src.api.graphql.subscriptions import Subscription # Якщо використовуються
+
+# TODO: Імпортувати кастомні скаляри та директиви, якщо вони визначені та потрібні на рівні схеми.
+# from backend.app.src.api.graphql.scalars import DateTimeScalar, UUIDScalar # Приклад
+# from backend.app.src.api.graphql.directives import IsAuthenticatedDirective # Приклад
+
+# --- Заглушки для Query та Mutation, поки вони не реалізовані ---
+# Ці заглушки дозволять схемі компілюватися, але не матимуть реальної функціональності.
+# Їх потрібно буде замінити на реальні імпорти.
+
+@strawberry.type
+class RootQuery:
+    """
+    Кореневий тип для GraphQL запитів (Queries).
+    Містить поля, що дозволяють отримувати дані з сервера.
+    """
+    @strawberry.field
+    def hello_query(self, name: str = "GraphQL User") -> str:
+        """Простий запит для перевірки роботи схеми."""
+        return f"Hello, {name}! This is a placeholder query."
+
+@strawberry.type
+class RootMutation:
+    """
+    Кореневий тип для GraphQL мутацій (Mutations).
+    Містить поля, що дозволяють змінювати дані на сервері.
+    """
+    @strawberry.mutation
+    def example_mutation(self, input_str: str) -> str:
+        """Проста мутація для перевірки роботи схеми."""
+        return f"Placeholder mutation received: {input_str}. No data was changed."
+
+# @strawberry.type
+# class RootSubscription:
+#     """
+#     Кореневий тип для GraphQL підписок (Subscriptions).
+#     Дозволяє клієнтам отримувати оновлення даних в реальному часі.
+#     """
+#     @strawberry.subscription
+#     async def example_subscription(self, target_id: int) -> strawberry.AsyncGenerator[str, None]:
+#         """Проста підписка для перевірки."""
+#         import asyncio
+#         count = 0
+#         while count < 5:
+#             await asyncio.sleep(1)
+#             yield f"Update for {target_id}: event {count}"
+#             count += 1
+# --- Кінець заглушок ---
+
+
+# Створення екземпляра схеми Strawberry.
+# Замініть `RootQuery` та `RootMutation` на реальні `Query` та `Mutation` після їх імпорту.
+schema = strawberry.Schema(
+    query=RootQuery, # Замінити на Query
+    mutation=RootMutation, # Замінити на Mutation
+    # subscription=RootSubscription, # Розкоментувати та замінити на Subscription, якщо потрібно
+    # types=[DateTimeScalar, UUIDScalar], # Додати список кастомних скалярів, якщо вони не знаходяться автоматично
+    # directives=[IsAuthenticatedDirective], # Додати список кастомних директив
+    # extensions=[] # Можна додати розширення, наприклад, для трасування, логування, APM.
+)
+
+# from backend.app.src.config.logging import get_logger # TODO: Розкоментувати для логування
+# logger = get_logger(__name__)
+# logger.info("GraphQL schema compiled successfully using Strawberry.")
+
+# Експорт схеми для використання в `graphql/__init__.py`.
+__all__ = [
+    "schema",
+]
+
+# Важливо:
+# - Усі GraphQL типи (UserType, GroupType тощо), що використовуються в полях Query/Mutation/Subscription
+#   або як їх аргументи, повинні бути доступні Strawberry під час компіляції схеми.
+#   Це зазвичай досягається шляхом їх імпорту в модулях, де визначені Query/Mutation/Subscription,
+#   або, для деяких конфігурацій, явним передаванням у параметр `types=[]` конструктора `strawberry.Schema`.
+# - Контекст запиту (що містить, наприклад, сесію БД, поточного користувача, даталоадери)
+#   буде створений у `context.py` та переданий до `GraphQLRouter` в `graphql/__init__.py` або `app/main.py`.
+#   Доступ до контексту в резолверах здійснюється через параметр `info: strawberry.Info`.
+# - Даталоадери (`dataloaders.py`) також ініціалізуються та передаються через контекст
+#   для вирішення проблеми N+1 запитів.

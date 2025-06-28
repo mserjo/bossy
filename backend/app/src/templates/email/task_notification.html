@@ -1,0 +1,77 @@
+{# backend/app/src/templates/email/task_notification.html #}
+{# -*- coding: utf-8 -*- #}
+{#
+Шаблон для email сповіщення, пов'язаного із завданням.
+Використовує Jinja2 синтаксис.
+
+Очікувані змінні в контексті (можуть варіюватися залежно від типу сповіщення):
+- user_name: Ім'я користувача-отримувача.
+- site_name: Назва системи/сайту.
+- notification_title: Заголовок сповіщення (наприклад, "Нове завдання призначено" або "Статус завдання змінено").
+- notification_message: Основний текст повідомлення, що описує подію.
+- task_name (опціонально): Назва завдання.
+- task_id (опціонально): ID завдання.
+- task_link (опціонально): Посилання на сторінку завдання в системі.
+- group_name (опціонально): Назва групи, до якої належить завдання.
+- actor_name (опціонально): Ім'я користувача, який виконав дію (наприклад, призначив завдання, змінив статус).
+- support_email: Email служби підтримки.
+#}
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ notification_title }} - {{ site_name }}</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .header { font-size: 20px; color: #444; margin-bottom: 20px; }
+        .content p { margin-bottom: 10px; }
+        .highlight { font-weight: bold; }
+        .button { display: inline-block; padding: 10px 15px; background-color: #28a745; color: #fff; text-decoration: none; border-radius: 3px; }
+        .footer { margin-top: 30px; font-size: 0.9em; color: #777; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            {{ notification_title }}
+        </div>
+        <div class="content">
+            <p>Шановний(а) {{ user_name }},</p>
+
+            <p>{{ notification_message | safe }}</p> {# safe, якщо message може містити HTML #}
+
+            {% if task_name %}
+            <p><strong>Завдання:</strong> <span class="highlight">{{ task_name }}</span></p>
+            {% endif %}
+
+            {% if group_name %}
+            <p><strong>Група:</strong> {{ group_name }}</p>
+            {% endif %}
+
+            {% if actor_name %}
+            <p><strong>Дія виконана:</strong> {{ actor_name }}</p>
+            {% endif %}
+
+            {% if task_link %}
+            <p>Ви можете переглянути деталі завдання, перейшовши за посиланням:</p>
+            <p style="text-align: center;">
+                <a href="{{ task_link }}" class="button">Переглянути Завдання</a>
+            </p>
+            <p>Або скопіюйте та вставте це посилання у ваш браузер:</p>
+            <p><a href="{{ task_link }}">{{ task_link }}</a></p>
+            {% endif %}
+
+            <p>Якщо у вас є питання, будь ласка, зверніться до адміністратора вашої групи або до служби підтримки: <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
+
+            <p>З повагою,<br>Команда {{ site_name }}</p>
+        </div>
+        <div class="footer">
+            <p>Це автоматичне сповіщення. Будь ласка, не відповідайте на цей лист.</p>
+            <p>&copy; {{ now() | date("%Y") }} {{ site_name }}. Всі права захищено.</p>
+            {# TODO: Додати посилання на налаштування сповіщень, якщо є #}
+        </div>
+    </div>
+</body>
+</html>

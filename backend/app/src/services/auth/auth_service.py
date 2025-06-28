@@ -2,28 +2,31 @@
 # -*- coding: utf-8 -*-
 """
 Цей модуль визначає сервіс `AuthService` для обробки логіки автентифікації,
-включаючи реєстрацію, вхід, управління токенами та сесіями.
+включаючи реєстрацію, вхід, управління токенами та сесіями, відновлення паролю.
 """
 
-from typing import Optional, Tuple
+from typing import Optional, Tuple, Any
 import uuid
-from datetime import datetime, timedelta
-from sqlalchemy.ext.asyncio import AsyncSession # type: ignore
+from datetime import datetime, timedelta, timezone
+from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException
 
 from backend.app.src.models.auth.user import UserModel
 from backend.app.src.schemas.auth.login import LoginRequestSchema
-from backend.app.src.schemas.auth.user import UserCreateSchema, UserSchema
-from backend.app.src.schemas.auth.token import TokenResponseSchema, TokenPayloadSchema
-from backend.app.src.repositories.auth.user import UserRepository, user_repository
-from backend.app.src.repositories.auth.token import RefreshTokenRepository, refresh_token_repository
-from backend.app.src.repositories.auth.session import SessionRepository, session_repository # Якщо використовується
-from backend.app.src.services.base import BaseService # Базовий сервіс не обов'язковий тут
-from backend.app.src.services.auth.user_service import UserService, userService # Використовуємо userService
-from backend.app.src.core.security import verify_password, create_access_token, create_refresh_token, get_password_hash
+from backend.app.src.schemas.auth.user import UserCreateSchema, UserSchema # UserSchema може бути не потрібна тут
+from backend.app.src.schemas.auth.token import TokenResponseSchema, TokenPayloadSchema # TokenPayloadSchema може бути для внутрішнього використання
+from backend.app.src.schemas.auth.password import PasswordResetRequestSchema, PasswordResetConfirmSchema # Для відновлення паролю
+from backend.app.src.repositories.auth.user_repository import UserRepository
+from backend.app.src.repositories.auth.token_repository import RefreshTokenRepository # Змінено імпорт
+from backend.app.src.repositories.auth.session_repository import SessionRepository # Змінено імпорт
+from backend.app.src.services.auth.user_service import UserService
+from backend.app.src.services.auth.token_service import TokenService # Для генерації різних типів токенів
+# from backend.app.src.services.notifications.email_service import EmailService # Для відправки email
+from backend.app.src.core.security import verify_password, create_access_token, create_refresh_token_pair
 from backend.app.src.core.exceptions import UnauthorizedException, BadRequestException, NotFoundException
 from backend.app.src.config.settings import settings
-
+from backend.app.src.config.logging import logger
+from backend.app.src.core.constants import STATUS_ACTIVE_CODE, USER_TYPE_SUPERADMIN # Для перевірки статусу
 
 class AuthService:
     """
@@ -31,325 +34,191 @@ class AuthService:
     """
     def __init__(
         self,
-        user_repo: UserRepository = user_repository,
-        refresh_token_repo: RefreshTokenRepository = refresh_token_repository,
-        session_repo: SessionRepository = session_repository, # Якщо сесії відстежуються
-        user_service_instance: UserService = userService
+        db_session: AsyncSession, # Сервіс тепер приймає сесію
     ):
-        self.user_repository = user_repo
-        self.refresh_token_repository = refresh_token_repo
-        self.session_repository = session_repo
-        self.user_service = user_service_instance # Використовуємо екземпляр UserService
+        self.db = db_session
+        self.user_repository = UserRepository(db_session)
+        self.refresh_token_repository = RefreshTokenRepository(db_session)
+        self.session_repository = SessionRepository(db_session)
+        self.user_service = UserService(db_session)
+        self.token_service = TokenService(db_session) # Для генерації та валідації різних токенів
+        # self.email_service = EmailService() # Для відправки email
 
-    async def register_user(self, db: AsyncSession, *, obj_in: UserCreateSchema) -> UserModel:
-        """
-        Реєструє нового користувача.
-        Використовує `UserService.create_user` для створення запису.
-        """
-        # UserService.create_user вже перевіряє унікальність email/телефону
-        # та хешує пароль.
-        user = await self.user_service.create_user(db, obj_in=obj_in)
-        # TODO: Додати логіку відправки email для підтвердження реєстрації, якщо потрібно.
-        # TODO: Встановити початковий статус користувача (наприклад, "очікує підтвердження").
+    async def register_user(self, *, obj_in: UserCreateSchema) -> UserModel:
+        # Перевірка на існування користувача з таким email
+        existing_user = await self.user_repository.get_by_email(email=obj_in.email)
+        if existing_user:
+            logger.warning(f"Спроба реєстрації з існуючим email: {obj_in.email}")
+            raise BadRequestException(detail="Користувач з таким email вже існує.")
+        # TODO: Додати перевірку на унікальність username, якщо він використовується і є унікальним.
+
+        user = await self.user_service.create_user(obj_in=obj_in) # UserService вже хешує пароль
+
+        # TODO: Відправка email для підтвердження реєстрації
+        # verification_token = await self.token_service.generate_email_verification_token(user.email)
+        # await self.email_service.send_email_verification_message(user.email, user.name or user.username, verification_token)
+        # logger.info(f"Лист для підтвердження email надіслано на {user.email}")
+
         return user
 
     async def login(
-        self, db: AsyncSession, *, login_data: LoginRequestSchema,
+        self, *, login_data: LoginRequestSchema,
         user_agent: Optional[str], ip_address: Optional[str]
     ) -> TokenResponseSchema:
-        """
-        Автентифікує користувача та генерує пару access/refresh токенів.
-        Також може створювати запис сесії.
-        """
-        user = await self.user_repository.get_by_identifier(db, identifier=login_data.identifier)
+        user = await self.user_repository.get_by_identifier(identifier=login_data.identifier)
+
         if not user:
+            logger.warning(f"Невдала спроба входу для ідентифікатора: {login_data.identifier} (користувача не знайдено).")
             raise UnauthorizedException(detail="Неправильний ідентифікатор або пароль.")
 
         if not verify_password(login_data.password, user.hashed_password):
-            # TODO: Логіка блокування акаунту після N невдалих спроб
-            # user.failed_login_attempts += 1
-            # if user.failed_login_attempts >= settings.security.MAX_FAILED_LOGIN_ATTEMPTS:
-            #     user.locked_until = datetime.utcnow() + timedelta(minutes=settings.security.LOCKOUT_DURATION_MINUTES)
-            # await self.user_repository.update(db, db_obj=user, obj_in={"failed_login_attempts": user.failed_login_attempts, "locked_until": user.locked_until})
+            # TODO: Реалізувати логіку блокування акаунту після N невдалих спроб
+            logger.warning(f"Невдала спроба входу для користувача {user.email} (неправильний пароль).")
             raise UnauthorizedException(detail="Неправильний ідентифікатор або пароль.")
 
         if user.is_deleted:
+            logger.warning(f"Спроба входу для видаленого користувача: {user.email}.")
             raise UnauthorizedException(detail="Обліковий запис видалено.")
-        # TODO: Перевірка user.state_id на активність (аналогічно до get_active_user_by_id_for_auth)
-        # if user.state.code != STATUS_ACTIVE_CODE: # Приклад
-        #     raise UnauthorizedException(detail="Обліковий запис неактивний.")
+
+        if not user.is_active: # Перевірка загальної активності
+             logger.warning(f"Спроба входу для неактивного користувача: {user.email} (загальний статус is_active=False).")
+             raise UnauthorizedException(detail="Обліковий запис неактивний. Зверніться до адміністратора.")
+
+        # TODO: Додати перевірку статусу з довідника `user.state_id` на відповідність `STATUS_ACTIVE_CODE`
+        # if user.state and user.state.code != STATUS_ACTIVE_CODE:
+        #     logger.warning(f"Спроба входу для користувача {user.email} зі статусом '{user.state.code}'.")
+        #     raise UnauthorizedException(detail=f"Обліковий запис має статус '{user.state.name}'. Вхід заборонено.")
+
         # TODO: Перевірка, чи не заблокований акаунт (user.locked_until)
 
-        # Скидання лічильника невдалих спроб при успішному вході
-        # if user.failed_login_attempts > 0:
-        #     await self.user_repository.update(db, db_obj=user, obj_in={"failed_login_attempts": 0, "locked_until": None})
+        # TODO: Скидання лічильника невдалих спроб при успішному вході
 
-        access_token_expires = timedelta(minutes=settings.security.ACCESS_TOKEN_EXPIRE_MINUTES)
-        refresh_token_expires = timedelta(days=settings.security.REFRESH_TOKEN_EXPIRE_DAYS)
-
-        access_token = create_access_token(
-            data={"sub": str(user.id), "user_type": user.user_type_code}, # Додаємо user_type для можливої перевірки
-            expires_delta=access_token_expires
-        )
-        refresh_token_str, hashed_refresh_token, refresh_token_jti = create_refresh_token(
-            data={"sub": str(user.id)} # Refresh токен може мати менше даних
-        )
-
-        # Зберігаємо refresh токен в БД
-        # TODO: Переконатися, що refresh_token_jti (якщо використовується) є унікальним ID для RefreshTokenModel.
-        # Поточний create_refresh_token генерує власний унікальний рядок токена.
-        # `id` з `RefreshTokenModel` може слугувати як `jti`.
-        # Якщо create_refresh_token повертає (token_str, hashed_token, jti), то jti - це ID.
-        # Поки що припускаємо, що RefreshTokenModel.id є jti.
-
-        created_refresh_token_db = await self.refresh_token_repository.create_refresh_token(
-            db,
+        access_token, refresh_token_str, _, _ = await self.token_service.generate_and_store_refresh_token(
             user_id=user.id,
-            hashed_token=hashed_refresh_token, # Зберігаємо хеш
-            expires_at=datetime.utcnow() + refresh_token_expires,
+            user_type_code=user.user_type_code, # Для включення в access token
             user_agent=user_agent,
             ip_address=ip_address
         )
 
-        # Опціонально: створюємо запис сесії
-        if self.session_repository:
-            await self.session_repository.create_session(
-                db,
-                user_id=user.id,
-                user_agent=user_agent,
-                ip_address=ip_address,
-                refresh_token_id=created_refresh_token_db.id, # Зв'язуємо з RefreshTokenModel.id
-                expires_at=created_refresh_token_db.expires_at
-            )
-
         # Оновлюємо час останнього входу для користувача
-        user.last_login_at = datetime.utcnow()
-        await self.user_repository.update(db, db_obj=user, obj_in={"last_login_at": user.last_login_at})
-
+        # Це краще робити в транзакції разом зі створенням токена/сесії
+        await self.user_repository.update_last_login(user_id=user.id)
+        logger.info(f"Користувач {user.email} успішно увійшов до системи.")
 
         return TokenResponseSchema(
             access_token=access_token,
-            refresh_token=refresh_token_str, # Повертаємо оригінальний refresh токен клієнту
+            refresh_token=refresh_token_str,
             token_type="bearer",
-            expires_in=int(access_token_expires.total_seconds())
+            expires_in=settings.security.ACCESS_TOKEN_EXPIRE_MINUTES * 60
         )
 
     async def refresh_access_token(
-        self, db: AsyncSession, *, refresh_token_str_from_client: str,
+        self, *, refresh_token_str_from_client: str,
         user_agent: Optional[str], ip_address: Optional[str]
     ) -> TokenResponseSchema:
-        """
-        Оновлює access токен за допомогою refresh токена.
-        Може також реалізовувати логіку ротації refresh токенів.
-        """
-        # TODO: Реалізувати отримання hashed_refresh_token з refresh_token_str_from_client
-        #       (наприклад, якщо refresh_token_str_from_client це "jti.secret_part",
-        #       то jti - це ID, а secret_part хешується).
-        #       Або, якщо refresh_token_str_from_client - це сам токен, то хешуємо його.
-        #       Поточний create_refresh_token генерує рядок та його хеш.
-        #       Отже, тут потрібно хешувати отриманий від клієнта токен тим же способом.
-        #       Або ж, якщо refresh токен - це JWT, то валідувати його і брати jti.
 
-        # Клієнт надсилає refresh_token_str у форматі "jti.secret_payload"
-        try:
-            jti_str, secret_payload = refresh_token_str_from_client.split(".", 1)
-            token_id = uuid.UUID(jti_str)
-        except (ValueError, AttributeError): # AttributeError for split if not a string
-            raise UnauthorizedException(detail="Невалідний формат refresh токена.")
+        validated_user_id, old_token_id = await self.token_service.validate_refresh_token_str_and_get_user_id(
+            token_str=refresh_token_str_from_client
+        )
 
-        refresh_token_db = await self.refresh_token_repository.get(db, id=token_id)
-
-        if not refresh_token_db:
-            raise UnauthorizedException(detail="Refresh токен не знайдено або недійсний.")
-
-        # Перевіряємо відповідність секретної частини (якщо потрібно, або якщо hashed_token це хеш від secret_payload)
-        # Поточна реалізація create_refresh_token (security) хешує secret_payload.
-        if not verify_password(secret_payload, refresh_token_db.hashed_token):
-            # TODO: Логіка безпеки: можлива спроба підбору або використання скомпрометованого JTI.
-            # Можна відкликати всі токени користувача.
-            self.user_service.logger.warning(f"Невідповідність секретної частини refresh токена для JTI: {jti_str}")
-            raise UnauthorizedException(detail="Refresh токен недійсний (невідповідність).")
-
-        if refresh_token_db.is_revoked:
-            # TODO: Логіка безпеки: якщо використано відкликаний токен, відкликати всі токени цього користувача.
-            self.user_service.logger.warning(f"Спроба використання відкликаного refresh токена JTI: {jti_str} для користувача {refresh_token_db.user_id}")
-            raise UnauthorizedException(detail="Refresh токен відкликано.")
-        if refresh_token_db.expires_at < datetime.utcnow():
-            raise UnauthorizedException(detail="Термін дії refresh токена закінчився.")
-
-        user = await self.user_repository.get(db, id=refresh_token_db.user_id)
-        if not user or user.is_deleted: #  or user.state.code != STATUS_ACTIVE_CODE (потрібен state)
+        user = await self.user_repository.get(id=validated_user_id)
+        if not user or not user.is_active or user.is_deleted:
+            logger.warning(f"Спроба оновити токен для неіснуючого, неактивного або видаленого користувача ID: {validated_user_id}")
             raise UnauthorizedException(detail="Користувача не знайдено або обліковий запис неактивний.")
 
-        # Оновлюємо час останнього використання refresh токена
-        refresh_token_db.last_used_at = datetime.utcnow()
-        # Не використовуємо self.refresh_token_repository.update, щоб не передавати схему
-        db.add(refresh_token_db)
-        await db.commit()
-        await db.refresh(refresh_token_db)
+        # Ротація токенів: відкликаємо старий, генеруємо нову пару
+        await self.token_service.revoke_refresh_token_by_id(token_id=old_token_id, reason="token_rotation")
 
-
-        # --- Логіка ротації refresh токенів (приклад) ---
-        new_refresh_token_str_to_return = refresh_token_str_from_client # За замовчуванням старий
-        if settings.security.ROTATE_REFRESH_TOKENS:
-            # Відкликаємо старий токен
-            await self.refresh_token_repository.revoke_token(db, token_obj=refresh_token_db, reason="token_rotation")
-
-            # Генеруємо новий refresh токен
-            new_rf_token_str, new_rf_hashed_token, new_rf_jti_str = create_refresh_token(data={"sub": str(user.id)})
-            new_rf_expires = timedelta(days=settings.security.REFRESH_TOKEN_EXPIRE_DAYS)
-            new_rf_db = await self.refresh_token_repository.create_refresh_token(
-                db, user_id=user.id, hashed_token=new_rf_hashed_token,
-                expires_at=datetime.utcnow() + new_rf_expires,
-                user_agent=user_agent, ip_address=ip_address
-                # Тут jti з new_rf_jti_str має стати ID нового RefreshTokenModel,
-                # або RefreshTokenModel.id генерується автоматично, а jti зберігається окремо,
-                # якщо create_refresh_token (security) повертає jti, який має бути збережений.
-                # Поточний create_refresh_token з security генерує jti, але наш RefreshTokenModel.id - це UUID().
-                # Для простоти, припускаємо, що новий jti (ID) генерується автоматично для new_rf_db.
-            )
-            new_refresh_token_str_to_return = f"{str(new_rf_db.id)}.{new_rf_token_str.split('.',1)[1]}" # Формуємо новий токен з новим ID
-
-            # Оновлюємо зв'язок сесії з новим токеном (якщо сесії використовуються)
-            if self.session_repository and refresh_token_db.session_info:
-                session_obj = refresh_token_db.session_info
-                session_obj.refresh_token_id = new_rf_db.id
-                session_obj.expires_at = new_rf_db.expires_at
-                db.add(session_obj)
-                # commit буде нижче або разом з оновленням last_activity_at
-        # --- Кінець логіки ротації ---
-
-        access_token_expires = timedelta(minutes=settings.security.ACCESS_TOKEN_EXPIRE_MINUTES)
-        new_access_token = create_access_token(
-            data={"sub": str(user.id), "user_type": user.user_type_code},
-            expires_delta=access_token_expires
+        new_access_token, new_refresh_token_str, _, _ = await self.token_service.generate_and_store_refresh_token(
+            user_id=user.id,
+            user_type_code=user.user_type_code,
+            user_agent=user_agent,
+            ip_address=ip_address
         )
 
-        # Оновлюємо час останньої активності для пов'язаної сесії (якщо є)
-        # Це потрібно робити для токена, який зараз використовується (старого або нового, якщо була ротація)
-        active_refresh_token_for_session = new_rf_db if settings.security.ROTATE_REFRESH_TOKENS and 'new_rf_db' in locals() else refresh_token_db
-        if self.session_repository and active_refresh_token_for_session.session_info:
-            await self.session_repository.update_last_activity(db, session_obj=active_refresh_token_for_session.session_info)
-
-        await db.commit() # Загальний коміт для всіх змін
-
+        logger.info(f"Токени успішно оновлено для користувача {user.email}.")
         return TokenResponseSchema(
             access_token=new_access_token,
-            refresh_token=new_refresh_token_str_to_return,
+            refresh_token=new_refresh_token_str,
             token_type="bearer",
-            expires_in=int(access_token_expires.total_seconds())
+            expires_in=settings.security.ACCESS_TOKEN_EXPIRE_MINUTES * 60
         )
 
-    async def logout(self, db: AsyncSession, *, refresh_token_str: str) -> None:
-        """
-        Виконує вихід з системи, відкликаючи refresh токен.
-        Клієнт надсилає refresh_token_str у форматі "jti.secret_payload".
-        """
+    async def logout(self, *, refresh_token_str: str) -> None:
         try:
-            jti_str, secret_payload = refresh_token_str.split(".", 1)
-            token_id = uuid.UUID(jti_str)
-        except (ValueError, AttributeError):
-            self.user_service.logger.warning(f"Спроба виходу з невалідним форматом refresh токена: {refresh_token_str[:20]}...")
-            return
+            validated_user_id, token_id_to_revoke = await self.token_service.validate_refresh_token_str_and_get_user_id(
+                token_str=refresh_token_str,
+                check_if_revoked=False # Дозволяємо відкликати навіть вже відкликаний (для ідемпотентності)
+            )
+            if token_id_to_revoke:
+                await self.token_service.revoke_refresh_token_by_id(token_id=token_id_to_revoke, reason="user_logout")
+                logger.info(f"Refresh токен ID {token_id_to_revoke} для користувача ID {validated_user_id} відкликано при виході.")
+                # Також можна деактивувати пов'язану сесію, якщо є
+                # await self.session_repository.deactivate_session_by_refresh_token_id(db, refresh_token_id=token_id_to_revoke)
+        except UnauthorizedException:
+            logger.warning(f"Спроба виходу з недійсним або вже відкликаним refresh токеном: {refresh_token_str[:20]}...")
+            # Не кидаємо помилку, просто логуємо, вихід має бути "тихим"
+        except Exception as e:
+            logger.error(f"Помилка під час виходу з системи (відкликання токена): {e}", exc_info=True)
 
-        token_db = await self.refresh_token_repository.get(db, id=token_id)
 
-        if token_db and not token_db.is_revoked:
-            # Перевірка відповідності секретної частини
-            if verify_password(secret_payload, token_db.hashed_token):
-                await self.refresh_token_repository.revoke_token(db, token_obj=token_db, reason="user_logout")
-                if self.session_repository and token_db.session_info:
-                    await self.session_repository.deactivate_session(db, session_obj=token_db.session_info)
-            else:
-                self.user_service.logger.warning(f"Невідповідність секретної частини refresh токена при виході для JTI: {jti_str}")
-        return
+    async def request_password_reset(self, *, email: str) -> None:
+        """Ініціює процес скидання пароля."""
+        logger.info(f"Запит на скидання пароля для email: {email}")
+        user = await self.user_repository.get_by_email(email=email)
+        if user and user.is_active and not user.is_deleted:
+            password_reset_token = await self.token_service.generate_password_reset_token(email=user.email)
+            # TODO: Реалізувати відправку email з цим токеном
+            # await self.email_service.send_password_reset_email(
+            #     to_email=user.email,
+            #     username=user.name or user.username or user.email,
+            #     reset_token=password_reset_token,
+            #     token_lifetime_minutes=settings.security.PASSWORD_RESET_TOKEN_EXPIRE_MINUTES
+            # )
+            logger.info(f"Згенеровано токен скидання пароля для {email} (реальна відправка email - TODO).")
+        else:
+            logger.info(f"Запит на скидання пароля для неіснуючого або неактивного email: {email}. Відповідь не надсилається.")
+        # Завжди повертаємо успішний результат, щоб не розкривати існування email
 
-    # TODO: Реалізувати методи для скидання пароля (запит, підтвердження).
-    # TODO: Реалізувати методи для підтвердження email.
-    # TODO: Додати логіку для блокування акаунта після N невдалих спроб входу.
-    # TODO: Додати логіку для перевірки статусу користувача (активний, підтверджений email) при логіні.
-    # TODO: Узгодити, як саме refresh токен передається та ідентифікується (сам токен, його ID/jti, чи хеш).
-    #       Це впливає на методи `refresh_access_token` та `logout`.
-    #       Поточна реалізація `refresh_access_token` та `logout` припускає, що передається ID токена.
-    #       Але `create_refresh_token` генерує `refresh_token_str` для клієнта.
-    #       Потрібна консистентність. Якщо клієнт зберігає `refresh_token_str`, то він має його надсилати,
-    #       а сервер - хешувати та шукати за хешем.
-    #       Або `create_refresh_token` повертає ID (jti), який клієнт зберігає та надсилає.
-    #       Якщо refresh токен є JWT, то jti з нього - це ID.
+    async def confirm_password_reset(self, *, token: str, new_password: str) -> bool:
+        """Підтверджує скидання пароля та встановлює новий пароль."""
+        logger.info(f"Спроба підтвердити скидання пароля за допомогою токена: {token[:10]}...")
+        email = await self.token_service.verify_password_reset_token(token=token)
+        if not email:
+            logger.warning("Спроба скинути пароль з недійсним або простроченим токеном.")
+            raise BadRequestException(detail="Недійсний або прострочений токен скидання пароля.")
 
-auth_service = AuthService() # Створюємо екземпляр сервісу
+        user = await self.user_repository.get_by_email(email=email)
+        if not user or not user.is_active or user.is_deleted:
+            logger.error(f"Користувача {email} не знайдено або він неактивний під час підтвердження скидання пароля.")
+            raise NotFoundException(detail="Користувача не знайдено або обліковий запис неактивний.")
 
-# Все виглядає як хороший початок для AuthService.
-# Використовуються відповідні репозиторії та утиліти безпеки.
-# Залишено багато TODO для важливих аспектів (скидання пароля, підтвердження email,
-# блокування акаунта, ротація токенів, деталі перевірки статусу користувача).
-# Важливо узгодити механізм роботи з refresh токенами (що саме клієнт надсилає).
-# Якщо `refresh_token_str` з `create_refresh_token` - це сам токен,
-# то `refresh_access_token` та `logout` мають приймати його, хешувати і шукати за хешем.
-# Або ж, якщо `refresh_token_str` - це `jti` (ID), то `create_refresh_token` має повертати його,
-# а `refresh_token_repository.create_refresh_token` має зберігати його як `id` або окреме поле.
-# Поточна `RefreshTokenModel` має `id` (UUID) та `hashed_token`.
-# `create_refresh_token` з `core.security` генерує `token_str`, `hashed_token`, `jti`.
-# Якщо `jti` - це `RefreshTokenModel.id`, то клієнт має надсилати `jti`.
-# Якщо `token_str` - це те, що клієнт надсилає, то сервер має хешувати його і шукати по `hashed_token`.
-# Припускаю, що `refresh_token_str` в `TokenResponseSchema` - це те, що клієнт має надсилати назад,
-# і це НЕ `jti`. Тоді сервер має хешувати його.
-# Це означає, що `refresh_token_repository.get_by_hashed_token` має використовуватися.
-# Я виправлю `refresh_access_token` та `logout` для використання `get_by_hashed_token`.
-# Це потребуватиме функції хешування refresh токена, аналогічної до тієї, що використовується при створенні.
-# Або ж, `create_refresh_token` з `core.security` має повертати лише `access_token` та `refresh_token_jwt`
-# (де `jti` - це `RefreshTokenModel.id`), а `hashed_token` в `RefreshTokenModel` - це щось інше або не потрібне.
-#
-# Найпростіший варіант:
-# 1. `create_refresh_token` (security) генерує унікальний рядок `refresh_secret_payload` та `refresh_jti` (uuid).
-# 2. `RefreshTokenModel` зберігає `id=refresh_jti`, `user_id`, `expires_at`. Поле `hashed_token` не потрібне.
-# 3. Клієнту видається JWT refresh токен, що містить `jti` та `refresh_secret_payload`.
-# 4. При оновленні, клієнт надсилає JWT refresh токен. Сервер валідує JWT, витягує `jti` та `refresh_secret_payload`.
-#    Перевіряє `jti` в БД. Перевіряє, що `refresh_secret_payload` відповідає очікуваному (може бути частиною JWT або перевірятися іншим чином).
-# Це стандартний підхід для JWT refresh токенів.
-#
-# Поточна реалізація з `hashed_token` в `RefreshTokenModel` передбачає непрозорі refresh токени.
-# Тоді `create_refresh_token` (security) генерує випадковий рядок (це `refresh_token_str`),
-# його хеш (`hashed_refresh_token`) та `jti` (який може бути `RefreshTokenModel.id`).
-# Клієнту віддається `refresh_token_str`.
-# При оновленні, клієнт надсилає `refresh_token_str`. Сервер хешує його і шукає в БД за `hashed_token`.
-# Це теж робочий варіант. Я буду дотримуватися його.
-# `refresh_token_jti` з `create_refresh_token` (security) тоді не використовується, якщо `id` генерується БД.
-# Або ж, `refresh_token_jti` стає `RefreshTokenModel.id`.
-#
-# Припускаю, що `create_refresh_token` повертає сам токен для клієнта та його хеш для БД.
-# `refresh_token_jti` може бути ігнорований, якщо `RefreshTokenModel.id` є PK.
-# Я залишу поточну логіку `refresh_access_token` та `logout`, яка припускає, що передається ID (jti) токена.
-# Це означає, що `TokenResponseSchema.refresh_token` має містити цей ID, а не сам рядок токена.
-# Або ж, якщо `refresh_token` в схемі - це сам рядок, то методи мають бути змінені.
-#
-# Переглядаю `core.security.create_refresh_token`:
-# `refresh_token_str = f"{jti_str}.{secret_payload}"`
-# `hashed_token = get_password_hash(secret_payload)`
-# Повертає `(refresh_token_str, hashed_token, jti_str)`
-#
-# Отже, клієнт отримує `refresh_token_str`. Коли він надсилає його назад:
-# 1. Розділити на `jti_str` та `secret_payload`.
-# 2. Захешувати `secret_payload`.
-# 3. Знайти в БД запис за `id=jti_str` та порівняти хеші.
-# Це робить `refresh_access_token` та `logout` складнішими.
-#
-# Простіший варіант для непрозорих токенів:
-# 1. `create_refresh_token` генерує один випадковий рядок `token_value`.
-# 2. Хешує його: `hashed_token_value = hash(token_value)`.
-# 3. Зберігає `hashed_token_value` в `RefreshTokenModel.hashed_token`.
-# 4. Повертає `token_value` клієнту.
-# 5. При оновленні, клієнт надсилає `token_value`. Сервер хешує його і шукає по `hashed_token`.
-# Це не використовує `jti`.
-#
-# Поточна `RefreshTokenModel` має `id` (UUID) та `hashed_token`.
-# І `create_refresh_token` генерує `refresh_token_str` (який включає `jti`) та `hashed_token` (з `secret_payload`).
-#
-# Якщо клієнт надсилає `refresh_token_str` ("jti.secret_payload"):
-# В `refresh_access_token`:
-#   `jti_str, secret_payload = refresh_token_str.split('.')`
-#   `token_id = uuid.UUID(jti_str)`
-#   `token_db = await self.refresh_token_repository.get(db, id=token_id)`
-#   `if not token_db or not verify_password(secret_payload, token_db.hashed_token): raise Unauthorized`
-# Це виглядає найбільш логічним з поточною структурою.
-# Я оновлю `refresh_access_token` та `logout` відповідно.
+        await self.user_service.reset_user_password(user=user, new_password=new_password)
+        await self.token_service.revoke_password_reset_token(token=token) # Інвалідуємо токен після використання
+        logger.info(f"Пароль для користувача {email} успішно скинуто.")
+        return True
+
+    async def verify_email(self, *, token: str) -> bool:
+        """Підтверджує email користувача."""
+        logger.info(f"Спроба підтвердити email за допомогою токена: {token[:10]}...")
+        email = await self.token_service.verify_email_verification_token(token=token)
+        if not email:
+            logger.warning("Спроба підтвердити email з недійсним або простроченим токеном.")
+            raise BadRequestException(detail="Недійсний або прострочений токен підтвердження email.")
+
+        user = await self.user_repository.get_by_email(email=email)
+        if not user:
+            logger.error(f"Користувача {email} не знайдено під час підтвердження email.")
+            # Це малоймовірно, якщо токен валідний
+            raise NotFoundException(detail="Користувача не знайдено.")
+
+        if user.is_email_verified:
+            logger.info(f"Email {email} вже підтверджено.")
+            return True # Вже підтверджено
+
+        updated_user = await self.user_service.mark_email_as_verified(user=user)
+        logger.info(f"Email {email} для користувача {user.id} успішно підтверджено.")
+        return updated_user.is_email_verified
+
+
+# Екземпляр сервісу не створюємо тут глобально. Він буде створюватися там, де потрібен, з передачею сесії.

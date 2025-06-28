@@ -6,11 +6,12 @@
 Цей модуль надає API для адміністраторів системи для:
 - Перегляду логів/статусів доставки конкретних сповіщень.
 - Можливо, для повторної спроби надсилання сповіщень, що не були доставлені.
-- Фільтрації логів доставки за різними критеріями (користувач, тип, статус).
+- Фільтрації логів доставки за різними критеріями (користувач, тип, статус, канал, дата).
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Path
-from typing import List, Optional
+from typing import List, Optional, Any
+from datetime import datetime # Для фільтрів по даті
 
 from backend.app.src.config.logging import get_logger
 from backend.app.src.schemas.notifications.delivery import NotificationDeliveryAttemptSchema
@@ -27,7 +28,7 @@ router = APIRouter()
 
 @router.get(
     "",
-    response_model=List[NotificationDeliveryAttemptSchema], # Або схема з пагінацією
+    response_model=List[NotificationDeliveryAttemptSchema], # Або схема з пагінацією, напр. DeliveryAttemptPageSchema
     tags=["Notifications", "Notification Delivery (Admin)"],
     summary="Отримати лог статусів доставки сповіщень (суперкористувач)"
 )
@@ -36,27 +37,35 @@ async def list_all_notification_delivery_statuses(
     current_user: UserModel = Depends(CurrentSuperuser),
     page: int = Query(DEFAULT_PAGE, ge=1, description="Номер сторінки"),
     page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=100, description="Розмір сторінки"),
-    user_id_filter: Optional[int] = Query(None, description="Фільтр за ID користувача"),
-    notification_id_filter: Optional[int] = Query(None, description="Фільтр за ID сповіщення"),
-    channel_filter: Optional[str] = Query(None, description="Фільтр за каналом доставки (напр., 'email', 'sms')"),
-    status_filter: Optional[str] = Query(None, description="Фільтр за статусом доставки (напр., 'sent', 'failed', 'pending')")
+    user_id: Optional[int] = Query(None, description="Фільтр за ID користувача-отримувача"),
+    notification_id: Optional[int] = Query(None, description="Фільтр за ID сповіщення"),
+    channel_type: Optional[str] = Query(None, description="Фільтр за каналом доставки (напр., 'EMAIL', 'SMS')"),
+    delivery_status: Optional[str] = Query(None, description="Фільтр за статусом доставки (напр., 'SENT', 'FAILED')"),
+    attempted_at_from: Optional[datetime] = Query(None, description="Початкова дата періоду для фільтрації спроб доставки"),
+    attempted_at_to: Optional[datetime] = Query(None, description="Кінцева дата періоду для фільтрації спроб доставки")
 ):
-    logger.info(f"Суперкористувач {current_user.email} запитує лог статусів доставки сповіщень.")
+    logger.info(
+        f"Суперкористувач {current_user.email} запитує лог статусів доставки сповіщень. "
+        f"Фільтри: user_id={user_id}, notification_id={notification_id}, channel={channel_type}, "
+        f"status={delivery_status}, from={attempted_at_from}, to={attempted_at_to}."
+    )
     service = NotificationDeliveryService(db_session)
 
     attempts_data = await service.get_all_delivery_attempts(
         skip=(page - 1) * page_size,
         limit=page_size,
-        user_id=user_id_filter,
-        notification_id=notification_id_filter,
-        channel=channel_filter,
-        status=status_filter
+        user_id=user_id,
+        notification_id=notification_id,
+        channel_type=channel_type,
+        delivery_status=delivery_status,
+        attempted_at_from=attempted_at_from,
+        attempted_at_to=attempted_at_to
     )
     # Припускаємо, сервіс повертає {"attempts": [], "total": 0}
-    # TODO: Додати обробку пагінації та заголовків у відповідь
+    # TODO: Додати обробку пагінації та заголовків у відповідь, якщо сервіс повертає total
     if isinstance(attempts_data, dict):
         return attempts_data.get("attempts", [])
-    return attempts_data # Якщо повертає просто список
+    return attempts_data
 
 
 @router.get(
@@ -66,7 +75,7 @@ async def list_all_notification_delivery_statuses(
     summary="Отримати деталі конкретної спроби доставки (суперкористувач)"
 )
 async def get_delivery_attempt_details_endpoint(
-    attempt_id: int = Path(..., description="ID спроби доставки"), # Змінено на int
+    attempt_id: int = Path(..., description="ID спроби доставки"),
     db_session: DBSession = Depends(),
     current_user: UserModel = Depends(CurrentSuperuser)
 ):
@@ -79,32 +88,28 @@ async def get_delivery_attempt_details_endpoint(
 
 @router.post(
     "/{attempt_id}/retry",
-    response_model=NotificationDeliveryAttemptSchema, # Повертає оновлений або новий запис спроби
+    response_model=NotificationDeliveryAttemptSchema,
     tags=["Notifications", "Notification Delivery (Admin)"],
     summary="Повторити спробу надсилання сповіщення (суперкористувач)"
 )
 async def retry_failed_notification_delivery(
-    attempt_id: int = Path(..., description="ID невдалої спроби доставки"),
+    attempt_id: int = Path(..., description="ID невдалої спроби доставки для повтору"),
     db_session: DBSession = Depends(),
     current_user: UserModel = Depends(CurrentSuperuser)
 ):
     logger.info(f"Суперкористувач {current_user.email} запитує повторне надсилання для спроби доставки ID: {attempt_id}.")
     service = NotificationDeliveryService(db_session)
     try:
-        # Сервіс має знайти оригінальне сповіщення та спробувати надіслати його знову,
-        # створивши новий запис NotificationDeliveryAttempt або оновивши існуючий.
         retried_attempt = await service.retry_delivery_attempt(attempt_id=attempt_id, actor_id=current_user.id)
-        if not retried_attempt: # Якщо оригінальна спроба не знайдена або не може бути повторена
+        if not retried_attempt:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Невдалося знайти або повторити спробу доставки.")
         return retried_attempt
-    except HTTPException as e:
-        raise e
-    except ValueError as ve: # Наприклад, якщо сповіщення вже було успішно доставлене
+    except ValueError as ve:
+        logger.warning(f"Помилка валідації при повторній спробі доставки ID {attempt_id}: {str(ve)}")
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(ve))
     except Exception as e_gen:
         logger.error(f"Помилка повторного надсилання сповіщення для спроби ID {attempt_id}: {e_gen}", exc_info=True)
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Помилка сервера.")
-
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Помилка сервера при повторній спробі надсилання.")
 
 # Роутер буде підключений в backend/app/src/api/v1/notifications/__init__.py
 # з префіксом /delivery-status

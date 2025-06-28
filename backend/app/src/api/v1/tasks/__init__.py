@@ -1,54 +1,61 @@
 # backend/app/src/api/v1/tasks/__init__.py
 # -*- coding: utf-8 -*-
 """
-Ініціалізаційний файл для пакету ендпоінтів завдань та подій API v1.
+Ініціалізаційний файл для пакету 'tasks' API v1.
 
-Цей пакет містить роутери для управління завданнями та пов'язаними сутностями:
-- Основні CRUD операції з завданнями/подіями (`tasks.py`).
-- Призначення завдань (`assignments.py`).
-- Обробка виконання завдань (`completions.py`).
-- Пропозиції завдань від користувачів (`proposals.py`).
-- Відгуки на завдання (`reviews.py`).
+Цей пакет містить ендпоінти для управління завданнями та подіями
+в системі через API v1. Операції можуть включати:
+- Створення, перегляд, редагування та видалення завдань/подій (`task.py`).
+- Призначення завдань користувачам (`assignment.py`).
+- Відстеження виконання завдань (`completion.py`).
+- Робота з пропозиціями завдань від користувачів (`proposal.py`).
+- Залишення відгуків на завдання (`review.py`).
 
-Ендпоінти зазвичай прив'язані до конкретної групи: `/groups/{group_id}/tasks/...`
+Шляхи до ендпоінтів завдань часто є вкладеними в групи, наприклад:
+`/groups/{group_id}/tasks/...`
+
+Цей файл робить каталог 'tasks' пакетом Python та експортує
+агрегований роутер `router` для всіх ендпоінтів завдань.
+Цей `router` призначений для підключення в контексті конкретної групи,
+наприклад, в `groups/__init__.py` або в `v1/router.py` з префіксом `/groups/{group_id}/tasks`.
 """
 
 from fastapi import APIRouter
 
-from backend.app.src.api.v1.tasks.tasks import router as main_tasks_router
-from backend.app.src.api.v1.tasks.assignments import router as task_assignments_router
-from backend.app.src.api.v1.tasks.completions import router as task_completions_router
-from backend.app.src.api.v1.tasks.proposals import router as task_proposals_router
-from backend.app.src.api.v1.tasks.reviews import router as task_reviews_router
+# TODO: Імпортувати окремі роутери з модулів цього пакету, коли вони будуть створені.
+# from backend.app.src.api.v1.tasks.task import router as crud_tasks_router
+# from backend.app.src.api.v1.tasks.assignment import router as task_assignment_router
+# from backend.app.src.api.v1.tasks.completion import router as task_completion_router
+# from backend.app.src.api.v1.tasks.proposal import router as task_proposal_router
+# from backend.app.src.api.v1.tasks.review import router as task_review_router
 
-# Агрегуючий роутер для всіх ендпоінтів, пов'язаних із завданнями.
-# Цей роутер буде підключатися до головного роутера API v1 з префіксом,
-# що включає group_id, наприклад, в `router.py` модуля `groups` або в головному `v1.router`.
-# Для кращої організації, ендпоінти, що стосуються конкретного завдання (наприклад, призначення, відгуки),
-# можуть бути вкладеними під шляхом конкретного завдання.
+# Агрегуючий роутер для всіх ендпоінтів завдань API v1.
+# Цей роутер буде підключений з префіксом, що включає group_id.
+router = APIRouter(tags=["v1 :: Tasks & Events"])
 
-# Наприклад, /groups/{group_id}/tasks - для main_tasks_router
-#           /groups/{group_id}/tasks/{task_id}/assignments - для task_assignments_router
-#           /groups/{group_id}/task-proposals - для task_proposals_router (може бути окремо від конкретного завдання)
+# TODO: Розкоментувати та підключити окремі роутери.
+# Приклад структури підключення:
 
-tasks_router = APIRouter()
+# Основні CRUD операції з завданнями (наприклад, /groups/{group_id}/tasks/, /groups/{group_id}/tasks/{task_id})
+# router.include_router(crud_tasks_router) # Шляхи визначаються всередині crud_tasks_router
 
-# Основні операції з завданнями
-tasks_router.include_router(main_tasks_router) # Без додаткового префіксу тут, він буде заданий при підключенні tasks_router
+# Дії, пов'язані з конкретним завданням (вкладені під /{task_id}/)
+# router.include_router(task_assignment_router, prefix="/{task_id}/assignments")
+# router.include_router(task_completion_router, prefix="/{task_id}/completions") # Або /actions
+# router.include_router(task_review_router, prefix="/{task_id}/reviews")
 
-# Вкладені роутери для конкретного завдання (під /groups/{group_id}/tasks/{task_id}/)
-task_specific_router = APIRouter()
-task_specific_router.include_router(task_assignments_router, prefix="/{task_id}/assignments", tags=["Tasks"])
-task_specific_router.include_router(task_completions_router, prefix="/{task_id}/actions", tags=["Tasks"]) # "actions" замість "completions" для URL
-task_specific_router.include_router(task_reviews_router, prefix="/{task_id}/reviews", tags=["Tasks"])
-
-tasks_router.include_router(task_specific_router) # Підключаємо вкладені роутери
-
-# Роутер для пропозицій завдань (може бути на рівні групи, а не конкретного завдання)
-# Наприклад, /groups/{group_id}/task-proposals
-tasks_router.include_router(task_proposals_router, prefix="/task-proposals", tags=["Tasks"])
+# Пропозиції завдань (можуть бути на рівні групи, а не конкретного завдання)
+# Наприклад, /groups/{group_id}/tasks/proposals
+# router.include_router(task_proposal_router, prefix="/proposals")
 
 
-__all__ = (
-    "tasks_router",
-)
+# Експорт агрегованого роутера.
+__all__ = [
+    "router",
+]
+
+# TODO: Узгодити назву експортованого роутера ("router") з імпортом
+# в `backend.app.src.api.v1.router.py` (очікує `tasks_v1_router`) або
+# в `backend.app.src.api.v1.groups.__init__.py` (якщо підключається там).
+# TODO: Переконатися, що шляхи та префікси коректно обробляють `group_id` та `task_id`.
+# Файли `task.py`, `assignment.py` і т.д. повинні враховувати ці параметри шляху.

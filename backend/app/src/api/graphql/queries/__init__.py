@@ -1,55 +1,69 @@
 # backend/app/src/api/graphql/queries/__init__.py
 # -*- coding: utf-8 -*-
 """
-Ініціалізаційний файл для пакету GraphQL запитів (Queries).
+Ініціалізаційний файл для пакету 'queries' GraphQL API.
 
-Цей пакет містить визначення резолверів для полів кореневого типу `Query`
-в GraphQL схемі. Кожен файл у цьому каталозі (наприклад, `user_queries.py`,
-`group_queries.py`) зазвичай містить резолвери для отримання даних,
-пов'язаних з певною доменною сутністю.
+Цей пакет відповідає за визначення кореневого типу `Query` та всіх
+резолверів для полів цього типу. Кореневий тип `Query` є точкою входу
+для всіх GraphQL запитів, що отримують дані з сервера.
 
-Цей `__init__.py` файл збирає всі частини типу `Query` (зазвичай це клас `Query`
-з методами-резолверами, або окремі функції, декоровані відповідним чином,
-залежно від бібліотеки) для передачі в `schema.py`.
+Резолвери для логічно пов'язаних запитів групуються в окремі
+файли всередині цього пакету (наприклад, `system.py`, `user.py`, `group.py`, `task.py`).
+Ці файли зазвичай визначають класи (наприклад, `SystemQueries`, `UserQueries`),
+які містять методи, декоровані `@strawberry.field`.
+
+Цей `__init__.py` файл імпортує ці класи-частини та об'єднує їх
+(наприклад, через успадкування) в єдиний клас `Query`, який потім
+експортується для використання в `graphql/schema.py`.
 """
 
-# import strawberry # Приклад для Strawberry
+import strawberry
 
-# TODO: Імпортувати частини типу Query з різних файлів.
-# Наприклад, якщо кожен файл визначає клас-міксін з полями Query:
-# from backend.app.src.api.graphql.queries.user_queries import UserQueries
-# from backend.app.src.api.graphql.queries.group_queries import GroupQueries
-# # ... і так далі ...
+# TODO: Імпортувати класи з полями Query з відповідних файлів цього пакету.
+# from backend.app.src.api.graphql.queries.system import SystemQueries
+# from backend.app.src.api.graphql.queries.user import UserQueries
+# from backend.app.src.api.graphql.queries.group import GroupQueries
+# from backend.app.src.api.graphql.queries.task import TaskQueries
+# from backend.app.src.api.graphql.queries.team import TeamQueries
+# from backend.app.src.api.graphql.queries.bonus import BonusQueries
+# from backend.app.src.api.graphql.queries.gamification import GamificationQueries
+# from backend.app.src.api.graphql.queries.report import ReportQueries
+# from backend.app.src.api.graphql.queries.dictionary import DictionaryQueries
 
+# --- Заглушка для класу Query ---
+# Замініть це на реальне успадкування від імпортованих класів.
+@strawberry.type
+class Query:
+    """
+    Кореневий GraphQL тип для запитів (Queries).
+    Об'єднує всі доступні запити для отримання даних з системи.
+    Кожне поле цього типу відповідає за окремий запит.
+    """
+    @strawberry.field
+    def placeholder_query(self) -> str:
+        """Заглушка для поля запиту."""
+        return "Це відповідь від заглушки запиту. Реалізуйте реальні запити."
+
+# Приклад, як може виглядати реальний клас Query після імпорту частин:
 # @strawberry.type
 # class Query(
-#     UserQueries,    # Наслідування для об'єднання полів
+#     SystemQueries,
+#     UserQueries,
 #     GroupQueries,
-#     # ... інші класи з полями Query ...
+#     TaskQueries,
+#     TeamQueries,
+#     BonusQueries,
+#     GamificationQueries,
+#     ReportQueries,
+#     DictionaryQueries
 # ):
-#     """
-#     Кореневий тип GraphQL Query.
-#     Об'єднує всі доступні запити в API.
-#     """
-#     # Можна додати тут загальні поля Query, якщо вони є.
-#     @strawberry.field
-#     def health_check(self) -> str:
-#         """Перевірка стану GraphQL API."""
-#         return "GraphQL API is running!"
+#     pass # Успадкування об'єднує всі поля з батьківських класів.
+# --- Кінець заглушки ---
 
-# __all__ = (
-#     "Query",
-# )
+__all__ = [
+    "Query",
+]
 
-# Для Ariadne, тут може агрегуватися об'єкт QueryType або список резолверів.
-# from ariadne import QueryType
-# query = QueryType()
-# # Далі імпортувати функції-резолвери та реєструвати їх:
-# # from .user_queries import resolve_user_by_id, resolve_users_list
-# # query.set_field("userById", resolve_user_by_id)
-# # query.set_field("usersList", resolve_users_list)
-# # Потім `query` експортується.
-
-# На даному етапі, поки конкретні запити не визначені, файл
-# може містити лише структуру або заглушку.
-pass
+# Переконайтеся, що кожен файл в цьому пакеті (system.py, user.py тощо)
+# визначає клас (наприклад, SystemQueries), декорований `@strawberry.type`,
+# з методами, декорованими `@strawberry.field`, які реалізують логіку запитів.

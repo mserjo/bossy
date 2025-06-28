@@ -137,25 +137,27 @@ class InterceptHandler(logging.Handler):
 # налаштовуються на використання кастомного класу логгера.
 #
 # Поки що, для простоти, основний акцент на налаштуванні Loguru для коду додатку.
-# Інтеграція з логами Uvicorn/FastAPI може бути доопрацьована.
-# Зазвичай, якщо Uvicorn використовує стандартний `logging`, то достатньо
-# `logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)`
-# або налаштувати обробники для конкретних логгерів (uvicorn, uvicorn.access, fastapi).
 
-# --- Функція для отримання логгера ---
-# Loguru логгер є глобальним, тому його можна просто імпортувати: `from loguru import logger`
-# Але для консистентності або якщо потрібні специфічні налаштування для різних модулів,
-# можна створити функцію-обгортку.
-# На даний момент, прямий імпорт `logger` з `loguru` є достатнім.
-# def get_logger(name: Optional[str] = None) -> "Logger": # type: ignore
-#     # Якщо name не передано, Loguru використовує ім'я модуля, звідки викликано.
-#     # Можна повернути той самий глобальний екземпляр logger.
-#     # Або logger.bind(name=name) для створення "дочірнього" логгера з контекстом.
-#     # Поки що просто повертаємо глобальний.
-#     return logger
+# Налаштування стандартного logging для перехоплення логів з бібліотек
+# (наприклад, Uvicorn, SQLAlchemy).
+# Встановлюємо InterceptHandler для кореневого логера.
+logging.basicConfig(handlers=[InterceptHandler()], level=0, force=True)
+
+# Додатково можна налаштувати рівні для конкретних бібліотечних логерів,
+# щоб зменшити кількість "шуму", якщо потрібно.
+# Наприклад:
+# logging.getLogger("sqlalchemy.engine").setLevel(logging.INFO if settings.app.DEBUG else logging.WARNING)
+# logging.getLogger("uvicorn.access").setLevel(logging.INFO) # Логи доступу Uvicorn
+# logging.getLogger("uvicorn.error").setLevel(logging.ERROR) # Помилки Uvicorn
+
+# Для більш тонкого налаштування логів Uvicorn, особливо форматів,
+# краще використовувати кастомний `log_config` при запуску Uvicorn.
+# Однак, `InterceptHandler` має перехопити їх, якщо вони використовують стандартний `logging`.
+
+logger.info("Loguru налаштовано. Стандартні логи Python будуть перехоплюватися.")
 
 # Приклад використання в інших модулях:
-# from backend.app.src.config.logging import logger (якщо get_logger не використовується)
+# from backend.app.src.config.logging import logger
 # logger.info("Це інформаційне повідомлення.")
 # logger.debug("Це повідомлення для відладки.")
 # try:
@@ -163,44 +165,10 @@ class InterceptHandler(logging.Handler):
 # except ZeroDivisionError:
 #     logger.exception("Виникла помилка ділення на нуль!")
 
-# TODO: Доопрацювати інтеграцію з логами Uvicorn/FastAPI.
-# Можливо, потрібно буде налаштувати `LOGGING_CONFIG` для Uvicorn,
-# щоб він використовував обробники Loguru або стандартний logging, перехоплений Loguru.
-# Див. документацію FastAPI та Uvicorn щодо конфігурації логування.
-#
 # TODO: Розглянути можливість структурованого логування (наприклад, у JSON форматі)
 # для файлових логів, якщо вони будуть відправлятися в системи агрегації логів (ELK, Splunk).
-# Loguru підтримує кастомні серіалізатори для цього.
-# logger.add(..., serialize=True)
-#
-# TODO: Додати перевірку існування каталогу для лог-файлів перед їх створенням,
-# якщо логування у файл буде увімкнено.
-#
-# Все виглядає як хороший базовий набір налаштувань логування.
-# Файловий логгер закоментований, оскільки потребує змінних в `AppSettings`.
-# Це можна буде додати пізніше.
-# Основний консольний логгер налаштований.
-# Перехоплення стандартних логів `logging` через `InterceptHandler` - корисна практика.
-# `force=True` в `logging.basicConfig` може бути потрібним, якщо Uvicorn/FastAPI
-# вже налаштували свої обробники.
-# Замість `logging.basicConfig`, краще налаштовувати конкретні логгери,
-# наприклад, `logging.getLogger("uvicorn.access").handlers = [InterceptHandler()]`
-# та `logging.getLogger("uvicorn.error").handlers = [InterceptHandler()]`.
-# І встановити їм рівні.
-#
-# Для FastAPI, якщо він використовує стандартний `logging`, то цього може бути достатньо.
-# Якщо ні, то потрібно буде дивитися на його конфігурацію логування.
-#
-# Поки що основний функціонал логування для додатку через Loguru налаштований.
-#
-# Вирішено: інтеграцію з `logging` зроблю простішою, просто налаштувавши
-# обробники для кореневого логгера `logging`.
-logging.getLogger().handlers = [InterceptHandler()]
-logging.getLogger().setLevel(LOG_LEVEL.upper()) # Встановлюємо рівень для стандартного logging
+# Loguru підтримує це через `serialize=True` в `logger.add()`.
+# Можна додати відповідний параметр в `LoggingSettings`, наприклад, `LOG_FILE_SERIALIZE: bool = False`.
+# І потім використовувати `serialize=settings.logging.LOG_FILE_SERIALIZE` для файлового обробника.
 
-# Це має перехоплювати логи з усіх бібліотек, що використовують стандартний logging,
-# якщо вони не мають власних специфічних налаштувань, що ігнорують батьківські обробники.
-# Для Uvicorn, це зазвичай працює, якщо не передавати йому кастомний `log_config`.
-# Uvicorn за замовчуванням використовує стандартний logging.
-#
-# Все готово.
+# Все готово для цього файлу.

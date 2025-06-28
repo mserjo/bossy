@@ -43,6 +43,10 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         :param model: Клас моделі SQLAlchemy, з якою працюватиме репозиторій.
         """
         self.model = model
+        # Ініціалізуємо логер для конкретного репозиторію
+        from backend.app.src.config.logging import logger
+        self.logger = logger.bind(repository=self.model.__name__)
+
 
     async def create(self, db: AsyncSession, *, obj_in: CreateSchemaType) -> ModelType:
         """
@@ -52,14 +56,30 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         :param obj_in: Pydantic схема з даними для створення.
         :return: Створений об'єкт моделі SQLAlchemy.
         """
-        # Конвертуємо Pydantic схему в словник, придатний для моделі SQLAlchemy.
-        # exclude_unset=True - не включати поля, які не були передані (мають значення за замовчуванням).
+        from sqlalchemy.exc import IntegrityError # Імпорт для обробки помилок цілісності
+        from backend.app.src.core.exceptions import ConflictException, DatabaseErrorException
+
         obj_in_data = jsonable_encoder(obj_in, exclude_unset=True)
-        db_obj = self.model(**obj_in_data)  # Створюємо екземпляр моделі SQLAlchemy
-        db.add(db_obj) # Додаємо об'єкт до сесії
-        await db.commit() # Зберігаємо зміни в БД
-        await db.refresh(db_obj) # Оновлюємо об'єкт з БД (наприклад, для отримання згенерованого ID)
-        return db_obj
+        db_obj = self.model(**obj_in_data)
+        db.add(db_obj)
+        try:
+            await db.commit()
+            await db.refresh(db_obj)
+            self.logger.info(f"Створено новий запис {self.model.__name__} з ID {db_obj.id}")
+            return db_obj
+        except IntegrityError as e:
+            await db.rollback()
+            self.logger.warning(f"Помилка цілісності при створенні {self.model.__name__}: {obj_in_data}. Деталі: {e}")
+            # TODO: Потрібно аналізувати `e.orig` для визначення конкретного порушення (наприклад, unique constraint)
+            # та повертати більш специфічний ConflictException або інший відповідний виняток.
+            # Наприклад, якщо e.orig містить "violates unique constraint".
+            # Поки що загальний ConflictException.
+            raise ConflictException(detail_key="error_conflict_resource", resource_name=self.model.__name__)
+        except Exception as e:
+            await db.rollback()
+            self.logger.error(f"Помилка створення {self.model.__name__}: {obj_in_data}. Деталі: {e}", exc_info=True)
+            raise DatabaseErrorException(f"Помилка створення {self.model.__name__} в БД.")
+
 
     async def get(self, db: AsyncSession, id: Any) -> Optional[ModelType]:
         """
@@ -69,9 +89,14 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         :param id: Ідентифікатор запису.
         :return: Об'єкт моделі SQLAlchemy або None, якщо запис не знайдено.
         """
-        statement = select(self.model).where(self.model.id == id)
-        result = await db.execute(statement)
-        return result.scalar_one_or_none()
+        try:
+            statement = select(self.model).where(self.model.id == id)
+            result = await db.execute(statement)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            self.logger.error(f"Помилка отримання {self.model.__name__} за ID {id}: {e}", exc_info=True)
+            from backend.app.src.core.exceptions import DatabaseErrorException # Локальний імпорт
+            raise DatabaseErrorException(f"Помилка отримання {self.model.__name__} з БД.")
 
     async def _apply_filters(self, stmt: Executable, filters: Optional[Dict[str, Any]]) -> Executable: # type: ignore
         """
@@ -80,16 +105,23 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """
         if filters:
             for field, value in filters.items():
-                if hasattr(self.model, field):
-                    # TODO: Додати більш гнучку логіку для різних операторів фільтрації
-                    # (наприклад, __in, __like, __gt, __lt).
-                    # Поки що проста рівність.
-                    if isinstance(value, list) and hasattr(getattr(self.model, field), 'in_'):
-                        stmt = stmt.where(getattr(self.model, field).in_(value))
-                    elif value is None:
-                        stmt = stmt.where(getattr(self.model, field).is_(None))
-                    else:
-                        stmt = stmt.where(getattr(self.model, field) == value)
+                if not hasattr(self.model, field):
+                    self.logger.warning(f"Спроба фільтрувати за неіснуючим полем '{field}' в моделі {self.model.__name__}")
+                    continue
+
+                column_attr = getattr(self.model, field)
+                if isinstance(value, list): # Оператор 'in'
+                    stmt = stmt.where(column_attr.in_(value))
+                elif value is None: # Оператор 'is null'
+                    stmt = stmt.where(column_attr.is_(None))
+                # TODO: Додати інші оператори: like, gt, lt, gte, lte, not_in, not_equal, etc.
+                # Приклад для like (пошук за частиною рядка):
+                # elif isinstance(value, str) and field.endswith("__icontains"): # Умовний суфікс для оператора
+                #    actual_field_name = field.removesuffix("__icontains")
+                #    if hasattr(self.model, actual_field_name):
+                #        stmt = stmt.where(getattr(self.model, actual_field_name).ilike(f"%{value}%"))
+                else: # Рівність
+                    stmt = stmt.where(column_attr == value)
         return stmt
 
     async def _apply_order_by(self, stmt: Executable, order_by: Optional[List[str]]) -> Executable: # type: ignore
@@ -128,13 +160,19 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         :param order_by: Список полів для сортування (наприклад, ["name", "-created_at"]).
         :return: Список об'єктів моделі SQLAlchemy.
         """
-        statement = select(self.model)
-        statement = await self._apply_filters(statement, filters)
-        statement = await self._apply_order_by(statement, order_by)
-        statement = statement.offset(skip).limit(limit)
+        try:
+            statement = select(self.model)
+            statement = await self._apply_filters(statement, filters)
+            statement = await self._apply_order_by(statement, order_by)
+            statement = statement.offset(skip).limit(limit)
 
-        result = await db.execute(statement)
-        return result.scalars().all() # type: ignore
+            result = await db.execute(statement)
+            return result.scalars().all() # type: ignore
+        except Exception as e:
+            self.logger.error(f"Помилка отримання списку {self.model.__name__}: {filters=}, {order_by=}. Деталі: {e}", exc_info=True)
+            from backend.app.src.core.exceptions import DatabaseErrorException # Локальний імпорт
+            raise DatabaseErrorException(f"Помилка отримання списку {self.model.__name__} з БД.")
+
 
     async def get_paginated(
         self, db: AsyncSession, *, page: int = 1, size: int = 20,
@@ -165,14 +203,16 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         if page > total_pages and total_pages > 0: page = total_pages # Не виходити за межі
         skip = (page - 1) * size
 
-        # Запит для отримання елементів поточної сторінки
-        items_statement = select(self.model)
-        items_statement = await self._apply_filters(items_statement, filters)
-        items_statement = await self._apply_order_by(items_statement, order_by)
-        items_statement = items_statement.offset(skip).limit(size)
+        items: List[ModelType] = []
+        if total_items > 0 : # Робимо запит на елементи, тільки якщо вони є
+            # Запит для отримання елементів поточної сторінки
+            items_statement = select(self.model)
+            items_statement = await self._apply_filters(items_statement, filters)
+            items_statement = await self._apply_order_by(items_statement, order_by)
+            items_statement = items_statement.offset(skip).limit(size)
 
-        items_result = await db.execute(items_statement)
-        items = items_result.scalars().all() # type: ignore
+            items_result = await db.execute(items_statement)
+            items = items_result.scalars().all() # type: ignore
 
         return PaginatedResponse(
             total=total_items,
@@ -205,13 +245,21 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         for field, value in update_data.items():
             if hasattr(db_obj, field):
                 setattr(db_obj, field, value)
-            # else: # Можна додати попередження або помилку, якщо поле не існує
-            #     logger.warning(f"Спроба оновити неіснуюче поле '{field}' в моделі {self.model.__name__}")
+            else:
+                self.logger.warning(f"Спроба оновити неіснуюче поле '{field}' в моделі {self.model.__name__}")
 
-        db.add(db_obj) # Додаємо об'єкт до сесії (SQLAlchemy відстежить зміни)
-        await db.commit() # Зберігаємо зміни
-        await db.refresh(db_obj) # Оновлюємо об'єкт з БД
-        return db_obj
+        db.add(db_obj)
+        try:
+            await db.commit()
+            await db.refresh(db_obj)
+            self.logger.info(f"Оновлено запис {self.model.__name__} з ID {db_obj.id}")
+            return db_obj
+        except Exception as e: # TODO: Обробляти IntegrityError та інші специфічні помилки
+            await db.rollback()
+            self.logger.error(f"Помилка оновлення {self.model.__name__} (ID: {db_obj.id}): {update_data}. Деталі: {e}", exc_info=True)
+            from backend.app.src.core.exceptions import DatabaseErrorException # Локальний імпорт
+            raise DatabaseErrorException(f"Помилка оновлення {self.model.__name__} в БД.")
+
 
     async def delete(self, db: AsyncSession, *, id: Any) -> Optional[ModelType]:
         """
@@ -223,34 +271,57 @@ class BaseRepository(Generic[ModelType, CreateSchemaType, UpdateSchemaType]):
         """
         db_obj = await self.get(db, id)
         if db_obj:
-            await db.delete(db_obj)
-            await db.commit()
-            return db_obj
+            try:
+                await db.delete(db_obj)
+                await db.commit()
+                self.logger.info(f"Видалено запис {self.model.__name__} з ID {id}")
+                return db_obj
+            except Exception as e: # TODO: Обробляти помилки, пов'язані з ForeignKey constraints
+                await db.rollback()
+                self.logger.error(f"Помилка видалення {self.model.__name__} (ID: {id}): {e}", exc_info=True)
+                from backend.app.src.core.exceptions import DatabaseErrorException # Локальний імпорт
+                raise DatabaseErrorException(f"Помилка видалення {self.model.__name__} з БД.")
+        self.logger.warning(f"Спроба видалити неіснуючий запис {self.model.__name__} з ID {id}")
         return None
 
-    async def soft_delete(self, db: AsyncSession, *, db_obj: ModelType) -> Optional[ModelType]:
+    async def soft_delete(self, db: AsyncSession, *, db_obj: ModelType, current_user_id: Optional[Any] = None) -> Optional[ModelType]:
         """
         Виконує "м'яке" видалення запису, якщо модель це підтримує.
         Встановлює поля `is_deleted = True` та `deleted_at = current_time`.
+        Також встановлює `updated_by_user_id`, якщо поле існує та `current_user_id` передано.
 
         :param db: Асинхронна сесія бази даних.
         :param db_obj: Об'єкт моделі SQLAlchemy для "м'якого" видалення.
+        :param current_user_id: ID користувача, що виконує дію (для updated_by_user_id).
         :return: Оновлений об'єкт моделі або None, якщо модель не підтримує "м'яке" видалення.
         """
         if not hasattr(db_obj, "is_deleted") or not hasattr(db_obj, "deleted_at"):
-            # Модель не підтримує "м'яке" видалення
-            # Можна кинути виняток або просто повернути None / не робити нічого.
-            # from backend.app.src.config.logging import logger
-            # logger.warning(f"Модель {self.model.__name__} не підтримує 'м'яке' видалення.")
-            return None # Або raise NotImplementedError
+            self.logger.warning(f"Модель {self.model.__name__} не підтримує 'м'яке' видалення.")
+            return None
 
+        from datetime import datetime, timezone # Імпорт для deleted_at
         setattr(db_obj, "is_deleted", True)
-        setattr(db_obj, "deleted_at", func.now()) # Використовуємо func.now() для часу БД
+        setattr(db_obj, "deleted_at", datetime.now(timezone.utc)) # Використовуємо UTC
+
+        if current_user_id and hasattr(db_obj, "updated_by_user_id"):
+            setattr(db_obj, "updated_by_user_id", current_user_id)
+
+        # updated_at має оновлюватися автоматично через onupdate=func.now() в BaseModel, якщо визначено.
+        # Якщо ні, то: if hasattr(db_obj, "updated_at"): setattr(db_obj, "updated_at", datetime.now(timezone.utc))
+
 
         db.add(db_obj)
-        await db.commit()
-        await db.refresh(db_obj)
-        return db_obj
+        try:
+            await db.commit()
+            await db.refresh(db_obj)
+            self.logger.info(f"'М'яко' видалено запис {self.model.__name__} з ID {db_obj.id}")
+            return db_obj
+        except Exception as e:
+            await db.rollback()
+            self.logger.error(f"Помилка 'м'якого' видалення {self.model.__name__} (ID: {db_obj.id}): {e}", exc_info=True)
+            from backend.app.src.core.exceptions import DatabaseErrorException # Локальний імпорт
+            raise DatabaseErrorException(f"Помилка 'м'якого' видалення {self.model.__name__} в БД.")
+
 
     async def restore(self, db: AsyncSession, *, db_obj: ModelType) -> Optional[ModelType]:
         """

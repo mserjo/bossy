@@ -30,40 +30,67 @@ class GroupRepository(BaseRepository[GroupModel, GroupCreateSchema, GroupUpdateS
             selectinload(self.model.settings),
             selectinload(self.model.icon_file),
             selectinload(self.model.parent_group), # Для ієрархії
-            # selectinload(self.model.child_groups) # Може бути багато, обережно
+            # selectinload(self.model.child_groups) # Може бути багато, завантажувати окремо, якщо потрібно
         )
-        result = await db.execute(statement)
-        return result.scalar_one_or_none()
+        try:
+            result = await db.execute(statement)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            self.logger.error(f"Помилка отримання групи з деталями (ID: {id}): {e}", exc_info=True)
+            return None
+
 
     async def get_user_groups(self, db: AsyncSession, *, user_id: uuid.UUID) -> List[GroupModel]:
         """
         Отримує список груп, до яких належить користувач.
         """
-        # Потрібен JOIN з GroupMembershipModel
-        from backend.app.src.models.groups.membership import GroupMembershipModel # Локальний імпорт для уникнення циклів
+        from backend.app.src.models.groups.membership import GroupMembershipModel
+        from backend.app.src.models.dictionaries.status import StatusModel # Для JOIN по статусу членства
+        from backend.app.src.core.constants import STATUS_ACTIVE_CODE # Припускаємо, що це код активного статусу
 
-        statement = select(self.model).join(
-            GroupMembershipModel, self.model.id == GroupMembershipModel.group_id
-        ).where(GroupMembershipModel.user_id == user_id)
-        # TODO: Додати фільтр для активного членства, якщо потрібно
-        # .where(GroupMembershipModel.status_in_group_id == ID_АКТИВНОГО_СТАТУСУ_ЧЛЕНСТВА)
+        try:
+            statement = (
+                select(self.model)
+                .join(GroupMembershipModel, self.model.id == GroupMembershipModel.group_id)
+                .join(StatusModel, GroupMembershipModel.status_in_group_id == StatusModel.id) # Приєднуємо статуси членства
+                .where(GroupMembershipModel.user_id == user_id)
+                .where(StatusModel.code == STATUS_ACTIVE_CODE) # Фільтруємо за активним статусом членства
+            )
+            # self.logger.debug(f"Запит для get_user_groups (user_id: {user_id}): {statement}")
+            result = await db.execute(statement)
+            return result.scalars().all() # type: ignore
+        except Exception as e:
+            self.logger.error(f"Помилка отримання груп для користувача {user_id}: {e}", exc_info=True)
+            return []
 
-        result = await db.execute(statement)
-        return result.scalars().all() # type: ignore
 
     async def get_child_groups(self, db: AsyncSession, *, parent_group_id: uuid.UUID) -> List[GroupModel]:
         """
         Отримує список дочірніх груп для вказаної батьківської групи.
         """
-        statement = select(self.model).where(self.model.parent_group_id == parent_group_id)
-        result = await db.execute(statement)
-        return result.scalars().all() # type: ignore
+        try:
+            statement = select(self.model).where(self.model.parent_group_id == parent_group_id)
+            result = await db.execute(statement)
+            return result.scalars().all() # type: ignore
+        except Exception as e:
+            self.logger.error(f"Помилка отримання дочірніх груп для {parent_group_id}: {e}", exc_info=True)
+            return []
 
-    # TODO: Додати метод для пошуку груп за назвою (з пагінацією).
-    # async def search_by_name(self, db: AsyncSession, *, name_query: str, skip: int = 0, limit: int = 100) -> List[GroupModel]:
-    #     statement = select(self.model).where(self.model.name.ilike(f"%{name_query}%")).offset(skip).limit(limit)
-    #     result = await db.execute(statement)
-    #     return result.scalars().all()
+
+    async def search_by_name(self, db: AsyncSession, *, name_query: str, skip: int = 0, limit: int = 100) -> List[GroupModel]:
+        """
+        Шукає групи за назвою (часткове співпадіння, без урахування регістру).
+        """
+        # Використовуємо get_multi з BaseRepository, передаючи відповідний фільтр
+        filters = {"name__ilike": f"%{name_query}%"} # Потрібно, щоб _apply_filters підтримував __ilike
+        # Поки _apply_filters не підтримує __ilike, робимо прямий запит:
+        try:
+            statement = select(self.model).where(self.model.name.ilike(f"%{name_query}%")).offset(skip).limit(limit)
+            result = await db.execute(statement)
+            return result.scalars().all() # type: ignore
+        except Exception as e:
+            self.logger.error(f"Помилка пошуку груп за назвою '{name_query}': {e}", exc_info=True)
+            return []
 
     # TODO: Додати метод для отримання групи разом з усіма її членами (якщо потрібно).
     # async def get_group_with_members(self, db: AsyncSession, id: uuid.UUID) -> Optional[GroupModel]:

@@ -36,9 +36,15 @@ class BaseDictionaryRepository(
         :param code: Символьний код для пошуку.
         :return: Об'єкт моделі довідника або None, якщо запис не знайдено.
         """
-        statement = select(self.model).where(self.model.code == code)
-        result = await db.execute(statement)
-        return result.scalar_one_or_none()
+        try:
+            statement = select(self.model).where(self.model.code == code)
+            result = await db.execute(statement)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            self.logger.error(f"Помилка отримання {self.model.__name__} за кодом '{code}': {e}", exc_info=True)
+            # Не кидаємо DatabaseErrorException тут, щоб сервіс міг обробити None
+            return None
+
 
     async def get_by_name(self, db: AsyncSession, *, name: str) -> Optional[DictModelType]:
         """
@@ -50,9 +56,13 @@ class BaseDictionaryRepository(
         :param name: Назва для пошуку.
         :return: Об'єкт моделі довідника або None, якщо запис не знайдено.
         """
-        statement = select(self.model).where(self.model.name == name)
-        result = await db.execute(statement)
-        return result.scalar_one_or_none()
+        try:
+            statement = select(self.model).where(self.model.name == name)
+            result = await db.execute(statement)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            self.logger.error(f"Помилка отримання {self.model.__name__} за назвою '{name}': {e}", exc_info=True)
+            return None
 
     # TODO: Розглянути додавання інших спільних методів для довідників, якщо потрібно.
     # Наприклад, отримання всіх активних записів (якщо є поле is_active або state_id).

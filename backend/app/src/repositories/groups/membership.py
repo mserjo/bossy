@@ -31,43 +31,76 @@ class GroupMembershipRepository(BaseRepository[GroupMembershipModel, GroupMember
         :param group_id: Ідентифікатор групи.
         :return: Об'єкт GroupMembershipModel або None.
         """
-        statement = select(self.model).where(
-            and_(self.model.user_id == user_id, self.model.group_id == group_id)
-        )
-        result = await db.execute(statement)
-        return result.scalar_one_or_none()
+        try:
+            statement = select(self.model).where(
+                and_(self.model.user_id == user_id, self.model.group_id == group_id)
+            )
+            result = await db.execute(statement)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            self.logger.error(f"Помилка отримання членства для user {user_id} в групі {group_id}: {e}", exc_info=True)
+            return None
+
 
     async def get_members_of_group(
         self, db: AsyncSession, *, group_id: uuid.UUID,
-        skip: int = 0, limit: int = 100
+        skip: int = 0, limit: int = 100,
+        order_by: Optional[List[str]] = None # Додано сортування
     ) -> List[GroupMembershipModel]:
         """
         Отримує список всіх членів (записів GroupMembershipModel) для вказаної групи.
         Може включати розгорнуту інформацію про користувача та роль.
+        Сортування за замовчуванням - за датою створення членства (created_at).
         """
-        statement = select(self.model).where(self.model.group_id == group_id).options(
-            selectinload(self.model.user), # Завантажуємо дані користувача
-            selectinload(self.model.role)  # Завантажуємо дані ролі
-        ).offset(skip).limit(limit)
-        # TODO: Додати сортування, наприклад, за датою приєднання або ім'ям користувача.
-        result = await db.execute(statement)
-        return result.scalars().all() # type: ignore
+        if order_by is None:
+            order_by = ["created_at_asc"] # Сортування за замовчуванням
+
+        try:
+            statement = select(self.model).where(self.model.group_id == group_id).options(
+                selectinload(self.model.user),
+                selectinload(self.model.role)
+            )
+            # Сортування буде застосовано до полів GroupMembershipModel
+            statement = await self._apply_order_by(statement, order_by) # type: ignore
+            # Якщо потрібно сортувати за полями user або role, це потребує JOIN в _apply_order_by або кастомної логіки тут.
+            # Наприклад, якщо order_by = ["user.name_asc"], то _apply_order_by має це обробити.
+            # Поки що _apply_order_by працює лише з полями self.model.
+
+            statement = statement.offset(skip).limit(limit)
+            result = await db.execute(statement)
+            return result.scalars().all() # type: ignore
+        except Exception as e:
+            self.logger.error(f"Помилка отримання членів групи {group_id}: {e}", exc_info=True)
+            return []
+
 
     async def get_groups_for_user(
         self, db: AsyncSession, *, user_id: uuid.UUID,
-        skip: int = 0, limit: int = 100
+        skip: int = 0, limit: int = 100,
+        order_by: Optional[List[str]] = None # Додано сортування
     ) -> List[GroupMembershipModel]:
         """
         Отримує список всіх членств (записів GroupMembershipModel) для вказаного користувача.
         Може включати розгорнуту інформацію про групу та роль.
+        Сортування за замовчуванням - за датою створення членства (created_at).
         """
-        statement = select(self.model).where(self.model.user_id == user_id).options(
-            selectinload(self.model.group), # Завантажуємо дані групи
-            selectinload(self.model.role)   # Завантажуємо дані ролі
-        ).offset(skip).limit(limit)
-        # TODO: Додати сортування.
-        result = await db.execute(statement)
-        return result.scalars().all() # type: ignore
+        if order_by is None:
+            order_by = ["created_at_asc"]
+
+        try:
+            statement = select(self.model).where(self.model.user_id == user_id).options(
+                selectinload(self.model.group),
+                selectinload(self.model.role)
+            )
+            statement = await self._apply_order_by(statement, order_by) # type: ignore
+            statement = statement.offset(skip).limit(limit)
+
+            result = await db.execute(statement)
+            return result.scalars().all() # type: ignore
+        except Exception as e:
+            self.logger.error(f"Помилка отримання груп для користувача {user_id}: {e}", exc_info=True)
+            return []
+
 
     async def get_user_role_in_group(
         self, db: AsyncSession, *, user_id: uuid.UUID, group_id: uuid.UUID
@@ -75,8 +108,12 @@ class GroupMembershipRepository(BaseRepository[GroupMembershipModel, GroupMember
         """
         Отримує ID ролі користувача в конкретній групі.
         """
+        # Не додаю try-except сюди, бо get_by_user_and_group вже має логування
         membership = await self.get_by_user_and_group(db, user_id=user_id, group_id=group_id)
-        return membership.user_role_id if membership else None
+        if membership:
+            return membership.user_role_id
+        return None
+
 
     # `create` та `update` успадковуються з BaseRepository.
     # `GroupMembershipCreateSchema` має містити user_id, group_id, user_role_id.
@@ -89,7 +126,18 @@ class GroupMembershipRepository(BaseRepository[GroupMembershipModel, GroupMember
         """
         membership_obj = await self.get_by_user_and_group(db, user_id=user_id, group_id=group_id)
         if membership_obj:
-            return await self.delete(db, id=membership_obj.id) # Використовуємо успадкований delete
+            try:
+                # Використовуємо успадкований delete, який вже має логування та обробку помилок
+                deleted_obj = await self.delete(db, id=membership_obj.id)
+                if deleted_obj:
+                    self.logger.info(f"Видалено членство для user {user_id} в групі {group_id}.")
+                return deleted_obj
+            except Exception as e:
+                # Хоча self.delete вже логує, тут можна додати контекст членства
+                self.logger.error(f"Помилка видалення членства для user {user_id} в групі {group_id}: {e}", exc_info=True)
+                # Повторно кидаємо виняток, якщо потрібно, або обробляємо тут
+                raise # Або повертаємо None/False залежно від очікуваної поведінки
+        self.logger.warning(f"Спроба видалити неіснуюче членство для user {user_id} в групі {group_id}.")
         return None
 
 

@@ -39,9 +39,15 @@ class UserRepository(BaseRepository[UserModel, UserCreateSchema, UserAdminUpdate
         :param email: Електронна пошта користувача.
         :return: Об'єкт UserModel або None, якщо користувача не знайдено.
         """
-        statement = select(self.model).where(self.model.email == email)
-        result = await db.execute(statement)
-        return result.scalar_one_or_none()
+        try:
+            statement = select(self.model).where(self.model.email == email)
+            result = await db.execute(statement)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            self.logger.error(f"Помилка отримання користувача за email {email}: {e}", exc_info=True)
+            # Не кидаємо DatabaseErrorException тут, щоб сервіс міг обробити None
+            return None
+
 
     async def get_by_phone_number(self, db: AsyncSession, *, phone_number: str) -> Optional[UserModel]:
         """
@@ -51,9 +57,14 @@ class UserRepository(BaseRepository[UserModel, UserCreateSchema, UserAdminUpdate
         :param phone_number: Номер телефону користувача.
         :return: Об'єкт UserModel або None, якщо користувача не знайдено.
         """
-        statement = select(self.model).where(self.model.phone_number == phone_number)
-        result = await db.execute(statement)
-        return result.scalar_one_or_none()
+        try:
+            statement = select(self.model).where(self.model.phone_number == phone_number)
+            result = await db.execute(statement)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            self.logger.error(f"Помилка отримання користувача за номером телефону {phone_number}: {e}", exc_info=True)
+            return None
+
 
     async def get_by_identifier(self, db: AsyncSession, *, identifier: str) -> Optional[UserModel]:
         """
@@ -66,11 +77,16 @@ class UserRepository(BaseRepository[UserModel, UserCreateSchema, UserAdminUpdate
         # TODO: Додати валідацію identifier, щоб визначити, чи це email, чи телефон,
         #       або покладатися на те, що пошук по обох полях буде коректним.
         #       Поки що простий пошук по обох полях через OR.
-        statement = select(self.model).where(
-            (self.model.email == identifier) | (self.model.phone_number == identifier)
-        )
-        result = await db.execute(statement)
-        return result.scalar_one_or_none()
+        try:
+            statement = select(self.model).where(
+                (self.model.email == identifier) | (self.model.phone_number == identifier)
+            )
+            result = await db.execute(statement)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            self.logger.error(f"Помилка отримання користувача за ідентифікатором {identifier}: {e}", exc_info=True)
+            return None
+
 
     async def is_superuser(self, user: UserModel) -> bool:
         """
@@ -131,14 +147,19 @@ class UserRepository(BaseRepository[UserModel, UserCreateSchema, UserAdminUpdate
                 selectinload(self.model.group_memberships).selectinload(
                     UserModel.group_memberships.property.mapper.class_.role # Завантажуємо роль для кожного членства
                 ),
-                # TODO: Додати selectinload для UserTypeModel, якщо user_type_code буде замінено на user_type_id
-                # selectinload(self.model.user_type),
+                selectinload(self.model.user_type), # Завантажуємо тип користувача
                 # TODO: Додати selectinload для поточного аватара, якщо це потрібно тут
-                # selectinload(self.model.avatars.and_where(AvatarModel.is_current == True)) # Потребує AvatarModel
+                # (потребує AvatarModel та логіки is_current)
+                # selectinload(self.model.avatars.and_where(AvatarModel.is_current == True))
             )
         )
-        result = await db.execute(statement)
-        return result.scalar_one_or_none()
+        try:
+            result = await db.execute(statement)
+            return result.scalar_one_or_none()
+        except Exception as e:
+            self.logger.error(f"Помилка отримання користувача з деталями (ID: {user_id}): {e}", exc_info=True)
+            # Не кидаємо DatabaseErrorException тут, щоб сервіс міг обробити None та кинути NotFoundException
+            return None
 
     # TODO: Розглянути, чи потрібен метод `authenticate` тут, чи це логіка сервісу.
     #       Зазвичай, репозиторій лише отримує дані, а сервіс перевіряє пароль.

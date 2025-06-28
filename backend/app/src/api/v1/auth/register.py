@@ -18,6 +18,7 @@ from backend.app.src.api.dependencies import DBSession # Реальна зале
 # TODO: Можливо, потрібен сервіс налаштувань для перевірки дозволу реєстрації
 # from backend.app.src.services.system.system_settings_service import SystemSettingsService
 # from backend.app.src.models.auth.user import UserModel # Якщо потрібно повернути модель для подальшої обробки
+from backend.app.src.core.exceptions import ForbiddenException, BadRequestException # Для локалізованих помилок
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -47,32 +48,26 @@ async def register_new_user(
 
     # TODO: Додати перевірку, чи дозволена реєстрація в системних налаштуваннях.
     # settings_service = SystemSettingsService(db_session)
-    # allow_registration_setting = await settings_service.get_setting_by_name("allow_registration")
-    # if not (allow_registration_setting and allow_registration_setting.value is True):
+    # allow_registration = await settings_service.get_setting_value_by_code("ALLOW_USER_REGISTRATION", True) # Припускаємо True за замовчуванням
+    # if not allow_registration:
     #     logger.warning("Спроба реєстрації, коли вона вимкнена в налаштуваннях.")
-    #     raise HTTPException(
-    #         status_code=status.HTTP_403_FORBIDDEN,
-    #         detail="Реєстрація нових користувачів наразі вимкнена."
-    #     )
+    #     raise ForbiddenException(detail_key="error_registration_disabled")
 
     try:
-        # UserService.create_user повинен обробляти унікальність та повертати UserModel
-        created_user = await user_service.create_user(user_create_data=user_create_data)
-        if not created_user: # Додаткова перевірка, хоча сервіс, ймовірно, кинув би виняток
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Не вдалося створити користувача."
-            )
-
-    except HTTPException as e: # Якщо сервіс кидає HTTPException (напр. 400 Bad Request for duplicate)
-        logger.warning(f"Помилка реєстрації для {user_create_data.email}: {e.detail}")
+        # UserService.create_user тепер приймає obj_in: UserCreateSchema
+        created_user = await user_service.create_user(obj_in=user_create_data)
+        # created_user гарантовано буде, якщо сервіс не кинув виняток
+    except BadRequestException as e: # Ловимо кастомні винятки від сервісу
+        logger.warning(f"Помилка реєстрації для {user_create_data.email} (BadRequest): {e.detail if isinstance(e.detail, str) else e.detail.get('key')}")
+        raise e # Перекидаємо далі, обробник FastAPI їх перетворить
+    except HTTPException as e: # Інші HTTP винятки, якщо сервіс їх кидає
+        logger.warning(f"Помилка реєстрації для {user_create_data.email} (HTTPException): {e.detail}")
         raise e
     except Exception as e_gen:
         logger.error(f"Неочікувана помилка під час реєстрації користувача {user_create_data.email}: {e_gen}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Помилка сервера під час реєстрації користувача."
-        )
+        # Використовуємо InternalServerErrorException для автоматичного перекладу
+        from backend.app.src.core.exceptions import InternalServerErrorException
+        raise InternalServerErrorException(detail_key="error_user_registration_server_error")
 
     # TODO: Після успішної реєстрації можна:
     # 1. Автоматично логінити користувача та повертати токени (виклик AuthService).

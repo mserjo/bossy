@@ -14,12 +14,30 @@ from typing import List, Optional
 from sqlalchemy import UniqueConstraint, Integer, String  # type: ignore # Для визначення обмежень унікальності
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 
-# from sqlalchemy.orm import relationship # type: ignore # Для визначення зв'язків (якщо потрібно)
+from sqlalchemy.orm import relationship, Mapped, mapped_column # type: ignore
+from typing import TYPE_CHECKING # Імпортуємо TYPE_CHECKING
 
 from backend.app.src.models.dictionaries.base import BaseDictModel # Імпорт базової моделі для довідників
 
-# TODO: Визначити, чи потрібні специфічні поля для моделі StatusModel, окрім успадкованих.
-# Наприклад, колір для візуального представлення статусу, або порядок сортування.
+if TYPE_CHECKING: # Блок для імпортів, що потрібні лише для перевірки типів
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.groups.group import GroupModel
+    from backend.app.src.models.tasks.task import TaskModel
+    from backend.app.src.models.groups.template import GroupTemplateModel
+    from backend.app.src.models.groups.poll import PollModel
+    from backend.app.src.models.bonuses.reward import RewardModel
+    from backend.app.src.models.gamification.badge import BadgeModel
+    from backend.app.src.models.gamification.level import LevelModel
+    from backend.app.src.models.teams.team import TeamModel
+    from backend.app.src.models.groups.membership import GroupMembershipModel
+    from backend.app.src.models.groups.invitation import GroupInvitationModel
+    from backend.app.src.models.tasks.assignment import TaskAssignmentModel
+    from backend.app.src.models.tasks.completion import TaskCompletionModel
+    from backend.app.src.models.tasks.proposal import TaskProposalModel
+    from backend.app.src.models.reports.report import ReportModel
+    # from backend.app.src.models.tasks.review import TaskReviewModel # Якщо буде status_id
+    # from backend.app.src.models.files.file import FileModel # Якщо буде status_id
+
 
 class StatusModel(BaseDictModel):
     """
@@ -73,49 +91,49 @@ class StatusModel(BaseDictModel):
 
     # --- Зворотні зв'язки (Relationships) ---
     # Назви back_populates мають відповідати назвам зв'язків в цільових моделях.
-    # ForeignKey рядки вказують на поле в цільовій моделі, яке посилається на StatusModel.id.
+    # foreign_keys вказуються у форматі List[Column], або рядком з назвою поля цільової моделі.
 
     # Зв'язок з UserModel.state_id
-    users_with_this_state = relationship("UserModel", back_populates="state", foreign_keys="[UserModel.state_id]")
+    users_with_this_state: Mapped[List["UserModel"]] = relationship("UserModel", back_populates="state", foreign_keys="[UserModel.state_id]")
     # Зв'язок з GroupModel.state_id
-    groups_with_this_state = relationship("GroupModel", back_populates="state", foreign_keys="[GroupModel.state_id]")
+    groups_with_this_state: Mapped[List["GroupModel"]] = relationship("GroupModel", back_populates="state", foreign_keys="[GroupModel.state_id]")
     # Зв'язок з TaskModel.state_id
-    tasks_with_this_state = relationship("TaskModel", back_populates="state", foreign_keys="[TaskModel.state_id]")
-    # ... і так далі для інших моделей, що успадковують BaseMainModel і використовують state_id ...
-    # GroupTemplateModel, PollModel, RewardModel, BadgeModel, LevelModel, TeamModel
-    group_templates_with_this_state = relationship("GroupTemplateModel", back_populates="state", foreign_keys="[GroupTemplateModel.state_id]")
-    polls_with_this_state = relationship("PollModel", back_populates="state", foreign_keys="[PollModel.state_id]")
-    rewards_with_this_state = relationship("RewardModel", back_populates="state", foreign_keys="[RewardModel.state_id]")
-    badges_with_this_state = relationship("BadgeModel", back_populates="state", foreign_keys="[BadgeModel.state_id]")
-    levels_with_this_state = relationship("LevelModel", back_populates="state", foreign_keys="[LevelModel.state_id]")
-    teams_with_this_state = relationship("TeamModel", back_populates="state", foreign_keys="[TeamModel.state_id]")
+    tasks_with_this_state: Mapped[List["TaskModel"]] = relationship("TaskModel", back_populates="state", foreign_keys="[TaskModel.state_id]")
+
+    group_templates_with_this_state: Mapped[List["GroupTemplateModel"]] = relationship("GroupTemplateModel", back_populates="state", foreign_keys="[GroupTemplateModel.state_id]")
+    polls_with_this_state: Mapped[List["PollModel"]] = relationship("PollModel", back_populates="state", foreign_keys="[PollModel.state_id]")
+    rewards_with_this_state: Mapped[List["RewardModel"]] = relationship("RewardModel", back_populates="state", foreign_keys="[RewardModel.state_id]")
+    badges_with_this_state: Mapped[List["BadgeModel"]] = relationship("BadgeModel", back_populates="state", foreign_keys="[BadgeModel.state_id]")
+    levels_with_this_state: Mapped[List["LevelModel"]] = relationship("LevelModel", back_populates="state", foreign_keys="[LevelModel.state_id]")
+    teams_with_this_state: Mapped[List["TeamModel"]] = relationship("TeamModel", back_populates="state", foreign_keys="[TeamModel.state_id]")
 
 
     # Зв'язок зі статусами членства в групах (з GroupMembershipModel.status_in_group_id)
-    group_memberships_with_this_status = relationship("GroupMembershipModel", back_populates="status_in_group", foreign_keys="[GroupMembershipModel.status_in_group_id]")
+    group_memberships_with_this_status: Mapped[List["GroupMembershipModel"]] = relationship("GroupMembershipModel", back_populates="status_in_group", foreign_keys="[GroupMembershipModel.status_in_group_id]")
 
     # Зв'язок зі статусами запрошень до груп (з GroupInvitationModel.status_id)
-    group_invitations_with_this_status = relationship("GroupInvitationModel", back_populates="status", foreign_keys="[GroupInvitationModel.status_id]")
+    group_invitations_with_this_status: Mapped[List["GroupInvitationModel"]] = relationship("GroupInvitationModel", back_populates="status", foreign_keys="[GroupInvitationModel.status_id]")
 
     # Зв'язок зі статусами призначень завдань (з TaskAssignmentModel.status_id)
-    task_assignments_with_this_status = relationship("TaskAssignmentModel", back_populates="status", foreign_keys="[TaskAssignmentModel.status_id]")
+    task_assignments_with_this_status: Mapped[List["TaskAssignmentModel"]] = relationship("TaskAssignmentModel", back_populates="status", foreign_keys="[TaskAssignmentModel.status_id]")
 
     # Зв'язок зі статусами виконань завдань (з TaskCompletionModel.status_id)
-    task_completions_with_this_status = relationship("TaskCompletionModel", back_populates="status", foreign_keys="[TaskCompletionModel.status_id]")
+    task_completions_with_this_status: Mapped[List["TaskCompletionModel"]] = relationship("TaskCompletionModel", back_populates="status", foreign_keys="[TaskCompletionModel.status_id]")
 
     # Зв'язок зі статусами пропозицій завдань (з TaskProposalModel.status_id)
-    task_proposals_with_this_status = relationship("TaskProposalModel", back_populates="status", foreign_keys="[TaskProposalModel.status_id]")
+    task_proposals_with_this_status: Mapped[List["TaskProposalModel"]] = relationship("TaskProposalModel", back_populates="status", foreign_keys="[TaskProposalModel.status_id]")
 
     # Зв'язок зі статусами звітів (з ReportModel.status_id)
-    reports_with_this_status = relationship("ReportModel", back_populates="status", foreign_keys="[ReportModel.status_id]")
+    # report_statuses: Mapped[List["ReportModel"]] = relationship(back_populates="status", foreign_keys="[ReportModel.status_id]")
+    # Дублює попередній рядок, видаляю цей.
+    reports_with_this_status: Mapped[List["ReportModel"]] = relationship("ReportModel", back_populates="status", foreign_keys="[ReportModel.status_id]")
+
 
     # Якщо TaskReviewModel матиме status_id для модерації:
-    # task_reviews_with_this_status = relationship("TaskReviewModel", back_populates="status", foreign_keys="[TaskReviewModel.status_id]")
+    # task_reviews_with_this_status: Mapped[List["TaskReviewModel"]] = relationship("TaskReviewModel", back_populates="status", foreign_keys="[TaskReviewModel.status_id]")
     # Якщо FileModel матиме status_id:
-    # files_with_this_status = relationship("FileModel", back_populates="status", foreign_keys="[FileModel.status_id]")
+    # files_with_this_status: Mapped[List["FileModel"]] = relationship("FileModel", back_populates="status", foreign_keys="[FileModel.status_id]")
 
-    # Зв'язок зі статусами звітів (з ReportModel.status_id)
-    report_statuses: Mapped[List["ReportModel"]] = relationship(back_populates="status", foreign_keys="[ReportModel.status_id]")
 
     # Поле для сортування статусів у визначеному порядку (наприклад, для UI).
     display_order: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)

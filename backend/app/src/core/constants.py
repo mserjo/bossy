@@ -34,6 +34,7 @@ SYSTEM_USER_SHADOW_USERNAME: str = "shadow" # Системний бот
 STATUS_CREATED_CODE: str = "created"
 STATUS_ACTIVE_CODE: str = "active"     # Загальний активний статус
 STATUS_INACTIVE_CODE: str = "inactive"   # Загальний неактивний статус
+STATUS_PENDING_EMAIL_VERIFICATION_CODE: str = "pending_email_verification" # Очікує підтвердження email
 STATUS_DELETED_CODE: str = "deleted"   # Для позначки "м'яко" видалених записів (якщо використовується окремий статус)
 STATUS_ARCHIVED_CODE: str = "archived"  # Для архівованих сутностей
 STATUS_PENDING_CODE: str = "pending"   # В очікуванні (наприклад, підтвердження)
@@ -182,9 +183,30 @@ REPORT_CODE_INACTIVE_GROUPS_REPORT: str = "INACTIVE_GROUPS_REPORT" # Звіт п
 DEFAULT_PAGE_SIZE: int = 20 # Кількість елементів на сторінці за замовчуванням для пагінації
 MAX_PAGE_SIZE: int = 100    # Максимальна кількість елементів на сторінці
 
+# Формати дати та часу
+DATETIME_FORMAT_TECHNICAL: str = "%Y-%m-%dT%H:%M:%S.%fZ" # ISO 8601 з мілісекундами та Z (UTC)
+DATETIME_FORMAT_USER_FRIENDLY: str = "%d.%m.%Y %H:%M:%S" # Приклад для відображення користувачу
+DATE_FORMAT_USER_FRIENDLY: str = "%d.%m.%Y"
+
+# Ключі для кешування Redis (приклади)
+CACHE_KEY_USER_PROFILE_PREFIX: str = "user_profile:" # user_profile:{user_id}
+CACHE_KEY_GROUP_DETAILS_PREFIX: str = "group_details:" # group_details:{group_id}
+CACHE_KEY_ALL_STATUSES: str = "all_statuses_dict"
+DEFAULT_CACHE_TTL_SECONDS: int = 300 # 5 хвилин
+
+# Назви черг Celery (приклади)
+CELERY_QUEUE_DEFAULT: str = "default_celery_queue"
+CELERY_QUEUE_NOTIFICATIONS: str = "notifications_celery_queue"
+CELERY_QUEUE_REPORTS: str = "reports_celery_queue"
+
+# Інші загальні ліміти або налаштування
+MAX_USERNAME_LENGTH: int = 150
+MAX_EMAIL_LENGTH: int = 255
+MAX_PASSWORD_LENGTH: int = 128 # Максимальна довжина паролю до хешування
+MIN_PASSWORD_LENGTH: int = 8
+
 # TODO: Додати інші загальні константи, якщо вони будуть потрібні.
-# Наприклад, максимальна довжина певних полів, формати дат,
-# ключі для кешування Redis, назви черг Celery тощо.
+# Наприклад, максимальна довжина інших полів, специфічні формати.
 
 # --- Константи для статусів пропозицій завдань (коди) ---
 TASK_PROPOSAL_STATUS_PENDING_CODE: str = "proposal_pending_review" # На розгляді
@@ -210,14 +232,7 @@ REPORT_STATUS_PROCESSING: str = "report_processing"    # В процесі ге�
 REPORT_STATUS_COMPLETED: str = "report_completed"     # Генерацію успішно завершено
 REPORT_STATUS_FAILED: str = "report_failed"          # Помилка під час генерації
 REPORT_STATUS_CANCELLED: str = "report_cancelled"     # Запит на генерацію скасовано (опціонально)
-DELIVERY_STATUS_PROCESSING: str = "PROCESSING"    # Обробляється системою перед відправкою
-DELIVERY_STATUS_SENT: str = "SENT"            # Надіслано провайдеру доставки
-DELIVERY_STATUS_DELIVERED: str = "DELIVERED"      # Доставлено отримувачу (підтверджено провайдером)
-DELIVERY_STATUS_FAILED: str = "FAILED"          # Не вдалося доставити
-DELIVERY_STATUS_RETRYING: str = "RETRYING"       # Запланована повторна спроба
-DELIVERY_STATUS_OPENED: str = "OPENED"          # Відкрито (наприклад, email або push)
-DELIVERY_STATUS_CLICKED: str = "CLICKED"         # Клікнуто посилання в сповіщенні
-DELIVERY_STATUS_UNSUBSCRIBED: str = "UNSUBSCRIBED" # Користувач відписався від цього типу сповіщень/каналу
+# Дублюючий блок DELIVERY_STATUS_ нижче видалено
 
 # Важливо, щоб значення кодів (наприклад, ROLE_SUPERADMIN_CODE)
 # збігалися з тими, що будуть ініціалізовані в довідниках у базі даних.

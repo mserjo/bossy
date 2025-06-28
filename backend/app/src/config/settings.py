@@ -47,6 +47,8 @@ class AppSettings(BaseSettings):
     USE_ELASTICSEARCH: bool = Field(default=True, description="Чи використовувати Elasticsearch для пошуку.")
     USE_FIREBASE: bool = Field(default=True, description="Чи використовувати Firebase (наприклад, для FCM).")
 
+    FRONTEND_URL: HttpUrl = Field(default="http://localhost:3000", description="Базовий URL фронтенд додатку")
+
     # Налаштування для .env файлу. Pydantic-settings шукає .env у поточному каталозі або батьківських.
     # Якщо .env файл знаходиться, наприклад, в корені проекту `bossy/.env`,
     # а додаток запускається з `bossy/backend/`, то шлях має бути `../.env`.
@@ -164,6 +166,28 @@ class ElasticsearchSettings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix='ELASTICSEARCH_', env_file=".env", env_file_encoding='utf-8', extra='ignore')
 
 
+class EmailSettings(BaseSettings):
+    """Налаштування для відправки електронної пошти."""
+    MAIL_ENABLED: bool = Field(default=True, description="Чи ввімкнено відправку email.")
+    MAIL_USERNAME: Optional[str] = Field(default=None)
+    MAIL_PASSWORD: Optional[str] = Field(default=None)
+    MAIL_FROM: EmailStr = Field(default="noreply@example.com")
+    MAIL_FROM_NAME: Optional[str] = Field(default="Bossy App")
+    MAIL_PORT: int = Field(default=587)
+    MAIL_SERVER: str = Field(default="smtp.example.com")
+    MAIL_STARTTLS: bool = Field(default=True)
+    MAIL_SSL_TLS: bool = Field(default=False)
+    # Для тестування або локальної розробки
+    MAIL_USE_CREDENTIALS: bool = Field(default=True) # Чи використовувати MAIL_USERNAME та MAIL_PASSWORD
+    MAIL_VALIDATE_CERTS: bool = Field(default=True) # Чи валідувати SSL сертифікати
+
+    # Шаблони (можна залишити тут або винести в окремий клас)
+    # EMAIL_TEMPLATES_DIR: Path = Field(default_factory=lambda: Path(AppSettings().BASE_DIR) / "src" / "templates" / "email")
+    # EMAIL_RESET_TOKEN_EXPIRE_HOURS: int = Field(default=48)
+
+    model_config = SettingsConfigDict(env_prefix='MAIL_', env_file=".env", env_file_encoding='utf-8', extra='ignore')
+
+
 class Settings(BaseSettings):
     """Головний клас налаштувань, що агрегує всі інші."""
     app: AppSettings = AppSettings()
@@ -175,6 +199,7 @@ class Settings(BaseSettings):
     celery: Optional[CelerySettings] = None
     firebase: Optional[FirebaseSettings] = None
     elasticsearch: Optional[ElasticsearchSettings] = None
+    email: Optional[EmailSettings] = None # Додано EmailSettings
 
     @model_validator(mode='before')
     @classmethod
@@ -239,6 +264,22 @@ class Settings(BaseSettings):
         else:
             values['elasticsearch'] = None
             # logger.info("Elasticsearch вимкнено (USE_ELASTICSEARCH=False).")
+
+        # Ініціалізація EmailSettings
+        # Припускаємо, що email завжди потрібен, якщо MAIL_ENABLED=True, незалежно від AppSettings.USE_EMAIL прапорця (якщо такий буде)
+        # Або ж можна додати app_config.USE_EMAIL і перевіряти його.
+        # Поки що, якщо MAIL_ENABLED=True в EmailSettings, то ініціалізуємо.
+        _email_settings = EmailSettings()
+        if _email_settings.MAIL_ENABLED:
+            if _email_settings.MAIL_SERVER and _email_settings.MAIL_FROM: # Основні поля для роботи
+                values['email'] = _email_settings
+                # logger.debug("Email увімкнено та налаштовано.")
+            else:
+                values['email'] = None
+                # logger.warning("Email увімкнено (MAIL_ENABLED=True), але MAIL_SERVER або MAIL_FROM не визначено. Email не буде використовуватися.")
+        else:
+            values['email'] = None
+            # logger.info("Email вимкнено (MAIL_ENABLED=False).")
 
         return values
 

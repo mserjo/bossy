@@ -24,8 +24,8 @@ from backend.app.src.core.constants import ROLE_SUPERADMIN_CODE, ROLE_ADMIN_CODE
 # Імпорт схем для токенів та користувачів
 from backend.app.src.schemas.auth.token import TokenPayloadSchema
 from backend.app.src.schemas.auth.user import UserSchema
-# Імпорт сервісів (якщо залежності викликають сервіси, наприклад, для отримання користувача)
-# from backend.app.src.services.auth.user_service import UserService # Приклад
+# Імпорт сервісів
+from backend.app.src.services.auth.user_service import UserService # Реальний імпорт
 
 # --- Залежність для OAuth2 (отримання токена з заголовка Authorization: Bearer <token>) ---
 # `tokenUrl` вказує на ендпоінт, де клієнт може отримати токен (для документації Swagger).
@@ -80,47 +80,33 @@ async def get_current_user(
     # ValidationError вже оброблено вище
 
     # Отримання користувача з БД за user_id
-    from backend.app.src.services.auth.user_service import userService # Імпортуємо екземпляр сервісу
+    # Створюємо екземпляр UserService з поточною сесією БД
+    user_service = UserService(db)
+    user_model: Optional[Any] = None # Використовуємо Any, щоб уникнути імпорту UserModel тут
 
-    user: Optional[UserModel] = None # Тепер це буде UserModel, а не UserSchema
     try:
         # Викликаємо метод сервісу, який повертає UserModel та кидає винятки
-        user = await userService.get_active_user_by_id_for_auth(db, user_id=user_id)
+        user_model = await user_service.get_active_user_by_id_for_auth(user_id=user_id)
         # Цей метод вже має робити всі перевірки (is_deleted, state_id на активність).
         # Якщо користувач не знайдений або не активний, сервіс кидає NotFoundException або ForbiddenException.
     except NotFoundException:
         raise credentials_exception
-    except ForbiddenException as e:
-        raise UnauthorizedException(detail=e.detail)
+    except ForbiddenException as e: # Якщо get_active_user_by_id_for_auth кидає ForbiddenException
+        raise UnauthorizedException(detail=e.detail) # Перетворюємо на Unauthorized для контексту токена
 
-    if user is None: # Додаткова перевірка, хоча сервіс мав би кинути виняток
+    if user_model is None: # Додаткова перевірка, хоча сервіс мав би кинути виняток
         raise credentials_exception
 
-    # Конвертуємо UserModel в UserSchema для повернення з залежності
-    return UserSchema.model_validate(user)
+    # Повертаємо UserModel напряму, а не UserSchema
+    return user_model
 
-async def get_current_active_user( # Ця залежність тепер може бути спрощена або видалена,
-                                 # оскільки get_current_user вже перевіряє активність через сервіс.
-    current_user_schema: UserSchema = Depends(get_current_user) # Змінено назву параметра
-) -> UserSchema: # Повертає UserSchema, як і раніше
-    """
-    Залежність, що перевіряє, чи поточний користувач активний.
-    `get_current_user` тепер вже викликає `userService.get_active_user_by_id_for_auth`,
-    який має виконувати всі необхідні перевірки активності.
-    Ця функція може залишитися для семантичної ясності або для майбутніх
-    додаткових перевірок, специфічних для "активного" користувача в контексті API.
-    """
-    # Наразі, якщо get_current_user успішно повернув користувача, він вважається активним.
-    # Додаткові перевірки тут можуть бути зайвими, якщо сервіс все робить.
-    # self.logger.debug(f"get_current_active_user: User {current_user_schema.id} is considered active.")
-    return current_user_schema
-
+# Функція get_current_active_user видалена, оскільки get_current_user тепер виконує її роль.
 
 # --- Залежності для перевірки ролей ---
-# Ці залежності використовують `get_current_active_user` для отримання користувача.
+# Ці залежності використовують `get_current_user` (яка вже гарантує активного користувача).
 
 async def get_current_superuser(
-    current_user: UserSchema = Depends(get_current_active_user)
+    current_user: UserSchema = Depends(get_current_user) # Змінено на get_current_user
 ) -> UserSchema:
     """
     Перевіряє, чи є поточний користувач супер-адміністратором.

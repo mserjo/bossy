@@ -49,11 +49,9 @@ async def login_for_access_token(
     )
     if not user:
         logger.warning(f"Не вдалося автентифікувати користувача: {form_data.username}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Невірне ім'я користувача або пароль",
-            headers={"WWW-Authenticate": "Bearer"},
-        )
+        # Використовуємо UnauthorizedException для автоматичного перекладу через обробник
+        from backend.app.src.core.exceptions import UnauthorizedException as CustomUnauthorizedException
+        raise CustomUnauthorizedException(detail_key="error_auth_failed") # Використовуємо ключ з translations
 
     # Припускаємо, що AuthService може генерувати токени або є окремий TokenService
     # Якщо AuthService генерує:

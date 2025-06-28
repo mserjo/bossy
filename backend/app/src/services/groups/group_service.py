@@ -29,7 +29,7 @@ class GroupService(BaseService[GroupRepository]):
     async def get_group_by_id(self, db: AsyncSession, group_id: uuid.UUID) -> GroupModel:
         group = await self.repository.get_with_details(db, id=group_id)
         if not group:
-            raise NotFoundException(detail=f"Групу з ID {group_id} не знайдено.")
+            raise NotFoundException(detail_key="error_group_not_found", group_id=str(group_id)) # Новий ключ
         return group
 
     async def create_group(
@@ -48,133 +48,136 @@ class GroupService(BaseService[GroupRepository]):
         if obj_in.parent_group_id:
             parent_group = await self.repository.get(db, id=obj_in.parent_group_id)
             if not parent_group:
-                raise BadRequestException(detail=f"Батьківську групу з ID {obj_in.parent_group_id} не знайдено.")
+                raise BadRequestException(detail_key="error_parent_group_not_found", group_id=str(obj_in.parent_group_id))
             # TODO: Перевірити, чи не створюється циклічна залежність (група не може бути батьківською сама собі).
             # TODO: Перевірити, чи користувач має права додавати підгрупи до parent_group.
 
         # Перевірка, чи існує тип групи, якщо вказаний
         if obj_in.group_type_id:
-            # Потрібен доступ до GroupTypeRepository або GroupTypeService
-            from backend.app.src.services.dictionaries.group_type_service import group_type_service as gts
-            try:
-                await gts.get_by_id(db, id=obj_in.group_type_id)
-            except NotFoundException:
-                raise BadRequestException(detail=f"Тип групи з ID {obj_in.group_type_id} не знайдено.")
+            from backend.app.src.repositories.dictionaries.group_type import group_type_repository # Використовуємо репозиторій
+            group_type = await group_type_repository.get(db, id=obj_in.group_type_id)
+            if not group_type:
+                raise BadRequestException(detail_key="error_group_type_not_found_for_create", type_id=str(obj_in.group_type_id))
 
         # TODO: Логіка застосування шаблону (created_from_template_id)
-        # if obj_in.created_from_template_id:
-        #     template = await group_template_service.get_template_by_id(db, id=obj_in.created_from_template_id)
-        #     if not template:
-        #         raise BadRequestException(f"Шаблон групи з ID {obj_in.created_from_template_id} не знайдено.")
-        #     # Застосувати дані з template.template_data до obj_in або після створення групи
+        if obj_in.created_from_template_id:
+            from backend.app.src.repositories.groups.template import group_template_repository # Припускаємо існування
+            template = await group_template_repository.get(db, id=obj_in.created_from_template_id)
+            if not template:
+                raise BadRequestException(detail_key="error_group_template_not_found", template_id=str(obj_in.created_from_template_id))
+            # TODO: Застосувати дані з template.template_data до obj_in або group_data
 
-        group_data = obj_in.model_dump(exclude_unset=True)
-        # `created_by_user_id` та `updated_by_user_id` з BaseModel встановлюються автоматично,
-        # якщо вони реалізовані через event listeners або залежності.
-        # Якщо ні, їх потрібно встановити тут:
-        # group_data["created_by_user_id"] = current_user.id
-        # group_data["updated_by_user_id"] = current_user.id
+        group_create_data = obj_in.model_dump(exclude_unset=True)
+        # Встановлюємо created_by_user_id та updated_by_user_id
+        group_create_data["created_by_user_id"] = current_user.id
+        group_create_data["updated_by_user_id"] = current_user.id
 
-        # `group_id` в BaseMainModel для самої GroupModel має бути NULL.
-        # Модель GroupModel успадковує group_id, але для неї він не використовується.
-        # Тому при створенні GroupModel його не передаємо.
-        if "group_id" in group_data: # На випадок, якщо схема його містить
-            del group_data["group_id"]
+        if "group_id" in group_create_data: # group_id з BaseMainModel тут не потрібен
+            del group_create_data["group_id"]
 
-        new_group = await self.repository.create(db, obj_in_data=group_data) # Змінено на obj_in_data
+        # Створюємо схему для передачі в self.repository.create
+        # Або передаємо словник, якщо BaseRepository.create це підтримує.
+        # BaseRepository.create приймає obj_in: CreateSchemaType.
+        # GroupCreateSchema не має created_by_user_id, updated_by_user_id.
+        # Тому створюємо модель напряму:
+        new_group_model = GroupModel(**group_create_data)
+        db.add(new_group_model)
+        try:
+            await db.flush() # Потрібен flush, щоб отримати ID перед створенням залежних записів
+        except Exception as e:
+            await db.rollback()
+            self.logger.error(f"Помилка при створенні групи (flush): {group_create_data}. Деталі: {e}", exc_info=True)
+            raise BadRequestException(detail_key="error_creating_group") # Новий ключ
+
 
         # Додати творця як адміністратора групи
         admin_role = await user_role_repository.get_by_code(db, code=ROLE_ADMIN_CODE)
         if not admin_role:
-            # Критична помилка - роль адміна має існувати
             self.logger.error(f"Роль адміністратора групи (код: {ROLE_ADMIN_CODE}) не знайдена в довіднику.")
-            # Можна кинути виняток або видалити щойно створену групу
-            await self.repository.delete(db, id=new_group.id) # Відкат
-            raise BadRequestException(detail="Помилка налаштування системи: роль адміністратора групи не знайдена.")
+            await db.rollback() # Відкат, оскільки група ще не закомічена
+            raise BadRequestException(detail_key="error_admin_role_not_found")
 
-        # Створюємо запис членства для творця групи напряму через репозиторій,
-        # оскільки group_membership_service.add_member_to_group може мати перевірку прав,
-        # яка тут не потрібна (або ще неможлива, бо адміна ще немає).
-        # GroupMembershipCreateSchema очікує user_id, group_id, user_role_id.
         membership_create_schema = GroupMembershipCreateSchema(
             user_id=current_user.id,
-            group_id=new_group.id,
+            group_id=new_group_model.id,
             user_role_id=admin_role.id
-            # status_in_group_id можна встановити, якщо є дефолтний активний статус
         )
         await group_membership_repository.create(db, obj_in=membership_create_schema)
 
+        default_settings_data = GroupSettingsCreateSchema()
+        await group_settings_service.create_settings_for_group(db, group_id=new_group_model.id, obj_in=default_settings_data)
 
-        # Створити налаштування групи за замовчуванням
-        # TODO: Визначити, які саме дефолтні налаштування (наприклад, тип бонусів)
-        # default_bonus_type = await bonus_type_repository.get_by_code(db, code=DEFAULT_BONUS_TYPE_CODE)
-        # default_settings_data = GroupSettingsCreateSchema(bonus_type_id=default_bonus_type.id if default_bonus_type else None)
-        default_settings_data = GroupSettingsCreateSchema() # Поки що порожні, Pydantic використає дефолти
-        await group_settings_service.create_settings_for_group(db, group_id=new_group.id, obj_in=default_settings_data)
-
-        # Повертаємо групу з деякими деталями для відповіді API
-        return await self.get_group_by_id(db, group_id=new_group.id)
+        try:
+            await db.commit()
+            await db.refresh(new_group_model)
+            # Потрібно також оновити пов'язані об'єкти, якщо вони потрібні у відповіді,
+            # або get_group_by_id має їх завантажувати.
+            # self.logger.info(f"Створено групу '{new_group_model.name}' (ID: {new_group_model.id}) користувачем {current_user.id}")
+            return await self.get_group_by_id(db, group_id=new_group_model.id) # get_group_by_id завантажить деталі
+        except Exception as e:
+            await db.rollback()
+            self.logger.error(f"Помилка при коміті створення групи: {new_group_model.name}. Деталі: {e}", exc_info=True)
+            raise BadRequestException(detail_key="error_creating_group_commit")
 
 
     async def update_group(
         self, db: AsyncSession, *, group_id: uuid.UUID, obj_in: GroupUpdateSchema, current_user: UserModel
     ) -> GroupModel:
         """Оновлює існуючу групу."""
-        db_group = await self.get_group_by_id(db, group_id=group_id) # Перевірка існування
+        db_group = await self.get_group_by_id(db, group_id=group_id)
 
-        # TODO: Перевірка прав користувача на оновлення групи (чи є він адміном цієї групи або superuser).
-        # if not (current_user.user_type_code == USER_TYPE_SUPERADMIN or
-        #         await group_membership_service.is_user_group_admin(db, user_id=current_user.id, group_id=group_id)):
-        #     raise ForbiddenException(detail="Ви не маєте прав на оновлення цієї групи.")
+        is_admin_or_superuser = await self._check_admin_or_superuser_rights(db, current_user, group_id)
+        if not is_admin_or_superuser:
+            raise ForbiddenException(detail_key="error_update_group_not_authorized")
 
-        # Перевірки для полів, що змінюються (аналогічно до create_group)
         if obj_in.parent_group_id and obj_in.parent_group_id != db_group.parent_group_id:
-            if obj_in.parent_group_id == group_id: # Самопосилання
-                raise BadRequestException(detail="Група не може бути батьківською сама для себе.")
+            if obj_in.parent_group_id == group_id:
+                raise BadRequestException(detail_key="error_group_self_parent")
             parent_group = await self.repository.get(db, id=obj_in.parent_group_id)
             if not parent_group:
-                raise BadRequestException(detail=f"Нову батьківську групу з ID {obj_in.parent_group_id} не знайдено.")
-            # TODO: Перевірка на циклічні залежності при зміні батьківської групи.
-            # TODO: Перевірка прав на зміну батьківської групи.
+                raise BadRequestException(detail_key="error_parent_group_not_found", group_id=str(obj_in.parent_group_id))
+            # TODO: Перевірка на циклічні залежності та права на зміну батьківської групи.
 
         if obj_in.group_type_id and obj_in.group_type_id != db_group.group_type_id:
-            from backend.app.src.services.dictionaries.group_type_service import group_type_service as gts
-            try:
-                await gts.get_by_id(db, id=obj_in.group_type_id)
-            except NotFoundException:
-                raise BadRequestException(detail=f"Новий тип групи з ID {obj_in.group_type_id} не знайдено.")
+            from backend.app.src.repositories.dictionaries.group_type import group_type_repository
+            group_type = await group_type_repository.get(db, id=obj_in.group_type_id)
+            if not group_type:
+                raise BadRequestException(detail_key="error_group_type_not_found_for_create", type_id=str(obj_in.group_type_id))
 
-        # update_data = obj_in.model_dump(exclude_unset=True)
-        # update_data["updated_by_user_id"] = current_user.id
-        return await self.repository.update(db, db_obj=db_group, obj_in=obj_in) # obj_in тут є схемою
+        update_data = obj_in.model_dump(exclude_unset=True)
+        update_data["updated_by_user_id"] = current_user.id
+
+        return await self.repository.update(db, db_obj=db_group, obj_in=update_data)
+
 
     async def delete_group(self, db: AsyncSession, *, group_id: uuid.UUID, current_user: UserModel) -> GroupModel:
         """
-        Видаляє групу (м'яке або тверде видалення залежно від налаштувань репозиторію).
+        Видаляє групу.
         """
         db_group = await self.get_group_by_id(db, group_id=group_id)
 
-        # TODO: Перевірка прав користувача на видалення групи.
-        # if not (current_user.user_type_code == USER_TYPE_SUPERADMIN or
-        #         await group_membership_service.is_user_group_admin(db, user_id=current_user.id, group_id=group_id)):
-        #     raise ForbiddenException(detail="Ви не маєте прав на видалення цієї групи.")
+        is_admin_or_superuser = await self._check_admin_or_superuser_rights(db, current_user, group_id)
+        if not is_admin_or_superuser:
+            raise ForbiddenException(detail_key="error_delete_group_not_authorized")
 
-        # TODO: Додаткова логіка перед видаленням:
-        # - Чи є в групі активні учасники (окрім адміна, що видаляє)?
-        # - Чи є активні підгрупи? (Якщо так, видалення може бути заборонено або потребувати каскадного видалення).
-        # - Архівація даних замість видалення.
-        # Поточний BaseRepository.delete виконує тверде видалення.
-        # Якщо потрібне м'яке:
-        if hasattr(self.repository, 'soft_delete') and hasattr(db_group, 'is_deleted'):
-            deleted_group = await self.repository.soft_delete(db, db_obj=db_group) # type: ignore
-            if not deleted_group: # Якщо soft_delete повернув None (не підтримується)
-                 raise NotImplementedError("М'яке видалення не підтримується для цієї сутності.")
-            return deleted_group
-        else: # Тверде видалення
-            deleted_group = await self.repository.delete(db, id=group_id)
-            if not deleted_group: # Якщо з якоїсь причини не видалилося
-                 raise NotFoundException(detail=f"Помилка видалення групи {group_id} або її вже не існувало.")
-            return deleted_group
+        # TODO: Додаткова логіка перед видаленням (активні учасники, підгрупи).
+
+        deleted_group = await self.repository.soft_delete(db, db_obj=db_group, current_user_id=current_user.id)
+        if not deleted_group:
+            self.logger.error(f"Не вдалося м'яко видалити групу {group_id}")
+            raise BadRequestException(detail_key="error_group_soft_delete_failed")
+        self.logger.info(f"Групу '{db_group.name}' (ID: {group_id}) м'яко видалено користувачем {current_user.id}")
+        return deleted_group
+
+
+    async def _check_admin_or_superuser_rights(self, db: AsyncSession, user: UserModel, group_id: uuid.UUID) -> bool:
+        """Допоміжний метод для перевірки прав адміна групи або суперюзера."""
+        if user.user_type_code == ROLE_SUPERADMIN_CODE:
+            return True
+        membership = await group_membership_repository.get_by_user_and_group(db, user_id=user.id, group_id=group_id)
+        if membership and membership.role and membership.role.code == ROLE_ADMIN_CODE:
+            return True
+        return False
 
 
     async def get_user_groups_paginated(

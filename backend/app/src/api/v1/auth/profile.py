@@ -25,56 +25,51 @@ router = APIRouter()
 
 @router.get(
     "/me",
-    response_model=UserPublicSchema,
+    response_model=UserPublicSchema, # Повертаємо публічну схему
     tags=["Profile"],
     summary="Отримати дані поточного користувача"
 )
 async def read_current_user_profile(
-    current_user: UserModel = Depends(CurrentActiveUser) # Використовуємо реальну залежність
+    current_user: UserModel = Depends(CurrentActiveUser) # Тепер це UserModel
 ):
     """
     Повертає інформацію про профіль поточного автентифікованого та активного користувача.
     """
     logger.info(f"Запит даних профілю для поточного користувача: {current_user.email}")
-    # UserModel повинен бути сумісним з UserPublicSchema для автоматичної валідації
+    # Конвертуємо UserModel в UserPublicSchema для відповіді
     return UserPublicSchema.model_validate(current_user)
 
 
 @router.put(
     "/me",
-    response_model=UserPublicSchema,
+    response_model=UserPublicSchema, # Повертаємо публічну схему
     tags=["Profile"],
     summary="Оновити профіль поточного користувача"
 )
 async def update_current_user_profile(
-    profile_update_data: UserProfileUpdateSchema,
-    current_user: UserModel = Depends(CurrentActiveUser),
+    profile_update_data: UserUpdateSchema, # Використовуємо UserUpdateSchema
+    current_user: UserModel = Depends(CurrentActiveUser), # Тепер це UserModel
     db_session: DBSession = Depends()
 ):
     """
-    Оновлює дані профілю (наприклад, ім'я користувача, ім'я, прізвище)
-    поточного автентифікованого користувача.
+    Оновлює дані профілю поточного автентифікованого користувача.
     """
     logger.info(f"Запит на оновлення профілю для користувача: {current_user.email}")
     user_service = UserService(db_session)
     try:
-        # UserService.update_user_profile повинен приймати UserModel та UserProfileUpdateSchema
+        # UserService.update_user_profile приймає current_user: UserModel та obj_in: UserUpdateSchema
         updated_user = await user_service.update_user_profile(
-            user_to_update=current_user,
-            user_in=profile_update_data
+            current_user=current_user, # Передаємо UserModel
+            obj_in=profile_update_data
         )
-        if not updated_user: # Якщо сервіс може повернути None при невдачі (окрім винятків)
-             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Не вдалося оновити профіль.")
-
-    except HTTPException as e: # Якщо сервіс кидає HTTPException (напр. 400 Bad Request for duplicate username)
+        # Сервіс має кидати виняток при помилці, тому перевірка на None не потрібна, якщо сервіс надійний.
+    except BadRequestException as e: # Ловимо кастомні винятки
         logger.warning(f"Помилка оновлення профілю для {current_user.email}: {e.detail}")
         raise e
     except Exception as e_gen:
         logger.error(f"Неочікувана помилка під час оновлення профілю {current_user.email}: {e_gen}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Помилка сервера під час оновлення профілю."
-        )
+        from backend.app.src.core.exceptions import InternalServerErrorException # Локальний імпорт
+        raise InternalServerErrorException(detail_key="error_profile_update_failed") # Новий ключ
 
     logger.info(f"Профіль користувача {updated_user.email} оновлено.")
     return UserPublicSchema.model_validate(updated_user)
@@ -87,8 +82,8 @@ async def update_current_user_profile(
     summary="Змінити пароль поточного користувача"
 )
 async def change_current_user_password(
-    password_data: PasswordChangeSchema,
-    current_user: UserModel = Depends(CurrentActiveUser),
+    password_data: UserPasswordUpdateSchema, # Використовуємо UserPasswordUpdateSchema
+    current_user: UserModel = Depends(CurrentActiveUser), # Тепер це UserModel
     db_session: DBSession = Depends()
 ):
     """
@@ -96,23 +91,21 @@ async def change_current_user_password(
     Потребує введення поточного паролю для підтвердження.
     """
     logger.info(f"Запит на зміну пароля для користувача: {current_user.email}")
-    user_service = UserService(db_session) # Або AuthService, якщо він відповідає за зміну паролю
+    user_service = UserService(db_session)
 
-    # UserService повинен мати метод для зміни пароля, який перевіряє поточний пароль
-    password_changed_successfully = await user_service.change_password(
-        user=current_user,
-        current_password=password_data.current_password,
-        new_password=password_data.new_password
-    )
-
-    if not password_changed_successfully:
-        # Сервіс повинен кидати HTTPException(400) якщо поточний пароль невірний,
-        # або повертати False, як тут. Краще кидати виняток у сервісі.
-        logger.warning(f"Не вдалося змінити пароль для {current_user.email}: невірний поточний пароль.")
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Невірний поточний пароль."
+    try:
+        await user_service.change_user_password( # Метод в сервісі називається change_user_password
+            user=current_user,
+            old_password=password_data.current_password,
+            new_password=password_data.new_password
         )
+    except BadRequestException as e: # Сервіс кидає BadRequestException при помилках
+        logger.warning(f"Не вдалося змінити пароль для {current_user.email}: {e.detail}")
+        raise e # Перекидаємо далі
+    except Exception as e_gen:
+        logger.error(f"Неочікувана помилка під час зміни пароля для {current_user.email}: {e_gen}", exc_info=True)
+        from backend.app.src.core.exceptions import InternalServerErrorException # Локальний імпорт
+        raise InternalServerErrorException(detail_key="error_password_change_failed") # Новий ключ
 
     logger.info(f"Пароль для користувача {current_user.email} успішно змінено.")
     # Тіло відповіді не потрібне при успішній зміні (204 No Content)

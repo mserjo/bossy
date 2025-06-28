@@ -41,6 +41,12 @@ class AppSettings(BaseSettings):
     RATE_LIMIT_TIMES: int = Field(default=100, ge=1, description="Кількість запитів")
     RATE_LIMIT_SECONDS: int = Field(default=60, ge=1, description="За період в секундах")
 
+    # Налаштування використання опціональних сервісів
+    USE_REDIS: bool = Field(default=True, description="Чи використовувати Redis для кешування та/або черг.")
+    USE_CELERY: bool = Field(default=True, description="Чи використовувати Celery для фонових завдань.")
+    USE_ELASTICSEARCH: bool = Field(default=True, description="Чи використовувати Elasticsearch для пошуку.")
+    USE_FIREBASE: bool = Field(default=True, description="Чи використовувати Firebase (наприклад, для FCM).")
+
     # Налаштування для .env файлу. Pydantic-settings шукає .env у поточному каталозі або батьківських.
     # Якщо .env файл знаходиться, наприклад, в корені проекту `bossy/.env`,
     # а додаток запускається з `bossy/backend/`, то шлях має бути `../.env`.
@@ -173,47 +179,66 @@ class Settings(BaseSettings):
     @model_validator(mode='before')
     @classmethod
     def init_optional_settings(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        # Завантажуємо RedisSettings
-        # Pydantic автоматично створить екземпляр з .env, якщо env_prefix правильний
-        # і клас RedisSettings не має обов'язкових полів без дефолтів
-        # або якщо відповідні змінні є в .env.
-        # Тут ми просто створюємо екземпляр, щоб перевірити наявність ключового поля.
-        # Якщо поле є, то Pydantic вже заповнив його в _redis_settings.
-        _redis_settings = RedisSettings() # Спробує завантажити з .env з префіксом REDIS_
-        if _redis_settings.REDIS_URL: # Перевіряємо, чи REDIS_URL було встановлено (з .env або зібрано)
-            values['redis'] = _redis_settings
+        # Отримуємо налаштування AppSettings, щоб перевірити прапори USE_...
+        # Якщо 'app' ще не створено (наприклад, при першому виклику валідатора),
+        # створюємо тимчасовий екземпляр AppSettings.
+        app_settings_data = values.get('app', {})
+        if isinstance(app_settings_data, AppSettings):
+            app_config = app_settings_data
         else:
-            # Якщо REDIS_URL не встановлено, можна явно присвоїти None,
-            # хоча Pydantic і так би це зробив для Optional[RedisSettings] = None.
-            # Це для наочності, що ми перевірили і не знайшли.
+            # Спробуємо створити AppSettings з даних, які можуть бути в values['app']
+            # або пустим словником, якщо 'app' ще немає.
+            # Це дозволить Pydantic завантажити змінні середовища для AppSettings.
+            app_config = AppSettings(**app_settings_data)
+
+
+        if app_config.USE_REDIS:
+            _redis_settings = RedisSettings()
+            if _redis_settings.REDIS_URL:
+                values['redis'] = _redis_settings
+                # logger.debug("Redis увімкнено та налаштовано.") # Логер тут ще може бути недоступний
+            else:
+                values['redis'] = None
+                # logger.warning("Redis увімкнено (USE_REDIS=True), але REDIS_URL не вдалося визначити. Redis не буде використовуватися.")
+        else:
             values['redis'] = None
+            # logger.info("Redis вимкнено (USE_REDIS=False).")
 
-
-        _celery_settings = CelerySettings()
-        if _celery_settings.CELERY_BROKER_URL:
-            values['celery'] = _celery_settings
-            # Якщо DEBUG і CELERY_TASK_ALWAYS_EAGER не задано, можна встановити
-            # app_settings = values.get('app') if isinstance(values.get('app'), AppSettings) else AppSettings() # Отримуємо app settings
-            # if app_settings.DEBUG and _celery_settings.CELERY_TASK_ALWAYS_EAGER is False: # Явно перевіряємо False
-            #     # Не можна змінювати тут, бо це BaseSettings.
-            #     # Це має бути налаштовано в .env або в дефолтах CelerySettings
-            #     # в залежності від ENVIRONMENT.
-            #     pass
+        if app_config.USE_CELERY:
+            _celery_settings = CelerySettings()
+            if _celery_settings.CELERY_BROKER_URL:
+                values['celery'] = _celery_settings
+                # logger.debug("Celery увімкнено та налаштовано.")
+            else:
+                values['celery'] = None
+                # logger.warning("Celery увімкнено (USE_CELERY=True), але CELERY_BROKER_URL не визначено. Celery не буде використовуватися.")
         else:
             values['celery'] = None
+            # logger.info("Celery вимкнено (USE_CELERY=False).")
 
-
-        _firebase_settings = FirebaseSettings()
-        if _firebase_settings.FIREBASE_CREDENTIALS_PATH:
-            values['firebase'] = _firebase_settings
+        if app_config.USE_FIREBASE:
+            _firebase_settings = FirebaseSettings()
+            if _firebase_settings.FIREBASE_CREDENTIALS_PATH:
+                values['firebase'] = _firebase_settings
+                # logger.debug("Firebase увімкнено та налаштовано.")
+            else:
+                values['firebase'] = None
+                # logger.warning("Firebase увімкнено (USE_FIREBASE=True), але FIREBASE_CREDENTIALS_PATH не визначено. Firebase не буде використовуватися.")
         else:
             values['firebase'] = None
+            # logger.info("Firebase вимкнено (USE_FIREBASE=False).")
 
-        _elasticsearch_settings = ElasticsearchSettings()
-        if _elasticsearch_settings.ELASTICSEARCH_HOSTS:
-            values['elasticsearch'] = _elasticsearch_settings
+        if app_config.USE_ELASTICSEARCH:
+            _elasticsearch_settings = ElasticsearchSettings()
+            if _elasticsearch_settings.ELASTICSEARCH_HOSTS:
+                values['elasticsearch'] = _elasticsearch_settings
+                # logger.debug("Elasticsearch увімкнено та налаштовано.")
+            else:
+                values['elasticsearch'] = None
+                # logger.warning("Elasticsearch увімкнено (USE_ELASTICSEARCH=True), але ELASTICSEARCH_HOSTS не визначено. Elasticsearch не буде використовуватися.")
         else:
             values['elasticsearch'] = None
+            # logger.info("Elasticsearch вимкнено (USE_ELASTICSEARCH=False).")
 
         return values
 

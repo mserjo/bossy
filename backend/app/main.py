@@ -143,38 +143,55 @@ async def startup_event() -> None:
     # Тому `init_db()` тут закоментовано.
     # # await init_db()
 
-    # 2. Ініціалізація підключення до Redis (якщо налаштовано)
-    if settings.redis and settings.redis.REDIS_URL:
-        # Зберігаємо Redis клієнт в стані додатку для легкого доступу
-        app.state.redis = await init_redis_pool(str(settings.redis.REDIS_URL))
-        logger.info(f"Підключення до Redis ({settings.redis.REDIS_URL}) встановлено (пул створено).")
-        # Перевірка з'єднання з Redis через ping
-        try:
-            # Отримуємо клієнт з app.state для перевірки
-            # `get_redis_client` може бути залежністю FastAPI, тому передаємо app_state
-            redis_client_instance: "AsyncRedisClient" = await get_redis_client(request=None, app_state=app.state) # type: ignore
-            if await redis_client_instance.ping():
-                logger.info("Redis ping успішний. З'єднання з Redis активне.")
-            else:
-                # Це малоймовірно, оскільки ping() зазвичай кидає виняток при помилці
-                logger.warning("Redis ping не повернув очікуваного результату, але не кинув виняток.")
-        except ConnectionRefusedError:
-             logger.error(f"Помилка підключення до Redis: ConnectionRefusedError. Перевірте, чи запущено Redis сервер за адресою {settings.redis.REDIS_URL} та чи доступний він.")
-        except Exception as e:
-            logger.error(f"Не вдалося виконати ping до Redis або інша помилка Redis: {e}", exc_info=True)
+    # 2. Ініціалізація підключення до Redis (якщо увімкнено та налаштовано)
+    if settings.app.USE_REDIS:
+        if settings.redis and settings.redis.REDIS_URL:
+            app.state.redis = await init_redis_pool(str(settings.redis.REDIS_URL))
+            logger.info(f"Підключення до Redis ({settings.redis.REDIS_URL}) встановлено (пул створено).")
+            try:
+                redis_client_instance: "AsyncRedisClient" = await get_redis_client(request=None, app_state=app.state) # type: ignore
+                if await redis_client_instance.ping():
+                    logger.info("Redis ping успішний. З'єднання з Redis активне.")
+                else:
+                    logger.warning("Redis ping не повернув очікуваного результату, але не кинув виняток.")
+            except ConnectionRefusedError:
+                 logger.error(f"Помилка підключення до Redis: ConnectionRefusedError. Перевірте, чи запущено Redis сервер за адресою {settings.redis.REDIS_URL} та чи доступний він.")
+            except Exception as e:
+                logger.error(f"Не вдалося виконати ping до Redis або інша помилка Redis: {e}", exc_info=True)
+        else:
+            app.state.redis = None
+            logger.warning("Redis увімкнено (settings.app.USE_REDIS=True), але налаштування Redis (settings.redis) або REDIS_URL відсутні. Підключення до Redis пропущено.")
     else:
-        app.state.redis = None # Явно вказуємо, що Redis не ініціалізовано
-        logger.info("Redis не налаштовано в `settings.redis` або `REDIS_URL` відсутній. Підключення до Redis пропущено.")
+        app.state.redis = None
+        logger.info("Використання Redis вимкнено (settings.app.USE_REDIS=False). Підключення до Redis пропущено.")
 
-    # 3. Ініціалізація Celery (якщо використовується)
-    # TODO: Розкоментувати та реалізувати, коли Celery буде інтегровано.
-    # Потрібно буде імпортувати `get_celery_app` та налаштувати його.
-    # if settings.celery and settings.celery.CELERY_BROKER_URL:
-    #     app.state.celery_app = get_celery_app()
-    #     logger.info(f"Celery налаштовано. Broker: {settings.celery.CELERY_BROKER_URL}")
-    # else:
-    #     app.state.celery_app = None
-    #     logger.info("Celery не налаштовано. Ініціалізація Celery пропущена.")
+    # 3. Ініціалізація Celery (якщо увімкнено та налаштовано)
+    if settings.app.USE_CELERY:
+        # TODO: Розкоментувати та реалізувати, коли Celery буде інтегровано.
+        # Потрібно буде імпортувати `get_celery_app` та налаштувати його.
+        if settings.celery and settings.celery.CELERY_BROKER_URL:
+        #     app.state.celery_app = get_celery_app()
+            logger.info(f"Celery (теоретично) налаштовано. Broker: {settings.celery.CELERY_BROKER_URL}") # Заглушка
+        else:
+        #     app.state.celery_app = None
+            logger.warning("Celery увімкнено (settings.app.USE_CELERY=True), але налаштування Celery (settings.celery) або CELERY_BROKER_URL відсутні. Ініціалізація Celery пропущена.")
+    else:
+        # app.state.celery_app = None
+        logger.info("Використання Celery вимкнено (settings.app.USE_CELERY=False). Ініціалізація Celery пропущена.")
+
+    # TODO: Додати аналогічні перевірки для Elasticsearch та Firebase, коли їх ініціалізація буде додана.
+    # if settings.app.USE_ELASTICSEARCH:
+    #   if settings.elasticsearch and settings.elasticsearch.ELASTICSEARCH_HOSTS:
+    #     # Ініціалізація Elasticsearch
+    #   else: logger.warning(...)
+    # else: logger.info(...)
+    #
+    # if settings.app.USE_FIREBASE:
+    #   if settings.firebase and settings.firebase.FIREBASE_CREDENTIALS_PATH:
+    #     # Ініціалізація Firebase
+    #   else: logger.warning(...)
+    # else: logger.info(...)
+
 
     # 4. Перевірка та ініціалізація початкових даних системи (довідники, системні користувачі)
     logger.info("Запуск перевірки та ініціалізації початкових даних системи...")
@@ -212,20 +229,33 @@ async def shutdown_event() -> None:
     """
     logger.info(f"Додаток '{settings.app.APP_NAME}' зупиняється...")
 
-    # 1. Закриття підключення до Redis (якщо воно було ініціалізовано)
-    if hasattr(app.state, 'redis') and app.state.redis:
+    # 1. Закриття підключення до Redis (якщо воно було ініціалізовано та використовується)
+    if settings.app.USE_REDIS and hasattr(app.state, 'redis') and app.state.redis:
         await close_redis_pool(app.state.redis)
         logger.info("Підключення до Redis закрито.")
+    elif settings.app.USE_REDIS:
+        logger.info("Redis було увімкнено (USE_REDIS=True), але не було активного підключення для закриття.")
+    else:
+        logger.info("Використання Redis вимкнено (USE_REDIS=False). Закриття підключення до Redis пропущено.")
+
 
     # 2. Закриття підключення до бази даних PostgreSQL
     await close_db_connection() # Закриває пул з'єднань SQLAlchemy
     logger.info("Підключення до бази даних PostgreSQL закрито.")
 
-    # 3. Зупинка Celery (якщо використовується та потрібно)
-    # TODO: Реалізувати логіку зупинки Celery, якщо потрібно.
-    # if hasattr(app.state, 'celery_app') and app.state.celery_app:
-    #     # app.state.celery_app.control.shutdown() # Приклад
-    #     logger.info("Celery зупинено.")
+    # 3. Зупинка Celery (якщо використовується, було ініціалізовано та потрібно)
+    if settings.app.USE_CELERY:
+        # TODO: Реалізувати логіку зупинки Celery, якщо потрібно.
+        # if hasattr(app.state, 'celery_app') and app.state.celery_app:
+        #     # app.state.celery_app.control.shutdown() # Приклад
+        #     logger.info("Celery (теоретично) зупинено.") # Заглушка
+        # else:
+        #     logger.info("Celery було увімкнено (USE_CELERY=True), але не було активного екземпляру для зупинки.")
+        logger.info("Celery (теоретично) зупинено (заглушка).") # Поки що просто логуємо
+    else:
+        logger.info("Використання Celery вимкнено (USE_CELERY=False). Зупинка Celery пропущена.")
+
+    # TODO: Додати аналогічні перевірки для Elasticsearch та Firebase.
 
     logger.info(f"Додаток '{settings.app.APP_NAME}' успішно зупинено.")
 

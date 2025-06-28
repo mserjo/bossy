@@ -10,147 +10,380 @@
 - Реєстрацію головного API роутера для REST ендпоінтів.
 - Реєстрацію GraphQL схеми для GraphQL ендпоінтів.
 - Визначення базових ендпоінтів, наприклад, для перевірки стану системи (health check).
+- Налаштування глобальних обробників винятків.
 """
 
-from fastapi import FastAPI, Request, status
+import asyncio
+from typing import TYPE_CHECKING, Any, Dict
+
+from fastapi import FastAPI, Request, status, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-# TODO: Розкоментувати, коли файли будуть створені
-# from backend.app.src.api.router import router as api_router_v1
-# from backend.app.src.api.graphql.schema import schema as graphql_schema
-# from backend.app.src.config.settings import settings
-# from backend.app.src.config.logging import get_logger
-# from backend.app.src.core.events import create_start_app_handler, create_stop_app_handler
-# from backend.app.src.services.system.initialization import (
-#     initialize_system_data,
-#     check_initial_data
-# )
+from strawberry.fastapi import GraphQLRouter # type: ignore
 
-# logger = get_logger(__name__) # TODO: Розкоментувати
+# Імпорт конфігурацій та логгера
+from backend.app.src.config.settings import settings
+from backend.app.src.config.logging import logger # Використовуємо logger з loguru
+from backend.app.src.config.database import (
+    # init_db, # Зазвичай не потрібен, якщо є Alembic
+    get_async_session,
+    close_db_connection,
+    connect_to_db,
+)
+from backend.app.src.config.redis import init_redis_pool, close_redis_pool, get_redis_client
+# from backend.app.src.config.celery_app import get_celery_app # TODO: Розкоментувати, коли Celery буде налаштовано
+
+# Імпорт роутерів
+from backend.app.src.api.router import router as main_api_router # Головний агрегований REST API роутер
+from backend.app.src.api.graphql.schema import schema as graphql_schema # Головна GraphQL схема
+from backend.app.src.api.graphql.context import get_graphql_context # Функція для отримання GraphQL контексту
+
+# Імпорт сервісів
+from backend.app.src.services.system.initialization_service import InitializationService
+
+# Імпорт для обробників подій, якщо вони винесені (поки не використовуються)
+# from backend.app.src.core.events import create_start_app_handler, create_stop_app_handler
+
+if TYPE_CHECKING:
+    from redis.asyncio import Redis as AsyncRedisClient # type: ignore
+    # Це для уникнення циклічного імпорту, якщо FastAPI/Request потрібні в redis.py для типів
 
 # Створення екземпляру FastAPI
-# TODO: Додати title, version, description з конфігураційного файлу settings
+# Використовуємо title, version, description з settings.app
+# Також додано openapi_tags для кращої документації OpenAPI.
+# URL для OpenAPI, Swagger UI (docs) та ReDoc вмикаються/вимикаються залежно від режиму DEBUG.
+openapi_tags_metadata = [
+    {
+        "name": "System",
+        "description": "Системні ендпоінти, включаючи перевірку стану та ініціалізацію.",
+    },
+    {
+        "name": "v1",
+        "description": "Ендпоінти API версії 1. Детальна специфікація знаходиться в підключеному роутері v1.",
+    },
+    {
+        "name": "graphql",
+        "description": "GraphQL API. Дозволяє гнучкі запити до даних.",
+    },
+    # TODO: Додати інші теги для основних груп ендпоінтів API v1 по мірі їх реалізації
+    # Наприклад: "Auth", "Users", "Groups", "Tasks" і т.д.
+    # Ці теги можна також визначати безпосередньо в APIRouter для кожної групи ендпоінтів.
+]
+
 app = FastAPI(
-    title="Bossy Backend",
-    version="0.1.0",
-    description="API для бонусної системи Bossy"
+    title=settings.app.APP_NAME,
+    version=settings.app.APP_VERSION,
+    description=settings.app.DESCRIPTION,
+    debug=settings.app.DEBUG,
+    openapi_url=f"{settings.app.API_V1_STR}/openapi.json" if not settings.app.DEBUG else "/openapi.json",
+    docs_url="/docs" if settings.app.DEBUG else None,
+    redoc_url="/redoc" if settings.app.DEBUG else None,
+    openapi_tags=openapi_tags_metadata
 )
 
 # Налаштування CORS
-# TODO: Винести origins в конфігураційний файл settings
-origins = [
-    "http://localhost",
-    "http://localhost:8080",
-    "http://localhost:3000", # Для Flutter Web в режимі розробки
-    # Додати інші дозволені origins за потреби
-]
+# Використовуємо BACKEND_CORS_ORIGINS з settings.app.
+# Якщо список origins порожній, CORS middleware не додається.
+if settings.app.BACKEND_CORS_ORIGINS:
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=[str(origin) for origin in settings.app.BACKEND_CORS_ORIGINS],
+        allow_credentials=True,
+        allow_methods=["*"], # Дозволяє всі стандартні HTTP методи
+        allow_headers=["*"], # Дозволяє всі стандартні HTTP заголовки
+    )
+    logger.info(f"CORS middleware додано. Дозволені origins: {settings.app.BACKEND_CORS_ORIGINS}")
+else:
+    logger.warning(
+        "CORS middleware не додано, оскільки `BACKEND_CORS_ORIGINS` не налаштовано в `settings.app`. "
+        "Це може бути проблемою для frontend додатків, що працюють на інших доменах/портах."
+    )
 
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=origins, # Дозволяє запити з вказаних джерел
-    allow_credentials=True, # Дозволяє передачу cookies
-    allow_methods=["*"], # Дозволяє всі HTTP методи
-    allow_headers=["*"], # Дозволяє всі HTTP заголовки
-)
+# Middleware для логування HTTP запитів та відповідей
+# Це забезпечує додаткове логування через Loguru на рівні FastAPI,
+# доповнюючи стандартне логування Uvicorn.
+@app.middleware("http")
+async def log_requests_middleware(request: Request, call_next: Any) -> Any:
+    """
+    Middleware для логування деталей кожного HTTP запиту та відповіді.
+    Логує метод, шлях, рядок запиту (якщо є) та статус відповіді.
+    У разі винятку під час обробки запиту, логує помилку.
+    """
+    # Формуємо рядок з параметрами запиту, якщо вони є
+    query_params = f"?{request.url.query}" if request.url.query else ""
+    logger.info(f"Вхідний запит: {request.method} {request.url.path}{query_params}")
+    try:
+        response = await call_next(request)
+        logger.info(f"Відповідь для {request.method} {request.url.path}{query_params}: Статус {response.status_code}")
+        return response
+    except Exception as e:
+        # Логуємо виняток, який стався під час обробки запиту,
+        # перед тим як він буде оброблений глобальними обробниками винятків.
+        logger.exception(f"Помилка під час обробки запиту: {request.method} {request.url.path}{query_params}")
+        raise e # Важливо повторно кинути виняток
 
-# TODO: Додати middleware для логування запитів, якщо потрібно окреме від Uvicorn
-# @app.middleware("http")
-# async def log_requests_middleware(request: Request, call_next):
-#     logger.info(f"Request: {request.method} {request.url}")
-#     response = await call_next(request)
-#     logger.info(f"Response status: {response.status_code}")
-#     return response
 
-# Обробники подій життєвого циклу
-# TODO: Розкоментувати та реалізувати функції, коли відповідні сервіси будуть готові
-# app.add_event_handler("startup", create_start_app_handler(app))
-# app.add_event_handler("shutdown", create_stop_app_handler(app))
+# Обробники подій життєвого циклу FastAPI
+@app.on_event("startup")
+async def startup_event() -> None:
+    """
+    Обробник події запуску додатку (startup event).
+    Виконується один раз при старті сервера FastAPI.
+    Ініціалізує підключення до бази даних, Redis, Celery (якщо використовуються)
+    та виконує початкове наповнення системи даними (довідники, системні користувачі).
+    """
+    logger.info(f"Додаток '{settings.app.APP_NAME}' версії {settings.app.APP_VERSION} запускається...")
+    logger.info(f"Середовище: {settings.app.ENVIRONMENT.value}, Режим відладки: {settings.app.DEBUG}")
 
-# @app.on_event("startup")
-# async def startup_event():
-#     """
-#     Обробник події запуску додатку.
-#     Виконується один раз при старті сервера.
-#     """
-#     logger.info("Додаток запускається...")
-#     # Перевірка та ініціалізація початкових даних
-#     # await check_initial_data() # Перевіряє, чи існують базові дані (довідники, системні користувачі)
-#     # await initialize_system_data() # Створює базові дані, якщо їх немає
-#     logger.info("Перевірка та ініціалізація початкових даних завершена.")
-#     # TODO: Додати інші дії, які потрібно виконати при старті,
-#     # наприклад, підключення до БД, Redis, Celery (якщо не зроблено в іншому місці)
+    # 1. Ініціалізація підключення до бази даних PostgreSQL
+    await connect_to_db() # Створює SQLAlchemy async engine
+    logger.info("Підключення до бази даних PostgreSQL встановлено (engine створено).")
+    # Зауваження: створення таблиць (еквівалент `Base.metadata.create_all(bind=engine)`)
+    # зазвичай виконується через Alembic міграції (`alembic upgrade head`).
+    # Тому `init_db()` тут закоментовано.
+    # # await init_db()
 
-# @app.on_event("shutdown")
-# async def shutdown_event():
-#     """
-#     Обробник події зупинки додатку.
-#     Виконується один раз при зупинці сервера.
-#     """
-#     logger.info("Додаток зупиняється...")
-#     # TODO: Додати дії, які потрібно виконати при зупинці,
-#     # наприклад, закриття з'єднань з БД, звільнення ресурсів
+    # 2. Ініціалізація підключення до Redis (якщо налаштовано)
+    if settings.redis and settings.redis.REDIS_URL:
+        # Зберігаємо Redis клієнт в стані додатку для легкого доступу
+        app.state.redis = await init_redis_pool(str(settings.redis.REDIS_URL))
+        logger.info(f"Підключення до Redis ({settings.redis.REDIS_URL}) встановлено (пул створено).")
+        # Перевірка з'єднання з Redis через ping
+        try:
+            # Отримуємо клієнт з app.state для перевірки
+            # `get_redis_client` може бути залежністю FastAPI, тому передаємо app_state
+            redis_client_instance: "AsyncRedisClient" = await get_redis_client(request=None, app_state=app.state) # type: ignore
+            if await redis_client_instance.ping():
+                logger.info("Redis ping успішний. З'єднання з Redis активне.")
+            else:
+                # Це малоймовірно, оскільки ping() зазвичай кидає виняток при помилці
+                logger.warning("Redis ping не повернув очікуваного результату, але не кинув виняток.")
+        except ConnectionRefusedError:
+             logger.error(f"Помилка підключення до Redis: ConnectionRefusedError. Перевірте, чи запущено Redis сервер за адресою {settings.redis.REDIS_URL} та чи доступний він.")
+        except Exception as e:
+            logger.error(f"Не вдалося виконати ping до Redis або інша помилка Redis: {e}", exc_info=True)
+    else:
+        app.state.redis = None # Явно вказуємо, що Redis не ініціалізовано
+        logger.info("Redis не налаштовано в `settings.redis` або `REDIS_URL` відсутній. Підключення до Redis пропущено.")
+
+    # 3. Ініціалізація Celery (якщо використовується)
+    # TODO: Розкоментувати та реалізувати, коли Celery буде інтегровано.
+    # Потрібно буде імпортувати `get_celery_app` та налаштувати його.
+    # if settings.celery and settings.celery.CELERY_BROKER_URL:
+    #     app.state.celery_app = get_celery_app()
+    #     logger.info(f"Celery налаштовано. Broker: {settings.celery.CELERY_BROKER_URL}")
+    # else:
+    #     app.state.celery_app = None
+    #     logger.info("Celery не налаштовано. Ініціалізація Celery пропущена.")
+
+    # 4. Перевірка та ініціалізація початкових даних системи (довідники, системні користувачі)
+    logger.info("Запуск перевірки та ініціалізації початкових даних системи...")
+    # Використовуємо асинхронний генератор сесій `get_async_session`
+    # для забезпечення коректного управління сесіями.
+    async for session in get_async_session():
+        try:
+            initialization_service = InitializationService(session)
+            init_results = await initialization_service.run_full_initialization()
+            # Явний коміт після всіх операцій сервісу ініціалізації в рамках однієї сесії.
+            # Це важливо, якщо `run_full_initialization` не робить коміти самостійно.
+            await session.commit()
+            logger.info(f"Результати ініціалізації системних даних: {init_results}")
+        except Exception as e:
+            # У разі помилки під час ініціалізації, відкочуємо транзакцію
+            await session.rollback()
+            logger.error(f"Помилка під час ініціалізації системних даних: {e}", exc_info=True)
+            # Тут можна вирішити, чи слід додатку падати при помилці ініціалізації,
+            # чи продовжувати роботу з попередженням.
+            # Наприклад, можна кинути виняток: raise SystemError(f"Failed to initialize system data: {e}")
+        finally:
+            # Завжди закриваємо сесію, отриману з генератора.
+            await session.close()
+    logger.info("Перевірка та ініціалізація початкових даних системи завершена.")
+
+    logger.info(f"Додаток '{settings.app.APP_NAME}' успішно запущено та готовий до роботи.")
+
+
+@app.on_event("shutdown")
+async def shutdown_event() -> None:
+    """
+    Обробник події зупинки додатку (shutdown event).
+    Виконується один раз при зупинці сервера FastAPI.
+    Закриває активні з'єднання з базою даних, Redis тощо.
+    """
+    logger.info(f"Додаток '{settings.app.APP_NAME}' зупиняється...")
+
+    # 1. Закриття підключення до Redis (якщо воно було ініціалізовано)
+    if hasattr(app.state, 'redis') and app.state.redis:
+        await close_redis_pool(app.state.redis)
+        logger.info("Підключення до Redis закрито.")
+
+    # 2. Закриття підключення до бази даних PostgreSQL
+    await close_db_connection() # Закриває пул з'єднань SQLAlchemy
+    logger.info("Підключення до бази даних PostgreSQL закрито.")
+
+    # 3. Зупинка Celery (якщо використовується та потрібно)
+    # TODO: Реалізувати логіку зупинки Celery, якщо потрібно.
+    # if hasattr(app.state, 'celery_app') and app.state.celery_app:
+    #     # app.state.celery_app.control.shutdown() # Приклад
+    #     logger.info("Celery зупинено.")
+
+    logger.info(f"Додаток '{settings.app.APP_NAME}' успішно зупинено.")
+
 
 # Підключення роутерів
-# TODO: Розкоментувати, коли роутери будуть створені та наповнені
-# app.include_router(api_router_v1, prefix=settings.API_V1_STR, tags=["v1"])
-# logger.info(f"API v1 роутер підключено за префіксом: {settings.API_V1_STR}")
+# Головний агрегований REST API роутер підключається з префіксом "/api".
+# Це означає, що всі ендпоінти, визначені в `main_api_router` (включаючи ті,
+# що підключені до нього, наприклад, v1 роутер з префіксом settings.app.API_V1_STR),
+# будуть доступні через `/api/...`.
+# Наприклад, якщо API_V1_STR = "/v1", то ендпоінти v1 будуть на `/api/v1/...`.
+app.include_router(main_api_router, prefix="/api") # Загальний префікс для всіх REST API
+logger.info(f"Головний REST API роутер підключено з префіксом: /api.")
+logger.info(f"Очікуваний префікс для API v1 (відносно /api): {settings.app.API_V1_STR}")
 
-# Підключення GraphQL
-# TODO: Розкоментувати, коли GraphQL схема буде готова
-# from strawberry.fastapi import GraphQLRouter
-# graphql_app = GraphQLRouter(graphql_schema, graphiql=settings.DEBUG)
-# app.include_router(graphql_app, prefix="/graphql", tags=["graphql"])
-# logger.info("GraphQL роутер підключено за префіксом: /graphql")
+# Підключення GraphQL API
+# Використовуємо GraphQL схему, імпортовану з `src.api.graphql.schema`,
+# та функцію для отримання контексту `get_graphql_context`.
+# GraphiQL UI (інтерактивний редактор запитів) вмикається залежно від `settings.app.DEBUG`.
+graphql_app_router = GraphQLRouter(
+    schema=graphql_schema,
+    graphiql=settings.app.DEBUG,
+    context_getter=get_graphql_context
+)
+app.include_router(
+    graphql_app_router,
+    prefix=settings.app.GRAPHQL_API_STR, # Префікс для GraphQL, наприклад, "/graphql"
+    tags=["graphql"] # Тег для групування в OpenAPI документації
+)
+logger.info(f"GraphQL роутер підключено. Префікс: {settings.app.GRAPHQL_API_STR}. GraphiQL UI: {settings.app.DEBUG}")
 
 
 # Ендпоінт для перевірки стану системи (health check)
+# Цей ендпоінт не має префіксу /api, доступний за шляхом /health.
 @app.get(
     "/health",
-    tags=["System"],
-    summary="Перевірка стану системи",
-    description="Повертає статус 200 OK, якщо система працює справно.",
-    status_code=status.HTTP_200_OK,
+    tags=["System"], # Групування в OpenAPI
+    summary="Перевірка стану та працездатності системи",
+    description="Повертає статус 200 OK та повідомлення, якщо система працює справно.",
+    status_code=status.HTTP_200_OK, # Очікуваний HTTP статус успішної відповіді
+    response_model=Dict[str, str] # Модель відповіді для OpenAPI документації
 )
-async def health_check() -> JSONResponse:
+async def health_check() -> Dict[str, str]:
     """
-    Перевіряє працездатність сервісу.
+    Перевіряє базову працездатність сервісу.
+    Може бути розширений для перевірки залежностей (БД, Redis тощо).
     """
-    # logger.info("Запит на перевірку стану системи /health") # TODO: Розкоментувати
-    return JSONResponse(content={"status": "OK"})
+    logger.info("Запит на перевірку стану системи: /health")
+    # TODO: Розширити перевірку стану, наприклад, пінгувати БД, Redis, якщо потрібно.
+    # Приклад:
+    # db_ping_ok = False
+    # async for session in get_async_session():
+    #     try:
+    #         await session.execute(text("SELECT 1"))
+    #         db_ping_ok = True
+    #     except Exception:
+    #         db_ping_ok = False
+    #     finally:
+    #         await session.close()
+    # if not db_ping_ok:
+    #     return {"status": "unhealthy", "message": "Database connection failed"}
+    return {"status": "OK", "message": f"{settings.app.APP_NAME} is healthy and running!"}
 
-# TODO: Додати обробку глобальних винятків, якщо потрібно кастомна логіка
-# from fastapi import HTTPException
-# @app.exception_handler(HTTPException)
-# async def http_exception_handler(request: Request, exc: HTTPException):
-#     return JSONResponse(
-#         status_code=exc.status_code,
-#         content={"detail": exc.detail, "custom_message": "Це кастомне повідомлення про помилку"},
-#     )
+# Глобальні обробники винятків
+# Ці обробники перехоплюють винятки, що виникають під час обробки запитів,
+# та повертають стандартизовані JSON-відповіді.
+
+@app.exception_handler(HTTPException)
+async def custom_http_exception_handler(request: Request, exc: HTTPException) -> JSONResponse:
+    """
+    Обробляє винятки типу `HTTPException` (стандартні помилки FastAPI).
+    Повертає JSON відповідь з кодом статусу, повідомленням та типом помилки.
+    Логує HTTP винятки, з детальною інформацією для серверних помилок (5xx).
+    """
+    log_level = "error" if exc.status_code >= 500 else "warning"
+    logger.log(
+        log_level,
+        f"HTTP виняток: Статус {exc.status_code}, Деталі: '{exc.detail}' для запиту {request.method} {request.url.path}",
+        exc_info=True if exc.status_code >= 500 else False # Логуємо stacktrace для 5xx
+    )
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "error": {
+                "code": exc.status_code, # Код помилки (ідентичний HTTP статусу)
+                "message": exc.detail,   # Повідомлення про помилку
+                "type": "http_exception" # Тип помилки
+            }
+        },
+        headers=getattr(exc, "headers", None) # Зберігаємо кастомні заголовки з винятку, якщо вони є
+    )
+
+@app.exception_handler(Exception)
+async def generic_exception_handler(request: Request, exc: Exception) -> JSONResponse:
+    """
+    Обробляє всі інші неперехоплені винятки (нащадки `Exception`).
+    Повертає стандартизовану JSON відповідь зі статусом 500 Internal Server Error.
+    Завжди логує повний stacktrace для невідомих помилок.
+    """
+    logger.error(
+        f"Неперехоплений внутрішній виняток: {exc.__class__.__name__} ('{str(exc)}') для запиту {request.method} {request.url.path}",
+        exc_info=True # Завжди логуємо stacktrace для невідомих серверних помилок
+    )
+    # Формуємо відповідь. У DEBUG режимі можна додавати більше деталей.
+    error_content: Dict[str, Any] = {
+        "code": status.HTTP_500_INTERNAL_SERVER_ERROR,
+        "message": "An unexpected internal server error occurred. Please try again later or contact support.",
+        "type": "unhandled_server_exception",
+    }
+    if settings.app.DEBUG:
+        error_content["detail"] = f"{exc.__class__.__name__}: {str(exc)}"
+        # У DEBUG можна додати traceback, але це може бути занадто багато для JSON відповіді.
+        # import traceback
+        # error_content["traceback"] = traceback.format_exc().splitlines()
+
+    return JSONResponse(
+        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+        content={"error": error_content},
+    )
+
 
 if __name__ == "__main__":
-    # Цей блок виконується, тільки якщо файл запускається напряму.
-    # Зазвичай, для запуску FastAPI додатку використовується Uvicorn.
-    # uvicorn main:app --reload
+    # Цей блок виконується, тільки якщо файл запускається напряму як скрипт
+    # (наприклад, `python backend/app/main.py`).
+    # Зазвичай, для запуску FastAPI додатку в розробці та на продакшені
+    # використовується ASGI сервер, такий як Uvicorn, викликаний з командного рядка:
+    # `uvicorn backend.app.main:app --reload --host 0.0.0.0 --port 8000`
     import uvicorn
-    # logger.info("Запуск додатку через uvicorn (режим розробки)...") # TODO: Розкоментувати
-    uvicorn.run(app, host="0.0.0.0", port=8000, log_level="info")
+    logger.info("Запуск додатку через Uvicorn (режим розробки, викликаний з main.py)...")
 
-# TODO: Додати документацію для OpenAPI (теги, опис тощо)
-# TODO: Перевірити відповідність всім вимогам з technical-task.md та code-style.md
-# TODO: Налаштувати інтеграцію з Celery, Redis, Firebase, Elasticsearch, якщо вони використовуються
-# (це може бути зроблено через обробники подій startup/shutdown або окремі конфігураційні модулі)
-"""
-Приклад структури:
-- FastAPI app instance
-- Middleware (CORS, logging, etc.)
-- Event handlers (startup, shutdown)
-  - Database connection
-  - Redis connection
-  - Celery setup
-  - Initial data seeding
-- Routers
-  - API v1 router
-  - GraphQL router
-- Health check endpoint
-- Global exception handlers (optional)
-"""
+    # Визначаємо порт з налаштувань, якщо він там є, інакше використовуємо дефолтний 8000.
+    app_port = getattr(settings.app, 'APP_PORT', 8000) # Безпечне отримання атрибуту
+
+    uvicorn.run(
+        "backend.app.main:app", # Шлях до екземпляру FastAPI додатку ('module:variable')
+        host="0.0.0.0",         # Слухати на всіх доступних мережевих інтерфейсах
+        port=app_port,
+        log_level=settings.logging.LOG_LEVEL.lower(), # Рівень логування для Uvicorn
+        reload=settings.app.DEBUG, # Автоматичне перезавантаження при зміні коду (тільки для DEBUG)
+        # log_config=None # Якщо None, Uvicorn використовує свій дефолтний лог-конфіг.
+                        # Наш Loguru InterceptHandler має перехоплювати стандартні логи.
+                        # Якщо встановити тут кастомний log_config для Loguru,
+                        # то треба бути обережним, щоб не було конфліктів.
+                        # Поки що залишимо так, щоб Loguru перехоплював стандартні логи.
+    )
+
+# TODO: Додати документацію для OpenAPI (теги, опис тощо) - Частково зроблено через openapi_tags_metadata.
+#       Потрібно буде додати детальні описи для кожного ендпоінту та схеми даних.
+# TODO: Перевірити відповідність всім вимогам з `technical-task.md` та `code-style.md` - Частково зроблено.
+#       Коментарі українською, структура файлу, використання логера, тощо.
+# TODO: Налаштувати інтеграцію з Celery, Firebase, Elasticsearch, якщо вони будуть активно використовуватися.
+#       Це може включати додавання відповідних клієнтів/конфігурацій в `startup` та `shutdown`
+#       та створення окремих конфігураційних модулів в `backend.app.src.config`.
+# TODO: Розглянути можливість винесення логіки `startup_event` та `shutdown_event` в окремі функції
+#       в `backend.app.src.core.events.py` (наприклад, `create_start_app_handler`, `create_stop_app_handler`),
+#       якщо ця логіка стане занадто об'ємною та складною. Поки що вона залишена тут для наочності.
+# TODO: Для `InitializationService` та `run_full_initialization`: переконатися, що всі операції
+#       в базі даних виконуються в рамках однієї транзакції, якщо це критично.
+#       Поточна реалізація `get_async_session` як генератора сесій дозволяє це зробити,
+#       якщо `initialization_service.run_full_initialization` не робить власних комітів/ролбеків
+#       для кожної окремої операції. Явний `session.commit()` та `session.rollback()`
+#       в `startup_event` керують транзакцією для всіх операцій сервісу.

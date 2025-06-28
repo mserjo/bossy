@@ -1,3 +1,5 @@
+# backend/requirements.txt
+
 # FastAPI and related
 fastapi
 uvicorn[standard] # Includes standard dependencies like websockets, http-parser

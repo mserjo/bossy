@@ -43,8 +43,13 @@ class TaskRepository(BaseRepository[TaskModel, TaskCreateSchema, TaskUpdateSchem
             # selectinload(self.model.reviews), # Зазвичай окремо
             # selectinload(self.model.source_proposal) # Якщо потрібно
         )
+    try:
         result = await db.execute(statement)
         return result.scalar_one_or_none()
+    except Exception as e:
+        self.logger.error(f"Помилка отримання завдання з деталями (ID: {task_id}): {e}", exc_info=True)
+        return None
+
 
     async def get_tasks_for_group(
         self, db: AsyncSession, *, group_id: uuid.UUID,
@@ -64,66 +69,74 @@ class TaskRepository(BaseRepository[TaskModel, TaskCreateSchema, TaskUpdateSchem
         """
         Отримує список завдань для вказаної групи з можливістю фільтрації та сортування.
         """
-        from backend.app.src.models.dictionaries.status import StatusModel # Для фільтрації за статусом
-        from backend.app.src.models.tasks.assignment import TaskAssignmentModel # Для фільтрації за виконавцем
+        # Локальні імпорти для уникнення циклічних залежностей на рівні модуля
+        from backend.app.src.models.dictionaries.status import StatusModel
+        from backend.app.src.models.tasks.assignment import TaskAssignmentModel
+        from backend.app.src.models.dictionaries.task_type import TaskTypeModel as TTModel # Перейменовуємо, щоб уникнути конфлікту з self.model.task_type
 
-        statement = select(self.model).where(self.model.group_id == group_id)
+        try:
+            statement = select(self.model).where(self.model.group_id == group_id)
 
-        if task_type_code:
-            # Потрібен JOIN з TaskTypeModel
-            statement = statement.join(TaskTypeModel, self.model.task_type_id == TaskTypeModel.id).where(TaskTypeModel.code == task_type_code)
+            if task_type_code:
+                statement = statement.join(TTModel, self.model.task_type_id == TTModel.id).where(TTModel.code == task_type_code)
 
-        if status_code:
-            # Потрібен JOIN зі StatusModel
-            statement = statement.join(StatusModel, self.model.state_id == StatusModel.id).where(StatusModel.code == status_code)
+            if status_code:
+                statement = statement.join(StatusModel, self.model.state_id == StatusModel.id).where(StatusModel.code == status_code)
 
-        if is_mandatory is not None:
-            statement = statement.where(self.model.is_mandatory == is_mandatory)
+            if is_mandatory is not None:
+                statement = statement.where(self.model.is_mandatory == is_mandatory)
 
-        if created_by_user_id:
-            statement = statement.where(self.model.created_by_user_id == created_by_user_id)
+            if created_by_user_id:
+                statement = statement.where(self.model.created_by_user_id == created_by_user_id)
 
-        if due_date_before:
-            statement = statement.where(self.model.due_date <= due_date_before)
+            if due_date_before:
+                statement = statement.where(self.model.due_date <= due_date_before)
 
-        if due_date_after:
-            statement = statement.where(self.model.due_date >= due_date_after)
+            if due_date_after:
+                statement = statement.where(self.model.due_date >= due_date_after)
 
-        if is_recurring is not None:
-            statement = statement.where(self.model.is_recurring == is_recurring)
+            if is_recurring is not None:
+                statement = statement.where(self.model.is_recurring == is_recurring)
 
-        if assignee_user_id or assignee_team_id:
-            # Потрібен JOIN з TaskAssignmentModel
-            # Це знайде завдання, які МАЮТЬ призначення вказаному користувачу/команді.
-            assignment_conditions = []
-            if assignee_user_id:
-                assignment_conditions.append(TaskAssignmentModel.user_id == assignee_user_id)
-            if assignee_team_id:
-                assignment_conditions.append(TaskAssignmentModel.team_id == assignee_team_id)
+            if assignee_user_id or assignee_team_id:
+                assignment_conditions = []
+                if assignee_user_id:
+                    assignment_conditions.append(TaskAssignmentModel.user_id == assignee_user_id)
+                if assignee_team_id:
+                    assignment_conditions.append(TaskAssignmentModel.team_id == assignee_team_id)
 
-            if assignment_conditions:
-                statement = statement.join(TaskAssignmentModel, self.model.id == TaskAssignmentModel.task_id).where(
-                    or_(*assignment_conditions)
+                if assignment_conditions:
+                    statement = statement.join(TaskAssignmentModel, self.model.id == TaskAssignmentModel.task_id).where(
+                        or_(*assignment_conditions)
+                    )
+
+            if include_details:
+                statement = statement.options(
+                    selectinload(self.model.task_type), # Зверніть увагу, це атрибут моделі TaskModel
+                    selectinload(self.model.creator),
+                    selectinload(self.model.state)
                 )
 
-        if include_details:
-            statement = statement.options(
-                selectinload(self.model.task_type),
-                selectinload(self.model.creator),
-                selectinload(self.model.state)
-            )
+            statement = await self._apply_order_by(statement, order_by) # type: ignore
+            statement = statement.offset(skip).limit(limit)
 
-        statement = await self._apply_order_by(statement, order_by) # Використовуємо метод з BaseRepository
-        statement = statement.offset(skip).limit(limit)
+            result = await db.execute(statement)
+            return result.scalars().all() # type: ignore
+        except Exception as e:
+            self.logger.error(f"Помилка отримання завдань для групи {group_id} з фільтрами: {e}", exc_info=True)
+            return []
 
-        result = await db.execute(statement)
-        return result.scalars().all() # type: ignore
 
     async def get_subtasks_for_task(self, db: AsyncSession, parent_task_id: uuid.UUID) -> List[TaskModel]:
         """Отримує всі підзадачі для вказаного батьківського завдання."""
-        statement = select(self.model).where(self.model.parent_task_id == parent_task_id)
-        result = await db.execute(statement)
-        return result.scalars().all() # type: ignore
+        try:
+            statement = select(self.model).where(self.model.parent_task_id == parent_task_id)
+            result = await db.execute(statement)
+            return result.scalars().all() # type: ignore
+        except Exception as e:
+            self.logger.error(f"Помилка отримання підзадач для завдання {parent_task_id}: {e}", exc_info=True)
+            return []
+
 
     # `create` успадкований. `TaskCreateSchema` має містити необхідні поля.
     # `group_id` та `created_by_user_id` мають бути встановлені сервісом.
@@ -145,9 +158,18 @@ class TaskRepository(BaseRepository[TaskModel, TaskCreateSchema, TaskUpdateSchem
 
         db_obj = self.model(group_id=group_id, created_by_user_id=creator_id, **obj_in_data)
         db.add(db_obj)
-        await db.commit()
-        await db.refresh(db_obj)
-        return db_obj
+        try:
+            await db.commit()
+            await db.refresh(db_obj)
+            self.logger.info(f"Створено завдання '{db_obj.name}' (ID: {db_obj.id}) в групі {group_id} користувачем {creator_id}")
+            return db_obj
+        except Exception as e: # TODO: Обробляти IntegrityError
+            await db.rollback()
+            self.logger.error(f"Помилка створення завдання в групі {group_id} користувачем {creator_id}: {obj_in_data}. Деталі: {e}", exc_info=True)
+            # Потрібно імпортувати DatabaseErrorException або кидати spezifischer Fehler
+            from backend.app.src.core.exceptions import DatabaseErrorException
+            raise DatabaseErrorException(f"Помилка створення завдання '{obj_in_data.get('name')}' в БД.")
+
 
     # `update` успадкований.
     # `delete` та `soft_delete` успадковані.

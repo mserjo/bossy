@@ -14,6 +14,7 @@ from .group_type import GroupTypeRepository
 from .task_type import TaskTypeRepository
 from .bonus_type import BonusTypeRepository
 from .integration import IntegrationRepository
+from .user_type import UserTypeRepository, user_type_repository # Додано
 
 __all__ = [
     "BaseDictionaryRepository",
@@ -23,6 +24,8 @@ __all__ = [
     "TaskTypeRepository",
     "BonusTypeRepository",
     "IntegrationRepository",
+    "UserTypeRepository", # Додано
+    "user_type_repository", # Додано екземпляр
 ]
 
 from backend.app.src.config.logging import logger

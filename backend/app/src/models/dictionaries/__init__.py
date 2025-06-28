@@ -20,6 +20,7 @@ from backend.app.src.models.dictionaries.base import BaseDictModel
 # Імпорт конкретних моделей довідників
 from backend.app.src.models.dictionaries.status import StatusModel
 from backend.app.src.models.dictionaries.user_role import UserRoleModel
+from backend.app.src.models.dictionaries.user_type import UserTypeModel # Додано UserTypeModel
 from backend.app.src.models.dictionaries.group_type import GroupTypeModel
 from backend.app.src.models.dictionaries.task_type import TaskTypeModel
 from backend.app.src.models.dictionaries.bonus_type import BonusTypeModel
@@ -33,6 +34,7 @@ __all__ = [
     "BaseDictModel",  # Експортуємо базову модель довідника, може бути корисною
     "StatusModel",
     "UserRoleModel",
+    "UserTypeModel", # Додано UserTypeModel
     "GroupTypeModel",
     "TaskTypeModel",
     "BonusTypeModel",
@@ -40,7 +42,7 @@ __all__ = [
 ]
 
 # TODO: Переконатися, що всі необхідні моделі довідників створені та включені до `__all__`.
-# На даний момент включені всі моделі, заплановані для створення в цьому пакеті.
+# UserTypeModel додано.
 
 # TODO: Додати коментар про те, що цей `__init__.py` також важливий для правильної роботи Alembic,
 # якщо конфігурація Alembic (`env.py`) сканує моделі шляхом імпорту пакетів.

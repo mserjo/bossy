@@ -33,7 +33,8 @@ class TaskService(BaseService[TaskRepository]):
         else:
             task = await self.repository.get(db, id=task_id)
         if not task:
-            raise NotFoundException(f"Завдання з ID {task_id} не знайдено.")
+            self.logger.warning(f"Завдання з ID {task_id} не знайдено.")
+            raise NotFoundException(detail_key="error_task_not_found", task_id=str(task_id))
         return task
 
     async def create_task(
@@ -42,45 +43,50 @@ class TaskService(BaseService[TaskRepository]):
         """
         Створює нове завдання/подію в групі.
         """
-        # Перевірка прав: адмін групи або superuser
         from backend.app.src.services.groups.group_membership_service import group_membership_service # Відкладений імпорт
+
+        self.logger.info(f"Спроба створити завдання в групі {group_id} користувачем {current_user.id}: {obj_in.name}")
+
+        # Перевірка прав: адмін групи або superuser
         if not await group_membership_service.is_user_group_admin(db, user_id=current_user.id, group_id=group_id) and \
            current_user.user_type_code != USER_TYPE_SUPERADMIN:
-            raise ForbiddenException("Лише адміністратор групи може створювати завдання.")
+            self.logger.warning(f"Користувач {current_user.id} не має прав створювати завдання в групі {group_id}.")
+            raise ForbiddenException(detail_key="error_task_creation_unauthorized")
 
         # Перевірка існування групи
         group = await group_repository.get(db, id=group_id)
         if not group:
-            raise NotFoundException(f"Групу з ID {group_id} не знайдено.")
+            raise NotFoundException(detail_key="error_group_not_found_for_task", group_id=str(group_id))
 
         # Перевірка існування типу завдання
         task_type = await task_type_repository.get(db, id=obj_in.task_type_id)
         if not task_type:
-            raise BadRequestException(f"Тип завдання з ID {obj_in.task_type_id} не знайдено.")
+            raise BadRequestException(detail_key="error_task_type_not_found", type_id=str(obj_in.task_type_id))
 
         # Перевірка батьківського завдання, якщо вказано
         if obj_in.parent_task_id:
             parent_task = await self.repository.get(db, id=obj_in.parent_task_id)
             if not parent_task:
-                raise BadRequestException(f"Батьківське завдання з ID {obj_in.parent_task_id} не знайдено.")
-            if parent_task.group_id != group_id: # Підзадача має бути в тій самій групі
-                raise BadRequestException("Батьківське завдання належить іншій групі.")
+                raise BadRequestException(detail_key="error_parent_task_not_found", task_id=str(obj_in.parent_task_id))
+            if parent_task.group_id != group_id:
+                raise BadRequestException(detail_key="error_parent_task_different_group")
             # TODO: Перевірка, чи батьківське завдання може мати підзадачі (на основі його TaskTypeModel.can_have_subtasks).
 
         # Перевірка команди, якщо вказано
         if obj_in.team_id:
             team = await team_repository.get(db, id=obj_in.team_id)
             if not team:
-                raise BadRequestException(f"Команду з ID {obj_in.team_id} не знайдено.")
-            if team.group_id != group_id: # Команда має бути з тієї ж групи
-                raise BadRequestException("Команда належить іншій групі.")
+                raise BadRequestException(detail_key="error_team_not_found_for_task", team_id=str(obj_in.team_id))
+            if team.group_id != group_id:
+                raise BadRequestException(detail_key="error_team_different_group")
 
-        # Встановлення початкового статусу (наприклад, "нове")
+        # Встановлення початкового статусу
         initial_status = await status_repository.get_by_code(db, code=TASK_STATUS_NEW_CODE)
         if not initial_status:
-            raise BadRequestException(f"Початковий статус завдання '{TASK_STATUS_NEW_CODE}' не знайдено.")
+            # Це критична помилка конфігурації
+            self.logger.error(f"Початковий статус завдання '{TASK_STATUS_NEW_CODE}' не знайдено в довіднику.")
+            raise BadRequestException(detail_key="error_initial_task_status_not_found", status_code=TASK_STATUS_NEW_CODE)
 
-        # Конвертація recurring_interval_description в timedelta
         obj_in_data = obj_in.model_dump(exclude_unset=True)
         recurring_interval_description = obj_in_data.pop("recurring_interval_description", None)
         recurring_interval_timedelta: Optional[timedelta] = None
@@ -124,29 +130,41 @@ class TaskService(BaseService[TaskRepository]):
         # TODO: Додати валідацію для полів, що оновлюються (аналогічно до create_task).
         # Наприклад, перевірка існування task_type_id, parent_task_id, team_id, якщо вони змінюються.
         # Обробка recurring_interval_description, якщо він передається в TaskUpdateSchema.
+        # TODO: Додати валідацію полів як в create_task (тип, батьківське, команда).
 
         update_data = obj_in.model_dump(exclude_unset=True)
+        # TODO: Обробка recurring_interval_description аналогічно до create_task
         if "recurring_interval_description" in update_data:
-            # Логіка конвертації з recurring_interval_description в timedelta
-            # і встановлення update_data["recurring_interval"]
-            # ... (аналогічно до create_task, але для оновлення) ...
-            del update_data["recurring_interval_description"] # Видаляємо, бо в моделі інше поле
+            self.logger.warning("Обробка recurring_interval_description для оновлення завдання ще не реалізована.")
+            del update_data["recurring_interval_description"]
 
-        return await self.repository.update(db, db_obj=db_task, obj_in=update_data)
+        # Встановлюємо updated_by_user_id
+        if hasattr(db_task, "updated_by_user_id"): # Перевірка, чи поле існує в моделі
+            update_data["updated_by_user_id"] = current_user.id
+
+
+        updated_task = await self.repository.update(db, db_obj=db_task, obj_in=update_data)
+        self.logger.info(f"Завдання {task_id} оновлено користувачем {current_user.id}.")
+        return updated_task
+
 
     async def delete_task(self, db: AsyncSession, *, task_id: uuid.UUID, current_user: UserModel) -> TaskModel:
         """Видаляє завдання/подію (м'яке видалення)."""
-        db_task = await self.get_task_by_id(db, task_id=task_id, include_details=False)
+        db_task = await self.get_task_by_id(db, task_id=task_id, include_details=False) # get_task_by_id вже логує та кидає виняток
 
-        # Перевірка прав
         from backend.app.src.services.groups.group_membership_service import group_membership_service
         if not await group_membership_service.is_user_group_admin(db, user_id=current_user.id, group_id=db_task.group_id) and \
            current_user.user_type_code != USER_TYPE_SUPERADMIN:
-            raise ForbiddenException("Ви не маєте прав видаляти це завдання.")
+            self.logger.warning(f"Користувач {current_user.id} не має прав видаляти завдання {task_id} в групі {db_task.group_id}.")
+            raise ForbiddenException(detail_key="error_task_delete_unauthorized")
 
-        deleted_task = await self.repository.soft_delete(db, db_obj=db_task) # type: ignore
+        # Використовуємо current_user.id для updated_by_user_id в soft_delete
+        deleted_task = await self.repository.soft_delete(db, db_obj=db_task, current_user_id=current_user.id) # type: ignore
         if not deleted_task:
-            raise NotImplementedError("М'яке видалення не підтримується або не вдалося для завдань.")
+            self.logger.error(f"Не вдалося м'яко видалити завдання {task_id}.")
+            raise BadRequestException(detail_key="error_task_soft_delete_failed") # Використовуємо новий ключ
+
+        self.logger.info(f"Завдання {task_id} м'яко видалено користувачем {current_user.id}.")
         return deleted_task
 
     # TODO: Додати методи для зміни статусу завдання (з перевіркою переходів).

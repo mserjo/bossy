@@ -9,36 +9,55 @@
 from fastapi import HTTPException, status as http_status # Використовуємо статуси з fastapi
 from typing import Optional, Dict, Any
 
+from backend.app.src.core.i18n import _ # Імпортуємо функцію перекладу
+
 # --- Базовий клас для кастомних винятків додатку ---
 class AppException(Exception):
     """
     Базовий клас для всіх кастомних винятків додатку.
     Дозволяє додати додаткові атрибути, якщо потрібно.
     """
-    def __init__(self, message: str, *args: Any) -> None:
-        super().__init__(message, *args)
-        self.message = message
+    def __init__(self, message_key: str, *args: Any, **kwargs_format: Any) -> None:
+        # message_key - це ключ для перекладу
+        # kwargs_format - аргументи для форматування перекладеного рядка
+        self.message_key = message_key
+        self.kwargs_format = kwargs_format
+        # Перекладений рядок буде отримано при необхідності (наприклад, в обробнику винятків)
+        # або можна одразу тут: self.translated_message = _(message_key, **kwargs_format)
+        # Але тоді локаль має бути відома на момент створення винятку.
+        # Краще передавати ключ і форматувати в обробнику, де відома локаль запиту.
+        super().__init__(f"AppException: {message_key}") # Базовий Exception приймає рядок
+
+    def get_translated_message(self, locale: Optional[str] = None) -> str:
+        """Повертає перекладене повідомлення для заданої локалі."""
+        return _(self.message_key, locale=locale, **self.kwargs_format)
 
     def __str__(self) -> str:
-        return self.message
+        # Повертає ключ, якщо не перекладено, або перекладене повідомлення для дефолтної локалі.
+        # Це для випадків, коли виняток логується або виводиться без явного перекладу.
+        return _(self.message_key, **self.kwargs_format)
+
 
 # --- HTTP Винятки (успадковуються від HTTPException FastAPI) ---
-# Ці винятки автоматично перетворюються FastAPI у відповідні HTTP відповіді.
+# detail тепер може приймати ключ для перекладу, який буде оброблено в main.py exception_handler
 
 class NotFoundException(HTTPException):
     """
     Виняток для ситуацій, коли запитуваний ресурс не знайдено (HTTP 404).
     """
-    def __init__(self, detail: str = "Ресурс не знайдено", headers: Optional[Dict[str, Any]] = None) -> None:
-        super().__init__(status_code=http_status.HTTP_404_NOT_FOUND, detail=detail, headers=headers)
+    def __init__(self, detail_key: str = "error_resource_not_found", headers: Optional[Dict[str, Any]] = None, **kwargs_format: Any) -> None:
+        # Перекладаємо ключ одразу, якщо локаль не буде передана в обробник.
+        # Або передаємо ключ, а обробник перекладає.
+        # Поки що передаємо ключ, а обробник в main.py буде відповідати за переклад.
+        super().__init__(status_code=http_status.HTTP_404_NOT_FOUND, detail={"key": detail_key, "format_args": kwargs_format}, headers=headers)
 
 class BadRequestException(HTTPException):
     """
     Виняток для некоректних запитів (HTTP 400).
     Використовується, коли дані запиту не валідні або відсутні необхідні параметри.
     """
-    def __init__(self, detail: str = "Некоректний запит", headers: Optional[Dict[str, Any]] = None) -> None:
-        super().__init__(status_code=http_status.HTTP_400_BAD_REQUEST, detail=detail, headers=headers)
+    def __init__(self, detail_key: str = "error_bad_request", headers: Optional[Dict[str, Any]] = None, **kwargs_format: Any) -> None:
+        super().__init__(status_code=http_status.HTTP_400_BAD_REQUEST, detail={"key": detail_key, "format_args": kwargs_format}, headers=headers)
 
 class UnauthorizedException(HTTPException):
     """
@@ -47,11 +66,10 @@ class UnauthorizedException(HTTPException):
     до ресурсу, що потребує автентифікації.
     Зазвичай включає заголовок WWW-Authenticate.
     """
-    def __init__(self, detail: str = "Не авторизовано", headers: Optional[Dict[str, Any]] = None) -> None:
-        # Стандартний заголовок для 401 помилки
+    def __init__(self, detail_key: str = "error_unauthorized", headers: Optional[Dict[str, Any]] = None, **kwargs_format: Any) -> None:
         if headers is None:
             headers = {"WWW-Authenticate": "Bearer"}
-        super().__init__(status_code=http_status.HTTP_401_UNAUTHORIZED, detail=detail, headers=headers)
+        super().__init__(status_code=http_status.HTTP_401_UNAUTHORIZED, detail={"key": detail_key, "format_args": kwargs_format}, headers=headers)
 
 class ForbiddenException(HTTPException):
     """
@@ -59,81 +77,77 @@ class ForbiddenException(HTTPException):
     Використовується, коли користувач автентифікований, але не має достатньо прав
     для доступу до ресурсу або виконання дії.
     """
-    def __init__(self, detail: str = "Доступ заборонено", headers: Optional[Dict[str, Any]] = None) -> None:
-        super().__init__(status_code=http_status.HTTP_403_FORBIDDEN, detail=detail, headers=headers)
+    def __init__(self, detail_key: str = "error_forbidden", headers: Optional[Dict[str, Any]] = None, **kwargs_format: Any) -> None:
+        super().__init__(status_code=http_status.HTTP_403_FORBIDDEN, detail={"key": detail_key, "format_args": kwargs_format}, headers=headers)
 
 class UnprocessableEntityException(HTTPException):
     """
     Виняток для неможливості обробки сутності (HTTP 422).
     Часто використовується FastAPI для помилок валідації Pydantic схем.
     Може використовуватися і для інших семантичних помилок в даних.
+    `detail` тут може бути складним об'єктом (списком помилок валідації).
+    Якщо це наш кастомний виклик, то передаємо ключ.
     """
-    def __init__(self, detail: Any = "Неможливо обробити сутність", headers: Optional[Dict[str, Any]] = None) -> None:
-        super().__init__(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY, detail=detail, headers=headers)
+    def __init__(self, detail: Any = None, headers: Optional[Dict[str, Any]] = None, detail_key: str = "error_unprocessable_entity", **kwargs_format: Any) -> None:
+        # Якщо detail не передано, використовуємо detail_key.
+        # Якщо detail передано (наприклад, помилки валідації FastAPI), використовуємо його.
+        processed_detail = detail
+        if detail is None:
+            processed_detail = {"key": detail_key, "format_args": kwargs_format}
+        super().__init__(status_code=http_status.HTTP_422_UNPROCESSABLE_ENTITY, detail=processed_detail, headers=headers)
+
 
 class ConflictException(HTTPException):
     """
     Виняток для конфліктних запитів (HTTP 409).
     Наприклад, спроба створити ресурс, який вже існує (з унікальним полем).
     """
-    def __init__(self, detail: str = "Конфлікт ресурсу", headers: Optional[Dict[str, Any]] = None) -> None:
-        super().__init__(status_code=http_status.HTTP_409_CONFLICT, detail=detail, headers=headers)
+    def __init__(self, detail_key: str = "error_conflict_resource", headers: Optional[Dict[str, Any]] = None, **kwargs_format: Any) -> None:
+        super().__init__(status_code=http_status.HTTP_409_CONFLICT, detail={"key": detail_key, "format_args": kwargs_format}, headers=headers)
 
 class InternalServerErrorException(HTTPException):
     """
     Виняток для внутрішніх помилок сервера (HTTP 500).
     Використовується для непередбачених помилок на сервері.
     """
-    def __init__(self, detail: str = "Внутрішня помилка сервера", headers: Optional[Dict[str, Any]] = None) -> None:
-        super().__init__(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail=detail, headers=headers)
+    def __init__(self, detail_key: str = "error_internal_server", headers: Optional[Dict[str, Any]] = None, **kwargs_format: Any) -> None:
+        super().__init__(status_code=http_status.HTTP_500_INTERNAL_SERVER_ERROR, detail={"key": detail_key, "format_args": kwargs_format}, headers=headers)
 
 
-# --- Специфічні винятки бізнес-логіки (можуть успадковуватися від AppException або стандартних) ---
-# Ці винятки можуть перехоплюватися та оброблятися в сервісному шарі або
-# перетворюватися на HTTP винятки за допомогою кастомних обробників винятків FastAPI.
+# --- Специфічні винятки бізнес-логіки (успадковуються від AppException) ---
 
 class DatabaseErrorException(AppException):
     """Виняток, пов'язаний з помилками бази даних."""
-    def __init__(self, detail: str = "Помилка бази даних", original_exception: Optional[Exception] = None) -> None:
-        super().__init__(detail)
+    def __init__(self, message_key: str = "error_database", original_exception: Optional[Exception] = None, **kwargs_format: Any) -> None:
+        super().__init__(message_key, **kwargs_format)
         self.original_exception = original_exception
 
 class BusinessLogicException(AppException):
     """Загальний виняток для помилок бізнес-логіки."""
-    def __init__(self, detail: str = "Помилка бізнес-логіки") -> None:
-        super().__init__(detail)
+    def __init__(self, message_key: str = "error_business_logic", **kwargs_format: Any) -> None:
+        super().__init__(message_key, **kwargs_format)
 
 class AuthenticationFailedException(BusinessLogicException):
     """Виняток при невдалій автентифікації (неправильний логін/пароль)."""
-    def __init__(self, detail: str = "Неправильний логін або пароль") -> None:
-        super().__init__(detail)
-        # Цей виняток може бути перетворений на UnauthorizedException(detail) обробником.
+    def __init__(self, message_key: str = "error_auth_failed", **kwargs_format: Any) -> None:
+        super().__init__(message_key, **kwargs_format)
 
 class InsufficientPermissionsException(BusinessLogicException):
-    """Виняток при недостатніх правах для виконання дії (не плутати з HTTP 403)."""
-    def __init__(self, detail: str = "Недостатньо прав для виконання дії") -> None:
-        super().__init__(detail)
-        # Може бути перетворений на ForbiddenException(detail).
+    """Виняток при недостатніх правах для виконання дії."""
+    def __init__(self, message_key: str = "error_insufficient_permissions", **kwargs_format: Any) -> None:
+        super().__init__(message_key, **kwargs_format)
 
 class ResourceAlreadyExistsException(BusinessLogicException):
     """Виняток при спробі створити ресурс, що вже існує."""
     def __init__(self, resource_name: str = "Ресурс", identifier: Optional[Any] = None) -> None:
-        detail = f"{resource_name} "
-        if identifier:
-            detail += f"з ідентифікатором '{identifier}' "
-        detail += "вже існує."
-        super().__init__(detail)
-        # Може бути перетворений на ConflictException(detail).
+        # resource_name може бути ключем для перекладу або вже перекладеним рядком.
+        # Для простоти, поки що залишимо resource_name як є, а identifier використовуємо в форматуванні.
+        super().__init__("error_resource_already_exists", resource_name=_(resource_name), identifier=identifier)
 
 class ResourceNotFoundException(BusinessLogicException):
     """Виняток, якщо ресурс не знайдено в бізнес-логіці (не HTTP 404)."""
     def __init__(self, resource_name: str = "Ресурс", identifier: Optional[Any] = None) -> None:
-        detail = f"{resource_name} "
-        if identifier:
-            detail += f"з ідентифікатором '{identifier}' "
-        detail += "не знайдено."
-        super().__init__(detail)
-        # Може бути перетворений на NotFoundException(detail).
+        super().__init__("error_resource_not_found_details", resource_name=_(resource_name), identifier=identifier)
 
 # TODO: Додати інші специфічні винятки, якщо потрібно.
 # Наприклад:

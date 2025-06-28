@@ -45,7 +45,8 @@ if TYPE_CHECKING:
     from backend.app.src.models.gamification.achievement import AchievementModel
     from backend.app.src.models.gamification.rating import RatingModel
     from backend.app.src.models.files.file import FileModel
-    # from backend.app.src.models.dictionaries.status import StatusModel # StatusModel вже має бути доступний через BaseMainModel
+    from backend.app.src.models.dictionaries.user_type import UserTypeModel
+    from backend.app.src.models.bonuses.transaction import TransactionModel # Додано
 
 
 class UserModel(BaseMainModel):
@@ -117,10 +118,8 @@ class UserModel(BaseMainModel):
     # Тип користувача: 'superadmin', 'admin' (загальний адмін, якщо є), 'user', 'bot'.
     # 'group_admin' - це роль в контексті групи, а не тип користувача.
     # TODO: Узгодити з довідником UserRoleModel та можливим Enum UserType.
-    # Поки що рядок, але може бути ForeignKey до окремого довідника типів користувачів, якщо такий буде.
-    # Згідно ТЗ: (довідник чи enum) типи користувачів.
-    # Якщо це буде ForeignKey: user_type_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("user_types.id"))
-    user_type_code: Column[str] = Column(String(50), nullable=False, default="user", index=True) # Посилається на code з довідника типів користувачів
+    # Тип користувача визначається через ForeignKey до таблиці user_types.
+    user_type_id: Mapped[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("user_types.id", name="fk_users_user_type_id"), nullable=True, index=True) # Зроблено nullable=True, щоб можна було створити юзера, а потім тип
 
     is_email_verified: Column[bool] = Column(Boolean, default=False, nullable=False)
     is_phone_verified: Column[bool] = Column(Boolean, default=False, nullable=False)
@@ -283,11 +282,20 @@ class UserModel(BaseMainModel):
     uploaded_files: Mapped[List["FileModel"]] = relationship(back_populates="uploader", foreign_keys="[FileModel.uploaded_by_user_id]", cascade="SET NULL")
 
     # Зв'язок зі статусом (успадковано з BaseMainModel)
-    # state: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[state_id]) # Вже є в BaseMainModel, якщо там розкоментовано
-    # Тут foreign_keys=[state_id] не потрібен, бо state_id вже є ForeignKey в BaseMainModel.
-    # Потрібно лише переконатися, що в BaseMainModel є `state = relationship("StatusModel")`
-    # і в StatusModel є `users_with_this_state = relationship("UserModel", back_populates="state")`.
-    # Я додав `state` в `BaseMainModel`.
+    # state: Mapped[Optional["StatusModel"]] = relationship("StatusModel", foreign_keys="[UserModel.state_id]", back_populates="users_with_this_state")
+    # Це вже визначено в BaseMainModel як:
+    # state: Mapped[Optional["StatusModel"]] = relationship("StatusModel", foreign_keys=[state_id], lazy="selectin")
+    # Потрібно в StatusModel додати `users_with_this_state: Mapped[List["UserModel"]] = relationship(back_populates="state")`
+
+    # Зв'язок з типом користувача
+    user_type: Mapped["UserTypeModel" | None] = relationship("UserTypeModel", back_populates="users", foreign_keys=[user_type_id])
+
+    # Зв'язок з транзакціями, де цей користувач є "пов'язаним" (наприклад, для подяки)
+    related_transactions: Mapped[List["TransactionModel"]] = relationship(
+        "TransactionModel", # Використовуємо рядкове посилання
+        back_populates="related_user",
+        foreign_keys="[TransactionModel.related_user_id]" # Вказуємо зовнішній ключ з TransactionModel
+    )
 
     # Зв'язки created_by/updated_by з BaseModel
     # created_records: Mapped[List["SQLABaseModel"]] = relationship( # Потребує більш складної реалізації з primaryjoin

@@ -60,33 +60,30 @@ class UserService(BaseService[UserRepository]):
                 logger.warning(f"Користувач з username {obj_in.username} вже існує.")
                 raise BadRequestException(detail="Користувач з таким ім'ям користувача вже існує.")
 
-        # TODO: Додати перевірку унікальності phone_number, якщо він використовується.
+        if obj_in.phone_number:
+            existing_user_phone = await self.repository.get_by_phone_number(db=self.db_session, phone_number=obj_in.phone_number)
+            if existing_user_phone:
+                logger.warning(f"Користувач з номером телефону {obj_in.phone_number} вже існує.")
+                raise BadRequestException(detail="Користувач з таким номером телефону вже існує.")
 
+        # Валідація пароля вже виконана на рівні схеми UserCreateSchema
         hashed_password = get_password_hash(obj_in.password)
-        user_create_data = obj_in.model_dump(exclude={"password"}, exclude_unset=True)
+        # Виключаємо confirm_password при створенні даних для моделі
+        user_create_data = obj_in.model_dump(exclude={"password", "confirm_password"}, exclude_unset=True)
         user_create_data["hashed_password"] = hashed_password
 
-        # Встановлення початкового статусу та ролі
+        # Встановлення початкового статусу
+        # user_type_code встановлюється за замовчуванням в схемі або передається
         if not user_create_data.get("state_id"):
             initial_status = await self.status_repo.get_by_code(code=STATUS_PENDING_EMAIL_VERIFICATION_CODE)
             if initial_status:
                 user_create_data["state_id"] = initial_status.id
-            else: # Fallback, якщо статус не знайдено (малоймовірно при правильній ініціалізації)
-                logger.error(f"Початковий статус {STATUS_PENDING_EMAIL_VERIFICATION_CODE} не знайдено в довіднику!")
-
-        if not user_create_data.get("role_id") and not obj_in.role_code: # Якщо ні ID, ні код ролі не передано
-            default_role = await self.user_role_repo.get_by_code(code=ROLE_USER_CODE)
-            if default_role:
-                user_create_data["role_id"] = default_role.id
             else:
-                logger.error(f"Дефолтна роль {ROLE_USER_CODE} не знайдена в довіднику!")
-        elif obj_in.role_code and not user_create_data.get("role_id"): # Якщо передано код ролі
-            role_obj = await self.user_role_repo.get_by_code(code=obj_in.role_code)
-            if role_obj:
-                user_create_data["role_id"] = role_obj.id
-            else:
-                logger.warning(f"Роль з кодом {obj_in.role_code} не знайдена, не вдалося встановити роль для нового користувача.")
+                logger.error(f"Початковий статус {STATUS_PENDING_EMAIL_VERIFICATION_CODE} не знайдено в довіднику! Користувач буде створений без явного статусу.")
 
+        # Логіка для `role_id` видалена, оскільки `UserModel` не має цього поля.
+        # `user_type_code` керує типом користувача (superadmin, user, bot).
+        # Ролі в групах керуються через `GroupMembershipModel`.
 
         db_user = await self.repository.create_with_data(data=user_create_data)
         logger.info(f"Створено нового користувача: {db_user.email} (ID: {db_user.id})")
@@ -111,13 +108,38 @@ class UserService(BaseService[UserRepository]):
     async def admin_update_user(
         self, *, user_to_update_id: uuid.UUID, obj_in: UserAdminUpdateSchema, admin_user: UserModel
     ) -> UserModel:
-        if admin_user.user_type_code != USER_TYPE_SUPERADMIN:
-            # TODO: Додати перевірку, чи може адмін групи змінювати користувачів своєї групи
-            raise ForbiddenException("Недостатньо прав для оновлення користувача.")
-
-        user_to_update = await self.get_user_by_id(user_id=user_to_update_id)
-        if not user_to_update: # get_user_by_id вже кидає NotFoundException
+        user_to_update = await self.repository.get_user_with_details(db=self.db_session, user_id=user_to_update_id)
+        if not user_to_update:
             raise NotFoundException(f"Користувача з ID {user_to_update_id} не знайдено для оновлення.")
+
+        if admin_user.user_type_code != USER_TYPE_SUPERADMIN:
+            can_admin_group_user = False
+            if admin_user.id == user_to_update_id: # Адмін може редагувати свій профіль (хоча для цього є update_user_profile)
+                pass # Дозволено, але UserAdminUpdateSchema може містити поля, які він не може сам собі міняти
+
+            # Перевірка, чи є admin_user адміном групи, до якої належить user_to_update
+            # Завантажуємо деталі admin_user, якщо вони ще не завантажені повністю
+            if not admin_user.group_memberships or not hasattr(admin_user.group_memberships[0], 'role'): # Приклад перевірки, чи завантажені деталі
+                admin_user_details = await self.repository.get_user_with_details(db=self.db_session, user_id=admin_user.id)
+                if not admin_user_details: # Малоймовірно, якщо admin_user передано
+                     raise ForbiddenException("Не вдалося перевірити права адміністратора.")
+                admin_user_group_memberships = admin_user_details.group_memberships
+            else:
+                admin_user_group_memberships = admin_user.group_memberships
+
+            admin_group_ids_where_admin = {
+                gm.group_id for gm in admin_user_group_memberships if gm.role and gm.role.code == ROLE_ADMIN_CODE
+            }
+
+            target_user_group_ids = {gm.group_id for gm in user_to_update.group_memberships}
+
+            if admin_group_ids_where_admin.intersection(target_user_group_ids):
+                can_admin_group_user = True
+
+            if not can_admin_group_user:
+                 raise ForbiddenException("Недостатньо прав для оновлення користувача. Адміністратор групи може оновлювати тільки користувачів своїх груп.")
+            # TODO: Додати більш гранульовану перевірку: адмін групи не може підвищити/змінити роль іншого адміна,
+            #       не може змінити user_type_code тощо.
 
         update_data = obj_in.model_dump(exclude_unset=True)
 
@@ -160,14 +182,59 @@ class UserService(BaseService[UserRepository]):
         return updated_user
 
     async def delete_user(self, *, user_to_delete_id: uuid.UUID, soft_delete: bool = True, actor: UserModel) -> Optional[UserModel]:
-        # Перевірка прав актора (наприклад, чи може він видаляти цього користувача)
-        if actor.user_type_code != USER_TYPE_SUPERADMIN and actor.id != user_to_delete_id:
-             # TODO: Додати логіку, чи може адмін групи видаляти користувачів
-            raise ForbiddenException("Недостатньо прав для видалення цього користувача.")
-
-        user_to_delete = await self.get_user_by_id(user_id=user_to_delete_id)
+        user_to_delete = await self.repository.get_user_with_details(db=self.db_session, user_id=user_to_delete_id)
         if not user_to_delete:
             raise NotFoundException(f"Користувача з ID {user_to_delete_id} не знайдено для видалення.")
+
+        # Перевірка прав актора
+        if actor.user_type_code != USER_TYPE_SUPERADMIN:
+            if actor.id == user_to_delete_id:
+                # Користувач може "видалити" (деактивувати) свій акаунт, якщо це дозволено
+                # Це, ймовірно, має бути soft_delete і зміна статусу на "деактивований" або "заплановано видалення"
+                # Поки що, якщо користувач видаляє сам себе, це буде soft_delete.
+                if not soft_delete: # Користувач не може себе фізично видалити
+                    raise ForbiddenException("Ви не можете фізично видалити власний обліковий запис.")
+            else:
+                # Перевірка, чи є actor адміном групи, до якої належить user_to_delete
+                # Завантажуємо деталі actor, якщо вони ще не завантажені повністю
+                if not actor.group_memberships or not hasattr(actor.group_memberships[0], 'role'):
+                    actor_details = await self.repository.get_user_with_details(db=self.db_session, user_id=actor.id)
+                    if not actor_details:
+                        raise ForbiddenException("Не вдалося перевірити права адміністратора.")
+                    actor_group_memberships = actor_details.group_memberships
+                else:
+                    actor_group_memberships = actor.group_memberships
+
+                admin_group_ids_where_admin = {
+                    gm.group_id for gm in actor_group_memberships if gm.role and gm.role.code == ROLE_ADMIN_CODE
+                }
+                target_user_group_ids = {gm.group_id for gm in user_to_delete.group_memberships}
+
+                can_admin_delete_user = False
+                if admin_group_ids_where_admin.intersection(target_user_group_ids):
+                    # Перевірка, чи не намагається адмін групи видалити іншого адміна тієї ж групи
+                    # або користувача з вищим user_type_code (наприклад, superadmin)
+                    if user_to_delete.user_type_code == USER_TYPE_SUPERADMIN:
+                        raise ForbiddenException("Адміністратор групи не може видалити супер-адміністратора.")
+
+                    is_target_also_admin_in_common_groups = False
+                    for gm_target in user_to_delete.group_memberships:
+                        if gm_target.group_id in admin_group_ids_where_admin and \
+                           gm_target.role and gm_target.role.code == ROLE_ADMIN_CODE:
+                            is_target_also_admin_in_common_groups = True
+                            break
+                    if is_target_also_admin_in_common_groups and user_to_delete.id != actor.id : # Адмін не може видалити іншого адміна спільної групи
+                        raise ForbiddenException("Адміністратор групи не може видалити іншого адміністратора цієї ж групи.")
+
+                    can_admin_delete_user = True
+
+                if not can_admin_delete_user:
+                    raise ForbiddenException("Недостатньо прав для видалення цього користувача. Адміністратор групи може видаляти тільки звичайних користувачів своїх груп.")
+
+        # Супер-адмін може видаляти будь-кого (крім, можливо, себе, якщо є така логіка)
+        if actor.user_type_code == USER_TYPE_SUPERADMIN and actor.id == user_to_delete_id and not soft_delete:
+            raise ForbiddenException("Супер-адміністратор не може фізично видалити сам себе.")
+
 
         if soft_delete:
             deleted_user = await self.repository.soft_delete(db_obj=user_to_delete)
@@ -176,48 +243,79 @@ class UserService(BaseService[UserRepository]):
         else: # Hard delete
             if actor.user_type_code != USER_TYPE_SUPERADMIN:
                 raise ForbiddenException("Лише супер-адміністратор може фізично видаляти користувачів.")
+            # Зберігаємо email перед видаленням для логування, оскільки об'єкт буде видалено
+            user_email_before_delete = user_to_delete.email
             await self.repository.delete(id=user_to_delete_id)
-            logger.info(f"Користувача {user_to_delete.email} фізично видалено супер-адміністратором {actor.email}.")
+            logger.info(f"Користувача {user_email_before_delete} фізично видалено супер-адміністратором {actor.email}.")
             return user_to_delete # Повертаємо об'єкт перед видаленням
 
     async def get_active_user_by_id_for_auth(self, user_id: uuid.UUID) -> UserModel:
-        user = await self.repository.get_active_user_with_details(id=user_id) # Репозиторій має завантажити state та role
+        """
+        Отримує активного користувача за ID з деталями, необхідними для автентифікації.
+        Кидає винятки, якщо користувач не знайдений, видалений, неактивний або має невідповідний статус.
+        """
+        user = await self.repository.get_user_with_details(db=self.db_session, user_id=user_id)
         if not user:
             raise NotFoundException(detail="Користувача не знайдено.")
-        if user.is_deleted:
+        if user.is_deleted: # Перевірка "м'якого" видалення
+            logger.warning(f"Спроба автентифікації для видаленого користувача: {user.email}")
             raise ForbiddenException(detail="Обліковий запис користувача видалено.")
-        if not user.is_active: # Це поле може дублювати логіку state_id
-            raise ForbiddenException(detail="Обліковий запис користувача неактивний.")
 
-        # Перевірка статусу через state.code, якщо state завантажено
-        if user.state and user.state.code != STATUS_ACTIVE_CODE:
-            logger.warning(f"Спроба автентифікації для користувача {user.email} зі статусом '{user.state.code}'.")
+        # UserModel має поле is_active, яке успадковано від BaseMainModel (default=False).
+        # Це поле повинно встановлюватися в True, коли користувач стає активним (наприклад, після верифікації email).
+        # Поки що, якщо state_id є, і статус ACTIVE, то is_active теж має бути True.
+        # Якщо user.is_active є, то використовуємо його.
+        # У UserModel немає is_active, воно є в BaseMainModel.
+        # Потрібно переконатися, що is_active коректно встановлюється.
+        # Припускаємо, що `user.state.code == STATUS_ACTIVE_CODE` є головним критерієм активності.
+
+        if not user.state:
+            logger.error(f"У користувача {user.email} відсутній об'єкт статусу (state is None). Вважаємо неактивним.")
+            raise ForbiddenException(detail="Статус облікового запису невизначений. Вхід заборонено.")
+
+        if user.state.code != STATUS_ACTIVE_CODE:
+            logger.warning(f"Спроба автентифікації для користувача {user.email} зі статусом '{user.state.code}' ('{user.state.name}').")
             raise ForbiddenException(detail=f"Обліковий запис має статус '{user.state.name}'. Вхід заборонено.")
 
-        logger.debug(f"Користувач {user_id} пройшов перевірку активності для автентифікації.")
+        # Додаткова перевірка на is_email_verified, якщо це вимога для входу
+        # if not user.is_email_verified:
+        #     logger.warning(f"Спроба входу для користувача {user.email} з непідтвердженим email.")
+        #     raise ForbiddenException(detail="Email не підтверджено. Будь ласка, підтвердіть свій email.")
+
+        logger.debug(f"Користувач {user_id} ({user.email}) пройшов перевірку активності для автентифікації.")
         return user
 
     async def change_user_password(self, *, user: UserModel, old_password: str, new_password: str) -> bool:
+        from backend.app.src.core.validators import is_strong_password
+
         if not verify_password(old_password, user.hashed_password):
             logger.warning(f"Невдала спроба зміни пароля для користувача {user.email}: неправильний старий пароль.")
             raise BadRequestException(detail="Неправильний поточний пароль.")
 
         if old_password == new_password:
             raise BadRequestException(detail="Новий пароль не може співпадати зі старим.")
-        # TODO: Додати перевірку складності нового пароля згідно налаштувань системи
+
+        is_strong_password(new_password) # Кине ValueError, якщо пароль не відповідає вимогам
 
         user.hashed_password = get_password_hash(new_password)
         await self.repository.update(db_obj=user, obj_in={"hashed_password": user.hashed_password})
         logger.info(f"Пароль для користувача {user.email} успішно змінено.")
-        # TODO: Інвалідувати всі активні сесії/токени цього користувача (крім поточного, якщо можливо)
+
+        # TODO: Інвалідувати всі активні сесії/refresh токени цього користувача (крім поточного, якщо можливо).
+        #       Це може вимагати виклику TokenService або SessionService.
+        #       Приклад: await TokenService(self.db_session).revoke_all_refresh_tokens_for_user(user.id)
         return True
 
     async def reset_user_password(self, *, user: UserModel, new_password: str) -> bool:
-        # TODO: Додати перевірку складності нового пароля
+        from backend.app.src.core.validators import is_strong_password
+        is_strong_password(new_password) # Кине ValueError, якщо пароль не відповідає вимогам
+
         user.hashed_password = get_password_hash(new_password)
         await self.repository.update(db_obj=user, obj_in={"hashed_password": user.hashed_password})
         logger.info(f"Пароль для користувача {user.email} успішно скинуто.")
-        # TODO: Інвалідувати всі активні сесії/токени
+
+        # TODO: Інвалідувати всі активні сесії/refresh токени цього користувача.
+        #       Приклад: await TokenService(self.db_session).revoke_all_refresh_tokens_for_user(user.id)
         return True
 
     async def mark_email_as_verified(self, *, user: UserModel) -> UserModel:

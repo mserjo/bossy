@@ -52,12 +52,36 @@ def is_valid_username_format(username: str) -> bool:
 #             raise ValueError("Некоректний формат імені користувача.")
 #         return value
 
+def is_valid_phone_number(phone_number: Optional[str]) -> bool:
+    """
+    Перевіряє, чи відповідає номер телефону базовому формату.
+    Дозволяє цифри та опціональний '+' на початку, довжина від 7 до 15 цифр.
+    Для більш строгої валідації варто використовувати спеціалізовані бібліотеки.
 
-def is_strong_password(password: str, min_length: int = 8) -> List[str]:
+    :param phone_number: Номер телефону для перевірки.
+    :raises ValueError: Якщо формат номера телефону некоректний.
+    :return: True, якщо формат номера телефону коректний.
+    """
+    if phone_number is None:
+        return True # Дозволяємо None, якщо поле опціональне
+
+    cleaned_phone = phone_number
+    if phone_number.startswith('+'):
+        cleaned_phone = phone_number[1:]
+
+    if not cleaned_phone.isdigit():
+        raise ValueError("Номер телефону повинен містити лише цифри після опціонального '+' на початку.")
+
+    if not (7 <= len(cleaned_phone) <= 15): # Приблизна довжина
+        raise ValueError("Некоректна довжина номера телефону (очікується від 7 до 15 цифр).")
+
+    return True
+
+def is_strong_password(password: str, min_length: int = 8) -> bool:
     """
     Перевіряє надійність пароля за кількома критеріями.
-    Повертає список повідомлень про помилки, якщо пароль не відповідає вимогам,
-    або порожній список, якщо пароль надійний.
+    Кидає ValueError, якщо пароль не відповідає вимогам.
+    Повертає True, якщо пароль надійний.
     """
     errors: List[str] = []
     if len(password) < min_length:
@@ -68,10 +92,12 @@ def is_strong_password(password: str, min_length: int = 8) -> List[str]:
         errors.append("Пароль повинен містити хоча б одну велику літеру.")
     if not re.search(r"[0-9]", password): # Цифри
         errors.append("Пароль повинен містити хоча б одну цифру.")
-    # Можна додати перевірку на спецсимволи:
-    # if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password):
-    #     errors.append("Пароль повинен містити хоча б один спеціальний символ.")
-    return errors
+    if not re.search(r"[!@#$%^&*(),.?\":{}|<>]", password): # Спецсимволи
+        errors.append("Пароль повинен містити хоча б один спеціальний символ.")
+
+    if errors:
+        raise ValueError(". ".join(errors))
+    return True
 
 # Приклад використання в Pydantic схемі:
 # class PasswordSchema(BaseModel):

@@ -18,33 +18,33 @@
 
 from fastapi import APIRouter
 
-# TODO: Імпортувати окремі роутери з модулів цього пакету, коли вони будуть створені.
-# from backend.app.src.api.v1.auth.login import router as login_router
-# from backend.app.src.api.v1.auth.register import router as register_router
-# from backend.app.src.api.v1.auth.token import router as token_router
-# from backend.app.src.api.v1.auth.password import router as password_router
-# from backend.app.src.api.v1.auth.profile import router as profile_router
+from backend.app.src.api.v1.auth.login import router as login_router
+from backend.app.src.api.v1.auth.register import router as register_router
+# from backend.app.src.api.v1.auth.token import router as token_router # token.py поки не використовується активно
+from backend.app.src.api.v1.auth.password import router as password_router
+from backend.app.src.api.v1.auth.profile import router as profile_router
 
 # Агрегуючий роутер для всіх ендпоінтів автентифікації та профілю API v1.
-router = APIRouter(tags=["v1 :: Auth & Profile"])
+# Тег "Auth" вже встановлено в кожному під-роутері, тому тут можна не дублювати
+# або встановити більш загальний тег для всієї групи /auth.
+# Я залишу тег, визначений в v1/router.py при підключенні auth_v1_router.
+auth_v1_router = APIRouter()
 
-# TODO: Розкоментувати та підключити окремі роутери, коли вони будуть готові.
-# Кожен підключений роутер може мати свій префікс відносно `/auth` (якщо `/auth`
-# буде префіксом для `auth_v1_router` в `v1/router.py`).
-# Наприклад, якщо `auth_v1_router` підключається з префіксом `/auth`:
-# router.include_router(login_router) # Ендпоінти логіну будуть доступні за /auth/login (якщо в login_router є префікс /login) або /auth/
-# router.include_router(register_router, prefix="/register") # /auth/register
-# router.include_router(token_router, prefix="/token")       # /auth/token (для refresh, revoke)
-# router.include_router(password_router, prefix="/password") # /auth/password (для forgot, reset, change)
-# router.include_router(profile_router, prefix="/me")        # /auth/me (для CRUD операцій з профілем поточного користувача)
+# Підключення окремих роутерів.
+# Префікси тут не потрібні, якщо вони вже визначені в v1/router.py для auth_v1_router (наприклад, /auth)
+# або якщо ендпоінти в під-роутерах мають унікальні шляхи.
+# Для кращої організації, шляхи в під-роутерах визначені відносно їх "кореня".
+# Наприклад, login_router має /login, /refresh-token, /logout.
+# register_router має /register.
+# profile_router має /me, /me/change-password.
+# password_router має /forgot-password, /reset-password.
+auth_v1_router.include_router(login_router)
+auth_v1_router.include_router(register_router)
+auth_v1_router.include_router(profile_router)
+auth_v1_router.include_router(password_router)
+# auth_v1_router.include_router(token_router) # Поки не активний
 
 # Експорт агрегованого роутера.
 __all__ = [
-    "router",
+    "auth_v1_router",
 ]
-
-# TODO: Узгодити назву експортованого роутера ("router") з імпортом
-# в `backend.app.src.api.v1.router.py` (там очікується `auth_v1_router`).
-# Рекомендується перейменувати змінну тут на `auth_v1_router` або
-# використовувати `from .auth import router as auth_v1_router` при імпорті.
-# Поки що залишаю "router".

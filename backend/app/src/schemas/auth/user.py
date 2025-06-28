@@ -88,15 +88,12 @@ class UserPublicSchema(IdentifiedSchema): # Тільки id + публічні �
     # avatar_url: Optional[str] = Field(None, description="URL аватара користувача")
     # user_type_code: str = Field(..., description="Код типу користувача") # Можливо, не потрібне публічно
 
-    # TODO: Визначити, які саме поля є публічними.
-    # Поки що тільки `id` та `name`.
-    # `name` з `BaseMainModel` використовується як основне відображуване ім'я.
-    first_name: Optional[str] = Field(None, description="Ім'я користувача (публічне, якщо заповнене)")
-    last_name: Optional[str] = Field(None, description="Прізвище користувача (публічне, якщо заповнене)")
-    # Поточний аватар може бути представлений як URL або як вкладена схема AvatarSchema.
-    # Для публічного профілю URL може бути кращим.
-    current_avatar_url: Optional[str] = Field(None, description="URL поточного аватара користувача")
-    # TODO: Поле `current_avatar_url` має формуватися на сервісному рівні.
+    # `name` з `BaseMainModel` (успадковано через `BaseSchema` -> `IdentifiedSchema` -> `BaseMainSchema`) використовується як основне відображуване ім'я.
+    first_name: Optional[str] = Field(None, description="Ім'я користувача (публічне, якщо заповнене та дозволено налаштуваннями приватності)")
+    last_name: Optional[str] = Field(None, description="Прізвище користувача (публічне, якщо заповнене та дозволено налаштуваннями приватності)")
+    description: Optional[str] = Field(None, description="Опис/біографія користувача (публічне, якщо заповнене та дозволено)")
+    current_avatar_url: Optional[str] = Field(None, description="URL поточного аватара користувача (публічний, якщо є та дозволено)")
+    # TODO: Сервісний шар повинен заповнювати ці поля з урахуванням налаштувань приватності.
 
 # --- Схема для створення нового користувача (наприклад, адміном або при реєстрації) ---
 class UserCreateSchema(BaseSchema):
@@ -118,35 +115,27 @@ class UserCreateSchema(BaseSchema):
     # Зазвичай, при створенні користувач може бути "неактивний" або "очікує підтвердження пошти".
     # Це керується логікою сервісу.
 
-    # TODO: Додати поле `confirm_password: str` для перевірки, якщо реєстрація через UI.
-    # Або це перевіряється на фронтенді.
+    confirm_password: str = Field(..., description="Підтвердження пароля")
 
     @field_validator('password')
     @classmethod
     def validate_password_strength(cls, value: str) -> str:
-        # TODO: Додати більш складну валідацію надійності пароля,
-        # наприклад, використовуючи функцію is_strong_password з backend.app.src.core.validators (якщо вона там буде).
-        # Поточна перевірка min_length=8 виконується Pydantic.
-        # Приклад:
-        # from backend.app.src.core.validators import is_strong_password
-        # if not is_strong_password(value):
-        #     raise ValueError("Пароль недостатньо надійний.")
-        if len(value) < 8: # Ця перевірка вже є через min_length, але для прикладу.
-            raise ValueError("Пароль повинен містити щонайменше 8 символів.")
+        from backend.app.src.core.validators import is_strong_password
+        is_strong_password(value) # Валідатор кине ValueError, якщо пароль не надійний
         return value
 
     @field_validator('phone_number')
     @classmethod
     def validate_phone_number_format(cls, value: Optional[str]) -> Optional[str]:
-        if value is not None:
-            # Проста перевірка: складається з цифр, можливо '+' на початку, довжина в розумних межах.
-            # Для більш строгої валідації потрібна бібліотека типу phonenumbers.
-            cleaned_phone = value.lstrip('+')
-            if not cleaned_phone.isdigit():
-                raise ValueError("Номер телефону повинен містити лише цифри та опціональний '+' на початку.")
-            if not (7 <= len(cleaned_phone) <= 15): # Приблизна довжина
-                raise ValueError("Некоректна довжина номера телефону.")
+        from backend.app.src.core.validators import is_valid_phone_number
+        is_valid_phone_number(value) # Валідатор кине ValueError, якщо номер не валідний
         return value
+
+    @model_validator(mode='after')
+    def check_passwords_match(cls, data: 'UserCreateSchema') -> 'UserCreateSchema':
+        if data.password != data.confirm_password:
+            raise ValueError("Паролі не співпадають.")
+        return data
 
 # --- Схема для оновлення інформації про користувача (власний профіль) ---
 class UserUpdateSchema(BaseSchema):
@@ -187,12 +176,13 @@ class UserPasswordUpdateSchema(BaseSchema):
     confirm_new_password: str = Field(..., description="Підтвердження нового пароля")
 
     @model_validator(mode='after')
-    def check_passwords_match(cls, data: 'UserPasswordUpdateSchema') -> 'UserPasswordUpdateSchema':
+    def check_passwords_match_and_strength(cls, data: 'UserPasswordUpdateSchema') -> 'UserPasswordUpdateSchema':
         if data.new_password != data.confirm_new_password:
             raise ValueError("Новий пароль та його підтвердження не співпадають.")
-        # TODO: Додати валідацію надійності для new_password тут або через field_validator.
-        if len(data.new_password) < 8: # Повтор для прикладу
-             raise ValueError("Новий пароль повинен містити щонайменше 8 символів.")
+
+        from backend.app.src.core.validators import is_strong_password
+        is_strong_password(data.new_password) # Валідація надійності нового пароля
+
         if data.new_password == data.current_password:
             raise ValueError("Новий пароль не може бути таким же, як поточний.")
         return data

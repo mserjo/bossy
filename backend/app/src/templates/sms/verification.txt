@@ -1,0 +1,19 @@
+{# backend/app/src/templates/sms/verification.txt #}
+{# -*- coding: utf-8 -*- #}
+{#
+Шаблон для SMS повідомлення з кодом верифікації.
+Використовує Jinja2 синтаксис (або інший, якщо SMS сервіс має свій формат).
+
+Очікувані змінні в контексті:
+- verification_code: Код верифікації (наприклад, 6-значний).
+- site_name (опціонально): Назва сервісу.
+- code_lifetime_minutes (опціонально): Час життя коду в хвилинах.
+#}
+{%- if site_name -%}
+{{ site_name }}: Ваш код верифікації: {{ verification_code }}.
+{%- else -%}
+Ваш код верифікації: {{ verification_code }}.
+{%- endif -%}
+{%- if code_lifetime_minutes %} Дійсний {{ code_lifetime_minutes }} хв.{% endif %}
+{#- TODO: Додати будь-які інші необхідні деталі або застереження. #}
+{#- Наприклад, "Нікому не повідомляйте цей код." #}

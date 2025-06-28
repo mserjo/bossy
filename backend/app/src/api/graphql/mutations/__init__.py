@@ -1,54 +1,68 @@
 # backend/app/src/api/graphql/mutations/__init__.py
 # -*- coding: utf-8 -*-
 """
-Ініціалізаційний файл для пакету GraphQL мутацій (Mutations).
+Ініціалізаційний файл для пакету 'mutations' GraphQL API.
 
-Цей пакет містить визначення резолверів для полів кореневого типу `Mutation`
-в GraphQL схемі. Мутації використовуються для зміни даних на сервері (створення,
+Цей пакет відповідає за визначення кореневого типу `Mutation` та всіх
+резолверів для полів цього типу. Кореневий тип `Mutation` є точкою входу
+для всіх GraphQL операцій, що змінюють дані на сервері (створення,
 оновлення, видалення).
 
-Кожен файл у цьому каталозі (наприклад, `auth_mutations.py`, `task_mutations.py`)
-зазвичай містить резолвери для мутацій, пов'язаних з певною доменною сутністю
-або функціональністю.
+Резолвери для логічно пов'язаних мутацій групуються в окремі
+файли всередині цього пакету (наприклад, `auth.py`, `user.py`, `group.py`).
+Ці файли зазвичай визначають класи, які містять методи,
+декоровані `@strawberry.mutation`.
 
-Цей `__init__.py` файл збирає всі частини типу `Mutation` для передачі в `schema.py`.
+Цей `__init__.py` файл імпортує ці класи-частини та об'єднує їх
+(наприклад, через успадкування) в єдиний клас `Mutation`, який потім
+експортується для використання в `graphql/schema.py`.
 """
 
-# import strawberry # Приклад для Strawberry
+import strawberry
 
-# TODO: Імпортувати частини типу Mutation з різних файлів.
-# Наприклад, якщо кожен файл визначає клас-міксін з полями Mutation:
-# from backend.app.src.api.graphql.mutations.auth_mutations import AuthMutations
-# from backend.app.src.api.graphql.mutations.task_mutations import TaskMutations
-# # ... і так далі ...
+# TODO: Імпортувати класи з полями Mutation з відповідних файлів цього пакету.
+# from backend.app.src.api.graphql.mutations.auth import AuthMutations
+# from backend.app.src.api.graphql.mutations.user import UserMutations
+# from backend.app.src.api.graphql.mutations.group import GroupMutations
+# from backend.app.src.api.graphql.mutations.task import TaskMutations
+# # ... і так далі для інших мутацій ...
 
+# --- Заглушка для класу Mutation ---
+# Замініть це на реальне успадкування від імпортованих класів.
+@strawberry.type
+class Mutation:
+    """
+    Кореневий GraphQL тип для мутацій (Mutations).
+    Об'єднує всі доступні операції для зміни даних в системі.
+    Кожне поле цього типу відповідає за окрему мутацію.
+    """
+    @strawberry.mutation
+    def placeholder_mutation(self, message: str) -> str:
+        """Заглушка для поля мутації."""
+        # В реальній мутації тут буде логіка зміни даних,
+        # використання сервісів, репозиторіїв тощо.
+        # Наприклад, створення нового користувача, оновлення завдання.
+        # Повертає рядок або відповідний GraphQL тип.
+        return f"Повідомлення '{message}' отримано заглушкою мутації. Дані не змінено."
+
+# Приклад, як може виглядати реальний клас Mutation після імпорту частин:
 # @strawberry.type
 # class Mutation(
-#     AuthMutations,  # Наслідування для об'єднання полів
+#     AuthMutations,
+#     UserMutations,
+#     GroupMutations,
 #     TaskMutations,
-#     # ... інші класи з полями Mutation ...
+#     # ... і так далі ...
 # ):
-#     """
-#     Кореневий тип GraphQL Mutation.
-#     Об'єднує всі доступні мутації в API.
-#     """
-#     # Можна додати тут загальні поля Mutation, якщо вони є,
-#     # хоча зазвичай мутації специфічні для сутностей.
-#     pass
+#     pass # Успадкування об'єднує всі поля з батьківських класів.
+# --- Кінець заглушки ---
 
-# __all__ = (
-#     "Mutation",
-# )
+__all__ = [
+    "Mutation",
+]
 
-# Для Ariadne, тут може агрегуватися об'єкт MutationType або список резолверів.
-# from ariadne import MutationType
-# mutation = MutationType()
-# # Далі імпортувати функції-резолвери та реєструвати їх:
-# # from .auth_mutations import resolve_login, resolve_register
-# # mutation.set_field("login", resolve_login)
-# # mutation.set_field("register", resolve_register)
-# # Потім `mutation` експортується.
-
-# На даному етапі, поки конкретні мутації не визначені, файл
-# може містити лише структуру або заглушку.
-pass
+# Переконайтеся, що кожен файл в цьому пакеті (auth.py, user.py тощо)
+# визначає клас (наприклад, AuthMutations), декорований `@strawberry.type`,
+# з методами, декорованими `@strawberry.mutation`.
+# Вхідні дані для мутацій (аргументи методів) зазвичай визначаються як
+# GraphQL InputTypes в `graphql/types/` та імпортуються сюди або в файли мутацій.

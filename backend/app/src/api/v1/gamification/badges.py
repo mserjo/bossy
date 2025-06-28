@@ -8,7 +8,7 @@
 - Учасників групи: Перегляд списку всіх доступних бейджів у групі.
 """
 
-from fastapi import APIRouter, Depends, Path, status, Response
+from fastapi import APIRouter, Depends, Path, Query, status, HTTPException, Response
 from typing import List, Optional
 
 from backend.app.src.config.logging import get_logger
@@ -17,6 +17,8 @@ from backend.app.src.services.gamification.badge_service import BadgeService
 from backend.app.src.api.dependencies import DBSession, CurrentActiveUser
 from backend.app.src.api.v1.groups.groups import group_admin_permission, group_member_permission
 from backend.app.src.models.auth.user import UserModel
+from backend.app.src.core.constants import DEFAULT_PAGE, DEFAULT_PAGE_SIZE
+
 
 logger = get_logger(__name__)
 router = APIRouter()
@@ -25,7 +27,7 @@ router = APIRouter()
 # Префікс /groups/{group_id}/gamification/badges
 
 @router.post(
-    "", # Відносно /groups/{group_id}/gamification/badges
+    "",
     response_model=BadgeSchema,
     status_code=status.HTTP_201_CREATED,
     tags=["Gamification", "Badges"],
@@ -40,29 +42,42 @@ async def create_badge(
     current_admin: UserModel = group_with_admin_rights["current_user"]
     logger.info(f"Адмін {current_admin.email} створює бейдж '{badge_in.name}' для групи {group_id}.")
     service = BadgeService(db_session)
-    # Переконатися, що badge_in має group_id або сервіс його встановлює
-    if not hasattr(badge_in, 'group_id') or badge_in.group_id != group_id:
-        logger.warning(f"Невідповідність group_id у запиті на створення бейджа для групи {group_id}.")
-        # Можна кинути помилку або дозволити сервісу встановити group_id
 
+    if hasattr(badge_in, 'group_id') and badge_in.group_id is not None and badge_in.group_id != group_id:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"ID групи в тілі запиту ({badge_in.group_id}) не співпадає з ID групи у шляху ({group_id})."
+        )
+    # Припускаємо, що сервіс встановлює group_id, якщо його немає в badge_in, або валідує
     new_badge = await service.create_badge(badge_create_data=badge_in, group_id=group_id)
     return new_badge
 
 @router.get(
     "",
-    response_model=List[BadgeSchema],
+    response_model=List[BadgeSchema], # Або схема з пагінацією
     tags=["Gamification", "Badges"],
     summary="Отримати список всіх бейджів у групі"
 )
 async def list_badges_in_group(
     group_id: int = Path(..., description="ID групи"),
-    access_check: dict = Depends(group_member_permission), # Учасники можуть бачити бейджі
-    db_session: DBSession = Depends()
+    access_check: dict = Depends(group_member_permission),
+    db_session: DBSession = Depends(),
+    page: int = Query(DEFAULT_PAGE, ge=1, description="Номер сторінки"),
+    page_size: int = Query(DEFAULT_PAGE_SIZE, ge=1, le=100, description="Розмір сторінки")
 ):
     current_user: UserModel = access_check["current_user"]
-    logger.info(f"Користувач {current_user.email} запитує список бейджів для групи {group_id}.")
+    logger.info(f"Користувач {current_user.email} запитує список бейджів для групи {group_id} (стор: {page}, розм: {page_size}).")
     service = BadgeService(db_session)
-    badges = await service.get_badges_for_group(group_id=group_id)
+    badges_data = await service.get_badges_for_group(
+        group_id=group_id,
+        skip=(page - 1) * page_size,
+        limit=page_size
+    )
+    if isinstance(badges_data, dict): # Якщо сервіс повертає пагіновані дані
+        badges = badges_data.get("badges", [])
+        # total_badges = badges_data.get("total", 0) # Для заголовків пагінації
+    else:
+        badges = badges_data
     return badges
 
 @router.get(
@@ -131,3 +146,6 @@ async def delete_badge(
     return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 # Роутер буде підключений в backend/app/src/api/v1/gamification/__init__.py
+# з префіксом /badges.
+# Тоді шляхи будуть:
+# /groups/{group_id}/gamification/badges/...

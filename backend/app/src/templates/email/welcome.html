@@ -1,0 +1,61 @@
+{# backend/app/src/templates/email/welcome.html #}
+{# -*- coding: utf-8 -*- #}
+{#
+Шаблон для вітального email листа, що надсилається новому користувачу після реєстрації.
+Використовує Jinja2 синтаксис.
+
+Очікувані змінні в контексті:
+- user_name: Ім'я користувача (або username).
+- site_name: Назва системи/сайту (наприклад, "Bossy").
+- verification_link (опціонально): Посилання для підтвердження email, якщо потрібно.
+- support_email: Email служби підтримки.
+#}
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ласкаво просимо до {{ site_name }}!</title>
+    <style>
+        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
+        .container { max-width: 600px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; border-radius: 5px; }
+        .header { font-size: 24px; color: #444; margin-bottom: 20px; text-align: center; }
+        .content p { margin-bottom: 15px; }
+        .button { display: inline-block; padding: 10px 20px; background-color: #007bff; color: #fff; text-decoration: none; border-radius: 3px; }
+        .footer { margin-top: 30px; font-size: 0.9em; color: #777; text-align: center; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            Вітаємо в {{ site_name }}, {{ user_name }}!
+        </div>
+        <div class="content">
+            <p>Дякуємо за реєстрацію в системі {{ site_name }}. Ми раді бачити вас серед наших користувачів!</p>
+
+            {% if verification_link %}
+            <p>Будь ласка, підтвердіть вашу електронну адресу, перейшовши за посиланням нижче:</p>
+            <p style="text-align: center;">
+                <a href="{{ verification_link }}" class="button">Підтвердити Email</a>
+            </p>
+            <p>Якщо кнопка не працює, скопіюйте та вставте це посилання у ваш браузер:</p>
+            <p><a href="{{ verification_link }}">{{ verification_link }}</a></p>
+            {% else %}
+            <p>Тепер ви можете увійти до свого акаунту та почати використовувати всі можливості системи.</p>
+            <p style="text-align: center;">
+                {# TODO: Додати посилання на сторінку логіну або головну сайту #}
+                <a href="#" class="button">Увійти до системи</a>
+            </p>
+            {% endif %}
+
+            <p>Якщо у вас виникнуть будь-які питання, будь ласка, звертайтеся до нашої служби підтримки: <a href="mailto:{{ support_email }}">{{ support_email }}</a>.</p>
+
+            <p>З найкращими побажаннями,<br>Команда {{ site_name }}</p>
+        </div>
+        <div class="footer">
+            <p>&copy; {{ now() | date("%Y") }} {{ site_name }}. Всі права захищено.</p>
+            {# TODO: Додати посилання на політику конфіденційності або умови використання #}
+        </div>
+    </div>
+</body>
+</html>

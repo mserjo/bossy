@@ -1,33 +1,41 @@
 # backend/app/src/api/v1/files/__init__.py
 # -*- coding: utf-8 -*-
 """
-Ініціалізаційний файл для пакету ендпоінтів управління файлами API v1.
+Ініціалізаційний файл для пакету 'files' API v1.
 
-Цей пакет містить роутери для:
-- Управління аватарами користувачів (`avatars.py`).
-- Загальних операцій з файлами (`files.py`), таких як завантаження
-  іконок груп, нагород, файлів до завдань тощо.
+Цей пакет містить ендпоінти для управління файлами в системі
+через API v1. Сюди можуть входити операції:
+- Завантаження файлів (аватари, іконки груп/нагород/бейджів, вкладення).
+- Можливо, перегляд/видалення завантажених файлів.
+
+Логіка може бути розділена на загальні операції (`files.py`)
+та специфічні, наприклад, для аватарів (`avatars.py`).
+
+Цей файл робить каталог 'files' пакетом Python та експортує
+агрегований роутер `router` для файлових операцій.
 """
 
 from fastapi import APIRouter
 
-from backend.app.src.api.v1.files.avatars import router as avatars_router
-from backend.app.src.api.v1.files.files import router as general_files_router
+# TODO: Імпортувати окремі роутери з модулів цього пакету, коли вони будуть створені.
+# from backend.app.src.api.v1.files.files import router as general_files_router
+# from backend.app.src.api.v1.files.avatars import router as avatars_router
 
-# Агрегуючий роутер для всіх ендпоінтів, пов'язаних з файлами.
-files_router = APIRouter()
+# Агрегуючий роутер для всіх ендпоінтів файлів API v1.
+router = APIRouter(tags=["v1 :: Files"])
 
-# Ендпоінти для аватарів користувачів
-# Будуть доступні за префіксом /files/avatars (визначеним у v1.router та тут)
-files_router.include_router(avatars_router, prefix="/avatars", tags=["Files"])
+# TODO: Розкоментувати та підключити окремі роутери.
+# Загальні операції з файлами (наприклад, /files/upload)
+# router.include_router(general_files_router)
 
-# Ендпоінти для загальних операцій з файлами
-# Будуть доступні за префіксом /files (визначеним у v1.router)
-files_router.include_router(general_files_router, tags=["Files"])
-# Якщо general_files_router має свої шляхи типу /upload, то кінцевий шлях буде /files/upload.
-# Якщо шляхи в general_files_router вже включають /files, то тут префікс не потрібен.
-# Поточна реалізація general_files_router.py передбачає, що префікс /files буде зовнішнім.
+# Специфічні ендпоінти для аватарів (наприклад, /files/avatars або /users/me/avatar)
+# router.include_router(avatars_router, prefix="/avatars")
 
-__all__ = (
-    "files_router",
-)
+
+# Експорт агрегованого роутера.
+__all__ = [
+    "router",
+]
+
+# TODO: Узгодити назву експортованого роутера ("router") з імпортом
+# в `backend.app.src.api.v1.router.py` (очікує `files_v1_router`).

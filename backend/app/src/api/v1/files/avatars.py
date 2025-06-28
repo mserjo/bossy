@@ -10,60 +10,67 @@
 - Видалення свого аватара.
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Path, Response
+from fastapi import (
+    APIRouter, Depends, HTTPException, status, UploadFile, File, Path, Response as FastAPIResponse, Request
+)
 from typing import Optional
 
 from backend.app.src.config.logging import get_logger
-from backend.app.src.schemas.files.avatar import UserAvatarSchema # Для відповіді з URL
-from backend.app.src.schemas.files.file import FileSchema # Можливо, для загальної інформації про файл
+from backend.app.src.schemas.files.avatar import UserAvatarSchema
 from backend.app.src.services.files.avatar_service import AvatarService
-# FileService може знадобитися для безпосередньої роботи з файлами, якщо AvatarService його не інкапсулює повністю
-# from backend.app.src.services.files.file_service import FileService
 from backend.app.src.api.dependencies import DBSession, CurrentActiveUser
 from backend.app.src.models.auth.user import UserModel
+from backend.app.src.core.config import settings # Для налаштувань файлів
 
 logger = get_logger(__name__)
 router = APIRouter()
 
-# Ендпоінти для аватарів, префікс /files/avatars
+# Ендпоінти для аватарів, префікс /avatars буде встановлено в files/__init__.py
+# або /users/me/avatar, якщо логіка інша.
+# Поточна структура передбачає, що цей роутер підключається до files_router,
+# тому шляхи будуть відносно /files/avatars
 
 @router.post(
-    "/me", # Тобто /files/avatars/me
-    response_model=UserAvatarSchema, # Повертає інформацію про аватар, включаючи URL
+    "/me",
+    response_model=UserAvatarSchema,
     status_code=status.HTTP_201_CREATED,
     tags=["Files", "User Avatars"],
     summary="Завантажити або оновити свій аватар"
 )
 async def upload_my_avatar(
+    request: Request, # Для генерації URL
     current_user: UserModel = Depends(CurrentActiveUser),
     db_session: DBSession = Depends(),
-    avatar_file: UploadFile = File(..., description="Файл аватара (зображення)")
+    avatar_file: UploadFile = File(..., description="Файл аватара (зображення: jpg, png, gif)")
 ):
-    """
-    Завантажує новий або оновлює існуючий аватар для поточного користувача.
-    Приймає файл зображення.
-    """
-    logger.info(f"Користувач {current_user.email} (ID: {current_user.id}) завантажує новий аватар.")
+    logger.info(f"Користувач {current_user.email} (ID: {current_user.id}) завантажує новий аватар: {avatar_file.filename}.")
 
-    # TODO: Додати перевірку типу файлу (MIME type) та розміру файлу.
-    # Наприклад:
-    # allowed_mime_types = ["image/jpeg", "image/png", "image/gif"]
-    # if avatar_file.content_type not in allowed_mime_types:
-    #     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Неприпустимий тип файлу.")
-    # max_size_bytes = 5 * 1024 * 1024 # 5 MB
-    # if avatar_file.size > max_size_bytes:
-    #     raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Файл занадто великий.")
+    if avatar_file.content_type not in settings.ALLOWED_AVATAR_MIME_TYPES:
+        logger.warning(f"Неприпустимий тип файлу аватара {avatar_file.content_type} від {current_user.email}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Неприпустимий тип файлу аватара. Дозволені: {', '.join(settings.ALLOWED_AVATAR_MIME_TYPES)}."
+        )
+
+    file_content = await avatar_file.read()
+    if len(file_content) > settings.MAX_AVATAR_SIZE_BYTES:
+        logger.warning(f"Файл аватара {avatar_file.filename} занадто великий ({len(file_content)} байт) від {current_user.email}")
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+            detail=f"Файл аватара занадто великий. Максимальний розмір: {settings.MAX_AVATAR_SIZE_BYTES // 1024}KB."
+        )
 
     avatar_service = AvatarService(db_session)
     try:
-        # Сервіс повинен обробити збереження файлу та оновлення запису в БД
         user_avatar_info = await avatar_service.upload_or_update_avatar(
             user_id=current_user.id,
-            file_data=await avatar_file.read(), # Читаємо вміст файлу
+            file_data=file_content,
             filename=avatar_file.filename,
-            content_type=avatar_file.content_type
+            content_type=avatar_file.content_type,
+            file_size=len(file_content),
+            request_base_url=str(request.base_url) # Для генерації повного URL, якщо потрібно
         )
-        logger.info(f"Аватар для користувача {current_user.email} успішно завантажено/оновлено.")
+        logger.info(f"Аватар для користувача {current_user.email} успішно завантажено/оновлено. URL: {user_avatar_info.avatar_url}")
         return user_avatar_info
     except HTTPException as e:
         raise e
@@ -73,28 +80,23 @@ async def upload_my_avatar(
 
 @router.get(
     "/me",
-    response_model=Optional[UserAvatarSchema], # Може бути None, якщо аватар не встановлено
+    response_model=Optional[UserAvatarSchema],
     tags=["Files", "User Avatars"],
     summary="Отримати інформацію про свій аватар"
 )
 async def get_my_avatar_info(
+    request: Request,
     current_user: UserModel = Depends(CurrentActiveUser),
     db_session: DBSession = Depends()
 ):
-    """
-    Повертає інформацію про поточний аватар користувача (наприклад, URL).
-    """
     logger.info(f"Користувач {current_user.email} запитує інформацію про свій аватар.")
     avatar_service = AvatarService(db_session)
-    avatar_info = await avatar_service.get_avatar_info_by_user_id(user_id=current_user.id)
-
-    # Якщо аватар не знайдено, сервіс може повернути None.
-    # Ендпоінт поверне 200 з null тілом, якщо response_model=Optional[...].
-    # Або можна кинути 404, якщо це вважається помилкою.
+    avatar_info = await avatar_service.get_avatar_info_by_user_id(
+        user_id=current_user.id,
+        request_base_url=str(request.base_url)
+        )
     if not avatar_info:
         logger.info(f"Аватар для користувача {current_user.email} не знайдено.")
-        # Тут можна залишити як є (поверне null) або:
-        # raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Аватар не встановлено.")
     return avatar_info
 
 @router.get(
@@ -104,18 +106,17 @@ async def get_my_avatar_info(
     summary="Отримати інформацію про аватар іншого користувача"
 )
 async def get_user_avatar_info(
+    request: Request,
     user_id_target: int = Path(..., description="ID користувача, чий аватар запитується"),
-    # current_user: UserModel = Depends(CurrentActiveUser), # Для логування, хто запитує
     db_session: DBSession = Depends()
+    # current_user: UserModel = Depends(CurrentActiveUser), # Якщо потрібна автентифікація для перегляду чужих аватарів
 ):
-    """
-    Повертає інформацію про аватар вказаного користувача.
-    Доступ може бути публічним або обмеженим.
-    """
-    # logger.info(f"Користувач {current_user.email} запитує аватар для користувача ID {user_id_target}.")
-    logger.info(f"Запит аватара для користувача ID {user_id_target}.") # Якщо доступ публічний
+    logger.info(f"Запит аватара для користувача ID {user_id_target}.")
     avatar_service = AvatarService(db_session)
-    avatar_info = await avatar_service.get_avatar_info_by_user_id(user_id=user_id_target)
+    avatar_info = await avatar_service.get_avatar_info_by_user_id(
+        user_id=user_id_target,
+        request_base_url=str(request.base_url)
+        )
     if not avatar_info:
         logger.info(f"Аватар для користувача ID {user_id_target} не знайдено.")
     return avatar_info
@@ -130,26 +131,17 @@ async def delete_my_avatar(
     current_user: UserModel = Depends(CurrentActiveUser),
     db_session: DBSession = Depends()
 ):
-    """
-    Видаляє поточний аватар користувача.
-    """
     logger.info(f"Користувач {current_user.email} (ID: {current_user.id}) видаляє свій аватар.")
     avatar_service = AvatarService(db_session)
     try:
         success = await avatar_service.delete_avatar_by_user_id(user_id=current_user.id)
         if not success:
-            # Можливо, аватар вже був відсутній
             logger.info(f"Аватар для користувача {current_user.email} не знайдено для видалення, або помилка видалення.")
-            # Можна повернути 404, якщо аватар не існував, або 204 в будь-якому випадку, якщо мета досягнута (аватара немає)
-            # Для простоти, якщо сервіс повертає False при "не знайдено", то 404.
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Аватар не знайдено для видалення.")
-        logger.info(f"Аватар для користувача {current_user.email} успішно видалено.")
-    except HTTPException as e:
-        raise e
+            # Якщо аватара не було, то операція "видалення" по суті успішна (його немає)
+            # Повертаємо 204, щоб не вводити в оману клієнта, що сталася помилка, якщо він просто не існував.
+            # Якщо ж сервіс розрізняє "не знайдено" і "помилка видалення існуючого", то можна повернути 404.
     except Exception as e_gen:
         logger.error(f"Помилка видалення аватара для {current_user.email}: {e_gen}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Помилка сервера при видаленні аватара.")
 
-    return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-# Роутер буде підключений в backend/app/src/api/v1/files/__init__.py
+    return FastAPIResponse(status_code=status.HTTP_204_NO_CONTENT)

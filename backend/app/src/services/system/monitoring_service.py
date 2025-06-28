@@ -2,44 +2,55 @@
 # -*- coding: utf-8 -*-
 """
 Цей модуль визначає сервіс `SystemEventLogService` для управління системними логами/подіями.
+Він відповідає за запис структурованих логів в базу даних та їх отримання.
+Для моніторингу метрик системи (CPU, пам'ять) див. `HealthService` або окремий сервіс метрик.
 """
 from typing import List, Optional, Dict, Any
 import uuid
-from datetime import datetime
-from sqlalchemy.ext.asyncio import AsyncSession # type: ignore
+from datetime import datetime, timedelta, timezone
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.src.models.system.monitoring import SystemEventLogModel
 from backend.app.src.schemas.system.monitoring import SystemEventLogCreateSchema, SystemEventLogSchema
-from backend.app.src.repositories.system.monitoring import SystemEventLogRepository, system_event_log_repository
+from backend.app.src.repositories.system.monitoring_repository import SystemEventLogRepository # Змінено імпорт
+from backend.app.src.repositories.auth.user_repository import UserRepository # Для перевірки user_id
 from backend.app.src.services.base import BaseService
-from backend.app.src.core.exceptions import NotFoundException # Логи зазвичай не кидають Forbidden/BadRequest при читанні
+from backend.app.src.core.exceptions import NotFoundException, BadRequestException
+from backend.app.src.config.logging import logger
+from backend.app.src.schemas.base import PaginatedResponse # Для типізації відповіді
 
 class SystemEventLogService(BaseService[SystemEventLogRepository]):
     """
     Сервіс для управління системними логами/подіями.
-    В основному надає методи для запису та отримання логів.
     """
+    def __init__(self, db_session: AsyncSession):
+        super().__init__(SystemEventLogRepository(db_session)) # Ініціалізуємо репозиторій з сесією
+        self.user_repo = UserRepository(db_session) # Для перевірки існування користувача
 
-    async def log_event(self, db: AsyncSession, *, obj_in: SystemEventLogCreateSchema) -> SystemEventLogModel:
+    async def log_event(self, *, obj_in: SystemEventLogCreateSchema) -> SystemEventLogModel:
         """
         Записує нову подію/лог в систему.
-        Цей метод може викликатися з різних частин додатку або з обробників логування.
         """
-        # Валідація рівня логування вже є в схемі.
-        # Інші перевірки (наприклад, чи існує user_id, якщо передано) можуть бути тут.
         if obj_in.user_id:
-            from backend.app.src.repositories.auth.user import user_repository # Відкладений імпорт
-            user = await user_repository.get(db, id=obj_in.user_id)
+            user = await self.user_repo.get(id=obj_in.user_id)
             if not user:
-                self.logger.warning(f"Спроба записати лог для неіснуючого користувача ID: {obj_in.user_id}. user_id буде NULL.")
-                obj_in.user_id = None # Або кинути помилку, або просто не встановлювати
+                logger.warning(f"Спроба записати лог для неіснуючого користувача ID: {obj_in.user_id}. user_id буде встановлено в NULL.")
+                obj_in.user_id = None
 
-        # Використовуємо успадкований метод create з BaseRepository
-        return await self.repository.create(db, obj_in=obj_in)
+        # Встановлюємо created_at, якщо воно не передано (хоча модель має default)
+        if obj_in.created_at is None:
+            obj_in.created_at = datetime.now(timezone.utc)
+        elif obj_in.created_at.tzinfo is None: # Переконуємося, що час aware
+             obj_in.created_at = obj_in.created_at.replace(tzinfo=timezone.utc)
+
+        new_log_entry = await self.repository.create(obj_in=obj_in)
+        logger.debug(f"Записано новий системний лог ID: {new_log_entry.id}, Рівень: {new_log_entry.level}")
+        return new_log_entry
 
     async def get_logs_paginated(
-        self, db: AsyncSession, *,
-        page: int = 1, size: int = 100, # Пагінація
+        self, *,
+        page: int = 1,
+        page_size: int = 100,
         level: Optional[str] = None,
         logger_name: Optional[str] = None,
         source_component: Optional[str] = None,
@@ -47,83 +58,85 @@ class SystemEventLogService(BaseService[SystemEventLogRepository]):
         date_from: Optional[datetime] = None,
         date_to: Optional[datetime] = None,
         message_contains: Optional[str] = None,
-        order_by: Optional[List[str]] = None # Наприклад, ["-created_at"]
-    ) -> PaginatedResponse[SystemEventLogModel]: # type: ignore
+        order_by: Optional[List[str]] = None
+    ) -> PaginatedResponse[SystemEventLogSchema]:
         """
         Отримує список логів з пагінацією та фільтрацією.
         """
-        # Формуємо словник фільтрів для передачі в репозиторій
+        if not order_by:
+            order_by = ["-created_at"]
+
+        # TODO: Доопрацювати BaseRepository або створити спеціалізований метод в SystemEventLogRepository
+        #       для підтримки всіх фільтрів (__ilike, __ge, __lt) та коректного підрахунку total.
+        #       Поточний get_paginated_with_filters в BaseRepository може не підтримувати все.
+
+        # Формування фільтрів для передачі в репозиторій
         filters: Dict[str, Any] = {}
         if level: filters["level"] = level.upper()
-        if logger_name: filters["logger_name__ilike"] = f"%{logger_name}%" # Приклад для ilike
-        if source_component: filters["source_component"] = source_component
+        if logger_name: filters["logger_name__ilike"] = f"%{logger_name}%"
+        if source_component: filters["source_component__ilike"] = f"%{source_component}%" # Припускаємо ilike
         if user_id: filters["user_id"] = user_id
-        if date_from: filters["created_at__ge"] = date_from # Потрібна підтримка __ge в BaseRepository
-        if date_to:
-            from datetime import timedelta
-            filters["created_at__lt"] = date_to + timedelta(days=1) # Потрібна підтримка __lt
+        if date_from: filters["created_at__ge"] = date_from
+        if date_to: filters["created_at__lt"] = date_to + timedelta(days=1) # До кінця дня
         if message_contains: filters["message__ilike"] = f"%{message_contains}%"
 
-        if not order_by:
-            order_by = ["-created_at"] # За замовчуванням сортуємо за спаданням дати створення
+        logger.info(f"Запит системних логів: стор. {page}, розм. {page_size}, фільтри: {filters}, сортування: {order_by}")
 
-        # Потрібно адаптувати BaseRepository.get_paginated або реалізувати логіку тут.
-        # Поточний BaseRepository._apply_filters підтримує лише рівність та list.in_.
-        # Тому, для фільтрів __ilike, __ge, __lt потрібна доробка BaseRepository
-        # або використання кастомного методу в SystemEventLogRepository.
-        #
-        # `SystemEventLogRepository` вже має метод `get_logs` з потрібною фільтрацією.
-        # Але він не повертає `PaginatedResponse`.
-        #
-        # Реалізуємо пагінацію тут, використовуючи `SystemEventLogRepository.get_logs`
-        # та окремий запит для total_count.
+        # Припускаємо, що репозиторій має метод, що підтримує ці фільтри та пагінацію
+        # і повертає кортеж (items, total_count)
+        # Або ж, якщо BaseRepository.get_paginated_with_filters це робить:
+        # paginated_result = await self.repository.get_paginated_with_filters(
+        #     skip=(page - 1) * page_size,
+        #     limit=page_size,
+        #     order_by_list=order_by,
+        #     filters=filters
+        # )
+        # items = [SystemEventLogSchema.from_orm(item) for item in paginated_result.items]
+        # total_items = paginated_result.total
 
-        # TODO: Реалізувати коректну пагінацію з фільтрами.
-        # Поки що простий виклик з лімітом, без точного total.
-        self.logger.warning("Пагінація для get_logs_paginated ще не повністю реалізована з усіма фільтрами в BaseRepository.")
-
-        # Приклад, як це могло б виглядати з кастомним підрахунком:
-        # total_items = await self.repository.count_logs_with_filters(db, filters=filters) # Потрібен такий метод
-        # items = await self.repository.get_logs(db, skip=(page-1)*size, limit=size, ...)
-        # return PaginatedResponse(total=total_items, page=page, size=len(items), pages=..., items=items)
-
-        # Поки що використовуємо get_multi з базового репозиторію,
-        # але він не підтримує всі потрібні фільтри (__ilike, __ge, __lt).
-        # Я залишу це як TODO для доопрацювання фільтрації в BaseRepository.
-        # Або ж, SystemEventLogRepository.get_logs має бути розширений для пагінації.
-
-        # Тимчасове рішення:
-        items = await self.repository.get_logs(
-            db, level=level, logger_name=logger_name, source_component=source_component,
-            user_id=user_id, date_from=date_from, date_to=date_to, message_contains=message_contains,
-            skip=(page-1)*size, limit=size
+        # ЗАГЛУШКА для пагінації з поточними можливостями (не зовсім точна)
+        items_models = await self.repository.get_logs( # Припускаємо, get_logs підтримує ці фільтри
+            level=level.upper() if level else None,
+            logger_name=logger_name,
+            source_component=source_component,
+            user_id=user_id,
+            date_from=date_from,
+            date_to=date_to + timedelta(days=1) if date_to else None, # +1 день для __lt
+            message_contains=message_contains,
+            skip=(page - 1) * page_size,
+            limit=page_size,
+            order_by=order_by
         )
-        # Приблизний підрахунок для пагінації (некоректний без реального total)
-        total_items_approx = len(items) if page == 1 and len(items) < size else (size * page + (1 if len(items) == size else 0))
+        items = [SystemEventLogSchema.from_orm(item) for item in items_models]
 
-        from backend.app.src.schemas.base import PaginatedResponse # Локальний імпорт
-        return PaginatedResponse(
-            total=total_items_approx, # TODO: Замінити на реальний підрахунок
+        # TODO: Потрібен окремий запит для total_count з тими ж фільтрами
+        # total_items = await self.repository.count_with_filters(filters=filters)
+        # Поки що заглушка для total
+        if page == 1 and len(items) < page_size:
+            total_items = len(items)
+        else:
+            # Це неточний підрахунок, потрібен реальний count
+            total_items = page * page_size + (1 if len(items) == page_size else 0)
+            logger.warning("Підрахунок total_items для логів є приблизним. Потребує доопрацювання.")
+
+
+        return PaginatedResponse[SystemEventLogSchema](
+            total=total_items,
             page=page,
             size=len(items),
-            pages=(total_items_approx + size - 1) // size if total_items_approx > 0 else 0, # TODO: Замінити
             items=items
         )
 
-
-    async def clear_old_logs(self, db: AsyncSession, *, older_than_days: int) -> int:
-        """Видаляє старі логи."""
+    async def clear_old_logs(self, *, older_than_days: int) -> int:
+        """Видаляє старі логи. Повертає кількість видалених записів."""
         if older_than_days <= 0:
             raise BadRequestException("Кількість днів для видалення логів має бути позитивним числом.")
-        return await self.repository.delete_old_logs(db, older_than_days=older_than_days)
 
-system_event_log_service = SystemEventLogService(system_event_log_repository)
+        cutoff_date = datetime.now(timezone.utc) - timedelta(days=older_than_days)
+        logger.info(f"Запит на видалення системних логів, старших за {older_than_days} днів (до {cutoff_date}).")
 
-# TODO: Доопрацювати пагінацію в `get_logs_paginated` для коректного підрахунку total_items
-#       з урахуванням всіх фільтрів (або розширити BaseRepository).
-# TODO: Перевірити, чи `SystemEventLogCreateSchema` містить всі необхідні поля
-#       і чи валідатор рівня логування працює коректно.
-#
-# Все виглядає як хороший початок для SystemEventLogService.
-# Основні методи для запису та отримання логів, а також для їх очищення.
-# Фільтрація в `get_logs` репозиторію вже досить гнучка.
+        deleted_count = await self.repository.delete_logs_older_than(cutoff_date=cutoff_date)
+        logger.info(f"Видалено {deleted_count} старих записів системних логів.")
+        return deleted_count
+
+# Екземпляр сервісу не створюємо тут глобально.

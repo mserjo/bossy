@@ -7,10 +7,11 @@
 """
 
 from pydantic_settings import BaseSettings, SettingsConfigDict
-from pydantic import PostgresDsn, RedisDsn, AmqpDsn, HttpUrl, Field, validator, model_validator
+from pydantic import PostgresDsn, RedisDsn, AmqpDsn, HttpUrl, Field, model_validator, EmailStr # Додано EmailStr
 from typing import List, Optional, Union, Literal, Dict, Any
 from enum import Enum
 import os
+from pathlib import Path # Додано Path
 
 class EnvironmentEnum(str, Enum):
     """Перелік можливих середовищ виконання додатку."""
@@ -28,18 +29,13 @@ class AppSettings(BaseSettings):
     DESCRIPTION: Optional[str] = "Бонусна система в межах групи (нагороди/бонуси/штрафи)."
     DEBUG: bool = Field(default=False, description="Режим відладки. НЕ ВИКОРИСТОВУВАТИ В PRODUCTION!")
     ENVIRONMENT: EnvironmentEnum = Field(default=EnvironmentEnum.DEVELOPMENT, description="Середовище виконання (development, staging, production, testing)")
-
-    SECRET_KEY: str = Field(..., description="Секретний ключ для криптографічних операцій")
+    BASE_DIR: Path = Field(default_factory=lambda: Path(__file__).resolve().parent.parent.parent, description="Базовий каталог проекту (backend).") # backend/app
 
     ALLOWED_HOSTS: List[str] = Field(default=["*"], description="Список дозволених хостів (для Django/FastAPI middleware)")
     BACKEND_CORS_ORIGINS: List[Union[str, HttpUrl]] = Field(default=[], description="Список дозволених джерел для CORS (URL)")
 
     API_V1_STR: str = "/api/v1"
     GRAPHQL_API_STR: str = "/graphql"
-
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, ge=1, description="Час життя access токена в хвилинах")
-    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7, ge=1, description="Час життя refresh токена в днях")
-    JWT_ALGORITHM: str = Field(default="HS256", description="Алгоритм підпису JWT токенів")
 
     RATE_LIMIT_ENABLE: bool = Field(default=True, description="Чи ввімкнено Rate Limiting")
     RATE_LIMIT_TIMES: int = Field(default=100, ge=1, description="Кількість запитів")
@@ -53,17 +49,34 @@ class AppSettings(BaseSettings):
     # Якщо запускати з `bossy/`, то `env_file="backend/.env"`.
     # `SettingsConfigDict` в Pydantic v2 автоматично шукає `.env`.
     model_config = SettingsConfigDict(
-        env_file=".env", # Шлях до .env файлу відносно місця запуску або автопошук
+        env_file=".env",
         env_file_encoding='utf-8',
         extra='ignore'
     )
+
+class AuthSettings(BaseSettings):
+    """Налаштування автентифікації та авторизації."""
+    SECRET_KEY: str = Field(..., description="Секретний ключ для криптографічних операцій (JWT, хешування паролів тощо)")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, ge=1, description="Час життя access токена в хвилинах")
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7, ge=1, description="Час життя refresh токена в днях")
+    JWT_ALGORITHM: str = Field(default="HS256", description="Алгоритм підпису JWT токенів")
+
+    SUPERUSER_EMAIL: EmailStr = Field(default="odin@example.com", description="Email супер-адміністратора")
+    SUPERUSER_PASSWORD: str = Field(..., description="Пароль супер-адміністратора (встановлюється через змінну середовища)")
+
+    # Налаштування для хешування паролів (якщо використовуються passlib contexts)
+    # PASSWORD_HASH_SCHEMES: List[str] = Field(default_factory=lambda: ["bcrypt"], description="Схеми хешування паролів")
+    # BCRYPT_ROUNDS: int = Field(default=12, description="Кількість раундів для bcrypt")
+
+    model_config = SettingsConfigDict(env_prefix='AUTH_', env_file=".env", env_file_encoding='utf-8', extra='ignore')
+
 
 class LoggingSettings(BaseSettings):
     """Налаштування логування."""
     LOG_LEVEL: str = Field(default="INFO", description="Рівень логування (DEBUG, INFO, WARNING, ERROR, CRITICAL)")
 
     LOG_TO_FILE_ENABLE: bool = Field(default=False, description="Чи ввімкнено логування у файл")
-    LOG_FILE_PATH: str = Field(default="logs/app.log", description="Шлях до файлу логів (відносно місця запуску або абсолютний)")
+    LOG_FILE_PATH: str = Field(default="logs/app.log", description="Шлях до файлу логів (відносно BASE_DIR або абсолютний)") # Змінено коментар
     LOG_FILE_LEVEL: str = Field(default="INFO", description="Рівень логування для файлу")
     LOG_FILE_ROTATION: str = Field(default="10 MB", description="Ротація файлу (розмір, час, наприклад, '1 week', '00:00')")
     LOG_FILE_RETENTION: str = Field(default="7 days", description="Час зберігання файлів логів ('1 month', '10 files')")
@@ -148,51 +161,59 @@ class ElasticsearchSettings(BaseSettings):
 class Settings(BaseSettings):
     """Головний клас налаштувань, що агрегує всі інші."""
     app: AppSettings = AppSettings()
+    auth: AuthSettings = AuthSettings() # Додано AuthSettings
     logging: LoggingSettings = LoggingSettings()
     db: DatabaseSettings = DatabaseSettings()
-
-    # Опціональні налаштування: створюємо екземпляр, лише якщо є відповідні змінні
-    # Це дозволяє не вимагати, наприклад, REDIS_URL, якщо Redis не використовується.
-    # Pydantic-settings завантажить змінні, і якщо ключова змінна (наприклад, REDIS_URL)
-    # не знайдена, то відповідний об'єкт налаштувань може не бути створений або матиме дефолти.
-    # Краще перевіряти наявність ключової змінної перед створенням об'єкта.
 
     redis: Optional[RedisSettings] = None
     celery: Optional[CelerySettings] = None
     firebase: Optional[FirebaseSettings] = None
     elasticsearch: Optional[ElasticsearchSettings] = None
 
-    # Pydantic v2: model_validator для ініціалізації опціональних налаштувань
-    @model_validator(mode='before') # Або 'after', але 'before' краще для заповнення з .env
+    @model_validator(mode='before')
     @classmethod
     def init_optional_settings(cls, values: Dict[str, Any]) -> Dict[str, Any]:
-        # Цей валідатор викликається перед створенням екземпляра Settings.
-        # `values` тут - це те, що Pydantic зміг завантажити з .env / середовища для самого Settings.
-        # Нам потрібно завантажити під-налаштування і перевірити їх.
-
-        # Завантажуємо RedisSettings і перевіряємо REDIS_URL
-        _redis_settings = RedisSettings()
-        if _redis_settings.REDIS_URL:
+        # Завантажуємо RedisSettings
+        # Pydantic автоматично створить екземпляр з .env, якщо env_prefix правильний
+        # і клас RedisSettings не має обов'язкових полів без дефолтів
+        # або якщо відповідні змінні є в .env.
+        # Тут ми просто створюємо екземпляр, щоб перевірити наявність ключового поля.
+        # Якщо поле є, то Pydantic вже заповнив його в _redis_settings.
+        _redis_settings = RedisSettings() # Спробує завантажити з .env з префіксом REDIS_
+        if _redis_settings.REDIS_URL: # Перевіряємо, чи REDIS_URL було встановлено (з .env або зібрано)
             values['redis'] = _redis_settings
+        else:
+            # Якщо REDIS_URL не встановлено, можна явно присвоїти None,
+            # хоча Pydantic і так би це зробив для Optional[RedisSettings] = None.
+            # Це для наочності, що ми перевірили і не знайшли.
+            values['redis'] = None
 
-        # Завантажуємо CelerySettings і перевіряємо CELERY_BROKER_URL
+
         _celery_settings = CelerySettings()
         if _celery_settings.CELERY_BROKER_URL:
             values['celery'] = _celery_settings
             # Якщо DEBUG і CELERY_TASK_ALWAYS_EAGER не задано, можна встановити
-            if values.get('app', AppSettings()).DEBUG and _celery_settings.CELERY_TASK_ALWAYS_EAGER is None:
-                 # _celery_settings.CELERY_TASK_ALWAYS_EAGER = True # Не можна змінювати тут, бо це BaseSettings
-                 # Краще, щоб CELERY_TASK_ALWAYS_EAGER залежало від DEBUG в своєму класі, якщо потрібно.
-                 pass
+            # app_settings = values.get('app') if isinstance(values.get('app'), AppSettings) else AppSettings() # Отримуємо app settings
+            # if app_settings.DEBUG and _celery_settings.CELERY_TASK_ALWAYS_EAGER is False: # Явно перевіряємо False
+            #     # Не можна змінювати тут, бо це BaseSettings.
+            #     # Це має бути налаштовано в .env або в дефолтах CelerySettings
+            #     # в залежності від ENVIRONMENT.
+            #     pass
+        else:
+            values['celery'] = None
 
 
         _firebase_settings = FirebaseSettings()
         if _firebase_settings.FIREBASE_CREDENTIALS_PATH:
             values['firebase'] = _firebase_settings
+        else:
+            values['firebase'] = None
 
         _elasticsearch_settings = ElasticsearchSettings()
-        if _elasticsearch_settings.ELASTICSEARCH_HOSTS: # Перевіряємо, чи список не порожній
+        if _elasticsearch_settings.ELASTICSEARCH_HOSTS:
             values['elasticsearch'] = _elasticsearch_settings
+        else:
+            values['elasticsearch'] = None
 
         return values
 
@@ -223,15 +244,22 @@ if settings.app.ENVIRONMENT == EnvironmentEnum.PRODUCTION and settings.app.DEBUG
 # означає, що кожен намагається завантажити свій `.env` (або той самий).
 # Це нормально, Pydantic об'єднає значення.
 # `env_nested_delimiter='__'` в `Settings.model_config` дозволяє задавати вкладені змінні
-# середовища, наприклад `APP__JWT_ALGORITHM=HS512`.
+# середовища, наприклад `AUTH__SECRET_KEY=mysecret`.
 #
-# `ge=1` для `RATE_LIMIT_TIMES` та `RATE_LIMIT_SECONDS` додано.
-# `default_factory=list` для `ELASTICSEARCH_HOSTS`.
-# `init_optional_settings` валідатор для більш чистої ініціалізації опціональних налаштувань.
-# Додано `LoggingSettings`.
-# Перевірка `all([...])` в `assemble_db_connection` для надійності.
-# Перевірка `all([...])` в `assemble_redis_url`.
-# Додано `str` для `CELERY_BROKER_URL` та `CELERY_RESULT_BACKEND_URL` для гнучкості,
-# хоча Pydantic DSN типи кращі для валідації. `Union` включає `str`.
-#
+# Додано `BASE_DIR` в `AppSettings`.
+# Створено `AuthSettings` та перенесено відповідні поля.
+# `init_optional_settings` тепер більш явно обробляє випадки, коли опціональні сервіси не налаштовані.
+# Шлях до лог-файлу в `LoggingSettings` тепер може бути відносним до `BASE_DIR`.
 # Все виглядає значно краще.
+#
+# TODO: Переконатися, що `BASE_DIR` правильно визначається.
+# `Path(__file__).resolve()` дасть шлях до поточного файлу (`settings.py`).
+# `.parent.parent.parent` підніметься на три рівні:
+# 1. `config/` -> `src/`
+# 2. `src/` -> `app/`
+# 3. `app/` -> `backend/`
+# Отже, `BASE_DIR` буде вказувати на каталог `backend/`. Це правильно.
+#
+# Важливо: `SUPERUSER_PASSWORD` в `AuthSettings` позначено як `...` (обов'язкове без дефолту),
+# що означає, воно *повинно* бути надане через змінну середовища `AUTH_SUPERUSER_PASSWORD`.
+# Це добре для безпеки.

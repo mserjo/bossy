@@ -170,25 +170,27 @@ class InitializationService:
         results = {"odin_created": False, "shadow_created": False}
 
         # Odin (Superuser)
-        odin = await self.user_repo.get_by_email(email=settings.auth.SUPERUSER_EMAIL)
+        # Використовуємо settings.auth.SUPERUSER_EMAIL та settings.auth.SUPERUSER_PASSWORD
+        superuser_email_str = str(settings.auth.SUPERUSER_EMAIL) # Конвертуємо EmailStr в str для get_by_email, якщо потрібно
+        odin = await self.user_repo.get_by_email(email=superuser_email_str)
         if not odin:
-            if not settings.auth.SUPERUSER_PASSWORD:
-                logger.error("Пароль супер-адміністратора (SUPERUSER_PASSWORD) не встановлено. Неможливо створити 'odin'.")
+            if not settings.auth.SUPERUSER_PASSWORD: # Це поле обов'язкове, Pydantic вже б видав помилку
+                logger.error(f"Пароль супер-адміністратора для {settings.auth.SUPERUSER_EMAIL} (SUPERUSER_PASSWORD) не встановлено в конфігурації. Неможливо створити '{SYSTEM_USER_ODIN_USERNAME}'.")
             else:
                 odin_in = UserCreateSchema(
-                    email=settings.auth.SUPERUSER_EMAIL,
+                    email=settings.auth.SUPERUSER_EMAIL, # Тут можна використовувати EmailStr
                     password=settings.auth.SUPERUSER_PASSWORD,
                     name=SYSTEM_USER_ODIN_USERNAME,
                     first_name="System", last_name="Superuser",
-                    user_type_code=USER_TYPE_SUPERADMIN,
-                    role_code=ROLE_SUPERADMIN_CODE, # Додаємо роль
+                    user_type_code=USER_TYPE_SUPERADMIN, # Код типу користувача
+                    role_code=ROLE_SUPERADMIN_CODE, # Код ролі
                     is_email_verified=True, is_active=True
                 )
-                await self.user_service.create_user(obj_in=odin_in) # Використовуємо сервіс для хешування
+                await self.user_service.create_user(obj_in=odin_in)
                 logger.info(f"Супер-адміністратора '{SYSTEM_USER_ODIN_USERNAME}' ({settings.auth.SUPERUSER_EMAIL}) створено.")
                 results["odin_created"] = True
         else:
-            logger.info(f"Супер-адміністратор '{SYSTEM_USER_ODIN_USERNAME}' вже існує.")
+            logger.info(f"Супер-адміністратор '{SYSTEM_USER_ODIN_USERNAME}' ({settings.auth.SUPERUSER_EMAIL}) вже існує.")
 
         # Shadow (System Bot)
         shadow_email = f"{SYSTEM_USER_SHADOW_USERNAME.lower()}@system.local" # Унікальний email для бота

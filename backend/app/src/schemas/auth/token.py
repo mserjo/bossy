@@ -105,7 +105,7 @@ class TokenPayloadSchema(BaseSchema):
 # `updated_at` оновлюється при зміні `last_used_at` або `is_revoked`.
 # Це коректно.
 
-TokenResponseSchema.model_rebuild()
-RefreshTokenSchema.model_rebuild()
-RefreshTokenRequestSchema.model_rebuild()
-TokenPayloadSchema.model_rebuild()
+# TokenResponseSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef
+# RefreshTokenSchema.model_rebuild() # Виклик перенесено до schemas/__init__.py
+# RefreshTokenRequestSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef
+# TokenPayloadSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef

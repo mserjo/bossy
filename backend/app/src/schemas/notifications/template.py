@@ -130,6 +130,6 @@ class NotificationTemplateUpdateSchema(BaseSchema):
 #
 # Все виглядає добре.
 
-NotificationTemplateSchema.model_rebuild()
-NotificationTemplateCreateSchema.model_rebuild()
-NotificationTemplateUpdateSchema.model_rebuild()
+# NotificationTemplateSchema.model_rebuild() # Виклик перенесено до schemas/__init__.py
+# NotificationTemplateCreateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef
+# NotificationTemplateUpdateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef

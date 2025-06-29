@@ -115,5 +115,5 @@ class TransactionCreateSchema(BaseSchema):
 # `transaction_type_code` для класифікації операції.
 # Все виглядає добре.
 
-TransactionSchema.model_rebuild()
-TransactionCreateSchema.model_rebuild()
+# TransactionSchema.model_rebuild() # Виклик перенесено до __init__.py пакету bonuses
+# TransactionCreateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef

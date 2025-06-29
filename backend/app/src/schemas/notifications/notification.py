@@ -125,7 +125,7 @@ class NotificationBulkReadSchema(BaseSchema):
 #
 # Все виглядає добре.
 
-NotificationSchema.model_rebuild()
-NotificationCreateSchema.model_rebuild()
-NotificationUpdateSchema.model_rebuild()
-NotificationBulkReadSchema.model_rebuild()
+# NotificationSchema.model_rebuild() # Виклик перенесено до schemas/__init__.py
+# NotificationCreateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef
+# NotificationUpdateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef
+# NotificationBulkReadSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef

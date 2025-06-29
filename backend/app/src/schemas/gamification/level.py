@@ -122,6 +122,6 @@ class LevelUpdateSchema(BaseSchema):
 #
 # Все виглядає добре.
 
-LevelSchema.model_rebuild()
-LevelCreateSchema.model_rebuild()
-LevelUpdateSchema.model_rebuild()
+# LevelSchema.model_rebuild() # Виклик перенесено до schemas/__init__.py
+# LevelCreateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef
+# LevelUpdateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef

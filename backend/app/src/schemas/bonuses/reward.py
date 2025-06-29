@@ -119,6 +119,6 @@ class RewardUpdateSchema(BaseSchema):
 # Зв'язок `bonus_type` з `BonusTypeSchema` дозволить отримати деталі про валюту вартості.
 # Все виглядає добре.
 
-RewardSchema.model_rebuild()
-RewardCreateSchema.model_rebuild()
-RewardUpdateSchema.model_rebuild()
+# RewardSchema.model_rebuild() # Виклик перенесено до schemas/__init__.py
+# RewardCreateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef
+# RewardUpdateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef

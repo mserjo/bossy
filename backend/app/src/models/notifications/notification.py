@@ -5,7 +5,7 @@
 які надсилаються користувачам системи. Сповіщення можуть бути внутрішніми (в додатку)
 або зовнішніми (email, SMS, месенджери - через DeliveryModel).
 """
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, Any, List, TYPE_CHECKING
 
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Boolean, Index  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
@@ -17,6 +17,12 @@ from datetime import datetime # Для роботи з датами та час�
 # Якщо сповіщення мають заголовок/тіло, які можна вважати name/description,
 # то BaseMainModel може бути варіантом, але title/body тут більш специфічні.
 from backend.app.src.models.base import BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.groups.group import GroupModel
+    from backend.app.src.models.notifications.delivery import NotificationDeliveryModel
+
 
 class NotificationModel(BaseModel):
     """
@@ -78,11 +84,11 @@ class NotificationModel(BaseModel):
 
     # --- Зв'язки (Relationships) ---
     # TODO: Узгодити back_populates="notifications_received" з UserModel
-    recipient: Mapped["UserModel"] = relationship(foreign_keys=[recipient_user_id], back_populates="notifications_received")
+    recipient: Mapped["UserModel"] = relationship(foreign_keys=[recipient_user_id], back_populates="notifications_received", lazy="selectin")
     # TODO: Узгодити back_populates="notifications" з GroupModel
-    group: Mapped[Optional["GroupModel"]] = relationship(foreign_keys=[group_id], back_populates="notifications")
+    group: Mapped[Optional["GroupModel"]] = relationship(foreign_keys=[group_id], back_populates="notifications", lazy="selectin")
 
-    deliveries: Mapped[List["NotificationDeliveryModel"]] = relationship(back_populates="notification", cascade="all, delete-orphan")
+    deliveries: Mapped[List["NotificationDeliveryModel"]] = relationship(back_populates="notification", cascade="all, delete-orphan", lazy="select")
 
     __table_args__ = (
         Index('ix_notifications_source_entity', 'source_entity_type', 'source_entity_id'),

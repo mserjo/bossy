@@ -4,7 +4,7 @@
 Цей модуль визначає модель SQLAlchemy `PollOptionModel` для зберігання варіантів відповідей
 для опитувань (`PollModel`). Кожне опитування може мати декілька варіантів відповідей.
 """
-from typing import List
+from typing import List, TYPE_CHECKING
 
 from sqlalchemy import Column, String, Text, ForeignKey, Integer # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
@@ -22,6 +22,11 @@ import uuid # Для роботи з UUID
 # Краще створити простішу базу або успадкувати від BaseModel і додати потрібні поля.
 # Зупинимось на BaseModel і додамо поле `text`.
 from backend.app.src.models.base import BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.groups.poll import PollModel
+    from backend.app.src.models.groups.poll_vote import PollVoteModel
+
 
 class PollOptionModel(BaseModel):
     """
@@ -49,7 +54,7 @@ class PollOptionModel(BaseModel):
     order_num: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True) # Додав index=True для order_num
 
     # --- Зв'язки (Relationships) ---
-    poll: Mapped["PollModel"] = relationship(back_populates="options")
+    poll: Mapped["PollModel"] = relationship(back_populates="options", lazy="selectin")
     votes: Mapped[List["PollVoteModel"]] = relationship(back_populates="option", cascade="all, delete-orphan")
 
 

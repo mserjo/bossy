@@ -7,7 +7,7 @@
 та рівнями гейміфікації (`LevelModel`), фіксуючи, якого рівня досяг користувач
 в конкретній групі та коли.
 """
-
+from typing import TYPE_CHECKING
 from sqlalchemy import Column, ForeignKey, DateTime, UniqueConstraint, Boolean, Index, text  # type: ignore # Додано Index, text
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
 from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore # Додано mapped_column
@@ -15,6 +15,12 @@ import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.groups.group import GroupModel
+    from backend.app.src.models.gamification.level import LevelModel
+
 
 class UserLevelModel(BaseModel):
     """
@@ -47,10 +53,10 @@ class UserLevelModel(BaseModel):
 
     # --- Зв'язки (Relationships) ---
     # TODO: Узгодити back_populates="achieved_user_levels" з UserModel
-    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="achieved_user_levels")
+    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="achieved_user_levels", lazy="selectin")
     # TODO: Узгодити back_populates="user_level_achievements" з GroupModel
-    group: Mapped["GroupModel"] = relationship(foreign_keys=[group_id], back_populates="user_level_achievements")
-    level: Mapped["LevelModel"] = relationship(back_populates="user_levels")
+    group: Mapped["GroupModel"] = relationship(foreign_keys=[group_id], back_populates="user_level_achievements", lazy="selectin")
+    level: Mapped["LevelModel"] = relationship(back_populates="user_levels", lazy="selectin")
 
 
     __table_args__ = (

@@ -39,11 +39,11 @@ class BonusAdjustmentModel(BaseModel):
     transaction_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("transactions.id", name="fk_bonus_adjustments_transaction_id", ondelete="SET NULL"), nullable=True, unique=True)
 
     # --- Зв'язки (Relationships) ---
-    account: Mapped["AccountModel"] = relationship(back_populates="adjustments")
-    admin: Mapped["UserModel"] = relationship(foreign_keys=[adjusted_by_user_id], back_populates="made_bonus_adjustments")
+    account: Mapped["AccountModel"] = relationship(back_populates="adjustments", lazy="selectin")
+    admin: Mapped["UserModel"] = relationship(foreign_keys=[adjusted_by_user_id], back_populates="made_bonus_adjustments", lazy="selectin")
 
     # Зв'язок з транзакцією
-    transaction: Mapped[Optional["TransactionModel"]] = relationship(back_populates="source_adjustment")
+    transaction: Mapped[Optional["TransactionModel"]] = relationship(back_populates="source_adjustment", lazy="selectin")
 
 
     def __repr__(self) -> str:

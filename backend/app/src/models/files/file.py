@@ -7,7 +7,7 @@
 Самі файли зберігаються в файловій системі або хмарному сховищі,
 а ця модель містить посилання на них та їх метадані.
 """
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TYPE_CHECKING
 
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Boolean # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
@@ -20,6 +20,17 @@ from datetime import datetime # Для роботи з датами та час�
 # Але зазвичай назва файлу - це `original_filename`, а опис може бути в `metadata`.
 # Поки що BaseModel.
 from backend.app.src.models.base import BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.groups.group import GroupModel
+    from backend.app.src.models.bonuses.reward import RewardModel
+    from backend.app.src.models.gamification.badge import BadgeModel
+    from backend.app.src.models.gamification.level import LevelModel
+    from backend.app.src.models.reports.report import ReportModel
+    from backend.app.src.models.teams.team import TeamModel
+    from backend.app.src.models.files.avatar import AvatarModel
+
 
 class FileModel(BaseModel):
     """
@@ -97,32 +108,32 @@ class FileModel(BaseModel):
 
     # --- Зв'язки (Relationships) ---
     # TODO: Узгодити back_populates="uploaded_files" з UserModel
-    uploader: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[uploaded_by_user_id], back_populates="uploaded_files")
+    uploader: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[uploaded_by_user_id], back_populates="uploaded_files", lazy="selectin")
     # TODO: Узгодити back_populates="context_files" з GroupModel (або specific, e.g., group_icons)
-    group_context: Mapped[Optional["GroupModel"]] = relationship(foreign_keys=[group_context_id], back_populates="context_files")
-    # status: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[status_id]) # Якщо буде status_id
+    group_context: Mapped[Optional["GroupModel"]] = relationship(foreign_keys=[group_context_id], back_populates="context_files", lazy="selectin")
+    # status: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[status_id], lazy="selectin") # Якщо буде status_id
 
     # Зворотні зв'язки від моделей, що використовують цей файл як іконку/аватар/звіт
     # Ці зв'язки є один-до-одного (або один-до-багатьох, якщо файл може бути кількома аватарами, що малоймовірно для унікального file_id в AvatarModel)
     # `uselist=False` вказує на один-до-одного з боку "один".
 
     # Для GroupModel.icon_file_id
-    group_icon_for: Mapped[Optional["GroupModel"]] = relationship(back_populates="icon_file", foreign_keys="[GroupModel.icon_file_id]")
+    group_icon_for: Mapped[Optional["GroupModel"]] = relationship(back_populates="icon_file", foreign_keys="[GroupModel.icon_file_id]", lazy="selectin")
     # Для RewardModel.icon_file_id
-    reward_icon_for: Mapped[Optional["RewardModel"]] = relationship(back_populates="icon_file", foreign_keys="[RewardModel.icon_file_id]")
+    reward_icon_for: Mapped[Optional["RewardModel"]] = relationship(back_populates="icon_file", foreign_keys="[RewardModel.icon_file_id]", lazy="selectin")
     # Для BadgeModel.icon_file_id
-    badge_icon_for: Mapped[Optional["BadgeModel"]] = relationship(back_populates="icon_file", foreign_keys="[BadgeModel.icon_file_id]")
+    badge_icon_for: Mapped[Optional["BadgeModel"]] = relationship(back_populates="icon_file", foreign_keys="[BadgeModel.icon_file_id]", lazy="selectin")
     # Для LevelModel.icon_file_id
-    level_icon_for: Mapped[Optional["LevelModel"]] = relationship(back_populates="icon_file", foreign_keys="[LevelModel.icon_file_id]")
+    level_icon_for: Mapped[Optional["LevelModel"]] = relationship(back_populates="icon_file", foreign_keys="[LevelModel.icon_file_id]", lazy="selectin")
     # Для ReportModel.file_id
-    report_file_for: Mapped[Optional["ReportModel"]] = relationship(back_populates="generated_file", foreign_keys="[ReportModel.file_id]")
+    report_file_for: Mapped[Optional["ReportModel"]] = relationship(back_populates="generated_file", foreign_keys="[ReportModel.file_id]", lazy="selectin")
     # Для TeamModel.icon_file_id
-    team_icon_for: Mapped[Optional["TeamModel"]] = relationship(back_populates="icon_file", foreign_keys="[TeamModel.icon_file_id]")
+    team_icon_for: Mapped[Optional["TeamModel"]] = relationship(back_populates="icon_file", foreign_keys="[TeamModel.icon_file_id]", lazy="selectin")
 
     # Для AvatarModel.file_id (один файл може бути пов'язаний з одним записом аватара)
     # Зв'язок з AvatarModel, де цей файл використовується.
     # В AvatarModel є file = relationship("FileModel"), тому тут має бути зворотний.
-    avatar_entry: Mapped[Optional["AvatarModel"]] = relationship(back_populates="file")
+    avatar_entry: Mapped[Optional["AvatarModel"]] = relationship(back_populates="file", lazy="selectin")
 
     def __repr__(self) -> str:
         """

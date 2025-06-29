@@ -7,7 +7,7 @@
 Рівні налаштовуються адміністратором групи.
 """
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 
 from sqlalchemy import Column, String, Text, ForeignKey, Integer, Numeric, CheckConstraint, \
     UniqueConstraint  # type: ignore
@@ -20,6 +20,12 @@ import uuid # Для роботи з UUID
 # (якщо рівні специфічні для груп, а не глобальні).
 # ТЗ: "налаштовується ... адміном групі", що вказує на приналежність до групи.
 from backend.app.src.models.base import BaseMainModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.files.file import FileModel
+    from backend.app.src.models.gamification.user_level import UserLevelModel
+    # GroupModel, StatusModel вже є в BaseMainModel
+
 
 class LevelModel(BaseMainModel):
     """
@@ -67,9 +73,9 @@ class LevelModel(BaseMainModel):
     # group: Mapped["GroupModel"] - успадковано з BaseMainModel
 
     # TODO: Узгодити back_populates з FileModel
-    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="level_icon_for")
+    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="level_icon_for", lazy="selectin")
 
-    user_levels: Mapped[List["UserLevelModel"]] = relationship(back_populates="level", cascade="all, delete-orphan")
+    user_levels: Mapped[List["UserLevelModel"]] = relationship(back_populates="level", cascade="all, delete-orphan", lazy="select")
 
     # state: Mapped[Optional["StatusModel"]] - успадковано з BaseMainModel
 

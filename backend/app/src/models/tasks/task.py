@@ -5,7 +5,7 @@
 Завдання/події належать до певної групи, мають тип, можуть мати виконавців, терміни, бонуси/штрафи.
 """
 from decimal import Decimal
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 
 from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Integer, Numeric, Interval, \
     CheckConstraint  # type: ignore
@@ -16,6 +16,18 @@ from datetime import datetime, timedelta  # Для роботи з датами 
 
 # Використовуємо BaseMainModel, оскільки завдання/подія має назву, опис, статус, належить до групи.
 from backend.app.src.models.base import BaseMainModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.dictionaries.task_type import TaskTypeModel
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.teams.team import TeamModel
+    from backend.app.src.models.tasks.assignment import TaskAssignmentModel
+    from backend.app.src.models.tasks.completion import TaskCompletionModel
+    from backend.app.src.models.tasks.review import TaskReviewModel
+    from backend.app.src.models.tasks.dependency import TaskDependencyModel
+    from backend.app.src.models.tasks.proposal import TaskProposalModel
+    # GroupModel та StatusModel вже є в BaseMainModel
+
 
 class TaskModel(BaseMainModel):
     """
@@ -119,31 +131,33 @@ class TaskModel(BaseMainModel):
     # --- Зв'язки (Relationships) ---
     # group: Mapped["GroupModel"] - успадковано з BaseMainModel
 
-    task_type: Mapped["TaskTypeModel"] = relationship(foreign_keys=[task_type_id], back_populates="tasks_of_this_type")
-    creator: Mapped["UserModel"] = relationship(foreign_keys=[created_by_user_id], back_populates="created_tasks")
+    task_type: Mapped["TaskTypeModel"] = relationship(foreign_keys=[task_type_id], back_populates="tasks_of_this_type", lazy="selectin")
+    creator: Mapped["UserModel"] = relationship(foreign_keys=[created_by_user_id], back_populates="created_tasks", lazy="selectin")
 
     parent_task: Mapped[Optional["TaskModel"]] = relationship(remote_side="TaskModel.id", back_populates="child_tasks", lazy="selectin")
-    child_tasks: Mapped[List["TaskModel"]] = relationship(back_populates="parent_task", cascade="all, delete-orphan")
+    child_tasks: Mapped[List["TaskModel"]] = relationship(back_populates="parent_task", cascade="all, delete-orphan", lazy="select")
 
-    assignments: Mapped[List["TaskAssignmentModel"]] = relationship(back_populates="task", cascade="all, delete-orphan")
-    completions: Mapped[List["TaskCompletionModel"]] = relationship(back_populates="task", cascade="all, delete-orphan")
-    reviews: Mapped[List["TaskReviewModel"]] = relationship(back_populates="task", cascade="all, delete-orphan")
+    assignments: Mapped[List["TaskAssignmentModel"]] = relationship(back_populates="task", cascade="all, delete-orphan", lazy="select")
+    completions: Mapped[List["TaskCompletionModel"]] = relationship(back_populates="task", cascade="all, delete-orphan", lazy="select")
+    reviews: Mapped[List["TaskReviewModel"]] = relationship(back_populates="task", cascade="all, delete-orphan", lazy="select")
 
-    team: Mapped[Optional["TeamModel"]] = relationship(foreign_keys=[team_id], back_populates="tasks_assigned")
+    team: Mapped[Optional["TeamModel"]] = relationship(foreign_keys=[team_id], back_populates="tasks_assigned", lazy="selectin")
 
-    streak_bonus_reference_task: Mapped[Optional["TaskModel"]] = relationship(remote_side="TaskModel.id", foreign_keys=[streak_bonus_ref_task_id])
+    streak_bonus_reference_task: Mapped[Optional["TaskModel"]] = relationship(remote_side="TaskModel.id", foreign_keys=[streak_bonus_ref_task_id], lazy="selectin")
 
     # state: Mapped[Optional["StatusModel"]] - успадковано з BaseMainModel
 
     dependent_tasks: Mapped[List["TaskDependencyModel"]] = relationship(
         foreign_keys="[TaskDependencyModel.prerequisite_task_id]",
         back_populates="prerequisite_task",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        lazy="select"
     )
     prerequisite_links: Mapped[List["TaskDependencyModel"]] = relationship(
         foreign_keys="[TaskDependencyModel.dependent_task_id]",
         back_populates="dependent_task",
-        cascade="all, delete-orphan"
+        cascade="all, delete-orphan",
+        lazy="select"
     )
 
     # Зв'язок з TaskProposalModel (якщо це завдання створено з пропозиції)
@@ -151,7 +165,7 @@ class TaskModel(BaseMainModel):
     # Або в TaskProposalModel є created_task_id
     # Поточна TaskProposalModel.created_task_id: Mapped[Optional[uuid.UUID]] = mapped_column(ForeignKey("tasks.id"))
     # Отже, зворотний зв'язок:
-    source_proposal: Mapped[Optional["TaskProposalModel"]] = relationship(back_populates="created_task")
+    source_proposal: Mapped[Optional["TaskProposalModel"]] = relationship(back_populates="created_task", lazy="selectin")
 
 
     def __repr__(self) -> str:

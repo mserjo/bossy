@@ -6,14 +6,19 @@
 (кількість виконаних завдань, накопичені бонуси тощо) і можуть зберігатися
 періодично для відстеження динаміки та історії.
 """
-
+from typing import TYPE_CHECKING
 from sqlalchemy import Column, ForeignKey, DateTime, String, Numeric, Integer, Index # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship, Mapped  # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore # Додано mapped_column
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.groups.group import GroupModel
+
 
 class RatingModel(BaseModel):
     """
@@ -66,9 +71,9 @@ class RatingModel(BaseModel):
 
     # --- Зв'язки (Relationships) ---
     # TODO: Узгодити back_populates="ratings_history" з UserModel
-    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="ratings_history")
+    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="ratings_history", lazy="selectin")
     # TODO: Узгодити back_populates="ratings_history" (або схоже) з GroupModel
-    group: Mapped["GroupModel"] = relationship(foreign_keys=[group_id], back_populates="ratings_history")
+    group: Mapped["GroupModel"] = relationship(foreign_keys=[group_id], back_populates="ratings_history", lazy="selectin")
 
     # Обмеження та індекси
     # Забезпечує, що для користувача, групи, типу рейтингу та дати зрізу є лише один запис.

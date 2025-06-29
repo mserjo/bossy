@@ -9,11 +9,18 @@ from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Inte
     CheckConstraint  # type: ignore # String, Text etc. for mapped_column
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
 from sqlalchemy.orm import relationship, Mapped, mapped_column # type: ignore
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 
 from backend.app.src.models.base import BaseMainModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.groups.poll_option import PollOptionModel
+    from backend.app.src.models.groups.poll_vote import PollVoteModel
+    # GroupModel та StatusModel вже є в BaseMainModel
+
 
 class PollModel(BaseMainModel):
     """
@@ -40,7 +47,7 @@ class PollModel(BaseMainModel):
     # group: Mapped["GroupModel"] - успадковано з BaseMainModel.state (там є foreign_keys=[group_id])
     # state: Mapped[Optional["StatusModel"]] - успадковано з BaseMainModel.state (там є foreign_keys=[state_id])
 
-    creator: Mapped["UserModel"] = relationship(foreign_keys=[created_by_user_id], back_populates="created_polls")
+    creator: Mapped["UserModel"] = relationship(foreign_keys=[created_by_user_id], back_populates="created_polls", lazy="selectin")
     options: Mapped[List["PollOptionModel"]] = relationship(back_populates="poll", cascade="all, delete-orphan", order_by="PollOptionModel.order_num")
     votes: Mapped[List["PollVoteModel"]] = relationship(back_populates="poll", cascade="all, delete-orphan")
 

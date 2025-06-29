@@ -5,7 +5,7 @@
 Групи є ключовим елементом системи, дозволяючи об'єднувати користувачів для спільних завдань,
 нарахування бонусів, спілкування тощо. Групи можуть мати ієрархічну структуру.
 """
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 
 from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Integer # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
@@ -13,6 +13,26 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
 
 from backend.app.src.models.base import BaseMainModel # Успадковуємо від BaseMainModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.dictionaries.group_type import GroupTypeModel
+    from backend.app.src.models.groups.membership import GroupMembershipModel
+    from backend.app.src.models.groups.settings import GroupSettingsModel
+    from backend.app.src.models.tasks.task import TaskModel
+    from backend.app.src.models.bonuses.reward import RewardModel
+    from backend.app.src.models.bonuses.account import AccountModel
+    from backend.app.src.models.groups.poll import PollModel
+    from backend.app.src.models.groups.invitation import GroupInvitationModel
+    from backend.app.src.models.files.file import FileModel
+    from backend.app.src.models.groups.template import GroupTemplateModel
+    # from backend.app.src.models.dictionaries.status import StatusModel # Вже є в BaseMainModel через TYPE_CHECKING
+    from backend.app.src.models.tasks.proposal import TaskProposalModel
+    from backend.app.src.models.gamification.user_level import UserLevelModel
+    from backend.app.src.models.gamification.badge import BadgeModel
+    from backend.app.src.models.gamification.rating import RatingModel
+    from backend.app.src.models.notifications.notification import NotificationModel
+    from backend.app.src.models.reports.report import ReportModel
+
 
 class GroupModel(BaseMainModel):
     """
@@ -77,73 +97,74 @@ class GroupModel(BaseMainModel):
     # --- Зв'язки (Relationships) ---
 
     # Зв'язок для ієрархії груп (батьківська група)
-    parent_group: Mapped[Optional["GroupModel"]] = relationship(remote_side="GroupModel.id", back_populates="child_groups", lazy="selectin") # SQLAlchemy 2.0 style
+    parent_group: Mapped[Optional["GroupModel"]] = relationship(remote_side="GroupModel.id", back_populates="child_groups", lazy="selectin")
 
     # Зв'язок для ієрархії груп (дочірні групи)
-    child_groups: Mapped[List["GroupModel"]] = relationship(back_populates="parent_group", cascade="all, delete-orphan", lazy="selectin")
+    child_groups: Mapped[List["GroupModel"]] = relationship(back_populates="parent_group", cascade="all, delete-orphan", lazy="select") # Змінено на select
 
     # Зв'язок з типом групи
     group_type: Mapped[Optional["GroupTypeModel"]] = relationship(foreign_keys=[group_type_id], back_populates="groups_of_this_type", lazy="selectin")
 
     # Зв'язок з учасниками групи через проміжну таблицю GroupMembershipModel
-    memberships: Mapped[List["GroupMembershipModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
+    memberships: Mapped[List["GroupMembershipModel"]] = relationship(back_populates="group", cascade="all, delete-orphan", lazy="select") # Змінено на select
 
     # Зв'язок з налаштуваннями групи (один-до-одного)
-    settings: Mapped[Optional["GroupSettingsModel"]] = relationship(back_populates="group", uselist=False, cascade="all, delete-orphan")
+    settings: Mapped[Optional["GroupSettingsModel"]] = relationship(back_populates="group", uselist=False, cascade="all, delete-orphan", lazy="selectin") # selectin для 1-1
 
     # Зв'язок із завданнями, що належать цій групі
-    tasks: Mapped[List["TaskModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
+    tasks: Mapped[List["TaskModel"]] = relationship(back_populates="group", cascade="all, delete-orphan", lazy="select") # Змінено на select
 
     # Зв'язок з нагородами, доступними в цій групі
-    rewards: Mapped[List["RewardModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
+    rewards: Mapped[List["RewardModel"]] = relationship(back_populates="group", cascade="all, delete-orphan", lazy="select") # Змінено на select
 
     # Зв'язок з рахунками користувачів у цій групі
-    accounts_in_group: Mapped[List["AccountModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
+    accounts_in_group: Mapped[List["AccountModel"]] = relationship(back_populates="group", cascade="all, delete-orphan", lazy="select") # Змінено на select
 
     # Зв'язок з опитуваннями/голосуваннями в групі
-    polls: Mapped[List["PollModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
+    polls: Mapped[List["PollModel"]] = relationship(back_populates="group", cascade="all, delete-orphan", lazy="select") # Змінено на select
 
     # Зв'язок із запрошеннями до групи
-    invitations: Mapped[List["GroupInvitationModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
+    invitations: Mapped[List["GroupInvitationModel"]] = relationship(back_populates="group", cascade="all, delete-orphan", lazy="select") # Змінено на select
 
     # Зв'язок з файлом іконки
-    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="group_icon_for", lazy="selectin") # Додано back_populates
+    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="group_icon_for", lazy="selectin")
 
     # Зв'язок з шаблоном, з якого створена група
     created_from_template: Mapped[Optional["GroupTemplateModel"]] = relationship(
         foreign_keys=[created_from_template_id],
-        back_populates="groups_created_from_this_template", # Назва зворотного зв'язку в GroupTemplateModel
+        back_populates="groups_created_from_this_template",
         lazy="selectin"
     )
 
     # Поле `group_id` з `BaseMainModel` для самої `GroupModel` не використовується і буде `NULL`.
     # Це поле призначене для сутностей, які належать до певної групи.
     # `state_id` з `BaseMainModel` використовується для статусу групи.
-    # state = relationship("StatusModel", foreign_keys=[state_id]) # Вже є в BaseMainModel, якщо там розкоментовано
+    # state = relationship("StatusModel", foreign_keys=[state_id]) # Вже є в BaseMainModel
 
     # Зв'язок з файлами, що належать до контексту цієї групи
     context_files: Mapped[List["FileModel"]] = relationship(
         back_populates="group_context",
-        foreign_keys="[FileModel.group_context_id]" # Вказуємо зовнішній ключ з FileModel
+        foreign_keys="[FileModel.group_context_id]", # Вказуємо зовнішній ключ з FileModel
+        lazy="select" # Змінено на select
     )
 
     # Зв'язок з пропозиціями завдань для цієї групи
-    task_proposals: Mapped[List["TaskProposalModel"]] = relationship(back_populates="group", cascade="all, delete-orphan")
+    task_proposals: Mapped[List["TaskProposalModel"]] = relationship(back_populates="group", cascade="all, delete-orphan", lazy="select") # Змінено на select
 
     # Зв'язок з досягненнями рівнів користувачами в цій групі
-    user_level_achievements: Mapped[List["UserLevelModel"]] = relationship(back_populates="group", foreign_keys="[UserLevelModel.group_id]", cascade="all, delete-orphan")
+    user_level_achievements: Mapped[List["UserLevelModel"]] = relationship(back_populates="group", foreign_keys="[UserLevelModel.group_id]", cascade="all, delete-orphan", lazy="select") # Змінено на select
 
     # Зв'язок з налаштуваннями бейджів для цієї групи
-    badges: Mapped[List["BadgeModel"]] = relationship(back_populates="group", foreign_keys="[BadgeModel.group_id]", cascade="all, delete-orphan")
+    badges: Mapped[List["BadgeModel"]] = relationship(back_populates="group", foreign_keys="[BadgeModel.group_id]", cascade="all, delete-orphan", lazy="select") # Змінено на select
 
     # Зв'язок з історією рейтингів в цій групі
-    ratings_history: Mapped[List["RatingModel"]] = relationship(back_populates="group", foreign_keys="[RatingModel.group_id]", cascade="all, delete-orphan")
+    ratings_history: Mapped[List["RatingModel"]] = relationship(back_populates="group", foreign_keys="[RatingModel.group_id]", cascade="all, delete-orphan", lazy="select") # Змінено на select
 
     # Зв'язок зі сповіщеннями, що стосуються цієї групи
-    notifications: Mapped[List["NotificationModel"]] = relationship(back_populates="group", foreign_keys="[NotificationModel.group_id]", cascade="all, delete-orphan")
+    notifications: Mapped[List["NotificationModel"]] = relationship(back_populates="group", foreign_keys="[NotificationModel.group_id]", cascade="all, delete-orphan", lazy="select") # Змінено на select
 
     # Зв'язок зі звітами, що стосуються цієї групи
-    reports: Mapped[List["ReportModel"]] = relationship(back_populates="group", foreign_keys="[ReportModel.group_id]", cascade="all, delete-orphan")
+    reports: Mapped[List["ReportModel"]] = relationship(back_populates="group", foreign_keys="[ReportModel.group_id]", cascade="all, delete-orphan", lazy="select") # Змінено на select
 
     def __repr__(self) -> str:
         """

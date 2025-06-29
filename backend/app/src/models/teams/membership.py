@@ -6,14 +6,19 @@
 та командами (`TeamModel`), фіксуючи, хто є членом якої команди.
 Може також зберігати роль користувача в команді (якщо є така потреба, окрім лідера).
 """
-
+from typing import TYPE_CHECKING
 from sqlalchemy import Column, ForeignKey, DateTime, UniqueConstraint, String # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship, Mapped  # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore # Додано mapped_column
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.teams.team import TeamModel
+
 
 class TeamMembershipModel(BaseModel):
     """
@@ -49,8 +54,8 @@ class TeamMembershipModel(BaseModel):
 
     # --- Зв'язки (Relationships) ---
     # TODO: Узгодити back_populates="team_memberships" з UserModel
-    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="team_memberships")
-    team: Mapped["TeamModel"] = relationship(back_populates="memberships")
+    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="team_memberships", lazy="selectin")
+    team: Mapped["TeamModel"] = relationship(back_populates="memberships", lazy="selectin")
 
     # Обмеження унікальності: один користувач може бути членом однієї команди лише один раз.
     __table_args__ = (

@@ -4,10 +4,10 @@
 Цей модуль визначає модель SQLAlchemy `ReportModel` для зберігання інформації
 про запити на генерацію звітів, їх параметри та, можливо, посилання на згенеровані файли.
 """
-
+from typing import TYPE_CHECKING, Optional, Dict, Any
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, LargeBinary # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
-from sqlalchemy.orm import relationship # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column # type: ignore # Додано Mapped, mapped_column
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 
@@ -15,6 +15,13 @@ from datetime import datetime # Для роботи з датами та час�
 # Якщо звіти мають назву/опис, можна розглянути BaseMainModel.
 # Поки що звіт - це результат запиту з параметрами.
 from backend.app.src.models.base import BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.groups.group import GroupModel
+    from backend.app.src.models.dictionaries.status import StatusModel
+    from backend.app.src.models.files.file import FileModel
+
 
 class ReportModel(BaseModel):
     """
@@ -75,10 +82,10 @@ class ReportModel(BaseModel):
     # `unique=True` для file_id, якщо один файл відповідає одному запису звіту.
 
     # --- Зв'язки (Relationships) ---
-    requester = relationship("UserModel", foreign_keys=[requested_by_user_id]) # back_populates="requested_reports" буде в UserModel
-    group = relationship("GroupModel", foreign_keys=[group_id]) # back_populates="reports" буде в GroupModel
-    status = relationship("StatusModel", foreign_keys=[status_id]) # back_populates="report_statuses" буде в StatusModel
-    generated_file = relationship("FileModel", foreign_keys=[file_id]) # back_populates="report_for_file" буде в FileModel
+    requester: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[requested_by_user_id], back_populates="requested_reports", lazy="selectin")
+    group: Mapped[Optional["GroupModel"]] = relationship(foreign_keys=[group_id], back_populates="reports", lazy="selectin")
+    status: Mapped["StatusModel"] = relationship(foreign_keys=[status_id], back_populates="reports_with_this_status", lazy="selectin") # Узгоджено з StatusModel
+    generated_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[file_id], back_populates="report_file_for", lazy="selectin") # Узгоджено з FileModel
 
     def __repr__(self) -> str:
         """

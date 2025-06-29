@@ -7,15 +7,20 @@
 2.  Можливості для користувача переглядати свої активні сесії та примусово завершувати їх (відкликати Refresh токени, пов'язані з сесією).
 3.  Збору аудиторської інформації про входи в систему.
 """
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import Column, String, DateTime, ForeignKey, Text, Boolean  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, INET # type: ignore
-from sqlalchemy.orm import relationship, Mapped  # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore # Додано mapped_column
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 
 from backend.app.src.models.base import BaseModel # Успадковуємо від BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.auth.token import RefreshTokenModel
+
 
 class SessionModel(BaseModel):
     """

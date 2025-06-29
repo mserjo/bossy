@@ -5,17 +5,23 @@
 Бейджі надаються користувачам за виконання певних умов або досягнень і слугують для престижу.
 Бейджі налаштовуються адміністратором групи.
 """
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 
 from sqlalchemy import Column, String, Text, ForeignKey, Integer, UniqueConstraint, Boolean, \
     CheckConstraint  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
-from sqlalchemy.orm import relationship, Mapped  # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column # type: ignore # Додано mapped_column
 import uuid # Для роботи з UUID
 
 # Використовуємо BaseMainModel, оскільки бейдж має назву, опис, статус (активний/неактивний для налаштування),
 # і належить до групи.
 from backend.app.src.models.base import BaseMainModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.files.file import FileModel
+    from backend.app.src.models.gamification.achievement import AchievementModel
+    # GroupModel, StatusModel вже є в BaseMainModel
+
 
 class BadgeModel(BaseMainModel):
     """
@@ -84,10 +90,10 @@ class BadgeModel(BaseMainModel):
     # Поки що припускаємо, що успадкованого достатньо, якщо GroupModel не має явного `badges` relationship.
     # Якщо GroupModel матиме `badges = relationship("BadgeModel", back_populates="group")`, то успадкований зв'язок спрацює.
 
-    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="badge_icon_for")
+    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="badge_icon_for", lazy="selectin")
 
     # Досягнення (хто і коли отримав цей бейдж)
-    achievements: Mapped[List["AchievementModel"]] = relationship(back_populates="badge", cascade="all, delete-orphan")
+    achievements: Mapped[List["AchievementModel"]] = relationship(back_populates="badge", cascade="all, delete-orphan", lazy="select")
 
     # `state_id` з BaseMainModel використовується для статусу налаштування бейджа.
     # state: Mapped[Optional["StatusModel"]] - успадковано

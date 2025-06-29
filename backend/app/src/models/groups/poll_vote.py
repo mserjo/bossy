@@ -5,7 +5,7 @@
 в опитуваннях. Кожен запис представляє голос одного користувача за один або декілька
 (якщо дозволено) варіантів відповіді в конкретному опитуванні.
 """
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import Column, ForeignKey, DateTime, UniqueConstraint # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
@@ -14,6 +14,12 @@ import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.groups.poll import PollModel
+    from backend.app.src.models.groups.poll_option import PollOptionModel
+    from backend.app.src.models.auth.user import UserModel
+
 
 class PollVoteModel(BaseModel):
     """
@@ -43,10 +49,10 @@ class PollVoteModel(BaseModel):
     user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_poll_votes_user_id", ondelete="SET NULL"), nullable=True, index=True)
 
     # --- Зв'язки (Relationships) ---
-    poll: Mapped["PollModel"] = relationship(back_populates="votes")
-    option: Mapped["PollOptionModel"] = relationship(back_populates="votes")
+    poll: Mapped["PollModel"] = relationship(back_populates="votes", lazy="selectin")
+    option: Mapped["PollOptionModel"] = relationship(back_populates="votes", lazy="selectin")
     # TODO: Узгодити back_populates="poll_votes_made" з UserModel
-    user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[user_id], back_populates="poll_votes_made")
+    user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[user_id], back_populates="poll_votes_made", lazy="selectin")
 
     # Обмеження унікальності:
     # 1. Якщо голосування не анонімне і дозволено лише один вибір: (poll_id, user_id) має бути унікальним.

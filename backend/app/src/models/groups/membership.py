@@ -5,7 +5,7 @@
 Ця модель представляє зв'язок "багато-до-багатьох" між користувачами (`UserModel`)
 та групами (`GroupModel`), а також зберігає роль користувача в конкретній групі.
 """
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import Column, ForeignKey, DateTime, UniqueConstraint, Text # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
@@ -14,6 +14,13 @@ import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel для id, created_at, updated_at
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.groups.group import GroupModel
+    from backend.app.src.models.dictionaries.user_role import UserRoleModel
+    from backend.app.src.models.dictionaries.status import StatusModel
+
 
 class GroupMembershipModel(BaseModel):
     """
@@ -56,11 +63,11 @@ class GroupMembershipModel(BaseModel):
     notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # --- Зв'язки (Relationships) ---
-    user: Mapped["UserModel"] = relationship(back_populates="group_memberships")
-    group: Mapped["GroupModel"] = relationship(back_populates="memberships")
+    user: Mapped["UserModel"] = relationship(back_populates="group_memberships", lazy="selectin")
+    group: Mapped["GroupModel"] = relationship(back_populates="memberships", lazy="selectin")
 
-    role: Mapped["UserRoleModel"] = relationship(foreign_keys=[user_role_id], back_populates="group_memberships_with_this_role")
-    status_in_group: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[status_in_group_id], back_populates="group_memberships_with_this_status")
+    role: Mapped["UserRoleModel"] = relationship(foreign_keys=[user_role_id], back_populates="group_memberships_with_this_role", lazy="selectin")
+    status_in_group: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[status_in_group_id], back_populates="group_memberships_with_this_status", lazy="selectin")
 
     # Обмеження унікальності: один користувач може мати лише одну роль в одній групі.
     __table_args__ = (

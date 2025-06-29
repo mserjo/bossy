@@ -6,7 +6,7 @@
 конкретного бейджа (`BadgeModel`). Це зв'язок "багато-до-багатьох"
 між користувачами та бейджами, що фіксує, хто який бейдж отримав і коли.
 """
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TYPE_CHECKING
 
 from sqlalchemy import Column, ForeignKey, DateTime, UniqueConstraint, Text # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
@@ -15,6 +15,11 @@ import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.gamification.badge import BadgeModel
+
 
 class AchievementModel(BaseModel):
     """
@@ -56,10 +61,10 @@ class AchievementModel(BaseModel):
 
     # --- Зв'язки (Relationships) ---
     # TODO: Узгодити back_populates="achievements_earned" з UserModel
-    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="achievements_earned")
-    badge: Mapped["BadgeModel"] = relationship(back_populates="achievements")
+    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="achievements_earned", lazy="selectin")
+    badge: Mapped["BadgeModel"] = relationship(back_populates="achievements", lazy="selectin")
     # TODO: Узгодити back_populates="awarded_achievements_by_admin" з UserModel
-    awarder: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[awarded_by_user_id], back_populates="awarded_achievements_by_admin")
+    awarder: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[awarded_by_user_id], back_populates="awarded_achievements_by_admin", lazy="selectin")
 
 
     # Обмеження унікальності:

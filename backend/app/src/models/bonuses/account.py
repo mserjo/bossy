@@ -5,16 +5,24 @@
 На рахунках накопичуються зароблені бонуси (або борг) в межах конкретної групи.
 Кожен користувач має окремий рахунок для кожної групи, до якої він належить.
 """
-from typing import List
+from typing import List, TYPE_CHECKING
 
 from sqlalchemy import Column, ForeignKey, Numeric, UniqueConstraint, String  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship, Mapped  # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore # Додано mapped_column
 import uuid # Для роботи з UUID
 
 # Використовуємо BaseModel, оскільки рахунок - це, по суті, запис з балансом,
 # а не сутність з ім'ям/описом.
 from backend.app.src.models.base import BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.groups.group import GroupModel
+    from backend.app.src.models.bonuses.transaction import TransactionModel
+    from backend.app.src.models.dictionaries.bonus_type import BonusTypeModel
+    from backend.app.src.models.bonuses.bonus_adjustment import BonusAdjustmentModel
+
 
 class AccountModel(BaseModel):
     """
@@ -62,10 +70,10 @@ class AccountModel(BaseModel):
     # Або `bonus_type_id = Column(UUID, ForeignKey("bonus_types.id"))`
 
     # --- Зв'язки (Relationships) ---
-    user: Mapped["UserModel"] = relationship(back_populates="accounts")
-    group: Mapped["GroupModel"] = relationship(back_populates="accounts_in_group")
+    user: Mapped["UserModel"] = relationship(back_populates="accounts", lazy="selectin")
+    group: Mapped["GroupModel"] = relationship(back_populates="accounts_in_group", lazy="selectin")
 
-    transactions: Mapped[List["TransactionModel"]] = relationship(back_populates="account", cascade="all, delete-orphan")
+    transactions: Mapped[List["TransactionModel"]] = relationship(back_populates="account", cascade="all, delete-orphan", lazy="select")
 
     # Зв'язок з BonusTypeModel через bonus_type_code
     # TODO: Узгодити back_populates="accounts_with_this_type" з BonusTypeModel
@@ -73,7 +81,8 @@ class AccountModel(BaseModel):
         "BonusTypeModel",
         primaryjoin="foreign(AccountModel.bonus_type_code) == remote(BonusTypeModel.code)",
         uselist=False, # Один тип бонусу на рахунок
-        back_populates="accounts_with_this_type"
+        back_populates="accounts_with_this_type",
+        lazy="selectin"
     )
 
     # Обмеження унікальності: один користувач може мати лише один рахунок певного типу валюти в одній групі.
@@ -88,7 +97,7 @@ class AccountModel(BaseModel):
     )
 
     # Зворотний зв'язок для ручних коригувань цього рахунку
-    adjustments: Mapped[List["BonusAdjustmentModel"]] = relationship(back_populates="account", cascade="all, delete-orphan")
+    adjustments: Mapped[List["BonusAdjustmentModel"]] = relationship(back_populates="account", cascade="all, delete-orphan", lazy="select")
 
     def __repr__(self) -> str:
         """

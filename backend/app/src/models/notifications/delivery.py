@@ -5,14 +5,18 @@
 статусу доставки сповіщень (`NotificationModel`) через різні канали
 (наприклад, email, SMS, push-сповіщення, месенджери).
 """
-
+from typing import TYPE_CHECKING
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Boolean, Integer  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
-from sqlalchemy.orm import relationship, Mapped  # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column # type: ignore # Додано mapped_column
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.notifications.notification import NotificationModel
+
 
 class NotificationDeliveryModel(BaseModel):
     """
@@ -80,7 +84,7 @@ class NotificationDeliveryModel(BaseModel):
 
 
     # --- Зв'язки (Relationships) ---
-    notification: Mapped["NotificationModel"] = relationship(back_populates="deliveries")
+    notification: Mapped["NotificationModel"] = relationship(back_populates="deliveries", lazy="selectin")
 
 
     def __repr__(self) -> str:

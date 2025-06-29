@@ -18,10 +18,18 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema # Identifi
 # from backend.app.src.schemas.dictionaries.user_role import UserRoleSchema
 # from backend.app.src.schemas.dictionaries.status import StatusSchema
 
-GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema')
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-UserRoleSchema = ForwardRef('backend.app.src.schemas.dictionaries.user_role.UserRoleSchema')
-StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.groups.group import GroupSimpleSchema
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.dictionaries.user_role import UserRoleSchema
+    from backend.app.src.schemas.dictionaries.status import StatusSchema
+
+# GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema') # Перенесено
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# UserRoleSchema = ForwardRef('backend.app.src.schemas.dictionaries.user_role.UserRoleSchema') # Перенесено
+# StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema') # Перенесено
 
 # --- Схема для відображення інформації про запрошення (для читання) ---
 class GroupInvitationSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -43,11 +51,11 @@ class GroupInvitationSchema(AuditDatesSchema): # Успадковує id, create
     status_id: Optional[uuid.UUID] = Field(None, description="ID статусу запрошення (надіслано, прийнято, прострочено)")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    group: Optional[GroupSimpleSchema] = Field(None, description="Інформація про групу, до якої запрошують")
-    creator: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача, який створив запрошення")
-    invited_user_info: Optional[UserPublicSchema] = Field(None, alias="invited_user", description="Інформація про запрошеного користувача (якщо user_id_invited вказано)")
-    role_to_assign: Optional[UserRoleSchema] = Field(None, description="Інформація про роль, яка буде призначена")
-    status: Optional[StatusSchema] = Field(None, description="Інформація про статус запрошення")
+    group: Optional['GroupSimpleSchema'] = Field(None, description="Інформація про групу, до якої запрошують") # Рядкове посилання
+    creator: Optional['UserPublicSchema'] = Field(None, description="Інформація про користувача, який створив запрошення") # Рядкове посилання
+    invited_user_info: Optional['UserPublicSchema'] = Field(None, alias="invited_user", description="Інформація про запрошеного користувача (якщо user_id_invited вказано)") # Рядкове посилання
+    role_to_assign: Optional['UserRoleSchema'] = Field(None, description="Інформація про роль, яка буде призначена") # Рядкове посилання
+    status: Optional['StatusSchema'] = Field(None, description="Інформація про статус запрошення") # Рядкове посилання
 
 
 # --- Схема для створення нового запрошення до групи ---

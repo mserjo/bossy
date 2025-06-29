@@ -16,7 +16,12 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # from backend.app.src.schemas.notifications.notification import NotificationSchema
 from backend.app.src.core.dicts import NotificationChannelEnum, NotificationDeliveryStatusEnum # Імпорт Enum
 
-NotificationSchema = ForwardRef('backend.app.src.schemas.notifications.notification.NotificationSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.notifications.notification import NotificationSchema
+
+# NotificationSchema = ForwardRef('backend.app.src.schemas.notifications.notification.NotificationSchema') # Перенесено
 
 # --- Схема для відображення інформації про спробу доставки сповіщення (для читання) ---
 class NotificationDeliverySchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -40,7 +45,7 @@ class NotificationDeliverySchema(AuditDatesSchema): # Успадковує id, c
     next_retry_at: Optional[datetime] = Field(None, description="Час наступної спроби (якщо планується)")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    notification: Optional[NotificationSchema] = Field(None, description="Сповіщення, що доставляється")
+    notification: Optional['NotificationSchema'] = Field(None, description="Сповіщення, що доставляється") # Рядкове посилання
 
 
 # --- Схема для створення запису про спробу доставки (зазвичай внутрішнє використання) ---

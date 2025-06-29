@@ -17,9 +17,16 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # from backend.app.src.schemas.auth.user import UserPublicSchema
 # from backend.app.src.schemas.dictionaries.status import StatusSchema (якщо є модерація відгуків)
 
-TaskSimpleSchema = ForwardRef('backend.app.src.schemas.tasks.task.TaskSimpleSchema')
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-# StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.tasks.task import TaskSimpleSchema
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    # from backend.app.src.schemas.dictionaries.status import StatusSchema
+
+# TaskSimpleSchema = ForwardRef('backend.app.src.schemas.tasks.task.TaskSimpleSchema') # Перенесено
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema') # Перенесено
 
 # --- Схема для відображення інформації про відгук на завдання (для читання) ---
 class TaskReviewSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -35,9 +42,9 @@ class TaskReviewSchema(AuditDatesSchema): # Успадковує id, created_at,
     # status_id: Optional[uuid.UUID] = Field(None, description="ID статусу відгуку (якщо є модерація)")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    task: Optional[TaskSimpleSchema] = Field(None, description="Завдання, до якого залишено відгук")
-    user: Optional[UserPublicSchema] = Field(None, description="Користувач, який залишив відгук")
-    # status: Optional[StatusSchema] = None # Якщо є модерація відгуків
+    task: Optional['TaskSimpleSchema'] = Field(None, description="Завдання, до якого залишено відгук") # Рядкове посилання
+    user: Optional['UserPublicSchema'] = Field(None, description="Користувач, який залишив відгук") # Рядкове посилання
+    # status: Optional['StatusSchema'] = None # Якщо є модерація відгуків
 
 
 # --- Схема для створення нового відгуку на завдання ---

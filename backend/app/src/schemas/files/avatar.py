@@ -8,17 +8,15 @@
 """
 
 from pydantic import Field, HttpUrl
-from typing import Optional, List, ForwardRef
+from typing import Optional, List, ForwardRef, TYPE_CHECKING # Додано TYPE_CHECKING
 import uuid
 from datetime import datetime
 
 from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
-# Потрібно буде імпортувати схеми для зв'язків:
-# from backend.app.src.schemas.auth.user import UserPublicSchema (для user)
-# from backend.app.src.schemas.files.file import FileSchema (для file)
 
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-FileSchema = ForwardRef('backend.app.src.schemas.files.file.FileSchema')
+if TYPE_CHECKING:
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.files.file import FileSchema
 
 # --- Схема для відображення інформації про аватар (для читання) ---
 class AvatarSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -31,8 +29,8 @@ class AvatarSchema(AuditDatesSchema): # Успадковує id, created_at, upd
     is_current: bool = Field(..., description="Чи є цей аватар поточним (активним) для користувача")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    user: Optional[UserPublicSchema] = Field(None, description="Користувач, якому належить аватар") # Може бути корисним для адмінки
-    file: Optional[FileSchema] = Field(None, description="Інформація про файл аватара (включаючи URL)")
+    user: Optional['UserPublicSchema'] = Field(None, description="Користувач, якому належить аватар") # Може бути корисним для адмінки
+    file: Optional['FileSchema'] = Field(None, description="Інформація про файл аватара (включаючи URL)")
 
 
 # --- Схема для створення/встановлення аватара (зазвичай внутрішнє використання) ---
@@ -89,6 +87,6 @@ class AvatarUpdateSchema(BaseSchema):
 # `AvatarUpdateSchema` дозволяє змінити `is_current`, що може бути використано сервісом.
 # Це виглядає коректно.
 
-AvatarSchema.model_rebuild()
-AvatarCreateSchema.model_rebuild()
-AvatarUpdateSchema.model_rebuild()
+# AvatarSchema.model_rebuild() # Викликається глобально в schemas/__init__.py
+# AvatarCreateSchema.model_rebuild() # Зазвичай не має ForwardRef
+# AvatarUpdateSchema.model_rebuild() # Зазвичай не має ForwardRef

@@ -15,13 +15,18 @@ from backend.app.src.schemas.base import BaseMainSchema, BaseSchema, AuditDatesS
 # Потрібно буде імпортувати схеми для зв'язків, коли вони будуть готові, наприклад:
 # from backend.app.src.schemas.groups.membership import GroupMembershipSchema
 # from backend.app.src.schemas.bonuses.account import AccountSchema
-from backend.app.src.schemas.files.avatar import AvatarSchema
+# from backend.app.src.schemas.files.avatar import AvatarSchema # Перенесено в TYPE_CHECKING
 from backend.app.src.schemas.dictionaries.status import StatusSchema
 from backend.app.src.schemas.groups.membership import GroupMembershipSchema
 from backend.app.src.schemas.bonuses.account import AccountSchema
 from backend.app.src.schemas.tasks.task import TaskSimpleSchema # Для created_tasks
 from backend.app.src.schemas.gamification.achievement import AchievementSchema # Для achievements_earned
 from backend.app.src.schemas.gamification.user_level import UserLevelSchema # Для achieved_user_levels
+
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.files.avatar import AvatarSchema
 
 
 # --- Схема для відображення повної інформації про користувача (для адмінів або власного профілю) ---
@@ -60,7 +65,7 @@ class UserSchema(BaseMainSchema):
     # Потрібно вибрати поточний аватар. Це краще робити на сервісному рівні
     # і додавати поле `current_avatar: Optional[AvatarSchema]` або `avatar_url: Optional[HttpUrl]`.
     # Поки що додаю список всіх аватарів (історія), або можна зробити поле для поточного.
-    current_avatar: Optional[AvatarSchema] = Field(None, description="Поточний аватар користувача")
+    current_avatar: Optional['AvatarSchema'] = Field(None, description="Поточний аватар користувача") # Використовуємо рядкове посилання
     # avatars_history: List[AvatarSchema] = Field(default_factory=list, description="Історія аватарів користувача")
 
 

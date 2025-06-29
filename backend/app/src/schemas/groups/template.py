@@ -16,8 +16,14 @@ from backend.app.src.schemas.base import BaseMainSchema, BaseSchema
 # from backend.app.src.schemas.auth.user import UserPublicSchema
 # from backend.app.src.schemas.dictionaries.status import StatusSchema
 
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.dictionaries.status import StatusSchema
+
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema') # Перенесено
 
 # --- Схема для відображення шаблону групи (для читання) ---
 class GroupTemplateSchema(BaseMainSchema):
@@ -31,8 +37,8 @@ class GroupTemplateSchema(BaseMainSchema):
     created_by_user_id: Optional[uuid.UUID] = Field(None, description="ID супер-адміністратора, який створив шаблон")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    creator: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача, який створив шаблон")
-    state: Optional[StatusSchema] = Field(None, description="Інформація про статус шаблону (успадковано з BaseMainSchema, де state_id)")
+    creator: Optional['UserPublicSchema'] = Field(None, description="Інформація про користувача, який створив шаблон") # Рядкове посилання
+    state: Optional['StatusSchema'] = Field(None, description="Інформація про статус шаблону (успадковано з BaseMainSchema, де state_id)") # Рядкове посилання
     # `state` тут буде псевдонімом для `status`, якщо `BaseMainSchema` має `state_id`
     # і ми хочемо розгорнутий об'єкт статусу.
     # Або ж, якщо `BaseMainSchema` вже має `state: Optional[StatusSchema] = None`,

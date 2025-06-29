@@ -18,9 +18,16 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # from backend.app.src.schemas.groups.group import GroupSimpleSchema
 # from backend.app.src.schemas.gamification.level import LevelSchema
 
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema')
-LevelSchema = ForwardRef('backend.app.src.schemas.gamification.level.LevelSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.groups.group import GroupSimpleSchema
+    from backend.app.src.schemas.gamification.level import LevelSchema
+
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema') # Перенесено
+# LevelSchema = ForwardRef('backend.app.src.schemas.gamification.level.LevelSchema') # Перенесено
 
 # --- Схема для відображення інформації про досягнутий рівень користувачем (для читання) ---
 class UserLevelSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -39,9 +46,9 @@ class UserLevelSchema(AuditDatesSchema): # Успадковує id, created_at, 
     # Поточна модель `UserLevelModel` (після обговорень) МАЄ `is_current`.
 
     # --- Розгорнуті зв'язки (приклад) ---
-    user: Optional[UserPublicSchema] = Field(None, description="Користувач, який досяг рівня")
-    group: Optional[GroupSimpleSchema] = Field(None, description="Група, в якій досягнуто рівень")
-    level: Optional[LevelSchema] = Field(None, description="Досягнутий рівень")
+    user: Optional['UserPublicSchema'] = Field(None, description="Користувач, який досяг рівня") # Рядкове посилання
+    group: Optional['GroupSimpleSchema'] = Field(None, description="Група, в якій досягнуто рівень") # Рядкове посилання
+    level: Optional['LevelSchema'] = Field(None, description="Досягнутий рівень") # Рядкове посилання
 
 
 # --- Схема для створення запису про досягнення рівня (зазвичай внутрішнє використання) ---

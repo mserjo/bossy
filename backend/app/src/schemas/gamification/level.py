@@ -19,10 +19,18 @@ from backend.app.src.schemas.base import BaseMainSchema, BaseSchema
 # from backend.app.src.schemas.files.file import FileSchema (або URL іконки)
 # from backend.app.src.schemas.gamification.user_level import UserLevelSchema (для списку користувачів на рівні)
 
-# GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema')
-# StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')
-# FileSchema = ForwardRef('backend.app.src.schemas.files.file.FileSchema')
-UserLevelSchema = ForwardRef('backend.app.src.schemas.gamification.user_level.UserLevelSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.groups.group import GroupSimpleSchema
+    from backend.app.src.schemas.dictionaries.status import StatusSchema
+    from backend.app.src.schemas.files.file import FileSchema
+    from backend.app.src.schemas.gamification.user_level import UserLevelSchema
+
+# GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema') # Перенесено
+# StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema') # Перенесено
+# FileSchema = ForwardRef('backend.app.src.schemas.files.file.FileSchema') # Перенесено
+# UserLevelSchema = ForwardRef('backend.app.src.schemas.gamification.user_level.UserLevelSchema') # Перенесено
 
 
 # --- Схема для відображення інформації про рівень (для читання) ---
@@ -42,12 +50,12 @@ class LevelSchema(BaseMainSchema):
     # icon_url: Optional[HttpUrl] = Field(None, description="URL іконки рівня") # Може генеруватися
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # group: Optional[GroupSimpleSchema] = Field(None, description="Група, якій належить рівень") # `group_id` вже є
-    state: Optional[ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')] = Field(None, description="Статус налаштування рівня")
-    icon: Optional[ForwardRef('backend.app.src.schemas.files.file.FileSchema')] = Field(None, description="Файл іконки рівня") # Або `icon_url`
+    # group: Optional['GroupSimpleSchema'] = Field(None, description="Група, якій належить рівень") # `group_id` вже є
+    state: Optional['StatusSchema'] = Field(None, description="Статус налаштування рівня") # Рядкове посилання
+    icon: Optional['FileSchema'] = Field(None, description="Файл іконки рівня") # Або `icon_url`, Рядкове посилання
 
     # Список користувачів, які досягли цього рівня (зазвичай не включається сюди)
-    user_levels: List[UserLevelSchema] = Field(default_factory=list, description="Записи про досягнення цього рівня користувачами")
+    user_levels: List['UserLevelSchema'] = Field(default_factory=list, description="Записи про досягнення цього рівня користувачами") # Рядкове посилання
 
 
 # --- Схема для створення нового налаштування рівня ---

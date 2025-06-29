@@ -18,10 +18,18 @@ from backend.app.src.schemas.base import BaseMainSchema, BaseSchema
 # from backend.app.src.schemas.files.file import FileSchema (або URL іконки)
 # from backend.app.src.schemas.gamification.achievement import AchievementSchema (для списку отриманих)
 
-# GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema')
-# StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')
-# FileSchema = ForwardRef('backend.app.src.schemas.files.file.FileSchema')
-AchievementSchema = ForwardRef('backend.app.src.schemas.gamification.achievement.AchievementSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.groups.group import GroupSimpleSchema
+    from backend.app.src.schemas.dictionaries.status import StatusSchema
+    from backend.app.src.schemas.files.file import FileSchema
+    from backend.app.src.schemas.gamification.achievement import AchievementSchema
+
+# GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema') # Перенесено
+# StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema') # Перенесено
+# FileSchema = ForwardRef('backend.app.src.schemas.files.file.FileSchema') # Перенесено
+# AchievementSchema = ForwardRef('backend.app.src.schemas.gamification.achievement.AchievementSchema') # Перенесено
 
 # --- Схема для відображення інформації про бейдж (для читання) ---
 class BadgeSchema(BaseMainSchema):
@@ -41,12 +49,12 @@ class BadgeSchema(BaseMainSchema):
     is_repeatable: bool = Field(..., description="Чи можна отримувати цей бейдж повторно")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    # group: Optional[GroupSimpleSchema] = Field(None, description="Група, якій належить бейдж") # `group_id` вже є
-    state: Optional[ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')] = Field(None, description="Статус налаштування бейджа")
-    icon: Optional[ForwardRef('backend.app.src.schemas.files.file.FileSchema')] = Field(None, description="Файл іконки бейджа") # Або `icon_url`
+    # group: Optional['GroupSimpleSchema'] = Field(None, description="Група, якій належить бейдж") # `group_id` вже є
+    state: Optional['StatusSchema'] = Field(None, description="Статус налаштування бейджа") # Рядкове посилання
+    icon: Optional['FileSchema'] = Field(None, description="Файл іконки бейджа") # Або `icon_url`, Рядкове посилання
 
     # Список досягнень (хто і коли отримав цей бейдж)
-    achievements: List[AchievementSchema] = Field(default_factory=list, description="Записи про отримання цього бейджа користувачами")
+    achievements: List['AchievementSchema'] = Field(default_factory=list, description="Записи про отримання цього бейджа користувачами") # Рядкове посилання
 
 
 # --- Схема для створення нового налаштування бейджа ---

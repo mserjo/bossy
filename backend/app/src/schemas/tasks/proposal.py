@@ -18,10 +18,18 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # from backend.app.src.schemas.dictionaries.status import StatusSchema
 # from backend.app.src.schemas.tasks.task import TaskSimpleSchema
 
-GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema')
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')
-TaskSimpleSchema = ForwardRef('backend.app.src.schemas.tasks.task.TaskSimpleSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.groups.group import GroupSimpleSchema
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.dictionaries.status import StatusSchema
+    from backend.app.src.schemas.tasks.task import TaskSimpleSchema
+
+# GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema') # Перенесено
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema') # Перенесено
+# TaskSimpleSchema = ForwardRef('backend.app.src.schemas.tasks.task.TaskSimpleSchema') # Перенесено
 
 # --- Схема для відображення інформації про пропозицію завдання (для читання) ---
 class TaskProposalSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -44,11 +52,11 @@ class TaskProposalSchema(AuditDatesSchema): # Успадковує id, created_a
     bonus_for_proposal_awarded: bool = Field(..., description="Чи були нараховані бонуси за вдалу пропозицію")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    group: Optional[GroupSimpleSchema] = Field(None, description="Група, для якої пропозиція")
-    proposer: Optional[UserPublicSchema] = Field(None, description="Користувач, що запропонував")
-    status: Optional[StatusSchema] = Field(None, description="Статус пропозиції")
-    reviewer: Optional[UserPublicSchema] = Field(None, description="Адміністратор, що розглянув пропозицію")
-    created_task: Optional[TaskSimpleSchema] = Field(None, description="Завдання, створене на основі пропозиції")
+    group: Optional['GroupSimpleSchema'] = Field(None, description="Група, для якої пропозиція") # Рядкове посилання
+    proposer: Optional['UserPublicSchema'] = Field(None, description="Користувач, що запропонував") # Рядкове посилання
+    status: Optional['StatusSchema'] = Field(None, description="Статус пропозиції") # Рядкове посилання
+    reviewer: Optional['UserPublicSchema'] = Field(None, description="Адміністратор, що розглянув пропозицію") # Рядкове посилання
+    created_task: Optional['TaskSimpleSchema'] = Field(None, description="Завдання, створене на основі пропозиції") # Рядкове посилання
 
 
 # --- Схема для створення нової пропозиції завдання ---

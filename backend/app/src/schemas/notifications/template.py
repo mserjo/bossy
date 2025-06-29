@@ -17,8 +17,14 @@ from backend.app.src.schemas.base import BaseMainSchema, BaseSchema
 # from backend.app.src.schemas.dictionaries.status import StatusSchema (state_id вже є)
 from backend.app.src.core.dicts import NotificationChannelEnum, NotificationTypeEnum # Імпорт Enum
 
-GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema')
-StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.groups.group import GroupSimpleSchema
+    from backend.app.src.schemas.dictionaries.status import StatusSchema
+
+# GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema') # Перенесено
+# StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema') # Перенесено
 
 # --- Схема для відображення інформації про шаблон сповіщення (для читання) ---
 class NotificationTemplateSchema(BaseMainSchema):
@@ -35,8 +41,8 @@ class NotificationTemplateSchema(BaseMainSchema):
     template_content: str = Field(..., description="Вміст шаблону (може містити плейсхолдери)")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    group: Optional[GroupSimpleSchema] = Field(None, description="Група, до якої належить шаблон (якщо є)")
-    state: Optional[StatusSchema] = Field(None, description="Статус шаблону")
+    group: Optional['GroupSimpleSchema'] = Field(None, description="Група, до якої належить шаблон (якщо є)") # Рядкове посилання
+    state: Optional['StatusSchema'] = Field(None, description="Статус шаблону") # Рядкове посилання
 
 
 # --- Схема для створення нового шаблону сповіщення ---

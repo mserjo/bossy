@@ -17,8 +17,14 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # from backend.app.src.schemas.bonuses.account import AccountSchema # Або AccountSimpleSchema
 # from backend.app.src.schemas.auth.user import UserPublicSchema (для related_user)
 
-AccountSchema = ForwardRef('backend.app.src.schemas.bonuses.account.AccountSchema')
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.bonuses.account import AccountSchema
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+
+# AccountSchema = ForwardRef('backend.app.src.schemas.bonuses.account.AccountSchema') # Перенесено
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
 
 # --- Схема для відображення інформації про транзакцію (для читання) ---
 class TransactionSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -39,8 +45,8 @@ class TransactionSchema(AuditDatesSchema): # Успадковує id, created_at
     balance_after_transaction: Optional[Decimal] = Field(None, description="Баланс рахунку після цієї транзакції")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    account: Optional[AccountSchema] = Field(None, description="Рахунок, до якого відноситься транзакція")
-    related_user: Optional[UserPublicSchema] = Field(None, description="Пов'язаний користувач (наприклад, для 'подяки')")
+    account: Optional['AccountSchema'] = Field(None, description="Рахунок, до якого відноситься транзакція") # Рядкове посилання
+    related_user: Optional['UserPublicSchema'] = Field(None, description="Пов'язаний користувач (наприклад, для 'подяки')") # Рядкове посилання
 
     # Валюта транзакції визначається з AccountModel.bonus_type_code
     # для account_id, до якого належить транзакція.

@@ -31,6 +31,13 @@ TaskSchema = ForwardRef('backend.app.src.schemas.tasks.task.TaskSchema') # Пр�
 PollSchema = ForwardRef('backend.app.src.schemas.groups.poll.PollSchema') # Приклад
 # ... і так далі для інших зв'язків
 
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    # from backend.app.src.schemas.auth.user import UserPublicSchema # Якщо потрібно для creator або leader в GroupSchema
+    from backend.app.src.schemas.dictionaries.status import StatusSchema
+    # Додайте інші імпорти, якщо вони використовуються в полях нижче
+
 # --- Схема для відображення повної інформації про групу (для учасників або адмінів) ---
 class GroupSchema(BaseMainSchema):
     """
@@ -47,12 +54,12 @@ class GroupSchema(BaseMainSchema):
     # parent_group: Optional['GroupSchema'] = None # Рекурсивний зв'язок
     # child_groups: List['GroupSchema'] = []
 
-    group_type: Optional[GroupTypeSchema] = None
-    # settings: Optional[GroupSettingsSchema] = None # Налаштування групи
-    # memberships: List[GroupMembershipSchema] = [] # Список учасників та їх ролей
+    group_type: Optional['GroupTypeSchema'] = None # Рядкове посилання
+    settings: Optional['GroupSettingsSchema'] = None # Налаштування групи, Рядкове посилання
+    memberships: List['GroupMembershipSchema'] = Field(default_factory=list) # Список учасників та їх ролей, Рядкове посилання
 
-    # tasks: List[TaskSchema] = [] # Завдання в групі (може бути пагінованим окремо)
-    # polls: List[PollSchema] = [] # Опитування в групі (може бути пагінованим окремо)
+    tasks: List['TaskSchema'] = Field(default_factory=list) # Завдання в групі, Рядкове посилання
+    polls: List['PollSchema'] = Field(default_factory=list) # Опитування в групі, Рядкове посилання
 
     # `group_id` з `BaseMainSchema` для `GroupModel` завжди буде `None`.
 

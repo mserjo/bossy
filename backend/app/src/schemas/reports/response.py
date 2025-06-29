@@ -7,7 +7,7 @@
 """
 
 from pydantic import Field
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any, Union, TYPE_CHECKING
 import uuid
 from datetime import datetime, date
 from decimal import Decimal
@@ -16,6 +16,9 @@ from backend.app.src.schemas.base import BaseSchema
 # Можуть знадобитися інші схеми для вкладених даних, наприклад:
 # from backend.app.src.schemas.auth.user import UserPublicSchema
 # from backend.app.src.schemas.tasks.task import TaskSimpleSchema
+
+if TYPE_CHECKING:
+    pass # Тут поки що немає міжмодульних залежностей для TYPE_CHECKING, але шаблон залишаю
 
 # --- Базова схема для елемента даних у звіті (якщо звіти табличні) ---
 class ReportDataItemSchema(BaseSchema):

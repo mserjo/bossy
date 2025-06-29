@@ -15,7 +15,12 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # Потрібно буде імпортувати схему TaskSimpleSchema для зв'язків
 # from backend.app.src.schemas.tasks.task import TaskSimpleSchema
 
-TaskSimpleSchema = ForwardRef('backend.app.src.schemas.tasks.task.TaskSimpleSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.tasks.task import TaskSimpleSchema
+
+# TaskSimpleSchema = ForwardRef('backend.app.src.schemas.tasks.task.TaskSimpleSchema') # Перенесено
 
 # --- Схема для відображення залежності між завданнями (для читання) ---
 class TaskDependencySchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -27,8 +32,8 @@ class TaskDependencySchema(AuditDatesSchema): # Успадковує id, created
     dependency_type: Optional[str] = Field(default="finish-to-start", description="Тип залежності (наприклад, 'finish-to-start')")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    dependent_task: Optional[TaskSimpleSchema] = Field(None, description="Залежне завдання")
-    prerequisite_task: Optional[TaskSimpleSchema] = Field(None, description="Завдання-передумова")
+    dependent_task: Optional['TaskSimpleSchema'] = Field(None, description="Залежне завдання") # Рядкове посилання
+    prerequisite_task: Optional['TaskSimpleSchema'] = Field(None, description="Завдання-передумова") # Рядкове посилання
 
 # --- Схема для створення нової залежності між завданнями ---
 class TaskDependencyCreateSchema(BaseSchema):

@@ -18,10 +18,18 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # from backend.app.src.schemas.teams.team import TeamSimpleSchema # Або повна TeamSchema
 # from backend.app.src.schemas.dictionaries.status import StatusSchema
 
-TaskSimpleSchema = ForwardRef('backend.app.src.schemas.tasks.task.TaskSimpleSchema') # Використовуємо Simple для уникнення рекурсії
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-TeamSimpleSchema = ForwardRef('backend.app.src.schemas.teams.team.TeamSimpleSchema') # Аналогічно
-StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.tasks.task import TaskSimpleSchema
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.teams.team import TeamSimpleSchema
+    from backend.app.src.schemas.dictionaries.status import StatusSchema
+
+# TaskSimpleSchema = ForwardRef('backend.app.src.schemas.tasks.task.TaskSimpleSchema') # Перенесено
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# TeamSimpleSchema = ForwardRef('backend.app.src.schemas.teams.team.TeamSimpleSchema') # Перенесено
+# StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema') # Перенесено
 
 # --- Схема для відображення інформації про призначення завдання (для читання) ---
 class TaskAssignmentSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -38,11 +46,11 @@ class TaskAssignmentSchema(AuditDatesSchema): # Успадковує id, created
     notes: Optional[str] = Field(None, description="Нотатки щодо цього призначення")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    task: Optional[TaskSimpleSchema] = Field(None, description="Інформація про завдання")
-    user: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача-виконавця")
-    team: Optional[TeamSimpleSchema] = Field(None, description="Інформація про команду-виконавця")
-    assigner: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача, який зробив призначення")
-    status: Optional[StatusSchema] = Field(None, description="Розгорнутий статус призначення")
+    task: Optional['TaskSimpleSchema'] = Field(None, description="Інформація про завдання") # Рядкове посилання
+    user: Optional['UserPublicSchema'] = Field(None, description="Інформація про користувача-виконавця") # Рядкове посилання
+    team: Optional['TeamSimpleSchema'] = Field(None, description="Інформація про команду-виконавця") # Рядкове посилання
+    assigner: Optional['UserPublicSchema'] = Field(None, description="Інформація про користувача, який зробив призначення") # Рядкове посилання
+    status: Optional['StatusSchema'] = Field(None, description="Розгорнутий статус призначення") # Рядкове посилання
 
 
 # --- Схема для створення нового призначення завдання ---

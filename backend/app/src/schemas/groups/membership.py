@@ -18,10 +18,18 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema # Identifi
 # from backend.app.src.schemas.dictionaries.user_role import UserRoleSchema
 # from backend.app.src.schemas.dictionaries.status import StatusSchema
 
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema')
-UserRoleSchema = ForwardRef('backend.app.src.schemas.dictionaries.user_role.UserRoleSchema')
-StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.groups.group import GroupSimpleSchema
+    from backend.app.src.schemas.dictionaries.user_role import UserRoleSchema
+    from backend.app.src.schemas.dictionaries.status import StatusSchema
+
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema') # Перенесено
+# UserRoleSchema = ForwardRef('backend.app.src.schemas.dictionaries.user_role.UserRoleSchema') # Перенесено
+# StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema') # Перенесено
 
 
 # --- Схема для відображення інформації про членство в групі (для читання) ---
@@ -38,10 +46,10 @@ class GroupMembershipSchema(AuditDatesSchema): # Успадковує id, create
     notes: Optional[str] = Field(None, description="Нотатки щодо членства")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    user: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача")
-    # group: Optional[GroupSimpleSchema] = None # Зазвичай не потрібно, бо ми вже в контексті групи або користувача
-    role: Optional[UserRoleSchema] = Field(None, description="Інформація про роль користувача в групі")
-    status_in_group: Optional[StatusSchema] = Field(None, description="Інформація про статус користувача в групі")
+    user: Optional['UserPublicSchema'] = Field(None, description="Інформація про користувача") # Рядкове посилання
+    # group: Optional['GroupSimpleSchema'] = None # Зазвичай не потрібно, бо ми вже в контексті групи або користувача
+    role: Optional['UserRoleSchema'] = Field(None, description="Інформація про роль користувача в групі") # Рядкове посилання
+    status_in_group: Optional['StatusSchema'] = Field(None, description="Інформація про статус користувача в групі") # Рядкове посилання
 
 # --- Схема для створення нового запису про членство (наприклад, адміном) ---
 class GroupMembershipCreateSchema(BaseSchema):

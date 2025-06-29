@@ -17,9 +17,16 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # from backend.app.src.schemas.groups.group import GroupSimpleSchema (для group)
 # from backend.app.src.schemas.notifications.delivery import NotificationDeliverySchema
 
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema')
-NotificationDeliverySchema = ForwardRef('backend.app.src.schemas.notifications.delivery.NotificationDeliverySchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.groups.group import GroupSimpleSchema
+    from backend.app.src.schemas.notifications.delivery import NotificationDeliverySchema
+
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema') # Перенесено
+# NotificationDeliverySchema = ForwardRef('backend.app.src.schemas.notifications.delivery.NotificationDeliverySchema') # Перенесено
 
 # --- Схема для відображення інформації про сповіщення (для читання) ---
 class NotificationSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -42,11 +49,11 @@ class NotificationSchema(AuditDatesSchema): # Успадковує id, created_a
     additional_data: Optional[Dict[str, Any]] = Field(None, description="Додаткові дані для сповіщення (JSON)") # Перейменовано з metadata
 
     # --- Розгорнуті зв'язки (приклад) ---
-    recipient: Optional[UserPublicSchema] = Field(None, description="Отримувач сповіщення")
-    group: Optional[GroupSimpleSchema] = Field(None, description="Група, пов'язана зі сповіщенням")
+    recipient: Optional['UserPublicSchema'] = Field(None, description="Отримувач сповіщення") # Рядкове посилання
+    group: Optional['GroupSimpleSchema'] = Field(None, description="Група, пов'язана зі сповіщенням") # Рядкове посилання
 
     # Список спроб доставки
-    deliveries: List[NotificationDeliverySchema] = Field(default_factory=list, description="Статуси доставки цього сповіщення")
+    deliveries: List['NotificationDeliverySchema'] = Field(default_factory=list, description="Статуси доставки цього сповіщення") # Рядкове посилання
 
 
 # --- Схема для створення нового сповіщення (зазвичай використовується внутрішньо системою) ---

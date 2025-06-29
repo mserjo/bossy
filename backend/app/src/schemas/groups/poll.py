@@ -16,7 +16,14 @@ from backend.app.src.schemas.base import BaseMainSchema, BaseSchema, AuditDatesS
 # from backend.app.src.schemas.auth.user import UserPublicSchema
 # from backend.app.src.schemas.dictionaries.status import StatusSchema
 
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.groups.group import GroupSimpleSchema
+    from backend.app.src.schemas.dictionaries.status import StatusSchema
+
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
 # GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema') # Для group в PollSchema
 # StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema') # Для state в PollSchema
 
@@ -60,8 +67,8 @@ class PollVoteSchema(PollVoteBaseSchema, AuditDatesSchema): # Додаємо id,
     """Схема для відображення поданого голосу."""
     poll_id: uuid.UUID = Field(..., description="ID опитування")
     user_id: Optional[uuid.UUID] = Field(None, description="ID користувача, який проголосував (NULL для анонімних)")
-    user: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача, який проголосував (якщо не анонімне)")
-    option: Optional[PollOptionSchema] = Field(None, description="Інформація про обраний варіант") # Може бути корисним
+    user: Optional['UserPublicSchema'] = Field(None, description="Інформація про користувача, який проголосував (якщо не анонімне)") # Рядкове посилання
+    option: Optional['PollOptionSchema'] = Field(None, description="Інформація про обраний варіант") # Може бути корисним, Рядкове посилання
 
 # --- Схеми для Poll ---
 
@@ -86,12 +93,12 @@ class PollSchema(BaseMainSchema):
     results_visibility: str = Field(..., description="Хто може бачити результати ('all', 'voted_only', 'admins_only', 'after_end')")
 
     # --- Розгорнуті зв'язки ---
-    creator: Optional[UserPublicSchema] = Field(None, description="Інформація про творця опитування")
-    # group: Optional[GroupSimpleSchema] = None # `group_id` вже є, і зв'язок успадковується, якщо є в BaseMainSchema
-    state: Optional[StatusSchema] = Field(None, description="Інформація про статус опитування (з BaseMainSchema.state_id)")
+    creator: Optional['UserPublicSchema'] = Field(None, description="Інформація про творця опитування") # Рядкове посилання
+    # group: Optional['GroupSimpleSchema'] = None # `group_id` вже є, і зв'язок успадковується, якщо є в BaseMainSchema
+    state: Optional['StatusSchema'] = Field(None, description="Інформація про статус опитування (з BaseMainSchema.state_id)") # Рядкове посилання
 
-    options: List[PollOptionSchema] = Field(default_factory=list, description="Список варіантів відповідей для опитування")
-    # votes: List[PollVoteSchema] = [] # Список голосів (зазвичай не віддається весь, а агрегується)
+    options: List['PollOptionSchema'] = Field(default_factory=list, description="Список варіантів відповідей для опитування") # Рядкове посилання
+    # votes: List['PollVoteSchema'] = [] # Список голосів (зазвичай не віддається весь, а агрегується) # Рядкове посилання
     total_votes: Optional[int] = Field(None, description="Загальна кількість голосів (обчислюване поле, додається сервісом)")
 
     @model_validator(mode='after')

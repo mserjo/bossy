@@ -22,13 +22,23 @@ from backend.app.src.schemas.base import BaseMainSchema, BaseSchema
 # from backend.app.src.schemas.tasks.review import TaskReviewSchema
 # from backend.app.src.schemas.tasks.dependency import TaskDependencySchema # (можливо, не розгортається)
 
-TaskTypeSchema = ForwardRef('backend.app.src.schemas.dictionaries.task_type.TaskTypeSchema')
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-# GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema') # group_id вже є
-# TeamSimpleSchema = ForwardRef('backend.app.src.schemas.teams.team.TeamSimpleSchema') # team_id вже є
-TaskAssignmentSchema = ForwardRef('backend.app.src.schemas.tasks.assignment.TaskAssignmentSchema')
-TaskCompletionSchema = ForwardRef('backend.app.src.schemas.tasks.completion.TaskCompletionSchema')
-TaskReviewSchema = ForwardRef('backend.app.src.schemas.tasks.review.TaskReviewSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.dictionaries.task_type import TaskTypeSchema
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.teams.team import TeamSimpleSchema
+    from backend.app.src.schemas.dictionaries.status import StatusSchema
+    # from backend.app.src.schemas.tasks.assignment import TaskAssignmentSchema # Якщо розгортатиметься
+    # from backend.app.src.schemas.tasks.completion import TaskCompletionSchema # Якщо розгортатиметься
+    # from backend.app.src.schemas.tasks.review import TaskReviewSchema # Якщо розгортатиметься
+
+
+# TaskTypeSchema = ForwardRef('backend.app.src.schemas.dictionaries.task_type.TaskTypeSchema') # Перенесено
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# TaskAssignmentSchema = ForwardRef('backend.app.src.schemas.tasks.assignment.TaskAssignmentSchema') # Перенесено
+# TaskCompletionSchema = ForwardRef('backend.app.src.schemas.tasks.completion.TaskCompletionSchema') # Перенесено
+# TaskReviewSchema = ForwardRef('backend.app.src.schemas.tasks.review.TaskReviewSchema') # Перенесено
 
 
 # --- Схема для відображення повної інформації про завдання/подію ---
@@ -63,19 +73,19 @@ class TaskSchema(BaseMainSchema):
     streak_bonus_points: Optional[float] = Field(None, description="Розмір додаткового бонусу за серію")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    task_type: Optional[TaskTypeSchema] = Field(None, description="Тип завдання/події")
-    creator: Optional[UserPublicSchema] = Field(None, description="Користувач, який створив завдання")
-    parent_task: Optional['TaskSchema'] = Field(None, description="Батьківське завдання (якщо це підзадача)")
+    task_type: Optional['TaskTypeSchema'] = Field(None, description="Тип завдання/події") # Рядкове посилання
+    creator: Optional['UserPublicSchema'] = Field(None, description="Користувач, який створив завдання") # Рядкове посилання
+    parent_task: Optional['TaskSchema'] = Field(None, description="Батьківське завдання (якщо це підзадача)") # Рядкове посилання
     # child_tasks: List['TaskSchema'] = Field(default_factory=list, description="Список підзадач") # Зазвичай окремий запит
-    team: Optional[ForwardRef('backend.app.src.schemas.teams.team.TeamSimpleSchema')] = Field(None, description="Команда, якій призначено завдання")
-    streak_bonus_reference_task_info: Optional['TaskSchema'] = Field(None, description="Інформація про завдання, за яке нараховується стрік-бонус")
+    team: Optional['TeamSimpleSchema'] = Field(None, description="Команда, якій призначено завдання") # Рядкове посилання
+    streak_bonus_reference_task_info: Optional['TaskSchema'] = Field(None, description="Інформація про завдання, за яке нараховується стрік-бонус") # Рядкове посилання
 
     # Списки призначень, виконань, відгуків зазвичай отримуються окремими запитами з пагінацією.
-    # assignments: List[TaskAssignmentSchema] = Field(default_factory=list)
-    # completions: List[TaskCompletionSchema] = Field(default_factory=list)
-    # reviews: List[TaskReviewSchema] = Field(default_factory=list)
+    # assignments: List['TaskAssignmentSchema'] = Field(default_factory=list)
+    # completions: List['TaskCompletionSchema'] = Field(default_factory=list)
+    # reviews: List['TaskReviewSchema'] = Field(default_factory=list)
 
-    state: Optional[ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')] = Field(None, description="Статус завдання/події")
+    state: Optional['StatusSchema'] = Field(None, description="Статус завдання/події") # Рядкове посилання
 
 
 # --- Схема для створення нового завдання/події ---

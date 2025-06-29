@@ -18,10 +18,18 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # from backend.app.src.schemas.teams.team import TeamSimpleSchema
 # from backend.app.src.schemas.dictionaries.status import StatusSchema
 
-TaskSimpleSchema = ForwardRef('backend.app.src.schemas.tasks.task.TaskSimpleSchema')
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-TeamSimpleSchema = ForwardRef('backend.app.src.schemas.teams.team.TeamSimpleSchema')
-StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.tasks.task import TaskSimpleSchema
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.teams.team import TeamSimpleSchema
+    from backend.app.src.schemas.dictionaries.status import StatusSchema
+
+# TaskSimpleSchema = ForwardRef('backend.app.src.schemas.tasks.task.TaskSimpleSchema') # Перенесено
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# TeamSimpleSchema = ForwardRef('backend.app.src.schemas.teams.team.TeamSimpleSchema') # Перенесено
+# StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema') # Перенесено
 
 # --- Схема для відображення інформації про виконання завдання (для читання) ---
 class TaskCompletionSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -49,11 +57,11 @@ class TaskCompletionSchema(AuditDatesSchema): # Успадковує id, created
     attachments: Optional[List[Dict[str, Any]]] = Field(None, description="Список метаданих файлів-додатків (JSON)") # Або схема для файлу
 
     # --- Розгорнуті зв'язки (приклад) ---
-    task: Optional[TaskSimpleSchema] = Field(None, description="Інформація про завдання")
-    user: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача-виконавця")
-    team: Optional[TeamSimpleSchema] = Field(None, description="Інформація про команду-виконавця")
-    status: Optional[StatusSchema] = Field(None, description="Розгорнутий статус виконання")
-    reviewer: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача, який перевірив завдання")
+    task: Optional['TaskSimpleSchema'] = Field(None, description="Інформація про завдання") # Рядкове посилання
+    user: Optional['UserPublicSchema'] = Field(None, description="Інформація про користувача-виконавця") # Рядкове посилання
+    team: Optional['TeamSimpleSchema'] = Field(None, description="Інформація про команду-виконавця") # Рядкове посилання
+    status: Optional['StatusSchema'] = Field(None, description="Розгорнутий статус виконання") # Рядкове посилання
+    reviewer: Optional['UserPublicSchema'] = Field(None, description="Інформація про користувача, який перевірив завдання") # Рядкове посилання
 
 
 # --- Схема для створення запису про взяття завдання в роботу (початок виконання) ---

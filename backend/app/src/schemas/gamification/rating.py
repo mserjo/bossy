@@ -18,8 +18,14 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # from backend.app.src.schemas.auth.user import UserPublicSchema
 # from backend.app.src.schemas.groups.group import GroupSimpleSchema
 
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.groups.group import GroupSimpleSchema
+
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema') # Перенесено
 
 # --- Схема для відображення інформації про запис рейтингу (для читання) ---
 class RatingSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -42,8 +48,8 @@ class RatingSchema(AuditDatesSchema): # Успадковує id, created_at, upd
 
 
     # --- Розгорнуті зв'язки (приклад) ---
-    user: Optional[UserPublicSchema] = Field(None, description="Користувач, до якого відноситься рейтинг")
-    group: Optional[GroupSimpleSchema] = Field(None, description="Група, в якій розраховано рейтинг")
+    user: Optional['UserPublicSchema'] = Field(None, description="Користувач, до якого відноситься рейтинг") # Рядкове посилання
+    group: Optional['GroupSimpleSchema'] = Field(None, description="Група, в якій розраховано рейтинг") # Рядкове посилання
 
 
 # --- Схема для створення запису рейтингу (зазвичай внутрішнє використання системою) ---

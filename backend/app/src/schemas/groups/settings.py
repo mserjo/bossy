@@ -14,8 +14,12 @@ from datetime import datetime, time
 from decimal import Decimal # Використовуємо Decimal
 
 from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
-# Потрібно буде імпортувати схему BonusTypeSchema для зв'язку
-BonusTypeSchema = ForwardRef('backend.app.src.schemas.dictionaries.bonus_type.BonusTypeSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.dictionaries.bonus_type import BonusTypeSchema
+
+# BonusTypeSchema = ForwardRef('backend.app.src.schemas.dictionaries.bonus_type.BonusTypeSchema') # Перенесено
 
 # --- Схема для відображення налаштувань групи (для читання) ---
 class GroupSettingsSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -27,7 +31,7 @@ class GroupSettingsSchema(AuditDatesSchema): # Успадковує id, created_
     # Налаштування бонусів
     currency_name: Optional[str] = Field(None, max_length=100, description="Назва валюти бонусів для групи")
     bonus_type_id: Optional[uuid.UUID] = Field(None, description="ID обраного типу бонусу з довідника")
-    selected_bonus_type: Optional[BonusTypeSchema] = Field(None, description="Розгорнутий об'єкт обраного типу бонусу")
+    selected_bonus_type: Optional['BonusTypeSchema'] = Field(None, description="Розгорнутий об'єкт обраного типу бонусу") # Рядкове посилання
     allow_decimal_bonuses: bool = Field(..., description="Чи дозволені дробові значення для бонусів")
     max_debt_allowed: Optional[Decimal] = Field(None, description="Максимально допустимий борг")
 

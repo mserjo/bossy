@@ -17,10 +17,18 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # from backend.app.src.schemas.dictionaries.status import StatusSchema
 # from backend.app.src.schemas.files.file import FileSchema # Або URL файлу
 
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema')
-StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')
-FileSchema = ForwardRef('backend.app.src.schemas.files.file.FileSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.groups.group import GroupSimpleSchema
+    from backend.app.src.schemas.dictionaries.status import StatusSchema
+    from backend.app.src.schemas.files.file import FileSchema
+
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema') # Перенесено
+# StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema') # Перенесено
+# FileSchema = ForwardRef('backend.app.src.schemas.files.file.FileSchema') # Перенесено
 
 # --- Схема для відображення метаданих звіту (для читання) ---
 class ReportSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -41,10 +49,10 @@ class ReportSchema(AuditDatesSchema): # Успадковує id, created_at, upd
     # file_url: Optional[HttpUrl] = Field(None, description="URL для завантаження файлу звіту") # Може генеруватися
 
     # --- Розгорнуті зв'язки (приклад) ---
-    requester: Optional[UserPublicSchema] = Field(None, description="Користувач, який замовив звіт")
-    group: Optional[GroupSimpleSchema] = Field(None, description="Група, для якої звіт")
-    status: Optional[StatusSchema] = Field(None, description="Статус генерації звіту")
-    generated_file_info: Optional[FileSchema] = Field(None, alias="generated_file", description="Інформація про згенерований файл звіту")
+    requester: Optional['UserPublicSchema'] = Field(None, description="Користувач, який замовив звіт") # Рядкове посилання
+    group: Optional['GroupSimpleSchema'] = Field(None, description="Група, для якої звіт") # Рядкове посилання
+    status: Optional['StatusSchema'] = Field(None, description="Статус генерації звіту") # Рядкове посилання
+    generated_file_info: Optional['FileSchema'] = Field(None, alias="generated_file", description="Інформація про згенерований файл звіту") # Рядкове посилання
     # `file_url` генерується сервісом і додається до `FileSchema` або окремо.
 
 

@@ -18,9 +18,16 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # from backend.app.src.schemas.auth.user import UserPublicSchema
 # from backend.app.src.schemas.bonuses.transaction import TransactionSchema
 
-AccountSchema = ForwardRef('backend.app.src.schemas.bonuses.account.AccountSchema')
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-TransactionSchema = ForwardRef('backend.app.src.schemas.bonuses.transaction.TransactionSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.bonuses.account import AccountSchema
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.bonuses.transaction import TransactionSchema
+
+# AccountSchema = ForwardRef('backend.app.src.schemas.bonuses.account.AccountSchema') # Перенесено
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# TransactionSchema = ForwardRef('backend.app.src.schemas.bonuses.transaction.TransactionSchema') # Перенесено
 
 # --- Схема для відображення інформації про ручне коригування бонусів (для читання) ---
 class BonusAdjustmentSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -34,9 +41,9 @@ class BonusAdjustmentSchema(AuditDatesSchema): # Успадковує id, create
     transaction_id: Optional[uuid.UUID] = Field(None, description="ID створеної транзакції, що відображає це коригування")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    account: Optional[AccountSchema] = Field(None, description="Рахунок, до якого застосовано коригування")
-    admin: Optional[UserPublicSchema] = Field(None, description="Адміністратор, який виконав коригування")
-    transaction: Optional[TransactionSchema] = Field(None, description="Пов'язана транзакція, що відображає коригування")
+    account: Optional['AccountSchema'] = Field(None, description="Рахунок, до якого застосовано коригування") # Рядкове посилання
+    admin: Optional['UserPublicSchema'] = Field(None, description="Адміністратор, який виконав коригування") # Рядкове посилання
+    transaction: Optional['TransactionSchema'] = Field(None, description="Пов'язана транзакція, що відображає коригування") # Рядкове посилання
 
 
 # --- Схема для створення нового ручного коригування бонусів ---

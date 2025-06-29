@@ -165,6 +165,7 @@ from backend.app.src.schemas.teams.team import TeamSchema
 from backend.app.src.schemas.teams.membership import TeamMembershipSchema
 from backend.app.src.schemas.reports.report import ReportSchema
 from backend.app.src.schemas.reports.response import ReportDataResponseSchema
+from backend.app.src.schemas.dictionaries.status import StatusSchema # Додано StatusSchema
 # Додайте інші схеми, які використовують ForwardRef або на які є посилання
 
 # Список схем для model_rebuild()
@@ -174,7 +175,7 @@ from backend.app.src.schemas.reports.response import ReportDataResponseSchema
 # Головне, щоб усі класи були доступні в глобальному просторі імен модуля.
 schemas_to_rebuild_globally = [
     # Спочатку схеми, на які часто посилаються
-    UserPublicSchema, GroupSimpleSchema,
+    UserPublicSchema, GroupSimpleSchema, StatusSchema, # Додано StatusSchema
     # Потім інші схеми
     FileSchema, AvatarSchema,
     UserSchema, RefreshTokenSchema, SessionSchema,

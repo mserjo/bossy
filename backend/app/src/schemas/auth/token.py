@@ -7,12 +7,15 @@
 """
 
 from pydantic import Field, field_validator
-from typing import Optional, Any
+from typing import Optional, Any, TYPE_CHECKING
 import uuid
 from datetime import datetime
 
 from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema # IdentifiedSchema, TimestampedSchema
-from backend.app.src.schemas.auth.user import UserPublicSchema
+# from backend.app.src.schemas.auth.user import UserPublicSchema # Перенесено в TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.auth.user import UserPublicSchema
 
 # --- Схема для відповіді API з токенами ---
 class TokenResponseSchema(BaseSchema):
@@ -43,7 +46,7 @@ class RefreshTokenSchema(AuditDatesSchema): # Успадковує id, created_a
 
     # `created_at` з AuditDatesSchema використовується як час видачі токена (`issued_at`).
 
-    user: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача, якому належить токен")
+    user: Optional['UserPublicSchema'] = Field(None, description="Інформація про користувача, якому належить токен") # Рядкове посилання
 
 # --- Схема для запиту на оновлення access токена за допомогою refresh токена ---
 class RefreshTokenRequestSchema(BaseSchema):

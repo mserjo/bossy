@@ -135,6 +135,6 @@ class FileUpdateSchema(BaseSchema):
 # Або через статус.
 # Залишаю як є.
 
-FileSchema.model_rebuild()
-FileCreateSchema.model_rebuild()
-FileUpdateSchema.model_rebuild()
+# FileSchema.model_rebuild() # Викликається глобально в schemas/__init__.py
+# FileCreateSchema.model_rebuild() # Зазвичай не має ForwardRef
+# FileUpdateSchema.model_rebuild() # Зазвичай не має ForwardRef

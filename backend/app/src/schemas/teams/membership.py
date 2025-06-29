@@ -16,8 +16,14 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # from backend.app.src.schemas.auth.user import UserPublicSchema
 # from backend.app.src.schemas.teams.team import TeamSimpleSchema
 
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-TeamSimpleSchema = ForwardRef('backend.app.src.schemas.teams.team.TeamSimpleSchema')
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.teams.team import TeamSimpleSchema
+
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# TeamSimpleSchema = ForwardRef('backend.app.src.schemas.teams.team.TeamSimpleSchema') # Перенесено
 
 # --- Схема для відображення інформації про членство в команді (для читання) ---
 class TeamMembershipSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -30,8 +36,8 @@ class TeamMembershipSchema(AuditDatesSchema): # Успадковує id, created
     role_in_team: Optional[str] = Field(None, max_length=100, description="Роль користувача в команді (якщо є, окрім лідера)")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    user: Optional[UserPublicSchema] = Field(None, description="Інформація про користувача-учасника")
-    team: Optional[TeamSimpleSchema] = Field(None, description="Інформація про команду") # Може бути корисним, якщо список членств для користувача
+    user: Optional['UserPublicSchema'] = Field(None, description="Інформація про користувача-учасника") # Рядкове посилання
+    team: Optional['TeamSimpleSchema'] = Field(None, description="Інформація про команду") # Може бути корисним, якщо список членств для користувача, Рядкове посилання
 
 
 # --- Схема для створення нового запису про членство в команді (додавання учасника) ---

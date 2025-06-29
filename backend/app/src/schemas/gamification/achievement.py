@@ -17,8 +17,14 @@ from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
 # from backend.app.src.schemas.auth.user import UserPublicSchema
 # from backend.app.src.schemas.gamification.badge import BadgeSchema # Або BadgeSimpleSchema
 
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-BadgeSchema = ForwardRef('backend.app.src.schemas.gamification.badge.BadgeSchema') # Використовуємо повну схему бейджа
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.gamification.badge import BadgeSchema
+
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# BadgeSchema = ForwardRef('backend.app.src.schemas.gamification.badge.BadgeSchema') # Перенесено
 
 # --- Схема для відображення інформації про досягнення (отриманий бейдж) ---
 class AchievementSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -35,9 +41,9 @@ class AchievementSchema(AuditDatesSchema): # Успадковує id, created_at
     award_reason: Optional[str] = Field(None, description="Причина ручного присудження")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    user: Optional[UserPublicSchema] = Field(None, description="Користувач, який отримав досягнення")
-    badge: Optional[BadgeSchema] = Field(None, description="Інформація про отриманий бейдж")
-    awarder: Optional[UserPublicSchema] = Field(None, description="Адміністратор, який вручну присудив досягнення (якщо є)")
+    user: Optional['UserPublicSchema'] = Field(None, description="Користувач, який отримав досягнення") # Рядкове посилання
+    badge: Optional['BadgeSchema'] = Field(None, description="Інформація про отриманий бейдж") # Рядкове посилання
+    awarder: Optional['UserPublicSchema'] = Field(None, description="Адміністратор, який вручну присудив досягнення (якщо є)") # Рядкове посилання
 
 
 # --- Схема для створення запису про досягнення (зазвичай внутрішнє використання або адміном) ---

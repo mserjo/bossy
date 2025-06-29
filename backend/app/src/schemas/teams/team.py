@@ -19,9 +19,17 @@ from backend.app.src.schemas.base import BaseMainSchema, BaseSchema
 # from backend.app.src.schemas.teams.membership import TeamMembershipSchema
 # from backend.app.src.schemas.tasks.task import TaskSimpleSchema (для tasks_assigned)
 
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-TeamMembershipSchema = ForwardRef('backend.app.src.schemas.teams.membership.TeamMembershipSchema')
-TaskSimpleSchema = ForwardRef('backend.app.src.schemas.tasks.task.TaskSimpleSchema') # Приклад
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.teams.membership import TeamMembershipSchema
+    from backend.app.src.schemas.tasks.task import TaskSimpleSchema
+    from backend.app.src.schemas.dictionaries.status import StatusSchema
+
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# TeamMembershipSchema = ForwardRef('backend.app.src.schemas.teams.membership.TeamMembershipSchema') # Перенесено
+# TaskSimpleSchema = ForwardRef('backend.app.src.schemas.tasks.task.TaskSimpleSchema') # Перенесено
 
 # --- Схема для відображення повної інформації про команду ---
 class TeamSchema(BaseMainSchema):
@@ -39,12 +47,12 @@ class TeamSchema(BaseMainSchema):
     max_members: Optional[int] = Field(None, ge=1, description="Максимальна кількість учасників у команді (NULL - без обмежень)")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    leader: Optional[UserPublicSchema] = Field(None, description="Лідер команди")
-    # group: Optional[GroupSimpleSchema] = Field(None, description="Група, до якої належить команда") # `group_id` вже є
-    state: Optional[ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')] = Field(None, description="Статус команди")
+    leader: Optional['UserPublicSchema'] = Field(None, description="Лідер команди") # Рядкове посилання
+    # group: Optional['GroupSimpleSchema'] = Field(None, description="Група, до якої належить команда") # `group_id` вже є
+    state: Optional['StatusSchema'] = Field(None, description="Статус команди") # Рядкове посилання
 
-    memberships: List[TeamMembershipSchema] = Field(default_factory=list, description="Список учасників команди")
-    tasks_assigned: List[TaskSimpleSchema] = Field(default_factory=list, description="Завдання, призначені цій команді") # Може бути великим, зазвичай окремо
+    memberships: List['TeamMembershipSchema'] = Field(default_factory=list, description="Список учасників команди") # Рядкове посилання
+    tasks_assigned: List['TaskSimpleSchema'] = Field(default_factory=list, description="Завдання, призначені цій команді") # Може бути великим, зазвичай окремо, Рядкове посилання
 
     members_count: Optional[int] = Field(None, description="Поточна кількість учасників у команді (обчислюване поле, додається сервісом)")
 

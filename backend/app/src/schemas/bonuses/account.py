@@ -14,16 +14,18 @@ from datetime import datetime
 from decimal import Decimal # Використовуємо Decimal для точності фінансових даних
 
 from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
-# Потрібно буде імпортувати схеми для зв'язків:
-# from backend.app.src.schemas.auth.user import UserPublicSchema
-# from backend.app.src.schemas.groups.group import GroupSimpleSchema
-# from backend.app.src.schemas.bonuses.transaction import TransactionSchema
-# from backend.app.src.schemas.dictionaries.bonus_type import BonusTypeSchema (якщо bonus_type_code розгортається)
+from typing import TYPE_CHECKING # Додано TYPE_CHECKING
 
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema')
-TransactionSchema = ForwardRef('backend.app.src.schemas.bonuses.transaction.TransactionSchema')
-BonusTypeSchema = ForwardRef('backend.app.src.schemas.dictionaries.bonus_type.BonusTypeSchema')
+if TYPE_CHECKING:
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.groups.group import GroupSimpleSchema
+    from backend.app.src.schemas.bonuses.transaction import TransactionSchema
+    from backend.app.src.schemas.dictionaries.bonus_type import BonusTypeSchema
+
+# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
+# GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema') # Перенесено
+# TransactionSchema = ForwardRef('backend.app.src.schemas.bonuses.transaction.TransactionSchema') # Перенесено
+# BonusTypeSchema = ForwardRef('backend.app.src.schemas.dictionaries.bonus_type.BonusTypeSchema') # Перенесено
 
 # --- Схема для відображення інформації про рахунок (для читання) ---
 class AccountSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -41,12 +43,12 @@ class AccountSchema(AuditDatesSchema): # Успадковує id, created_at, up
     bonus_type_code: str = Field(..., description="Код типу бонусів для цього рахунку (з довідника BonusTypeModel.code)")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    user: Optional[UserPublicSchema] = Field(None, description="Власник рахунку")
-    group: Optional[GroupSimpleSchema] = Field(None, description="Група, до якої належить рахунок")
-    bonus_type: Optional[BonusTypeSchema] = Field(None, description="Деталі типу бонусу для цього рахунку")
+    user: Optional['UserPublicSchema'] = Field(None, description="Власник рахунку") # Рядкове посилання
+    group: Optional['GroupSimpleSchema'] = Field(None, description="Група, до якої належить рахунок") # Рядкове посилання
+    bonus_type: Optional['BonusTypeSchema'] = Field(None, description="Деталі типу бонусу для цього рахунку") # Рядкове посилання
 
     # Список транзакцій зазвичай не включається сюди повністю, а отримується окремим запитом з пагінацією.
-    transactions: List[TransactionSchema] = Field(default_factory=list, description="Історія транзакцій по рахунку (може бути обмежена або винесена)")
+    transactions: List['TransactionSchema'] = Field(default_factory=list, description="Історія транзакцій по рахунку (може бути обмежена або винесена)") # Рядкове посилання
 
 
 # --- Схема для створення рахунку (зазвичай виконується сервісом автоматично) ---

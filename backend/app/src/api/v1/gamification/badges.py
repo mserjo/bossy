@@ -34,8 +34,8 @@ router = APIRouter()
     summary="Створити новий бейдж (адміністратор групи)"
 )
 async def create_badge(
-    group_id: int = Path(..., description="ID групи"),
     badge_in: BadgeCreateSchema,
+    group_id: int = Path(..., description="ID групи"),
     group_with_admin_rights: dict = Depends(group_admin_permission),
     db_session: DBSession = Depends()
 ):
@@ -107,9 +107,9 @@ async def get_badge_details(
     summary="Оновити бейдж (адміністратор групи)"
 )
 async def update_badge(
+    badge_in: BadgeUpdateSchema,
     group_id: int = Path(..., description="ID групи"),
     badge_id: int = Path(..., description="ID бейджа"),
-    badge_in: BadgeUpdateSchema,
     group_with_admin_rights: dict = Depends(group_admin_permission),
     db_session: DBSession = Depends()
 ):

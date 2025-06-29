@@ -42,8 +42,8 @@ router = APIRouter()
     summary="Підключити таск-трекер"
 )
 async def connect_task_tracker(
-    provider: str = Path(..., description="Провайдер трекера (напр., 'jira', 'trello')"),
     connection_data: TrackerConnectionRequestSchema,
+    provider: str = Path(..., description="Провайдер трекера (напр., 'jira', 'trello')"),
     current_user: UserModel = Depends(CurrentActiveUser),
     # group_id: Optional[int] = Query(None, description="ID групи, якщо інтеграція групова"),
     db_session: DBSession = Depends()

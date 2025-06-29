@@ -170,8 +170,8 @@ async def get_calendar_sync_settings(
     summary="Оновити налаштування синхронізації для інтеграції"
 )
 async def update_calendar_sync_settings(
-    integration_id: int = Path(..., description="ID інтеграції календаря"),
     settings_in: CalendarSyncSettingsUpdateSchema,
+    integration_id: int = Path(..., description="ID інтеграції календаря"),
     current_user: UserModel = Depends(CurrentActiveUser),
     db_session: DBSession = Depends()
 ):

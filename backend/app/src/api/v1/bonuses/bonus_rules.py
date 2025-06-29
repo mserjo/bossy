@@ -39,8 +39,8 @@ router = APIRouter()
     summary="Створити нове правило для бонусів/штрафів у групі (адміністратор групи)"
 )
 async def create_bonus_rule_for_group(
-    group_id: int = Path(..., description="ID групи, для якої створюється правило"),
     rule_in: BonusRuleCreateSchema,
+    group_id: int = Path(..., description="ID групи, для якої створюється правило"),
     group_with_admin_rights: dict = Depends(group_admin_permission),
     db_session: DBSession = Depends()
 ):
@@ -117,9 +117,9 @@ async def get_bonus_rule_details(
     summary="Оновити правило бонусів/штрафів (адміністратор групи)"
 )
 async def update_existing_bonus_rule(
+    rule_in: BonusRuleUpdateSchema,
     group_id: int = Path(..., description="ID групи"),
     rule_id: int = Path(..., description="ID правила для оновлення"),
-    rule_in: BonusRuleUpdateSchema,
     group_with_admin_rights: dict = Depends(group_admin_permission),
     db_session: DBSession = Depends()
 ):

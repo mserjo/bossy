@@ -89,17 +89,15 @@ class TeamMembershipRepository(BaseRepository[TeamMembershipModel, TeamMembershi
 
     # `update` успадкований. `TeamMembershipUpdateSchema` для оновлення `role_in_team`.
 
-team_membership_repository = TeamMembershipRepository(TeamMembershipModel)
+    # TODO: Переконатися, що `TeamMembershipCreateSchema` правильно обробляє `team_id`.
+    #       Якщо `team_id` не є частиною схеми, то метод `add_member_to_team` є коректним.
+    #       Якщо `team_id` є частиною схеми, то можна використовувати успадкований `create`.
+    #       Поточна `TeamMembershipCreateSchema` не має `team_id`.
 
-# TODO: Переконатися, що `TeamMembershipCreateSchema` правильно обробляє `team_id`.
-#       Якщо `team_id` не є частиною схеми, то метод `add_member_to_team` є коректним.
-#       Якщо `team_id` є частиною схеми, то можна використовувати успадкований `create`.
-#       Поточна `TeamMembershipCreateSchema` не має `team_id`.
-#
     async def count_members_in_team(self, db: AsyncSession, *, team_id: uuid.UUID) -> int:
         """Підраховує кількість учасників у команді."""
         statement = select(func.count(self.model.id)).where(self.model.team_id == team_id) # type: ignore
         result = await db.execute(statement)
         return result.scalar_one() or 0
 
-# Все виглядає добре. Надано необхідні методи для роботи з членством у командах.
+team_membership_repository = TeamMembershipRepository(TeamMembershipModel)

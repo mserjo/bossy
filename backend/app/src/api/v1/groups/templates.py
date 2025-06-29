@@ -93,8 +93,8 @@ async def get_group_template_details_endpoint(
     summary="Оновити шаблон групи (суперкористувач)"
 )
 async def update_group_template_endpoint(
-    template_id: int = Path(..., description="ID шаблону групи"),
     template_in: GroupTemplateUpdateSchema,
+    template_id: int = Path(..., description="ID шаблону групи"),
     db_session: DBSession = Depends(),
     current_user: UserModel = Depends(CurrentSuperuser)
 ):

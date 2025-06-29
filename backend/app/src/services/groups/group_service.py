@@ -248,10 +248,5 @@ group_service = GroupService(group_repository)
 #
 # Важливо: `group_membership_service.add_member_to_group` потребує `current_user_making_change`.
 #
-# Все виглядає як хороший початок для GroupService.Оновлення: Після створення `GroupService`, я помітив, що метод `create_group` викликає `group_membership_service.add_member_to_group`. Це створює потенційну циклічну залежність на рівні імпорту, якщо `group_membership_service` також імпортує щось з `group_service` (хоча це малоймовірно для простого випадку).
-
-Також, `GroupService` потребує `GroupSettingsCreateSchema` та `group_settings_service` для створення налаштувань за замовчуванням.
-
-Я продовжу зі створенням інших сервісів для `groups`.
-
-**3. `GroupSettingsService` (`backend/app/src/services/groups/group_settings_service.py`):**
+# TODO: Розглянути можливу циклічну залежність, якщо group_membership_service імпортує group_service.
+# TODO: Переконатися, що GroupService правильно інтегрується з GroupSettingsService.

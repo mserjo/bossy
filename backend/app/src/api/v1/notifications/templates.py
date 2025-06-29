@@ -122,8 +122,8 @@ async def get_notification_template_details_endpoint(
     summary="Оновити шаблон сповіщення (суперкористувач)"
 )
 async def update_notification_template_endpoint(
-    template_id: int = Path(..., description="ID шаблону сповіщення"),
     template_in: NotificationTemplateUpdateSchema,
+    template_id: int = Path(..., description="ID шаблону сповіщення"),
     db_session: DBSession = Depends(),
     current_user: UserModel = Depends(CurrentSuperuser)
 ):

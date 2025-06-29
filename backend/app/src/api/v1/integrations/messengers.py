@@ -123,8 +123,8 @@ async def get_messenger_integration_settings(
     summary="Оновити налаштування сповіщень для месенджер-інтеграції"
 )
 async def update_my_messenger_integration_settings(
-    integration_id: int = Path(..., description="ID інтеграції месенджера"),
     settings_in: MessengerNotificationSettingsUpdateSchema,
+    integration_id: int = Path(..., description="ID інтеграції месенджера"),
     current_user: UserModel = Depends(CurrentActiveUser),
     db_session: DBSession = Depends()
 ):

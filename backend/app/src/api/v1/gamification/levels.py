@@ -36,8 +36,8 @@ config_router = APIRouter(prefix="/config", tags=["Gamification", "Levels Config
     summary="Створити нове налаштування рівня (адміністратор групи)"
 )
 async def create_level_configuration(
-    group_id: int = Path(..., description="ID групи"),
     level_in: LevelCreateSchema,
+    group_id: int = Path(..., description="ID групи"),
     group_with_admin_rights: dict = Depends(group_admin_permission),
     db_session: DBSession = Depends()
 ):
@@ -79,9 +79,9 @@ async def list_level_configurations(
     summary="Оновити налаштування рівня (адміністратор групи)"
 )
 async def update_level_configuration(
+    level_in: LevelUpdateSchema,
     group_id: int = Path(..., description="ID групи"),
     level_config_id: int = Path(..., description="ID налаштування рівня"),
-    level_in: LevelUpdateSchema,
     group_with_admin_rights: dict = Depends(group_admin_permission),
     db_session: DBSession = Depends()
 ):

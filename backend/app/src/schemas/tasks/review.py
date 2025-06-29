@@ -118,6 +118,6 @@ class TaskReviewUpdateSchema(BaseSchema):
 #
 # Все виглядає добре.
 
-TaskReviewSchema.model_rebuild()
-TaskReviewCreateSchema.model_rebuild()
-TaskReviewUpdateSchema.model_rebuild()
+# TaskReviewSchema.model_rebuild()
+# TaskReviewCreateSchema.model_rebuild()
+# TaskReviewUpdateSchema.model_rebuild()

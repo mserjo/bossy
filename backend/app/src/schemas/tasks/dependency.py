@@ -108,6 +108,6 @@ class TaskDependencyUpdateSchema(BaseSchema):
 #
 # Все виглядає добре.
 
-TaskDependencySchema.model_rebuild()
-TaskDependencyCreateSchema.model_rebuild()
-TaskDependencyUpdateSchema.model_rebuild()
+# TaskDependencySchema.model_rebuild()
+# TaskDependencyCreateSchema.model_rebuild()
+# TaskDependencyUpdateSchema.model_rebuild()

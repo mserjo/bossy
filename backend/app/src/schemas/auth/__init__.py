@@ -87,7 +87,7 @@ __all__ = [
 
 # Виклик model_rebuild для схем, що містять ForwardRef
 # (UserSchema може посилатися на багато інших, тому її варто оновити)
-UserSchema.model_rebuild()
-RefreshTokenSchema.model_rebuild() # Може посилатися на UserPublicSchema
-SessionSchema.model_rebuild() # Може посилатися на UserPublicSchema або RefreshTokenSchema
+# UserSchema.model_rebuild() # Перенесено до глобального __init__.py
+# RefreshTokenSchema.model_rebuild() # Перенесено до глобального __init__.py
+# SessionSchema.model_rebuild() # Перенесено до глобального __init__.py
 # Інші схеми в цьому пакеті (Create/Update) зазвичай не мають складних ForwardRef.

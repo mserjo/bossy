@@ -7,7 +7,7 @@
 """
 from typing import Optional
 
-from sqlalchemy import Column, ForeignKey, DateTime, Text, UniqueConstraint # type: ignore
+from sqlalchemy import Column, ForeignKey, DateTime, Text, UniqueConstraint, Index, text  # type: ignore # Додано Index, text
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
 from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
@@ -44,7 +44,7 @@ class TaskAssignmentModel(BaseModel):
     """
     __tablename__ = "task_assignments"
 
-    task_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True)
+    task_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("tasks.id", ondelete="CASCADE"), nullable=False, index=True)
 
     # Виконавець - або користувач, або команда. Одне з цих полів має бути заповнене.
     user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_task_assignments_user_id", ondelete="CASCADE"), nullable=True, index=True)
@@ -74,8 +74,20 @@ class TaskAssignmentModel(BaseModel):
     # Поки що, якщо обидва NULL, це може означати "відкрите для взяття" завдання, але це краще реалізувати інакше.
     # Це таблиця саме призначень.
     __table_args__ = (
-        UniqueConstraint('task_id', 'user_id', name='uq_task_user_assignment', postgresql_where=(user_id.isnot(None))), # type: ignore
-        UniqueConstraint('task_id', 'team_id', name='uq_task_team_assignment', postgresql_where=(team_id.isnot(None))), # type: ignore
+        Index(
+            'ix_task_user_assignment_unique',
+            task_id,
+            user_id,
+            unique=True,
+            postgresql_where=user_id.isnot(None) # type: ignore
+        ),
+        Index(
+            'ix_task_team_assignment_unique',
+            task_id,
+            team_id,
+            unique=True,
+            postgresql_where=team_id.isnot(None) # type: ignore
+        ),
         # Коментар для Alembic:
         # Додати в міграцію для забезпечення, що або user_id, або team_id заповнене, але не обидва:
         # op.create_check_constraint(

@@ -36,7 +36,8 @@ class TransactionModel(BaseModel):
 
     related_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_transactions_related_user_id", ondelete="SET NULL"), nullable=True, index=True)
 
-    metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    # Перейменовано з 'metadata' для уникнення конфлікту з зарезервованим іменем SQLAlchemy
+    additional_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
     balance_after_transaction: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
 
     # --- Зв'язки (Relationships) ---

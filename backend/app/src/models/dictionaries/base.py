@@ -9,6 +9,7 @@
 """
 
 from sqlalchemy import Column, String # type: ignore
+from sqlalchemy.orm import Mapped, mapped_column # Додано для SQLAlchemy 2.0
 
 from backend.app.src.models.base import BaseMainModel # Імпорт базової моделі
 
@@ -35,7 +36,8 @@ class BaseDictModel(BaseMainModel):
     # Або розглянути композитний індекс/обмеження, якщо `code` має бути унікальним
     # в поєднанні з іншим полем (наприклад, `group_id`, якщо довідники специфічні для груп).
     # Для загальних довідників `unique=True` є доцільним.
-    code: Column[str] = Column(String(100), nullable=False, index=True)
+    # code: Column[str] = Column(String(100), nullable=False, index=True) # Старий стиль
+    code: Mapped[str] = mapped_column(String(100), nullable=False, index=True) # Новий стиль SQLAlchemy 2.0
 
     # TODO: Подумати над тим, чи потрібне поле `group_id` для всіх довідників.
     # Деякі довідники можуть бути глобальними (наприклад, системні статуси, ролі),

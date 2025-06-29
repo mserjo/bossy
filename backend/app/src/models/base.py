@@ -103,7 +103,9 @@ class BaseMainModel(BaseModel):
 
     # Використовуємо рядкові посилання на моделі для уникнення циклічних імпортів на рівні файлів.
     # SQLAlchemy зможе їх розпізнати, якщо всі моделі успадковують від одного Base.
-    state: Mapped[Optional["StatusModel"]] = relationship("StatusModel", foreign_keys=[state_id], lazy="selectin")
+    @declared_attr
+    def state(cls) -> Mapped[Optional["StatusModel"]]:
+        return relationship("StatusModel", foreign_keys=[cls.state_id], lazy="selectin") # type: ignore
 
     # Зв'язок з групою
     # `back_populates` має відповідати назві зв'язку в GroupModel, якщо там є зворотний зв'язок
@@ -112,7 +114,9 @@ class BaseMainModel(BaseModel):
     # в `GroupModel` може бути складним.
     # Поки що без `back_populates` або з загальною назвою, яку треба буде узгодити.
     # `foreign_keys` вказується явно, щоб SQLAlchemy точно знав, яке поле використовувати.
-    group: Mapped[Optional["GroupModel"]] = relationship("GroupModel", foreign_keys=[group_id], lazy="selectin")
+    @declared_attr
+    def group(cls) -> Mapped[Optional["GroupModel"]]:
+        return relationship("GroupModel", foreign_keys=[cls.group_id], lazy="selectin") # type: ignore
     # TODO: Узгодити `back_populates` для `group` з `GroupModel`, коли там будуть визначені
     #       зворотні зв'язки до різних типів сутностей, що належать групі.
     #       Наприклад, `GroupModel` може мати `tasks = relationship("TaskModel", back_populates="group")`.

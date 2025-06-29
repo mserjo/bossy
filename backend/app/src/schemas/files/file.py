@@ -7,19 +7,16 @@
 """
 
 from pydantic import Field, HttpUrl
-from typing import Optional, List, Any, ForwardRef, Dict # Додано Dict
+from typing import Optional, List, Any, ForwardRef, Dict, TYPE_CHECKING # Додано TYPE_CHECKING
 import uuid
 from datetime import datetime
 
 from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
-# Потрібно буде імпортувати схеми для зв'язків:
-# from backend.app.src.schemas.auth.user import UserPublicSchema (для uploader)
-# from backend.app.src.schemas.groups.group import GroupSimpleSchema (для group_context)
-# from backend.app.src.schemas.dictionaries.status import StatusSchema (якщо є status_id)
 
-UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema')
-GroupSimpleSchema = ForwardRef('backend.app.src.schemas.groups.group.GroupSimpleSchema')
-# StatusSchema = ForwardRef('backend.app.src.schemas.dictionaries.status.StatusSchema')
+if TYPE_CHECKING:
+    from backend.app.src.schemas.auth.user import UserPublicSchema
+    from backend.app.src.schemas.groups.group import GroupSimpleSchema
+    # from backend.app.src.schemas.dictionaries.status import StatusSchema
 
 
 # --- Схема для відображення метаданих файлу (для читання) ---
@@ -37,7 +34,7 @@ class FileSchema(AuditDatesSchema): # Успадковує id, created_at, updat
     group_context_id: Optional[uuid.UUID] = Field(None, description="ID групи, в контексті якої завантажено файл")
 
     file_category_code: Optional[str] = Field(None, max_length=50, description="Код категорії файлу (наприклад, 'AVATAR', 'TASK_ATTACHMENT')")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Додаткові метадані про файл (JSON)")
+    additional_info: Optional[Dict[str, Any]] = Field(None, description="Додаткові метадані про файл (JSON)") # Перейменовано з metadata
     # status_id: Optional[uuid.UUID] = Field(None, description="ID статусу файлу (якщо є)")
 
     is_public: bool = Field(..., description="Чи є файл публічно доступним")
@@ -46,9 +43,9 @@ class FileSchema(AuditDatesSchema): # Успадковує id, created_at, updat
     file_url: Optional[HttpUrl] = Field(None, description="URL для доступу/завантаження файлу")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    uploader: Optional[UserPublicSchema] = Field(None, description="Користувач, який завантажив файл")
-    group_context: Optional[GroupSimpleSchema] = Field(None, description="Група, в контексті якої завантажено файл")
-    # status: Optional[StatusSchema] = Field(None, description="Статус файлу (якщо є)")
+    uploader: Optional['UserPublicSchema'] = Field(None, description="Користувач, який завантажив файл") # Використовуємо рядкове посилання
+    group_context: Optional['GroupSimpleSchema'] = Field(None, description="Група, в контексті якої завантажено файл") # Використовуємо рядкове посилання
+    # status: Optional['StatusSchema'] = Field(None, description="Статус файлу (якщо є)")
 
 
 # --- Схема для створення метаданих файлу (після завантаження файлу на сервер/сховище) ---
@@ -66,7 +63,7 @@ class FileCreateSchema(BaseSchema):
     group_context_id: Optional[uuid.UUID] = Field(None, description="ID групи-контексту")
 
     file_category_code: Optional[str] = Field(None, max_length=50, description="Код категорії файлу")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Додаткові метадані (JSON)")
+    additional_info: Optional[Dict[str, Any]] = Field(None, description="Додаткові метадані (JSON)") # Перейменовано з metadata
     # status_id: Optional[uuid.UUID] # Початковий статус (наприклад, "доступний")
     is_public: bool = Field(default=False, description="Чи є файл публічним (за замовчуванням False)")
 
@@ -82,7 +79,7 @@ class FileUpdateSchema(BaseSchema):
     """
     original_filename: Optional[str] = Field(None, max_length=255)
     file_category_code: Optional[str] = Field(None, max_length=50)
-    metadata: Optional[Dict[str, Any]] = Field(None)
+    additional_info: Optional[Dict[str, Any]] = Field(None) # Перейменовано з metadata
     # status_id: Optional[uuid.UUID] = Field(None)
     is_public: Optional[bool] = Field(None)
     # group_context_id: Optional[uuid.UUID] # Зміна контексту групи - обережно

@@ -131,41 +131,69 @@ __all__ = _base_schemas_all + \
 # Виклик model_rebuild для всіх схем, які можуть мати ForwardRef,
 # після того, як всі модулі схем імпортовано.
 # Це має вирішити проблеми з циклічними залежностями та ForwardRef.
-# from backend.app.src.schemas.files import FileSchema, AvatarSchema # Виклики model_rebuild() тепер у __init__.py підпакетів
-# from backend.app.src.schemas.auth import UserSchema, RefreshTokenSchema, SessionSchema
-# from backend.app.src.schemas.groups import GroupSchema, GroupMembershipSchema, PollSchema, PollOptionSchema, PollVoteSchema, GroupInvitationSchema, GroupSettingsSchema, GroupTemplateSchema
-# from backend.app.src.schemas.tasks import TaskSchema, TaskAssignmentSchema, TaskCompletionSchema, TaskDependencySchema, TaskProposalSchema, TaskReviewSchema
-# from backend.app.src.schemas.bonuses import AccountSchema, TransactionSchema, RewardSchema, BonusAdjustmentSchema
-# from backend.app.src.schemas.notifications import NotificationSchema, NotificationDeliverySchema, NotificationTemplateSchema
-# from backend.app.src.schemas.gamification import LevelSchema, UserLevelSchema, BadgeSchema, AchievementSchema, RatingSchema
-# from backend.app.src.schemas.teams import TeamSchema, TeamMembershipSchema
-# from backend.app.src.schemas.reports import ReportSchema
-# # Додайте інші схеми, якщо вони використовують ForwardRef до інших пакетів
+# Явні імпорти для глобального model_rebuild
+from backend.app.src.schemas.files.file import FileSchema
+from backend.app.src.schemas.files.avatar import AvatarSchema
+from backend.app.src.schemas.auth.user import UserSchema, UserPublicSchema
+from backend.app.src.schemas.auth.token import RefreshTokenSchema
+from backend.app.src.schemas.auth.session import SessionSchema
+from backend.app.src.schemas.groups.group import GroupSchema, GroupSimpleSchema
+from backend.app.src.schemas.groups.membership import GroupMembershipSchema
+from backend.app.src.schemas.groups.poll import PollSchema, PollOptionSchema, PollVoteSchema
+from backend.app.src.schemas.groups.invitation import GroupInvitationSchema
+from backend.app.src.schemas.groups.settings import GroupSettingsSchema
+from backend.app.src.schemas.groups.template import GroupTemplateSchema
+from backend.app.src.schemas.tasks.task import TaskSchema
+from backend.app.src.schemas.tasks.assignment import TaskAssignmentSchema
+from backend.app.src.schemas.tasks.completion import TaskCompletionSchema
+from backend.app.src.schemas.tasks.dependency import TaskDependencySchema
+from backend.app.src.schemas.tasks.proposal import TaskProposalSchema
+from backend.app.src.schemas.tasks.review import TaskReviewSchema
+from backend.app.src.schemas.bonuses.account import AccountSchema
+from backend.app.src.schemas.bonuses.transaction import TransactionSchema
+from backend.app.src.schemas.bonuses.reward import RewardSchema
+from backend.app.src.schemas.bonuses.bonus_adjustment import BonusAdjustmentSchema
+from backend.app.src.schemas.notifications.notification import NotificationSchema
+from backend.app.src.schemas.notifications.delivery import NotificationDeliverySchema
+from backend.app.src.schemas.notifications.template import NotificationTemplateSchema
+from backend.app.src.schemas.gamification.level import LevelSchema
+from backend.app.src.schemas.gamification.user_level import UserLevelSchema
+from backend.app.src.schemas.gamification.badge import BadgeSchema
+from backend.app.src.schemas.gamification.achievement import AchievementSchema
+from backend.app.src.schemas.gamification.rating import RatingSchema
+from backend.app.src.schemas.teams.team import TeamSchema
+from backend.app.src.schemas.teams.membership import TeamMembershipSchema
+from backend.app.src.schemas.reports.report import ReportSchema
+from backend.app.src.schemas.reports.response import ReportDataResponseSchema
+# Додайте інші схеми, які використовують ForwardRef або на які є посилання
 
-# # Список схем для model_rebuild()
-# # Порядок може бути важливим, якщо є залежності між ForwardRef в різних файлах.
-# # Зазвичай, якщо схема A посилається на B, а B на A, то порядок не має значення,
-# # Pydantic має впоратися.
-# # Головне, щоб усі класи були доступні в глобальному просторі імен модуля.
-# schemas_to_rebuild_globally = [
-#     FileSchema, AvatarSchema, # з files
-#     UserSchema, RefreshTokenSchema, SessionSchema, # з auth
-#     GroupSchema, GroupMembershipSchema, PollSchema, PollOptionSchema, PollVoteSchema, GroupInvitationSchema, GroupSettingsSchema, GroupTemplateSchema, # з groups
-#     TaskSchema, TaskAssignmentSchema, TaskCompletionSchema, TaskDependencySchema, TaskProposalSchema, TaskReviewSchema, # з tasks
-#     AccountSchema, TransactionSchema, RewardSchema, BonusAdjustmentSchema, # з bonuses
-#     NotificationSchema, NotificationDeliverySchema, NotificationTemplateSchema, # з notifications
-#     LevelSchema, UserLevelSchema, BadgeSchema, AchievementSchema, RatingSchema, # з gamification
-#     TeamSchema, TeamMembershipSchema, # з teams
-#     ReportSchema, # з reports
-#     # Додайте інші, якщо потрібно
-# ]
+# Список схем для model_rebuild()
+# Порядок може бути важливим, якщо є залежності між ForwardRef в різних файлах.
+# Зазвичай, якщо схема A посилається на B, а B на A, то порядок не має значення,
+# Pydantic має впоратися.
+# Головне, щоб усі класи були доступні в глобальному просторі імен модуля.
+schemas_to_rebuild_globally = [
+    # Спочатку схеми, на які часто посилаються
+    UserPublicSchema, GroupSimpleSchema,
+    # Потім інші схеми
+    FileSchema, AvatarSchema,
+    UserSchema, RefreshTokenSchema, SessionSchema,
+    GroupSchema, GroupMembershipSchema, PollSchema, PollOptionSchema, PollVoteSchema, GroupInvitationSchema, GroupSettingsSchema, GroupTemplateSchema,
+    TaskSchema, TaskAssignmentSchema, TaskCompletionSchema, TaskDependencySchema, TaskProposalSchema, TaskReviewSchema,
+    AccountSchema, TransactionSchema, RewardSchema, BonusAdjustmentSchema,
+    NotificationSchema, NotificationDeliverySchema, NotificationTemplateSchema,
+    LevelSchema, UserLevelSchema, BadgeSchema, AchievementSchema, RatingSchema,
+    TeamSchema, TeamMembershipSchema,
+    ReportSchema, ReportDataResponseSchema,
+    # Додайте інші, якщо потрібно, в правильному порядку або всі разом
+]
 
-# for schema_cls in schemas_to_rebuild_globally:
-#     try:
-#         schema_cls.model_rebuild()
-#     except Exception as e:
-#         # Логування або обробка помилки, якщо потрібно
-#         print(f"Попередження: не вдалося глобально оновити схему {schema_cls.__name__}: {e}")
+for schema_cls in schemas_to_rebuild_globally:
+    try:
+        schema_cls.model_rebuild()
+    except Exception as e:
+        # Логування або обробка помилки, якщо потрібно
+        print(f"Попередження: не вдалося глобально оновити схему {schema_cls.__name__}: {e}")
 
 
 # Цей файл є важливою частиною структури проекту, забезпечуючи єдину точку

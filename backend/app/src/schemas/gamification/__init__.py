@@ -97,10 +97,10 @@ __all__ = [
 # Самі класи схем Update можуть існувати (закоментовані) у відповідних файлах.
 
 # Виклик model_rebuild для схем, що містять ForwardRef
-LevelSchema.model_rebuild()
-UserLevelSchema.model_rebuild()
-BadgeSchema.model_rebuild()
-AchievementSchema.model_rebuild()
-RatingSchema.model_rebuild()
+# LevelSchema.model_rebuild() # Видалено, буде глобальний виклик
+# UserLevelSchema.model_rebuild() # Видалено, буде глобальний виклик
+# BadgeSchema.model_rebuild() # Видалено, буде глобальний виклик
+# AchievementSchema.model_rebuild() # Видалено, буде глобальний виклик
+# RatingSchema.model_rebuild() # Видалено, буде глобальний виклик
 
 # Все виглядає добре.

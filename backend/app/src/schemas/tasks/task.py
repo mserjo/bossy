@@ -231,6 +231,6 @@ class TaskUpdateSchema(BaseSchema):
 #
 # Все виглядає добре.
 
-TaskSchema.model_rebuild()
-TaskCreateSchema.model_rebuild()
-TaskUpdateSchema.model_rebuild()
+# TaskSchema.model_rebuild() # Виклик перенесено до schemas/__init__.py
+# TaskCreateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef
+# TaskUpdateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef

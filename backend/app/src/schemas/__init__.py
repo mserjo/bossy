@@ -28,73 +28,95 @@ from . import tasks # Може містити ForwardRefs
 # навіть після використання рядкових анотацій, але зазвичай Pydantic v2
 # справляється з цим досить добре, якщо всі модулі вже імпортовані.
 
-# Схеми, які точно використовують рядкові посилання і потребують rebuild:
+# Схеми, які точно використовують рядкові посилання і потребують rebuild.
+# Порядок викликів model_rebuild важливий: спочатку ті, від яких залежать інші.
 
-# 0. UserPublicSchema - від неї можуть залежати багато інших схем, включаючи FileSchema, AvatarSchema.
-# Важливо, щоб вона була оброблена однією з перших серед тих, хто має залежності.
+# --- Dictionaries (словники) ---
+# Зазвичай схеми довідників прості і не мають складних ForwardRef,
+# але якщо StatusSchema або BonusTypeSchema мали б їх, їх model_rebuild() був би тут.
+# Наприклад:
+# if hasattr(dictionaries, 'status') and hasattr(dictionaries.status, 'StatusSchema'):
+#     dictionaries.status.StatusSchema.model_rebuild()
+# if hasattr(dictionaries, 'bonus_type') and hasattr(dictionaries.bonus_type, 'BonusTypeSchema'):
+#     dictionaries.bonus_type.BonusTypeSchema.model_rebuild()
+
+# --- Auth & Users (користувачі та автентифікація) ---
+# UserPublicSchema часто використовується іншими.
 if hasattr(auth, 'user') and hasattr(auth.user, 'UserPublicSchema'):
     auth.user.UserPublicSchema.model_rebuild()
 
-# 1. Схеми з модуля 'files', оскільки AvatarSchema залежить від FileSchema.
+# FileSchema та AvatarSchema (якщо вони залежать від UserPublicSchema або одна від одної)
 if hasattr(files, 'file') and hasattr(files.file, 'FileSchema'):
-    files.file.FileSchema.model_rebuild() # FileSchema може залежати від UserPublicSchema
+    files.file.FileSchema.model_rebuild()
 if hasattr(files, 'avatar') and hasattr(files.avatar, 'AvatarSchema'):
-    files.avatar.AvatarSchema.model_rebuild() # AvatarSchema залежить від FileSchema та UserPublicSchema
+    files.avatar.AvatarSchema.model_rebuild() # Залежить від FileSchema, UserPublicSchema
 
-# 2. Тепер схеми з модуля 'auth', зокрема UserSchema, яка залежить від AvatarSchema.
+# Повна UserSchema (може залежати від AvatarSchema)
 if hasattr(auth, 'user') and hasattr(auth.user, 'UserSchema'):
     auth.user.UserSchema.model_rebuild()
-# Інші схеми з auth.user, якщо вони теж використовують ForwardRef
-if hasattr(auth, 'user') and hasattr(auth.user, 'UserCreateSchema'):
-    auth.user.UserCreateSchema.model_rebuild()
-if hasattr(auth, 'user') and hasattr(auth.user, 'UserUpdateSchema'):
-    auth.user.UserUpdateSchema.model_rebuild()
-if hasattr(auth, 'user') and hasattr(auth.user, 'UserPasswordUpdateSchema'):
-    auth.user.UserPasswordUpdateSchema.model_rebuild()
-if hasattr(auth, 'user') and hasattr(auth.user, 'UserAdminUpdateSchema'):
-    auth.user.UserAdminUpdateSchema.model_rebuild()
 
-# 3. Схеми з модуля 'bonuses'
-if hasattr(bonuses, 'account') and hasattr(bonuses.account, 'AccountSchema'):
-    bonuses.account.AccountSchema.model_rebuild() # AccountSchema залежить від UserPublicSchema, TransactionSchema
+# RefreshTokenSchema (може залежати від UserPublicSchema)
+if hasattr(auth, 'token') and hasattr(auth.token, 'RefreshTokenSchema'):
+    auth.token.RefreshTokenSchema.model_rebuild()
+
+# --- Bonuses (бонуси, рахунки, транзакції, нагороди) ---
+# TransactionSchema та AccountSchema мають взаємні посилання.
+# Pydantic v2 має обробити це, якщо обидва типи відомі.
+# Спробуємо такий порядок:
 if hasattr(bonuses, 'transaction') and hasattr(bonuses.transaction, 'TransactionSchema'):
-    bonuses.transaction.TransactionSchema.model_rebuild() # TransactionSchema залежить від AccountSchema, UserPublicSchema
-# Порядок AccountSchema та TransactionSchema може бути важливим, якщо вони посилаються одна на одну.
-# Якщо TransactionSchema в AccountSchema, то TransactionSchema.model_rebuild() має бути першим.
-# Якщо AccountSchema в TransactionSchema, то AccountSchema.model_rebuild() має бути першим.
-# Поточний код: AccountSchema -> TransactionSchema; TransactionSchema -> AccountSchema. Цикл.
-# Pydantic v2 має краще справлятися з цим, якщо обидві вже імпортовані.
-# Залишимо поточний порядок, але маємо на увазі.
-# Якщо AccountSchema містить List[TransactionSchema], а TransactionSchema містить Optional[AccountSchema],
-# то, можливо, TransactionSchema.model_rebuild() перед AccountSchema.model_rebuild() буде краще.
-# Давайте спробуємо так:
-# if hasattr(bonuses, 'transaction') and hasattr(bonuses.transaction, 'TransactionSchema'):
-#     bonuses.transaction.TransactionSchema.model_rebuild()
-# if hasattr(bonuses, 'account') and hasattr(bonuses.account, 'AccountSchema'):
-#     bonuses.account.AccountSchema.model_rebuild()
-# Поки що залишу як є, Pydantic v2 має впоратися після того, як всі модулі завантажені.
+    bonuses.transaction.TransactionSchema.model_rebuild()
+if hasattr(bonuses, 'account') and hasattr(bonuses.account, 'AccountSchema'):
+    bonuses.account.AccountSchema.model_rebuild()
 
-if hasattr(bonuses, 'account') and hasattr(bonuses.account, 'AccountCreateSchema'): # Зазвичай не мають ForwardRef
-    bonuses.account.AccountCreateSchema.model_rebuild()
-if hasattr(bonuses, 'account') and hasattr(bonuses.account, 'AccountUpdateSchema'):
-    bonuses.account.AccountUpdateSchema.model_rebuild()
+# RewardSchema залежить від StatusSchema (з dictionaries) та BonusTypeSchema (з dictionaries)
+# Також може залежати від FileSchema.
+if hasattr(bonuses, 'reward') and hasattr(bonuses.reward, 'RewardSchema'):
+    bonuses.reward.RewardSchema.model_rebuild()
+
+# BonusAdjustmentSchema (якщо має ForwardRefs)
+if hasattr(bonuses, 'bonus_adjustment') and hasattr(bonuses.bonus_adjustment, 'BonusAdjustmentSchema'):
+    bonuses.bonus_adjustment.BonusAdjustmentSchema.model_rebuild()
 
 
-# 4. Інші модулі по порядку
+# --- Groups (групи та членство) ---
 if hasattr(groups, 'group') and hasattr(groups.group, 'GroupSchema'):
-    groups.group.GroupSchema.model_rebuild()
+    groups.group.GroupSchema.model_rebuild() # Може залежати від UserPublicSchema (для адмінів/творця)
 if hasattr(groups, 'membership') and hasattr(groups.membership, 'GroupMembershipSchema'):
-    groups.membership.GroupMembershipSchema.model_rebuild() # Може залежати від UserSchema, GroupSchema
+    groups.membership.GroupMembershipSchema.model_rebuild() # Залежить від UserSchema, GroupSchema, UserRoleSchema
 
+# --- Tasks (завдання) ---
 if hasattr(tasks, 'task') and hasattr(tasks.task, 'TaskSchema'):
-    tasks.task.TaskSchema.model_rebuild() # Може залежати від UserPublicSchema, TaskTypeSchema
+    tasks.task.TaskSchema.model_rebuild() # Може залежати від UserPublicSchema, TaskTypeSchema, StatusSchema
 if hasattr(tasks, 'assignment') and hasattr(tasks.assignment, 'TaskAssignmentSchema'):
-    tasks.assignment.TaskAssignmentSchema.model_rebuild()
+    tasks.assignment.TaskAssignmentSchema.model_rebuild() # Залежить від TaskSchema, UserSchema
 if hasattr(tasks, 'completion') and hasattr(tasks.completion, 'TaskCompletionSchema'):
-    tasks.completion.TaskCompletionSchema.model_rebuild()
+    tasks.completion.TaskCompletionSchema.model_rebuild() # Залежить від TaskSchema, UserSchema
 
+# --- Notifications (сповіщення) ---
 if hasattr(notifications, 'notification') and hasattr(notifications.notification, 'NotificationSchema'):
-    notifications.notification.NotificationSchema.model_rebuild()
+    notifications.notification.NotificationSchema.model_rebuild() # Може залежати від UserSchema
+if hasattr(notifications, 'template') and hasattr(notifications.template, 'NotificationTemplateSchema'):
+    notifications.template.NotificationTemplateSchema.model_rebuild() # Може залежати від GroupSimpleSchema, StatusSchema
+if hasattr(notifications, 'delivery') and hasattr(notifications.delivery, 'NotificationDeliverySchema'):
+    notifications.delivery.NotificationDeliverySchema.model_rebuild() # Залежить від NotificationSchema
+
+# --- Gamification (гейміфікація: рівні, бейджі) ---
+# Схеми з gamification можуть залежати від UserSchema, GroupSchema, TaskSchema тощо.
+if hasattr(gamification, 'level') and hasattr(gamification.level, 'LevelSchema'):
+    gamification.level.LevelSchema.model_rebuild()
+if hasattr(gamification, 'user_level') and hasattr(gamification.user_level, 'UserLevelSchema'): # Виправлено шлях
+    gamification.user_level.UserLevelSchema.model_rebuild() # Залежить від UserSchema, LevelSchema
+if hasattr(gamification, 'badge') and hasattr(gamification.badge, 'BadgeSchema'):
+    gamification.badge.BadgeSchema.model_rebuild()
+if hasattr(gamification, 'achievement') and hasattr(gamification.achievement, 'AchievementSchema'): # Припускаючи назву схеми
+    gamification.achievement.AchievementSchema.model_rebuild() # Залежить від UserSchema, BadgeSchema
+
+# Інші схеми Create/Update зазвичай не потребують model_rebuild, якщо вони не містять ForwardRef.
+# Наприклад:
+# if hasattr(auth, 'user') and hasattr(auth.user, 'UserCreateSchema'):
+#     auth.user.UserCreateSchema.model_rebuild()
+# ... і так далі для інших схем Create/Update, якщо вони складні.
+# Зазвичай це не потрібно.
 
 
 # Важливо: цей файл буде виконано, коли будь-який модуль з `backend.app.src.schemas`

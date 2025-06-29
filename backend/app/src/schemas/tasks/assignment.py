@@ -136,6 +136,6 @@ class TaskAssignmentUpdateSchema(BaseSchema):
 #
 # Все виглядає добре.
 
-TaskAssignmentSchema.model_rebuild()
-TaskAssignmentCreateSchema.model_rebuild()
-TaskAssignmentUpdateSchema.model_rebuild()
+# TaskAssignmentSchema.model_rebuild()
+# TaskAssignmentCreateSchema.model_rebuild()
+# TaskAssignmentUpdateSchema.model_rebuild()

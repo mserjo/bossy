@@ -114,5 +114,5 @@ class RatingCreateSchema(BaseSchema):
 #
 # Все виглядає добре.
 
-RatingSchema.model_rebuild()
-RatingCreateSchema.model_rebuild()
+# RatingSchema.model_rebuild()
+# RatingCreateSchema.model_rebuild()

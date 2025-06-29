@@ -98,5 +98,5 @@ class BonusAdjustmentCreateSchema(BaseSchema):
 #
 # Все виглядає добре.
 
-BonusAdjustmentSchema.model_rebuild()
-BonusAdjustmentCreateSchema.model_rebuild()
+# BonusAdjustmentSchema.model_rebuild() # Виклик перенесено до schemas/__init__.py
+# BonusAdjustmentCreateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef

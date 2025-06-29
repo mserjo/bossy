@@ -122,6 +122,6 @@ class BadgeUpdateSchema(BaseSchema):
 #
 # Все виглядає добре.
 
-BadgeSchema.model_rebuild()
-BadgeCreateSchema.model_rebuild()
-BadgeUpdateSchema.model_rebuild()
+# BadgeSchema.model_rebuild() # Виклик перенесено до schemas/__init__.py
+# BadgeCreateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef
+# BadgeUpdateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef

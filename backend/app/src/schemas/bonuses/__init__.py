@@ -98,3 +98,12 @@ __all__ = [
 # TransactionSchema.model_rebuild() # Видалено, буде глобальний виклик
 # RewardSchema.model_rebuild() # Видалено, буде глобальний виклик
 # BonusAdjustmentSchema.model_rebuild() # Видалено, буде глобальний виклик
+
+# Явний виклик model_rebuild для схем з ForwardRef після всіх імпортів
+# Це допомагає Pydantic правильно розпізнати типи, визначені як рядкові літерали (ForwardRef)
+# AccountSchema.model_rebuild() # Перенесено до schemas/__init__.py
+# TransactionSchema.model_rebuild() # Перенесено до schemas/__init__.py
+# Якщо RewardSchema або BonusAdjustmentSchema також мають складні ForwardRef,
+# їх model_rebuild() теж можна тут викликати.
+# Наприклад, якщо RewardSchema посилається на AccountSchema:
+# RewardSchema.model_rebuild() # Перенесено до schemas/__init__.py

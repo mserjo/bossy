@@ -106,5 +106,5 @@ class UserLevelCreateSchema(BaseSchema):
 #
 # Все виглядає добре.
 
-UserLevelSchema.model_rebuild()
-UserLevelCreateSchema.model_rebuild()
+# UserLevelSchema.model_rebuild() # Виклик перенесено до schemas/__init__.py
+# UserLevelCreateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef

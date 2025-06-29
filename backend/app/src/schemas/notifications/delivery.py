@@ -124,6 +124,6 @@ class NotificationDeliveryUpdateSchema(BaseSchema):
 #
 # Все виглядає добре.
 
-NotificationDeliverySchema.model_rebuild()
-NotificationDeliveryCreateSchema.model_rebuild()
-NotificationDeliveryUpdateSchema.model_rebuild()
+# NotificationDeliverySchema.model_rebuild() # Виклик перенесено до schemas/__init__.py
+# NotificationDeliveryCreateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef
+# NotificationDeliveryUpdateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef

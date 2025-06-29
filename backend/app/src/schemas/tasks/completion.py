@@ -142,7 +142,7 @@ class TaskCompletionReviewSchema(BaseSchema):
 # `updated_at` - при зміні статусу, додаванні коментарів тощо.
 # Все виглядає добре.
 
-TaskCompletionSchema.model_rebuild()
-TaskCompletionStartSchema.model_rebuild()
-TaskCompletionSubmitSchema.model_rebuild()
-TaskCompletionReviewSchema.model_rebuild()
+# TaskCompletionSchema.model_rebuild()
+# TaskCompletionStartSchema.model_rebuild()
+# TaskCompletionSubmitSchema.model_rebuild()
+# TaskCompletionReviewSchema.model_rebuild()

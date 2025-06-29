@@ -103,5 +103,5 @@ class AchievementCreateSchema(BaseSchema):
 #
 # Все виглядає добре.
 
-AchievementSchema.model_rebuild()
-AchievementCreateSchema.model_rebuild()
+# AchievementSchema.model_rebuild() # Виклик перенесено до schemas/__init__.py
+# AchievementCreateSchema.model_rebuild() # Зазвичай не потрібно для схем без ForwardRef

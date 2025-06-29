@@ -8,9 +8,9 @@
 в конкретній групі та коли.
 """
 
-from sqlalchemy import Column, ForeignKey, DateTime, UniqueConstraint, Boolean  # type: ignore
+from sqlalchemy import Column, ForeignKey, DateTime, UniqueConstraint, Boolean, Index, text  # type: ignore # Додано Index, text
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship, Mapped  # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore # Додано mapped_column
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 
@@ -40,24 +40,10 @@ class UserLevelModel(BaseModel):
     """
     __tablename__ = "user_levels"
 
-    user_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
-    # Група, в контексті якої досягнуто рівень. Рівні самі по собі належать групам.
-    group_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True)
-    level_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("levels.id", ondelete="CASCADE"), nullable=False, index=True)
-
-    # `created_at` з BaseModel може слугувати як `achieved_at`.
-    # Якщо потрібне окреме поле:
-    # achieved_at: Column[DateTime] = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
-
-    # Якщо користувач може мати лише один поточний рівень в групі, це поле допоможе його ідентифікувати.
-    # При досягненні нового рівня, попередній запис `is_current` стає False.
-    # Або ж, якщо зберігається лише поточний рівень, то ця таблиця може мати UniqueConstraint(user_id, group_id).
-    # Якщо зберігається історія всіх досягнутих рівнів:
-    is_current: Column[bool] = Column(Boolean, default=True, nullable=False, index=True)
-    # TODO: Додати логіку для оновлення `is_current` при досягненні нового рівня.
-    # Або ж, якщо зберігається тільки поточний рівень, то це поле не потрібне,
-    # а унікальність (user_id, group_id) гарантує один запис.
-    # Поки що залишаю для можливості зберігання історії.
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    group_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("groups.id", ondelete="CASCADE"), nullable=False, index=True)
+    level_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("levels.id", ondelete="CASCADE"), nullable=False, index=True)
+    is_current: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
 
     # --- Зв'язки (Relationships) ---
     # TODO: Узгодити back_populates="achieved_user_levels" з UserModel
@@ -69,7 +55,13 @@ class UserLevelModel(BaseModel):
 
     __table_args__ = (
         UniqueConstraint('user_id', 'level_id', name='uq_user_level_achieved'), # Користувач досягає кожного рівня лише один раз
-        UniqueConstraint('user_id', 'group_id', name='uq_user_group_current_level', postgresql_where=(is_current == True)), # Лише один поточний рівень на користувача в групі
+        Index(
+            'ix_user_group_current_level_unique', # Назва індексу
+            user_id,
+            group_id,
+            unique=True,
+            postgresql_where=(is_current.is_(True)) # Умова для часткового індексу
+        ),
     )
 
     def __repr__(self) -> str:

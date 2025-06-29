@@ -128,6 +128,46 @@ __all__ = _base_schemas_all + \
 # ForwardRef на глобальному рівні, можна буде повернутися до цього питання.
 # Основна мета цього файлу - агрегація та реекспорт схем.
 
+# Виклик model_rebuild для всіх схем, які можуть мати ForwardRef,
+# після того, як всі модулі схем імпортовано.
+# Це має вирішити проблеми з циклічними залежностями та ForwardRef.
+# from backend.app.src.schemas.files import FileSchema, AvatarSchema # Виклики model_rebuild() тепер у __init__.py підпакетів
+# from backend.app.src.schemas.auth import UserSchema, RefreshTokenSchema, SessionSchema
+# from backend.app.src.schemas.groups import GroupSchema, GroupMembershipSchema, PollSchema, PollOptionSchema, PollVoteSchema, GroupInvitationSchema, GroupSettingsSchema, GroupTemplateSchema
+# from backend.app.src.schemas.tasks import TaskSchema, TaskAssignmentSchema, TaskCompletionSchema, TaskDependencySchema, TaskProposalSchema, TaskReviewSchema
+# from backend.app.src.schemas.bonuses import AccountSchema, TransactionSchema, RewardSchema, BonusAdjustmentSchema
+# from backend.app.src.schemas.notifications import NotificationSchema, NotificationDeliverySchema, NotificationTemplateSchema
+# from backend.app.src.schemas.gamification import LevelSchema, UserLevelSchema, BadgeSchema, AchievementSchema, RatingSchema
+# from backend.app.src.schemas.teams import TeamSchema, TeamMembershipSchema
+# from backend.app.src.schemas.reports import ReportSchema
+# # Додайте інші схеми, якщо вони використовують ForwardRef до інших пакетів
+
+# # Список схем для model_rebuild()
+# # Порядок може бути важливим, якщо є залежності між ForwardRef в різних файлах.
+# # Зазвичай, якщо схема A посилається на B, а B на A, то порядок не має значення,
+# # Pydantic має впоратися.
+# # Головне, щоб усі класи були доступні в глобальному просторі імен модуля.
+# schemas_to_rebuild_globally = [
+#     FileSchema, AvatarSchema, # з files
+#     UserSchema, RefreshTokenSchema, SessionSchema, # з auth
+#     GroupSchema, GroupMembershipSchema, PollSchema, PollOptionSchema, PollVoteSchema, GroupInvitationSchema, GroupSettingsSchema, GroupTemplateSchema, # з groups
+#     TaskSchema, TaskAssignmentSchema, TaskCompletionSchema, TaskDependencySchema, TaskProposalSchema, TaskReviewSchema, # з tasks
+#     AccountSchema, TransactionSchema, RewardSchema, BonusAdjustmentSchema, # з bonuses
+#     NotificationSchema, NotificationDeliverySchema, NotificationTemplateSchema, # з notifications
+#     LevelSchema, UserLevelSchema, BadgeSchema, AchievementSchema, RatingSchema, # з gamification
+#     TeamSchema, TeamMembershipSchema, # з teams
+#     ReportSchema, # з reports
+#     # Додайте інші, якщо потрібно
+# ]
+
+# for schema_cls in schemas_to_rebuild_globally:
+#     try:
+#         schema_cls.model_rebuild()
+#     except Exception as e:
+#         # Логування або обробка помилки, якщо потрібно
+#         print(f"Попередження: не вдалося глобально оновити схему {schema_cls.__name__}: {e}")
+
+
 # Цей файл є важливою частиною структури проекту, забезпечуючи єдину точку
 # доступу до всіх схем даних, що використовуються для валідації API запитів/відповідей
 # та взаємодії з ORM моделями.

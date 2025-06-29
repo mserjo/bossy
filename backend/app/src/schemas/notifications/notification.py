@@ -39,7 +39,7 @@ class NotificationSchema(AuditDatesSchema): # Успадковує id, created_a
     is_read: bool = Field(..., description="Чи прочитане сповіщення користувачем")
     read_at: Optional[datetime] = Field(None, description="Час, коли сповіщення було прочитане")
 
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Додаткові дані для сповіщення (JSON)")
+    additional_data: Optional[Dict[str, Any]] = Field(None, description="Додаткові дані для сповіщення (JSON)") # Перейменовано з metadata
 
     # --- Розгорнуті зв'язки (приклад) ---
     recipient: Optional[UserPublicSchema] = Field(None, description="Отримувач сповіщення")

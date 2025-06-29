@@ -35,7 +35,7 @@ class TransactionSchema(AuditDatesSchema): # Успадковує id, created_at
 
     related_user_id: Optional[uuid.UUID] = Field(None, description="ID пов'язаного користувача (наприклад, для 'подяки')")
 
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Додаткові структуровані дані (JSON)")
+    additional_data: Optional[Dict[str, Any]] = Field(None, description="Додаткові структуровані дані (JSON), раніше 'metadata'") # Перейменовано
     balance_after_transaction: Optional[Decimal] = Field(None, description="Баланс рахунку після цієї транзакції")
 
     # --- Розгорнуті зв'язки (приклад) ---
@@ -61,7 +61,7 @@ class TransactionCreateSchema(BaseSchema):
     source_entity_id: Optional[uuid.UUID] = Field(None, description="ID сутності-джерела")
 
     related_user_id: Optional[uuid.UUID] = Field(None, description="ID пов'язаного користувача")
-    metadata: Optional[Dict[str, Any]] = Field(None, description="Додаткові дані (JSON)")
+    additional_data: Optional[Dict[str, Any]] = Field(None, description="Додаткові дані (JSON), раніше 'metadata'") # Перейменовано
 
     # `balance_after_transaction` розраховується сервісом при створенні транзакції.
     # `created_at`, `updated_at`, `id` встановлюються автоматично.

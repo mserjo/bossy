@@ -6,9 +6,9 @@
 пов'язаний з користувачем (`UserModel`).
 """
 
-from sqlalchemy import Column, ForeignKey, Boolean, UniqueConstraint # type: ignore
+from sqlalchemy import Column, ForeignKey, Boolean, Index, text # type: ignore # Замінено UniqueConstraint на Index
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship, Mapped  # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore # Додано mapped_column
 import uuid # Для роботи з UUID
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel
@@ -34,20 +34,15 @@ class AvatarModel(BaseModel):
     """
     __tablename__ = "avatars"
 
-    user_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    user_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
 
     # Посилання на запис у FileModel, де зберігаються метадані файлу аватара.
     # TODO: Замінити "files.id" на константу або імпорт моделі FileModel.
-    file_id: Column[uuid.UUID] = Column(UUID(as_uuid=True), ForeignKey("files.id", ondelete="CASCADE"), nullable=False, index=True, unique=True)
-    # `unique=True` для file_id, якщо один файл може бути аватаром лише одного користувача
-    # або лише одним активним аватаром. Це не зовсім правильно.
-    # Один файл може бути використаний як аватар різними користувачами (якщо це дефолтний аватар).
-    # Або якщо користувач завантажує той самий файл кілька разів, створюються нові записи FileModel.
-    # Унікальність має бути на (user_id, is_current=True).
-    # Поки що знімаю `unique=True` з `file_id` тут.
+    file_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("files.id", ondelete="CASCADE"), nullable=False, index=True)
+    # `unique=True` для file_id було знято, оскільки унікальність має бути на (user_id, is_current=True).
     # Унікальність `file_id` в `FileModel.storage_path` вже є.
 
-    is_current: Column[bool] = Column(Boolean, default=True, nullable=False, index=True)
+    is_current: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False, index=True)
     # Якщо `is_current` = True, то це поточний аватар користувача.
     # Має бути лише один запис з `is_current=True` для кожного `user_id`.
 
@@ -61,12 +56,18 @@ class AvatarModel(BaseModel):
     # Обмеження унікальності:
     # Для кожного user_id може бути лише один аватар з is_current = True.
     # Це реалізується через частковий унікальний індекс.
+    # Важливо: для часткового індексу поле `is_current` має бути частиною самого UniqueConstraint.
+    # Однак, логіка "тільки один is_current=True на user_id" краще реалізується так:
+    # UniqueConstraint('user_id', name='uq_user_current_avatar', postgresql_where=text("is_current IS TRUE"))
+    # Або через виключення (exclusion constraint), якщо БД підтримує.
+    # Використовуємо Index для часткового унікального індексу.
     __table_args__ = (
-        UniqueConstraint('user_id', name='uq_user_current_avatar', postgresql_where=(is_current == True)),
-        # Також, якщо один файл не може бути активним аватаром для двох користувачів одночасно:
-        # UniqueConstraint('file_id', name='uq_file_current_avatar', postgresql_where=(is_current == True)),
-        # Але це може бути занадто обмежуючим, якщо файли можуть повторно використовуватися.
-        # Головне - унікальність поточного аватара для користувача.
+        Index(
+            'ix_user_current_avatar_unique', # Назва індексу
+            user_id,                       # Поле для індексування
+            unique=True,
+            postgresql_where=(is_current.is_(True)) # Умова для часткового індексу
+        ),
     )
 
     def __repr__(self) -> str:

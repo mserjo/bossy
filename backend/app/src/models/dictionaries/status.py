@@ -136,11 +136,11 @@ class StatusModel(BaseDictModel):
 
 
     # Поле для сортування статусів у визначеному порядку (наприклад, для UI).
-    display_order: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True)
+    display_order: Mapped[Optional[int]] = mapped_column(Integer, default=0, nullable=True) # Вже використовує Mapped
 
     # Поле для зберігання кольору статусу (наприклад, для візуального виділення в UI).
     # Формат кольору, наприклад, HEX (#RRGGBB) або назва кольору.
-    color_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True) # Збільшено довжину для назв кольорів
+    color_code: Mapped[Optional[str]] = mapped_column(String(20), nullable=True) # Вже використовує Mapped
 
     def __repr__(self) -> str:
         """

@@ -6,7 +6,7 @@
 сповіщень різними мовами, підставляючи динамічні дані.
 """
 
-from sqlalchemy import Column, String, Text, ForeignKey, UniqueConstraint # type: ignore
+from sqlalchemy import Column, String, Text, ForeignKey, UniqueConstraint, Index, text # type: ignore # Додано Index, text
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
 from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore
 import uuid # Для роботи з UUID
@@ -64,17 +64,17 @@ class NotificationTemplateModel(BaseMainModel):
     # Потрібно забезпечити його унікальність, можливо, в поєднанні з іншими полями.
 
     # Тип сповіщення, для якого цей шаблон.
-    notification_type_code: Column[str] = Column(String(100), nullable=False, index=True)
+    notification_type_code: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
 
     # Канал, для якого цей шаблон (наприклад, 'IN_APP', 'EMAIL_SUBJECT', 'EMAIL_BODY_HTML', 'SMS', 'PUSH')
     # TODO: Створити Enum або довідник для NotificationChannel.
-    channel_code: Column[str] = Column(String(50), nullable=False, index=True)
+    channel_code: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
 
     # Код мови (наприклад, 'uk', 'en')
-    language_code: Column[str] = Column(String(10), nullable=False, index=True) # ISO 639-1 коди (uk, en)
+    language_code: Mapped[str] = mapped_column(String(10), nullable=False, index=True) # ISO 639-1 коди (uk, en)
 
     # Вміст шаблону. Може містити змінні для підстановки.
-    template_content: Column[str] = Column(Text, nullable=False)
+    template_content: Mapped[str] = mapped_column(Text, nullable=False)
 
     # `group_id` з BaseMainModel дозволяє створювати кастомні шаблони для груп.
     # `group_id` з BaseMainModel дозволяє створювати кастомні шаблони для груп.
@@ -170,11 +170,13 @@ class NotificationTemplateModel(BaseMainModel):
 
     __table_args__ = (
         # Унікальний шаблон для групи, типу, каналу та мови
-        UniqueConstraint('notification_type_code', 'channel_code', 'language_code', 'group_id',
-                         name='uq_notif_template_group_key',
-                         postgresql_where=(group_id.isnot(None))),
+        Index('ix_notif_template_group_key_unique',
+              'notification_type_code', 'channel_code', 'language_code', 'group_id',
+              unique=True,
+              postgresql_where=Column('group_id').isnot(None)),
         # Унікальний глобальний шаблон для типу, каналу та мови
-        UniqueConstraint('notification_type_code', 'channel_code', 'language_code',
-                         name='uq_notif_template_global_key',
-                         postgresql_where=(group_id.is_(None))),
+        Index('ix_notif_template_global_key_unique',
+              'notification_type_code', 'channel_code', 'language_code',
+              unique=True,
+              postgresql_where=Column('group_id').is_(None)),
     )

@@ -72,7 +72,8 @@ class NotificationModel(BaseModel):
 
     is_read: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     read_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    metadata: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
+    # Перейменовано з 'metadata' для уникнення конфлікту з зарезервованим іменем SQLAlchemy
+    additional_data: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True)
 
 
     # --- Зв'язки (Relationships) ---

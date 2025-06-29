@@ -87,7 +87,7 @@ class FileService(BaseService[FileRepository]):
         category: FileCategoryEnum, # Категорія файлу
         group_id_context: Optional[uuid.UUID] = None, # Якщо файл стосується групи
         is_public: bool = False,
-        custom_metadata: Optional[Dict[str, Any]] = None
+        additional_info: Optional[Dict[str, Any]] = None # Перейменовано з custom_metadata
     ) -> FileModel:
         """
         Обробляє завантаження файлу: зберігає файл, створює запис метаданих.
@@ -128,7 +128,7 @@ class FileService(BaseService[FileRepository]):
             uploaded_by_user_id=current_user.id,
             group_context_id=group_id_context,
             file_category_code=category.value,
-            metadata=custom_metadata,
+            additional_info=additional_info, # Перейменовано з metadata
             is_public=is_public
         )
         return await self.repository.create(db, obj_in=file_create_schema)

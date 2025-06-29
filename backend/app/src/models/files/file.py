@@ -7,11 +7,11 @@
 Самі файли зберігаються в файловій системі або хмарному сховищі,
 а ця модель містить посилання на них та їх метадані.
 """
-from typing import Optional
+from typing import Optional, Dict, Any
 
 from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Integer, Boolean # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
-from sqlalchemy.orm import relationship, Mapped  # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore # Додано mapped_column
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 
@@ -70,29 +70,29 @@ class FileModel(BaseModel):
     __tablename__ = "files"
 
     # Шлях/ключ у файловому сховищі. Має бути унікальним.
-    storage_path: Column[str] = Column(String(1024), nullable=False, unique=True, index=True)
-    original_filename: Column[str] = Column(String(255), nullable=False)
-    mime_type: Column[str] = Column(String(100), nullable=False, index=True)
-    file_size_bytes: Column[Integer] = Column(Integer, nullable=False) # Використовуємо Integer, PostgreSQL підтримує до 2GB. Для більших - BigInteger.
+    storage_path: Mapped[str] = mapped_column(String(1024), nullable=False, unique=True, index=True)
+    original_filename: Mapped[str] = mapped_column(String(255), nullable=False)
+    mime_type: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    file_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False) # Використовуємо Integer, PostgreSQL підтримує до 2GB. Для більших - BigInteger.
 
     # Хто завантажив файл
     # TODO: Замінити "users.id" на константу або імпорт моделі UserModel.
-    uploaded_by_user_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_files_uploader_id", ondelete="SET NULL"), nullable=True, index=True)
+    uploaded_by_user_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("users.id", name="fk_files_uploader_id", ondelete="SET NULL"), nullable=True, index=True)
 
     # Контекст групи, якщо файл специфічний для групи
     # TODO: Замінити "groups.id" на константу або імпорт моделі GroupModel.
-    group_context_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("groups.id", name="fk_files_group_context_id", ondelete="CASCADE"), nullable=True, index=True)
+    group_context_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("groups.id", name="fk_files_group_context_id", ondelete="CASCADE"), nullable=True, index=True)
 
     # Категорія файлу
     # TODO: Створити Enum або довідник для FileCategory.
     # Приклади: "USER_AVATAR", "GROUP_ICON", "REWARD_ICON", "BADGE_ICON", "LEVEL_ICON", "TASK_ATTACHMENT", "REPORT_FILE".
-    file_category_code: Column[str | None] = Column(String(50), nullable=True, index=True)
+    file_category_code: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
 
-    metadata: Column[JSONB | None] = Column(JSONB, nullable=True) # Наприклад, {"width": 100, "height": 100} для зображень
+    additional_info: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True) # Перейменовано з metadata, Наприклад, {"width": 100, "height": 100} для зображень
 
-    # status_id: Column[uuid.UUID | None] = Column(UUID(as_uuid=True), ForeignKey("statuses.id"), nullable=True, index=True)
+    # status_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("statuses.id"), nullable=True, index=True)
 
-    is_public: Column[bool] = Column(Boolean, default=False, nullable=False, index=True)
+    is_public: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
 
 
     # --- Зв'язки (Relationships) ---

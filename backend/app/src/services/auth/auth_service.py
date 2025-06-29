@@ -16,13 +16,13 @@ from backend.app.src.schemas.auth.login import LoginRequestSchema
 from backend.app.src.schemas.auth.user import UserCreateSchema, UserSchema # UserSchema може бути не потрібна тут
 from backend.app.src.schemas.auth.token import TokenResponseSchema, TokenPayloadSchema # TokenPayloadSchema може бути для внутрішнього використання
 from backend.app.src.schemas.auth.password import PasswordResetRequestSchema, PasswordResetConfirmSchema # Для відновлення паролю
-from backend.app.src.repositories.auth.user_repository import UserRepository
-from backend.app.src.repositories.auth.token_repository import RefreshTokenRepository # Змінено імпорт
-from backend.app.src.repositories.auth.session_repository import SessionRepository # Змінено імпорт
+from backend.app.src.repositories.auth.user import UserRepository # Виправлено шлях
+from backend.app.src.repositories.auth.token import RefreshTokenRepository # Виправлено шлях
+from backend.app.src.repositories.auth.session import SessionRepository # Виправлено шлях
 from backend.app.src.services.auth.user_service import UserService
 from backend.app.src.services.auth.token_service import TokenService # Для генерації різних типів токенів
 # from backend.app.src.services.notifications.email_service import EmailService # Для відправки email
-from backend.app.src.core.security import verify_password, create_access_token, create_refresh_token_pair
+from backend.app.src.config.security import verify_password # create_access_token, create_refresh_token_pair - не використовуються напряму тут
 from backend.app.src.core.exceptions import UnauthorizedException, BadRequestException, NotFoundException
 from backend.app.src.config.settings import settings
 from backend.app.src.config.logging import logger

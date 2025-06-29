@@ -5,7 +5,7 @@
 Включає параметри для JWT токенів, хешування паролів, політики CORS тощо.
 """
 
-from passlib.context import CryptContext # type: ignore # Для хешування паролів
+from passlib.context import CryptContext  # type: ignore # Для хешування паролів
 from typing import List, Union, Optional
 from pydantic import HttpUrl
 
@@ -20,14 +20,67 @@ from backend.app.src.config.settings import settings
 # (корисно при міграції з інших алгоритмів).
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
+
 # Функції для роботи з паролями
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Перевіряє, чи співпадає звичайний пароль з захешованим."""
     return pwd_context.verify(plain_password, hashed_password)
 
+
 def get_password_hash(password: str) -> str:
     """Генерує хеш для пароля."""
     return pwd_context.hash(password)
+
+
+# --- Функції для створення JWT токенів ---
+from datetime import datetime, timedelta, timezone
+import uuid
+from jose import jwt
+from typing import Tuple  # Додано Tuple
+
+
+# SECRET_KEY та ALGORITHM мають бути визначені вище або імпортовані з settings
+# Припускаємо, що вони вже є (будуть визначені нижче з settings)
+
+def create_access_token_raw(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """
+    Генерує access token на основі переданих даних та часу життя.
+    """
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(
+            minutes=ACCESS_TOKEN_EXPIRE_MINUTES)  # Використовуємо ACCESS_TOKEN_EXPIRE_MINUTES
+    to_encode.update({"exp": expire, "iat": datetime.now(timezone.utc)})
+    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
+    return encoded_jwt
+
+
+def create_refresh_token_pair() -> Tuple[str, str, str]:
+    """
+    Генерує пару для refresh токена:
+    1. Токен для клієнта (jti.secret_payload_part)
+    2. Хешована секретна частина для зберігання в БД (hashed_secret_payload_part)
+    3. JTI (JWT ID) як рядок
+    """
+    jti = str(uuid.uuid4())
+    # Секретна частина, яку знатиме лише клієнт (частина токена) та сервер (для перевірки хеша)
+    # Важливо: ця секретна частина не повинна бути легко вгадуваною і має бути достатньо довгою.
+    # Для простоти, генеруємо ще один UUID як секретну частину.
+    secret_payload_part = str(uuid.uuid4())
+
+    # Хешуємо секретну частину для зберігання в БД
+    # Використовуємо той же pwd_context, що й для паролів, або окремий для токенів.
+    # Для прикладу, використаємо get_password_hash, хоча це може бути надлишковим.
+    # Краще мати окремий, менш "важкий" механізм, якщо це критично для продуктивності,
+    # але для безпеки це надійно.
+    hashed_secret_payload_part = get_password_hash(secret_payload_part)  # Хешуємо секретну частину
+
+    # Токен, що повертається клієнту, складається з JTI та нехешованої секретної частини
+    client_refresh_token = f"{jti}.{secret_payload_part}"
+
+    return client_refresh_token, hashed_secret_payload_part, jti
 
 
 # --- Параметри JWT токенів (взяті з settings.auth, оскільки вони стосуються автентифікації) ---

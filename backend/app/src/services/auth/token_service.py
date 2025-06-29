@@ -13,13 +13,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.src.config.settings import settings
 from backend.app.src.config.logging import logger
-from backend.app.src.core.security import (
+from backend.app.src.config.security import ( # Виправлено шлях на config.security
     ALGORITHM, create_access_token_raw, create_refresh_token_pair,
     get_password_hash, verify_password # verify_password тут для перевірки секретної частини refresh токена
 )
 from backend.app.src.models.auth.token import RefreshTokenModel
-from backend.app.src.repositories.auth.token_repository import RefreshTokenRepository
-from backend.app.src.repositories.auth.user_repository import UserRepository # Для отримання користувача
+from backend.app.src.repositories.auth.token import RefreshTokenRepository # Виправлено шлях
+from backend.app.src.repositories.auth.user import UserRepository # Виправлено шлях, для отримання користувача
 from backend.app.src.core.exceptions import UnauthorizedException, InternalServerError, InvalidTokenException
 
 class TokenService:

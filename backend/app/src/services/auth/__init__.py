@@ -9,15 +9,14 @@
 - `TokenService` (або як частина AuthService): для генерації та валідації токенів.
 """
 
-from .user_service import UserService, user_service
-from .auth_service import AuthService, auth_service
+from .user_service import UserService  # Імпортуємо тільки клас UserService
+from .auth_service import AuthService  # Імпортуємо тільки клас AuthService
 # from .token_service import TokenService, token_service # Якщо буде окремим
 
 __all__ = [
-    "UserService",
-    "user_service",
-    "AuthService",
-    "auth_service",
+    "UserService",  # Експортуємо тільки клас UserService
+    "AuthService",  # Експортуємо тільки клас AuthService
+    # "auth_service", # Видаляємо екземпляр
     # "TokenService",
     # "token_service",
 ]

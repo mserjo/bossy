@@ -51,6 +51,11 @@ from backend.app.src.schemas.dictionaries.integration_type import (
     IntegrationTypeCreateSchema,
     IntegrationTypeUpdateSchema,
 )
+from backend.app.src.schemas.dictionaries.user_type import ( # Додано імпорт для UserType
+    UserTypeSchema,
+    UserTypeCreateSchema,
+    UserTypeUpdateSchema,
+)
 
 # Визначення змінної `__all__` для контролю публічного API пакету.
 # Включаємо як схеми для читання, так і для створення/оновлення.
@@ -89,6 +94,11 @@ __all__ = [
     "IntegrationTypeSchema",
     "IntegrationTypeCreateSchema",
     "IntegrationTypeUpdateSchema",
+
+    # UserType schemas # Додано експорт для UserType
+    "UserTypeSchema",
+    "UserTypeCreateSchema",
+    "UserTypeUpdateSchema",
 ]
 
 # TODO: Переконатися, що всі необхідні схеми довідників створені та включені до `__all__`.

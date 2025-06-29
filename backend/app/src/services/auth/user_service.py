@@ -14,13 +14,16 @@ from fastapi import HTTPException, status
 
 from backend.app.src.models.auth.user import UserModel
 from backend.app.src.schemas.auth.user import UserCreateSchema, UserUpdateSchema, UserAdminUpdateSchema, UserSchema
-from backend.app.src.repositories.auth.user_repository import UserRepository
-from backend.app.src.repositories.dictionaries.status_repository import StatusRepository # Для статусів
-from backend.app.src.repositories.dictionaries.user_role_repository import UserRoleRepository # Для ролей
+from backend.app.src.models.auth.user import UserModel
+from backend.app.src.schemas.auth.user import UserCreateSchema, UserUpdateSchema, UserAdminUpdateSchema, UserSchema
+from backend.app.src.repositories.auth.user import UserRepository # Виправлено шлях
+from backend.app.src.repositories.dictionaries.status import StatusRepository # Для статусів, виправлено шлях
+from backend.app.src.repositories.dictionaries.user_role import UserRoleRepository # Для ролей, виправлено шлях
 from backend.app.src.services.base import BaseService
-from backend.app.src.core.security import get_password_hash, verify_password
+from backend.app.src.config.security import get_password_hash, verify_password # Виправлено шлях на config.security
 from backend.app.src.core.exceptions import NotFoundException, BadRequestException, ForbiddenException
-from backend.app.src.core.constants import USER_TYPE_SUPERADMIN, STATUS_ACTIVE_CODE, STATUS_PENDING_EMAIL_VERIFICATION_CODE, ROLE_USER_CODE
+from backend.app.src.core.constants import USER_TYPE_SUPERADMIN, STATUS_ACTIVE_CODE, \
+    STATUS_PENDING_EMAIL_VERIFICATION_CODE, ROLE_USER_CODE, ROLE_ADMIN_CODE
 from backend.app.src.config.logging import logger
 
 class UserService(BaseService[UserRepository]):

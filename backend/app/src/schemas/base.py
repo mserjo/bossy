@@ -86,6 +86,11 @@ class PaginatedResponse(BaseSchema, Generic[DataType]):
     # next_page: Optional[int] = Field(None, description="Номер наступної сторінки, якщо є")
     # prev_page: Optional[int] = Field(None, description="Номер попередньої сторінки, якщо є")
 
+    model_config = ConfigDict(
+        from_attributes=True, # Успадковано, але для ясності
+        arbitrary_types_allowed=True # Дозволяє використовувати типи, які Pydantic не знає за замовчуванням
+    )
+
 class MessageResponse(BaseSchema):
     """
     Схема для стандартної відповіді з повідомленням.

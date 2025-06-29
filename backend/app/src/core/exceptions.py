@@ -186,3 +186,11 @@ class ResourceNotFoundException(BusinessLogicException):
 # Тут для простоти `detail` - це рядок.
 #
 # Все готово.
+
+class InvalidTokenException(UnauthorizedException):
+    """Виняток для невалідних або прострочених токенів (не лише JWT, а й refresh, one-time)."""
+    def __init__(self, detail_key: str = "error_invalid_or_expired_token", headers: Optional[Dict[str, Any]] = None, **kwargs_format: Any) -> None:
+        # WWW-Authenticate може бути недоречним для всіх типів невалідних токенів,
+        # але оскільки успадковується від UnauthorizedException, він буде.
+        # Можна перекрити, якщо потрібно.
+        super().__init__(detail_key=detail_key, headers=headers, **kwargs_format)

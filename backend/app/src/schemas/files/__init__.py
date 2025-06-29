@@ -59,8 +59,17 @@ __all__ = [
 # Поки що залишаю без явних викликів `model_rebuild`.
 # Головне, що всі схеми експортуються через `__all__`.
 
+# Імпортуємо та оновлюємо залежні схеми перед оновленням схем цього модуля
+from backend.app.src.schemas.auth.user import UserPublicSchema
+from backend.app.src.schemas.groups.group import GroupSimpleSchema
+
+# Переконуємося, що залежні схеми оновлені (якщо вони теж мають ForwardRef)
+# UserPublicSchema.model_rebuild() # Видалено, буде глобальний виклик
+# GroupSimpleSchema.model_rebuild() # Видалено, буде глобальний виклик
+
+
 # Виклик model_rebuild для схем, що містять ForwardRef
-FileSchema.model_rebuild()
-AvatarSchema.model_rebuild()
+# FileSchema.model_rebuild() # Видалено, буде глобальний виклик
+# AvatarSchema.model_rebuild() # Видалено, буде глобальний виклик
 
 # Все виглядає добре.

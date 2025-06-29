@@ -73,8 +73,8 @@ __all__ = [
 # Головне, що всі схеми експортуються через `__all__`.
 
 # Виклик model_rebuild для схем, що містять ForwardRef
-NotificationSchema.model_rebuild()
-NotificationTemplateSchema.model_rebuild()
-NotificationDeliverySchema.model_rebuild()
+# NotificationSchema.model_rebuild() # Видалено, буде глобальний виклик
+# NotificationTemplateSchema.model_rebuild() # Видалено, буде глобальний виклик
+# NotificationDeliverySchema.model_rebuild() # Видалено, буде глобальний виклик
 
 # Все виглядає добре.

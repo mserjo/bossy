@@ -94,7 +94,7 @@ __all__ = [
 # Виклик model_rebuild для схем, що містять ForwardRef
 # Порядок важливий, якщо є залежності між ними в цьому ж модулі, але тут вони
 # переважно посилаються на схеми з інших модулів, які мають бути вже доступні.
-AccountSchema.model_rebuild()
-TransactionSchema.model_rebuild()
-RewardSchema.model_rebuild()
-BonusAdjustmentSchema.model_rebuild()
+# AccountSchema.model_rebuild() # Видалено, буде глобальний виклик
+# TransactionSchema.model_rebuild() # Видалено, буде глобальний виклик
+# RewardSchema.model_rebuild() # Видалено, буде глобальний виклик
+# BonusAdjustmentSchema.model_rebuild() # Видалено, буде глобальний виклик

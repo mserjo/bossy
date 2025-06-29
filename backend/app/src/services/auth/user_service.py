@@ -289,7 +289,7 @@ class UserService(BaseService[UserRepository]):
             return deleted_user
         else: # Hard delete
             if actor.user_type_code != USER_TYPE_SUPERADMIN:
-            raise ForbiddenException(detail_key="error_hard_delete_not_authorized") # Новий ключ
+                raise ForbiddenException(detail_key="error_hard_delete_not_authorized") # Новий ключ
             user_email_before_delete = user_to_delete.email
             deleted_obj = await self.repository.delete(db=self.db_session, id=user_to_delete_id)
             if deleted_obj:
@@ -305,22 +305,22 @@ class UserService(BaseService[UserRepository]):
         """
         user = await self.repository.get_user_with_details(db=self.db_session, user_id=user_id)
         if not user:
-        raise NotFoundException(detail_key="error_user_not_found_for_auth") # Новий ключ
-    if user.is_deleted:
+            raise NotFoundException(detail_key="error_user_not_found_for_auth") # Новий ключ
+        if user.is_deleted:
             logger.warning(f"Спроба автентифікації для видаленого користувача: {user.email}")
-        raise ForbiddenException(detail_key="error_user_account_deleted") # Новий ключ
+            raise ForbiddenException(detail_key="error_user_account_deleted") # Новий ключ
 
         if not user.state:
             logger.error(f"У користувача {user.email} відсутній об'єкт статусу (state is None). Вважаємо неактивним.")
-        raise ForbiddenException(detail_key="error_user_status_undefined") # Новий ключ
+            raise ForbiddenException(detail_key="error_user_status_undefined") # Новий ключ
 
         if user.state.code != STATUS_ACTIVE_CODE:
             logger.warning(f"Спроба автентифікації для користувача {user.email} зі статусом '{user.state.code}' ('{user.state.name}').")
-        raise ForbiddenException(detail_key="error_user_account_not_active", status_name=user.state.name) # Новий ключ
+            raise ForbiddenException(detail_key="error_user_account_not_active", status_name=user.state.name) # Новий ключ
 
-    # if not user.is_email_verified: # Ця перевірка може бути частиною логіки STATUS_ACTIVE_CODE
+        # if not user.is_email_verified: # Ця перевірка може бути частиною логіки STATUS_ACTIVE_CODE
         #     logger.warning(f"Спроба входу для користувача {user.email} з непідтвердженим email.")
-    #     raise ForbiddenException(detail_key="error_user_email_not_verified") # Новий ключ
+        #     raise ForbiddenException(detail_key="error_user_email_not_verified") # Новий ключ
 
         logger.debug(f"Користувач {user_id} ({user.email}) пройшов перевірку активності для автентифікації.")
         return user
@@ -330,21 +330,21 @@ class UserService(BaseService[UserRepository]):
 
         if not verify_password(old_password, user.hashed_password):
             logger.warning(f"Невдала спроба зміни пароля для користувача {user.email}: неправильний старий пароль.")
-        raise BadRequestException(detail_key="error_invalid_current_password") # Новий ключ
+            raise BadRequestException(detail_key="error_invalid_current_password") # Новий ключ
 
         if old_password == new_password:
-        raise BadRequestException(detail_key="error_new_password_same_as_old") # Новий ключ
+            raise BadRequestException(detail_key="error_new_password_same_as_old") # Новий ключ
 
-    try:
-        is_strong_password(new_password)
-    except ValueError as e: # is_strong_password кидає ValueError з повідомленням
-        # Повідомлення з is_strong_password вже може бути локалізованим, якщо валідатор це підтримує.
-        # Або ж ми можемо мати загальний ключ для помилки надійності пароля.
-        # Поки що передаємо повідомлення з валідатора.
-        raise BadRequestException(detail=str(e))
-
+        try:
+            is_strong_password(new_password)
+        except ValueError as e: # is_strong_password кидає ValueError з повідомленням
+            # Повідомлення з is_strong_password вже може бути локалізованим, якщо валідатор це підтримує.
+            # Або ж ми можемо мати загальний ключ для помилки надійності пароля.
+            # Поки що передаємо повідомлення з валідатора.
+            raise BadRequestException(detail=str(e))
 
         user.hashed_password = get_password_hash(new_password)
+        # Помилка відступу тут: наступні два рядки мають бути на тому ж рівні, що й user.hashed_password
         await self.repository.update(db_obj=user, obj_in={"hashed_password": user.hashed_password})
         logger.info(f"Пароль для користувача {user.email} успішно змінено.")
 

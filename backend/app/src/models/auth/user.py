@@ -10,7 +10,7 @@ from typing import List, TYPE_CHECKING, Optional
 
 from sqlalchemy import String, Text, DateTime, Boolean, ForeignKey, Integer, Index  # type: ignore  # Removed LargeBinary as it's not used, Column
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore # Додано mapped_column
+from sqlalchemy.orm import relationship, Mapped, mapped_column, declared_attr # Додано mapped_column та declared_attr
 import uuid # Для роботи з UUID
 
 from backend.app.src.models.base import BaseMainModel # Успадковуємо від BaseMainModel для отримання name, description, state_id тощо.
@@ -138,176 +138,224 @@ class UserModel(BaseMainModel):
     otp_backup_codes_hashed: Mapped[Optional[str]] = mapped_column(Text, nullable=True) # Список хешів резервних кодів
 
     # --- Зв'язки (Relationships) ---
-    # Зв'язок з токенами оновлення
-    refresh_tokens: Mapped[List["RefreshTokenModel"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    @declared_attr
+    def refresh_tokens(cls) -> Mapped[List["RefreshTokenModel"]]:
+        return relationship("RefreshTokenModel", back_populates="user", cascade="all, delete-orphan")
 
-    # Зв'язок з сесіями користувача
-    sessions: Mapped[List["SessionModel"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    @declared_attr
+    def sessions(cls) -> Mapped[List["SessionModel"]]:
+        return relationship("SessionModel", back_populates="user", cascade="all, delete-orphan")
 
-    # Зв'язок з аватарами користувача (один користувач може мати багато записів AvatarModel для історії)
-    avatars: Mapped[List["AvatarModel"]] = relationship(back_populates="user", cascade="all, delete-orphan", foreign_keys="[AvatarModel.user_id]")
-    # Поточний аватар можна буде отримати через фільтр is_current=True або окремим полем/методом.
+    @declared_attr
+    def avatars(cls) -> Mapped[List["AvatarModel"]]:
+        # foreign_keys тут вказується як рядок з назвою класу та атрибуту,
+        # або як пряме посилання на атрибут класу AvatarModel, якщо він вже визначений.
+        # Для @declared_attr краще використовувати рядкові посилання або cls-based, якщо можливо.
+        # Однак, оскільки AvatarModel.user_id є простим стовпцем, можна так:
+        return relationship("AvatarModel", back_populates="user", cascade="all, delete-orphan", foreign_keys="[AvatarModel.user_id]")
 
-    # Зв'язок з членством у групах (таблиця GroupMembershipModel)
-    group_memberships: Mapped[List["GroupMembershipModel"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    @declared_attr
+    def group_memberships(cls) -> Mapped[List["GroupMembershipModel"]]:
+        return relationship("GroupMembershipModel", back_populates="user", cascade="all, delete-orphan")
 
-    # Зв'язок з рахунками користувача (таблиця AccountModel)
-    accounts: Mapped[List["AccountModel"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+    @declared_attr
+    def accounts(cls) -> Mapped[List["AccountModel"]]:
+        return relationship("AccountModel", back_populates="user", cascade="all, delete-orphan")
 
-    # Зв'язок з отриманими сповіщеннями (таблиця NotificationModel)
-    notifications_received: Mapped[List["NotificationModel"]] = relationship(
-        back_populates="recipient", # Узгоджено з NotificationModel
-        foreign_keys="[NotificationModel.recipient_user_id]",
-        cascade="all, delete-orphan"
-    )
+    @declared_attr
+    def notifications_received(cls) -> Mapped[List["NotificationModel"]]:
+        return relationship(
+            "NotificationModel",
+            back_populates="recipient",
+            foreign_keys="[NotificationModel.recipient_user_id]",
+            cascade="all, delete-orphan"
+        )
 
-    # Зв'язок з створеними завданнями/подіями
-    created_tasks: Mapped[List["TaskModel"]] = relationship(
-        back_populates="creator",
-        foreign_keys="[TaskModel.created_by_user_id]",
-        cascade="all, delete-orphan" # Або SET NULL, якщо завдання можуть існувати без автора
-    )
+    @declared_attr
+    def created_tasks(cls) -> Mapped[List["TaskModel"]]:
+        return relationship(
+            "TaskModel",
+            back_populates="creator",
+            foreign_keys="[TaskModel.created_by_user_id]",
+            cascade="all, delete-orphan"
+        )
 
-    # Зв'язок з призначеннями завдань (де цей користувач є виконавцем)
-    task_assignments: Mapped[List["TaskAssignmentModel"]] = relationship(
-        back_populates="user", # Виконавець
-        foreign_keys="[TaskAssignmentModel.user_id]",
-        cascade="all, delete-orphan"
-    )
-    # Зв'язок з призначеннями завдань (де цей користувач є тим, хто призначив)
-    made_task_assignments: Mapped[List["TaskAssignmentModel"]] = relationship(
-        back_populates="assigner",
-        foreign_keys="[TaskAssignmentModel.assigned_by_user_id]",
-        cascade="all, delete-orphan" # Або SET NULL
-    )
+    @declared_attr
+    def task_assignments(cls) -> Mapped[List["TaskAssignmentModel"]]:
+        return relationship(
+            "TaskAssignmentModel",
+            back_populates="user",
+            foreign_keys="[TaskAssignmentModel.user_id]",
+            cascade="all, delete-orphan"
+        )
 
-    # Зв'язок з виконаннями завдань
-    task_completions: Mapped[List["TaskCompletionModel"]] = relationship(
-        back_populates="user", # Виконавець
-        foreign_keys="[TaskCompletionModel.user_id]",
-        cascade="all, delete-orphan"
-    )
-    # Зв'язок з перевірками завдань (де цей користувач є тим, хто перевірив)
-    reviewed_task_completions: Mapped[List["TaskCompletionModel"]] = relationship(
-        back_populates="reviewer",
-        foreign_keys="[TaskCompletionModel.reviewed_by_user_id]",
-        cascade="all, delete-orphan" # Або SET NULL
-    )
+    @declared_attr
+    def made_task_assignments(cls) -> Mapped[List["TaskAssignmentModel"]]:
+        return relationship(
+            "TaskAssignmentModel",
+            back_populates="assigner",
+            foreign_keys="[TaskAssignmentModel.assigned_by_user_id]",
+            cascade="all, delete-orphan"
+        )
 
-    # Зв'язок з пропозиціями завдань (де цей користувач є автором пропозиції)
-    task_proposals_made: Mapped[List["TaskProposalModel"]] = relationship(
-        back_populates="proposer",
-        foreign_keys="[TaskProposalModel.proposed_by_user_id]",
-        cascade="all, delete-orphan"
-    )
-    # Зв'язок з пропозиціями завдань (де цей користувач є тим, хто розглянув)
-    task_proposals_reviewed: Mapped[List["TaskProposalModel"]] = relationship(
-        back_populates="reviewer",
-        foreign_keys="[TaskProposalModel.reviewed_by_user_id]",
-        cascade="all, delete-orphan" # Або SET NULL
-    )
+    @declared_attr
+    def task_completions(cls) -> Mapped[List["TaskCompletionModel"]]:
+        return relationship(
+            "TaskCompletionModel",
+            back_populates="user",
+            foreign_keys="[TaskCompletionModel.user_id]",
+            cascade="all, delete-orphan"
+        )
 
-    # Зв'язок з відгуками на завдання, залишеними цим користувачем
-    task_reviews_left: Mapped[List["TaskReviewModel"]] = relationship(
-        back_populates="user",
-        foreign_keys="[TaskReviewModel.user_id]",
-        cascade="all, delete-orphan"
-    )
+    @declared_attr
+    def reviewed_task_completions(cls) -> Mapped[List["TaskCompletionModel"]]:
+        return relationship(
+            "TaskCompletionModel",
+            back_populates="reviewer",
+            foreign_keys="[TaskCompletionModel.reviewed_by_user_id]",
+            cascade="all, delete-orphan"
+        )
 
-    # Зв'язок з голосами в опитуваннях
-    poll_votes_made: Mapped[List["PollVoteModel"]] = relationship(
-        back_populates="user",
-        foreign_keys="[PollVoteModel.user_id]",
-        cascade="all, delete-orphan" # Або SET NULL, якщо голоси анонімізуються при видаленні юзера
-    )
+    @declared_attr
+    def task_proposals_made(cls) -> Mapped[List["TaskProposalModel"]]:
+        return relationship(
+            "TaskProposalModel",
+            back_populates="proposer",
+            foreign_keys="[TaskProposalModel.proposed_by_user_id]",
+            cascade="all, delete-orphan"
+        )
 
-    # Зв'язок з системними логами, пов'язаними з цим користувачем
-    system_event_logs: Mapped[List["SystemEventLogModel"]] = relationship(
-        back_populates="user", # Потрібно додати "user" в SystemEventLogModel
-        foreign_keys="[SystemEventLogModel.user_id]"
-        # ondelete='SET NULL' має бути на ForeignKey в SystemEventLogModel.user_id
-        # cascade тут не потрібен для SET NULL
-    )
+    @declared_attr
+    def task_proposals_reviewed(cls) -> Mapped[List["TaskProposalModel"]]:
+        return relationship(
+            "TaskProposalModel",
+            back_populates="reviewer",
+            foreign_keys="[TaskProposalModel.reviewed_by_user_id]",
+            cascade="all, delete-orphan"
+        )
 
-    # Зв'язок з створеними шаблонами груп (якщо created_by_user_id в GroupTemplateModel)
-    created_group_templates: Mapped[List["GroupTemplateModel"]] = relationship(
-        back_populates="creator",
-        foreign_keys="[GroupTemplateModel.created_by_user_id]"
-        # ondelete='SET NULL' має бути на ForeignKey в GroupTemplateModel.created_by_user_id
-    )
+    @declared_attr
+    def task_reviews_left(cls) -> Mapped[List["TaskReviewModel"]]:
+        return relationship(
+            "TaskReviewModel",
+            back_populates="user",
+            foreign_keys="[TaskReviewModel.user_id]",
+            cascade="all, delete-orphan"
+        )
 
-    # Зв'язок з створеними опитуваннями (якщо created_by_user_id в PollModel)
-    created_polls: Mapped[List["PollModel"]] = relationship(
-        back_populates="creator",
-        foreign_keys="[PollModel.created_by_user_id]"
-        # ondelete='SET NULL' або 'CASCADE' має бути на ForeignKey в PollModel.created_by_user_id
-    )
+    @declared_attr
+    def poll_votes_made(cls) -> Mapped[List["PollVoteModel"]]:
+        return relationship(
+            "PollVoteModel",
+            back_populates="user",
+            foreign_keys="[PollVoteModel.user_id]",
+            cascade="all, delete-orphan"
+        )
 
-    # Зв'язок з командами, де користувач є лідером
-    led_teams: Mapped[List["TeamModel"]] = relationship(
-        back_populates="leader",
-        foreign_keys="[TeamModel.leader_user_id]"
-        # ondelete='SET NULL' має бути на ForeignKey в TeamModel.leader_user_id
-    )
+    @declared_attr
+    def system_event_logs(cls) -> Mapped[List["SystemEventLogModel"]]:
+        return relationship(
+            "SystemEventLogModel",
+            back_populates="user",
+            foreign_keys="[SystemEventLogModel.user_id]"
+        )
 
-    # Зв'язок з членством в командах
-    team_memberships: Mapped[List["TeamMembershipModel"]] = relationship(
-        back_populates="user",
-        foreign_keys="[TeamMembershipModel.user_id]",
-        cascade="all, delete-orphan"
-    )
+    @declared_attr
+    def created_group_templates(cls) -> Mapped[List["GroupTemplateModel"]]:
+        return relationship(
+            "GroupTemplateModel",
+            back_populates="creator",
+            foreign_keys="[GroupTemplateModel.created_by_user_id]"
+        )
 
-    # Зв'язок з ручними коригуваннями бонусів, зробленими цим адміном
-    made_bonus_adjustments: Mapped[List["BonusAdjustmentModel"]] = relationship(
-        back_populates="admin",
-        foreign_keys="[BonusAdjustmentModel.adjusted_by_user_id]"
-        # ondelete='SET NULL' має бути на ForeignKey в BonusAdjustmentModel.adjusted_by_user_id
-    )
+    @declared_attr
+    def created_polls(cls) -> Mapped[List["PollModel"]]:
+        return relationship(
+            "PollModel",
+            back_populates="creator",
+            foreign_keys="[PollModel.created_by_user_id]"
+        )
 
-    # Зв'язок з запитами на звіти, зробленими цим користувачем
-    requested_reports: Mapped[List["ReportModel"]] = relationship(
-        back_populates="requester",
-        foreign_keys="[ReportModel.requested_by_user_id]"
-        # ondelete='SET NULL' має бути на ForeignKey в ReportModel.requested_by_user_id
-    )
+    @declared_attr
+    def led_teams(cls) -> Mapped[List["TeamModel"]]:
+        return relationship(
+            "TeamModel",
+            back_populates="leader",
+            foreign_keys="[TeamModel.leader_user_id]"
+        )
 
-    # Зв'язок з досягненнями (отриманими бейджами та рівнями)
-    achieved_user_levels: Mapped[List["UserLevelModel"]] = relationship(back_populates="user", foreign_keys="[UserLevelModel.user_id]", cascade="all, delete-orphan")
-    achievements_earned: Mapped[List["AchievementModel"]] = relationship(back_populates="user", foreign_keys="[AchievementModel.user_id]", cascade="all, delete-orphan")
-    # Зв'язок з досягненнями, які цей користувач (адмін) вручну присудив
-    awarded_achievements_by_admin: Mapped[List["AchievementModel"]] = relationship(
-        back_populates="awarder",
-        foreign_keys="[AchievementModel.awarded_by_user_id]"
-        # ondelete='SET NULL' має бути на ForeignKey в AchievementModel.awarded_by_user_id
-    )
+    @declared_attr
+    def team_memberships(cls) -> Mapped[List["TeamMembershipModel"]]:
+        return relationship(
+            "TeamMembershipModel",
+            back_populates="user",
+            foreign_keys="[TeamMembershipModel.user_id]",
+            cascade="all, delete-orphan"
+        )
 
-    # Зв'язок з рейтингами цього користувача
-    ratings_history: Mapped[List["RatingModel"]] = relationship(back_populates="user", foreign_keys="[RatingModel.user_id]", cascade="all, delete-orphan")
+    @declared_attr
+    def made_bonus_adjustments(cls) -> Mapped[List["BonusAdjustmentModel"]]:
+        return relationship(
+            "BonusAdjustmentModel",
+            back_populates="admin",
+            foreign_keys="[BonusAdjustmentModel.adjusted_by_user_id]"
+        )
 
-    # Зв'язок з файлами, завантаженими цим користувачем
-    uploaded_files: Mapped[List["FileModel"]] = relationship(
-        back_populates="uploader",
-        foreign_keys="[FileModel.uploaded_by_user_id]"
-        # ondelete='SET NULL' має бути на ForeignKey в FileModel.uploaded_by_user_id
-    )
+    @declared_attr
+    def requested_reports(cls) -> Mapped[List["ReportModel"]]:
+        return relationship(
+            "ReportModel",
+            back_populates="requester",
+            foreign_keys="[ReportModel.requested_by_user_id]"
+        )
 
-    # Зв'язок зі статусом (успадковано з BaseMainModel)
-    # state: Mapped[Optional["StatusModel"]] = relationship("StatusModel", foreign_keys="[UserModel.state_id]", back_populates="users_with_this_state")
-    # Це вже визначено в BaseMainModel як:
-    # state: Mapped[Optional["StatusModel"]] = relationship("StatusModel", foreign_keys=[state_id], lazy="selectin")
-    # Потрібно в StatusModel додати `users_with_this_state: Mapped[List["UserModel"]] = relationship(back_populates="state")`
+    @declared_attr
+    def achieved_user_levels(cls) -> Mapped[List["UserLevelModel"]]:
+        return relationship("UserLevelModel", back_populates="user", foreign_keys="[UserLevelModel.user_id]", cascade="all, delete-orphan")
+
+    @declared_attr
+    def achievements_earned(cls) -> Mapped[List["AchievementModel"]]:
+        return relationship("AchievementModel", back_populates="user", foreign_keys="[AchievementModel.user_id]", cascade="all, delete-orphan")
+
+    @declared_attr
+    def awarded_achievements_by_admin(cls) -> Mapped[List["AchievementModel"]]:
+        return relationship(
+            "AchievementModel",
+            back_populates="awarder",
+            foreign_keys="[AchievementModel.awarded_by_user_id]"
+        )
+
+    @declared_attr
+    def ratings_history(cls) -> Mapped[List["RatingModel"]]:
+        return relationship("RatingModel", back_populates="user", foreign_keys="[RatingModel.user_id]", cascade="all, delete-orphan")
+
+    @declared_attr
+    def uploaded_files(cls) -> Mapped[List["FileModel"]]:
+        return relationship(
+            "FileModel",
+            back_populates="uploader",
+            foreign_keys="[FileModel.uploaded_by_user_id]"
+        )
+
+    # Зв'язок зі статусом (успадковано з BaseMainModel, там вже @declared_attr)
+    # state: Mapped[Optional["StatusModel"]] (успадковано)
 
     # Зв'язок з типом користувача
-    user_type: Mapped[Optional["UserTypeModel"]] = relationship("UserTypeModel", back_populates="users", foreign_keys=[user_type_id], lazy="selectin")
+    @declared_attr
+    def user_type(cls) -> Mapped[Optional["UserTypeModel"]]:
+        # Тут foreign_keys=[cls.user_type_id] використовує атрибут user_type_id самого класу UserModel
+        return relationship("UserTypeModel", back_populates="users", foreign_keys=[cls.user_type_id], lazy="selectin")
 
     # Зв'язок з транзакціями, де цей користувач є "пов'язаним" (наприклад, для подяки)
-    related_transactions: Mapped[List["TransactionModel"]] = relationship(
-        "TransactionModel", # Використовуємо рядкове посилання
-        back_populates="related_user",
-        foreign_keys="[TransactionModel.related_user_id]" # Вказуємо зовнішній ключ з TransactionModel
-    )
+    @declared_attr
+    def related_transactions(cls) -> Mapped[List["TransactionModel"]]:
+        return relationship(
+            "TransactionModel",
+            back_populates="related_user",
+            foreign_keys="[TransactionModel.related_user_id]"
+        )
 
-    # Зв'язки created_by/updated_by з BaseModel
+    # Зв'язки created_by/updated_by з BaseModel (там вже визначені як Mapped)
     # created_records: Mapped[List["SQLABaseModel"]] = relationship( # Потребує більш складної реалізації з primaryjoin
     #     foreign_keys="[SQLABaseModel.created_by_user_id]",
     #     backref="created_by_user"

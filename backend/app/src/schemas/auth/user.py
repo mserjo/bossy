@@ -245,9 +245,9 @@ class UserAdminUpdateSchema(UserUpdateSchema):
 # `min_length` для пароля.
 # Все виглядає добре.
 
-UserSchema.model_rebuild()
-UserPublicSchema.model_rebuild()
-UserCreateSchema.model_rebuild()
-UserUpdateSchema.model_rebuild()
-UserPasswordUpdateSchema.model_rebuild()
-UserAdminUpdateSchema.model_rebuild()
+# UserSchema.model_rebuild() # Буде викликано централізовано
+# UserPublicSchema.model_rebuild() # Буде викликано централізовано
+# UserCreateSchema.model_rebuild() # Зазвичай не потребує для простих схем без ForwardRef
+# UserUpdateSchema.model_rebuild() # Зазвичай не потребує для простих схем без ForwardRef
+# UserPasswordUpdateSchema.model_rebuild() # Зазвичай не потребує для простих схем без ForwardRef
+# UserAdminUpdateSchema.model_rebuild() # Зазвичай не потребує для простих схем без ForwardRef

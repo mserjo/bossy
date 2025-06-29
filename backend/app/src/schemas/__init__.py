@@ -1,203 +1,90 @@
 # backend/app/src/schemas/__init__.py
 # -*- coding: utf-8 -*-
 """
-Головний ініціалізаційний файл для пакету схем Pydantic (`schemas`).
+Ініціалізаційний файл для пакету схем Pydantic.
 
-Цей файл агрегує та експортує основні схеми даних з усіх підпакетів.
-Це дозволяє імпортувати схеми з одного централізованого місця, наприклад:
-
-from backend.app.src.schemas import UserSchema, GroupCreateSchema, TaskSchema
-
-Також цей файл може використовуватися для глобального виклику `model_rebuild()`
-для всіх схем, що використовують `ForwardRef`, хоча Pydantic v2
-зазвичай обробляє це автоматично.
+Цей файл відповідає за імпорт ключових схем або модулів схем,
+а також за централізований виклик `model_rebuild()` для тих схем,
+які використовують рядкові анотації типів (ForwardRef) для розв'язання
+циклічних залежностей.
 """
 
-# Імпорт базових схем
-from backend.app.src.schemas.base import (
-    BaseSchema,
-    IdentifiedSchema,
-    TimestampedSchema,
-    AuditDatesSchema,
-    BaseMainSchema,
-    PaginatedResponse,
-    MessageResponse,
-    DetailResponse,
-)
+# Імпортуємо модулі, що містять схеми, які можуть потребувати `model_rebuild`
+# або містять схеми, на які є посилання з інших модулів.
+from . import base
+from . import auth
+from . import bonuses
+from . import dictionaries
+from . import files
+from . import gamification
+from . import groups
+from . import notifications
+from . import system # Хоча тут може не бути ForwardRefs, для повноти
+from . import tasks # Може містити ForwardRefs
 
-# Імпорт схем з підпакетів
-from backend.app.src.schemas.auth import *
-from backend.app.src.schemas.bonuses import *
-from backend.app.src.schemas.dictionaries import *
-from backend.app.src.schemas.files import *
-from backend.app.src.schemas.gamification import *
-from backend.app.src.schemas.groups import *
-from backend.app.src.schemas.notifications import *
-from backend.app.src.schemas.reports import *
-from backend.app.src.schemas.system import *
-from backend.app.src.schemas.tasks import *
-from backend.app.src.schemas.teams import *
+# Тепер викликаємо model_rebuild() для конкретних схем,
+# які використовують рядкові анотації (ForwardRef).
+# Порядок тут може бути важливим, якщо схеми залежать одна від одної
+# навіть після використання рядкових анотацій, але зазвичай Pydantic v2
+# справляється з цим досить добре, якщо всі модулі вже імпортовані.
 
-# Визначення змінної `__all__` для контролю публічного API пакету `schemas`.
-# Це агрегація `__all__` з усіх підпакетів плюс базові схеми.
-
-_base_schemas_all = [
-    "BaseSchema", "IdentifiedSchema", "TimestampedSchema", "AuditDatesSchema",
-    "BaseMainSchema", "PaginatedResponse", "MessageResponse", "DetailResponse",
-]
-
-# Динамічне збирання __all__ з підключених модулів
-# (або можна просто скопіювати їх сюди, якщо імпорт * не використовується для __all__ в підмодулях)
-# Поки що припускаємо, що __all__ визначено в кожному __init__.py підпакету.
-import backend.app.src.schemas.auth as auth_schemas
-import backend.app.src.schemas.bonuses as bonuses_schemas
-import backend.app.src.schemas.dictionaries as dictionaries_schemas
-import backend.app.src.schemas.files as files_schemas
-import backend.app.src.schemas.gamification as gamification_schemas
-import backend.app.src.schemas.groups as groups_schemas
-import backend.app.src.schemas.notifications as notifications_schemas
-import backend.app.src.schemas.reports as reports_schemas
-import backend.app.src.schemas.system as system_schemas
-import backend.app.src.schemas.tasks as tasks_schemas
-import backend.app.src.schemas.teams as teams_schemas
-
-__all__ = _base_schemas_all + \
-    auth_schemas.__all__ + \
-    bonuses_schemas.__all__ + \
-    dictionaries_schemas.__all__ + \
-    files_schemas.__all__ + \
-    gamification_schemas.__all__ + \
-    groups_schemas.__all__ + \
-    notifications_schemas.__all__ + \
-    reports_schemas.__all__ + \
-    system_schemas.__all__ + \
-    tasks_schemas.__all__ + \
-    teams_schemas.__all__
-
-# Глобальний виклик model_rebuild для всіх схем, що можуть містити ForwardRef.
-# Це може бути корисним, щоб гарантувати, що всі посилання розв'язані.
-# Pydantic v2 зазвичай робить це "ліниво" при першому доступі.
-# Якщо виникають проблеми, цей блок можна розкоментувати та адаптувати.
-#
-# from pydantic import BaseModel as PydanticBaseModel_
-# import inspect
-#
-# all_schemas_to_rebuild = []
-# modules_to_scan = [
-#     auth_schemas, bonuses_schemas, dictionaries_schemas, files_schemas,
-#     gamification_schemas, groups_schemas, notifications_schemas,
-#     reports_schemas, system_schemas, tasks_schemas, teams_schemas
-# ]
-#
-# for module in modules_to_scan:
-#     for name, obj in inspect.getmembers(module):
-#         if inspect.isclass(obj) and issubclass(obj, PydanticBaseModel_) and obj is not PydanticBaseModel_:
-#             # Перевірка, чи схема має ForwardRef або потребує оновлення
-#             # Це складно визначити автоматично без глибокого аналізу.
-#             # Простіше додати всі схеми, які потенційно можуть мати ForwardRef.
-#             # Або ж, якщо Pydantic v2 справляється, то це не потрібно.
-#             # if hasattr(obj, 'model_fields'): # Pydantic v2
-#             #     for field_info in obj.model_fields.values():
-#             #         # Проста перевірка наявності ForwardRef у анотаціях
-#             #         # (потребує більш ретельної реалізації для вкладених типів)
-#             #         if isinstance(field_info.annotation, str) or isinstance(field_info.annotation, ForwardRef):
-#             #             all_schemas_to_rebuild.append(obj)
-#             #             break
-#             #         if hasattr(field_info.annotation, '__args__'): # Для Optional, List, Union
-#             #             for arg_type in field_info.annotation.__args__:
-#             #                 if isinstance(arg_type, str) or isinstance(arg_type, ForwardRef):
-#             #                     all_schemas_to_rebuild.append(obj)
-#             #                     break
-#             #             if obj in all_schemas_to_rebuild: break # Вже додано
-#             pass # Поки що не робимо автоматичний пошук, покладаємося на Pydantic v2
-
-# for schema_class in all_schemas_to_rebuild:
-#     try:
-#         # schema_class.model_rebuild(force=True) # Для Pydantic v2
-#         pass
-#     except Exception as e:
-#         print(f"Warning: Could not rebuild schema {schema_class.__name__} in global __init__.py: {e}")
-
-# Фіналізація стратегії `model_rebuild`:
-# Оскільки `model_rebuild()` вже викликається в `__init__.py` кожного підпакету схем
-# (наприклад, `schemas/groups/__init__.py`), глобальний виклик тут, ймовірно,
-# не потрібен і може бути навіть шкідливим, якщо порядок не гарантований.
-# Pydantic v2 має ефективно обробляти ForwardRef, якщо всі типи імпортовані
-# до моменту валідації або генерації схеми OpenAPI.
-# Залишаємо цей блок закоментованим. Якщо виникнуть проблеми з нерозв'язаними
-# ForwardRef на глобальному рівні, можна буде повернутися до цього питання.
-# Основна мета цього файлу - агрегація та реекспорт схем.
-
-# Виклик model_rebuild для всіх схем, які можуть мати ForwardRef,
-# після того, як всі модулі схем імпортовано.
-# Це має вирішити проблеми з циклічними залежностями та ForwardRef.
-# Явні імпорти для глобального model_rebuild
-from backend.app.src.schemas.files.file import FileSchema
-from backend.app.src.schemas.files.avatar import AvatarSchema
-from backend.app.src.schemas.auth.user import UserSchema, UserPublicSchema
-from backend.app.src.schemas.auth.token import RefreshTokenSchema
-from backend.app.src.schemas.auth.session import SessionSchema
-from backend.app.src.schemas.groups.group import GroupSchema, GroupSimpleSchema
-from backend.app.src.schemas.groups.membership import GroupMembershipSchema
-from backend.app.src.schemas.groups.poll import PollSchema, PollOptionSchema, PollVoteSchema
-from backend.app.src.schemas.groups.invitation import GroupInvitationSchema
-from backend.app.src.schemas.groups.settings import GroupSettingsSchema
-from backend.app.src.schemas.groups.template import GroupTemplateSchema
-from backend.app.src.schemas.tasks.task import TaskSchema
-from backend.app.src.schemas.tasks.assignment import TaskAssignmentSchema
-from backend.app.src.schemas.tasks.completion import TaskCompletionSchema
-from backend.app.src.schemas.tasks.dependency import TaskDependencySchema
-from backend.app.src.schemas.tasks.proposal import TaskProposalSchema
-from backend.app.src.schemas.tasks.review import TaskReviewSchema
-from backend.app.src.schemas.bonuses.account import AccountSchema
-from backend.app.src.schemas.bonuses.transaction import TransactionSchema
-from backend.app.src.schemas.bonuses.reward import RewardSchema
-from backend.app.src.schemas.bonuses.bonus_adjustment import BonusAdjustmentSchema
-from backend.app.src.schemas.notifications.notification import NotificationSchema
-from backend.app.src.schemas.notifications.delivery import NotificationDeliverySchema
-from backend.app.src.schemas.notifications.template import NotificationTemplateSchema
-from backend.app.src.schemas.gamification.level import LevelSchema
-from backend.app.src.schemas.gamification.user_level import UserLevelSchema
-from backend.app.src.schemas.gamification.badge import BadgeSchema
-from backend.app.src.schemas.gamification.achievement import AchievementSchema
-from backend.app.src.schemas.gamification.rating import RatingSchema
-from backend.app.src.schemas.teams.team import TeamSchema
-from backend.app.src.schemas.teams.membership import TeamMembershipSchema
-from backend.app.src.schemas.reports.report import ReportSchema
-from backend.app.src.schemas.reports.response import ReportDataResponseSchema
-from backend.app.src.schemas.dictionaries.status import StatusSchema # Додано StatusSchema
-# Додайте інші схеми, які використовують ForwardRef або на які є посилання
-
-# Список схем для model_rebuild()
-# Порядок може бути важливим, якщо є залежності між ForwardRef в різних файлах.
-# Зазвичай, якщо схема A посилається на B, а B на A, то порядок не має значення,
-# Pydantic має впоратися.
-# Головне, щоб усі класи були доступні в глобальному просторі імен модуля.
-schemas_to_rebuild_globally = [
-    # Спочатку схеми, на які часто посилаються
-    UserPublicSchema, GroupSimpleSchema, StatusSchema, # Додано StatusSchema
-    # Потім інші схеми
-    FileSchema, AvatarSchema,
-    UserSchema, RefreshTokenSchema, SessionSchema,
-    GroupSchema, GroupMembershipSchema, PollSchema, PollOptionSchema, PollVoteSchema, GroupInvitationSchema, GroupSettingsSchema, GroupTemplateSchema,
-    TaskSchema, TaskAssignmentSchema, TaskCompletionSchema, TaskDependencySchema, TaskProposalSchema, TaskReviewSchema,
-    AccountSchema, TransactionSchema, RewardSchema, BonusAdjustmentSchema,
-    NotificationSchema, NotificationDeliverySchema, NotificationTemplateSchema,
-    LevelSchema, UserLevelSchema, BadgeSchema, AchievementSchema, RatingSchema,
-    TeamSchema, TeamMembershipSchema,
-    ReportSchema, ReportDataResponseSchema,
-    # Додайте інші, якщо потрібно, в правильному порядку або всі разом
-]
-
-for schema_cls in schemas_to_rebuild_globally:
-    try:
-        schema_cls.model_rebuild()
-    except Exception as e:
-        # Логування або обробка помилки, якщо потрібно
-        print(f"Попередження: не вдалося глобально оновити схему {schema_cls.__name__}: {e}")
+# Схеми, які точно використовують рядкові посилання і потребують rebuild:
+if hasattr(auth, 'user') and hasattr(auth.user, 'UserSchema'):
+    auth.user.UserSchema.model_rebuild()
+if hasattr(auth, 'user') and hasattr(auth.user, 'UserPublicSchema'):
+    auth.user.UserPublicSchema.model_rebuild()
+# Додамо інші схеми з auth.user, якщо вони теж використовують ForwardRef
+if hasattr(auth, 'user') and hasattr(auth.user, 'UserCreateSchema'): # Малоймовірно, але для повноти
+    auth.user.UserCreateSchema.model_rebuild()
+if hasattr(auth, 'user') and hasattr(auth.user, 'UserUpdateSchema'):
+    auth.user.UserUpdateSchema.model_rebuild()
+if hasattr(auth, 'user') and hasattr(auth.user, 'UserPasswordUpdateSchema'):
+    auth.user.UserPasswordUpdateSchema.model_rebuild()
+if hasattr(auth, 'user') and hasattr(auth.user, 'UserAdminUpdateSchema'):
+    auth.user.UserAdminUpdateSchema.model_rebuild()
 
 
-# Цей файл є важливою частиною структури проекту, забезпечуючи єдину точку
-# доступу до всіх схем даних, що використовуються для валідації API запитів/відповідей
-# та взаємодії з ORM моделями.
-# Це також допомагає уникнути довгих шляхів імпорту в інших частинах коду.
+if hasattr(bonuses, 'account') and hasattr(bonuses.account, 'AccountSchema'):
+    bonuses.account.AccountSchema.model_rebuild()
+if hasattr(bonuses, 'account') and hasattr(bonuses.account, 'AccountCreateSchema'):
+    bonuses.account.AccountCreateSchema.model_rebuild()
+if hasattr(bonuses, 'account') and hasattr(bonuses.account, 'AccountUpdateSchema'):
+    bonuses.account.AccountUpdateSchema.model_rebuild()
+
+if hasattr(bonuses, 'transaction') and hasattr(bonuses.transaction, 'TransactionSchema'):
+    bonuses.transaction.TransactionSchema.model_rebuild() # Якщо TransactionSchema використовує ForwardRef
+
+# Приклад для інших можливих схем, які можуть мати ForwardRef:
+if hasattr(groups, 'group') and hasattr(groups.group, 'GroupSchema'):
+    groups.group.GroupSchema.model_rebuild()
+if hasattr(groups, 'membership') and hasattr(groups.membership, 'GroupMembershipSchema'):
+    groups.membership.GroupMembershipSchema.model_rebuild()
+
+
+if hasattr(tasks, 'task') and hasattr(tasks.task, 'TaskSchema'):
+    tasks.task.TaskSchema.model_rebuild()
+if hasattr(tasks, 'assignment') and hasattr(tasks.assignment, 'TaskAssignmentSchema'):
+    tasks.assignment.TaskAssignmentSchema.model_rebuild()
+if hasattr(tasks, 'completion') and hasattr(tasks.completion, 'TaskCompletionSchema'):
+    tasks.completion.TaskCompletionSchema.model_rebuild()
+
+if hasattr(notifications, 'notification') and hasattr(notifications.notification, 'NotificationSchema'):
+    notifications.notification.NotificationSchema.model_rebuild()
+
+if hasattr(files, 'avatar') and hasattr(files.avatar, 'AvatarSchema'):
+    files.avatar.AvatarSchema.model_rebuild()
+
+
+# Важливо: цей файл буде виконано, коли будь-який модуль з `backend.app.src.schemas`
+# буде імпортовано вперше. Це забезпечить, що всі модулі схем завантажені
+# перед тим, як викликається `model_rebuild()`.
+
+# Логування для відладки (можна прибрати в продакшені)
+try:
+    from backend.app.src.config.logging import get_logger # type: ignore
+    log = get_logger(__name__)
+    log.info("Pydantic schemas __init__ executed and model_rebuild() calls attempted.")
+except ImportError:
+    # Може статися, якщо логер ще не налаштований або є проблеми з імпортом конфігурації
+    import logging
+    logging.info("Pydantic schemas __init__ executed (fallback logger).")

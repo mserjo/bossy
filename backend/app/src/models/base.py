@@ -59,8 +59,13 @@ class BaseModel(Base): # type: ignore
     # Сервіси будуть відповідати за заповнення created_by_user_id/updated_by_user_id.
     # Зв'язки тут можуть бути для зручності отримання об'єкта користувача.
 
-    created_by: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[created_by_user_id], lazy="selectin") # type: ignore
-    updated_by: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[updated_by_user_id], lazy="selectin") # type: ignore
+    @declared_attr
+    def created_by(cls) -> Mapped[Optional["UserModel"]]: # type: ignore
+        return relationship("UserModel", foreign_keys=[cls.created_by_user_id], lazy="selectin") # type: ignore
+
+    @declared_attr
+    def updated_by(cls) -> Mapped[Optional["UserModel"]]: # type: ignore
+        return relationship("UserModel", foreign_keys=[cls.updated_by_user_id], lazy="selectin") # type: ignore
     # TODO: Потрібно буде перевірити та узгодити `back_populates` для created_by/updated_by,
     #       якщо UserModel матиме відповідні зворотні зв'язки (наприклад, `audited_records_created`
     #       або щось подібне). Наразі залишено `lazy="selectin"` для ефективності.

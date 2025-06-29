@@ -110,6 +110,6 @@ class AccountUpdateSchema(BaseSchema):
 #
 # Все виглядає добре.
 
-AccountSchema.model_rebuild()
-AccountCreateSchema.model_rebuild()
-AccountUpdateSchema.model_rebuild()
+# AccountSchema.model_rebuild() # Буде викликано централізовано
+# AccountCreateSchema.model_rebuild() # Зазвичай не потребує для простих схем без ForwardRef
+# AccountUpdateSchema.model_rebuild() # Зазвичай не потребує для простих схем без ForwardRef

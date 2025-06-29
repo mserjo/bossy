@@ -15,7 +15,7 @@ from sqlalchemy.ext.asyncio import AsyncSession # type: ignore
 from typing import Optional, List, Any
 
 # Імпорт налаштувань та утиліт
-from backend.app.src.config.database import get_db_session # Фабрика сесій БД
+from backend.app.src.config.database import get_async_session # Фабрика сесій БД
 from backend.app.src.config.settings import settings
 from backend.app.src.config.security import ALGORITHM, SECRET_KEY # Параметри JWT
 from backend.app.src.core.exceptions import UnauthorizedException, ForbiddenException, NotFoundException
@@ -25,7 +25,7 @@ from backend.app.src.core.constants import ROLE_SUPERADMIN_CODE, ROLE_ADMIN_CODE
 from backend.app.src.schemas.auth.token import TokenPayloadSchema
 from backend.app.src.schemas.auth.user import UserSchema
 # Імпорт сервісів
-from backend.app.src.services.auth.user_service import UserService # Реальний імпорт
+# from backend.app.src.services.auth.user_service import UserService # Реальний імпорт - ПЕРЕМІЩЕНО
 
 # --- Залежність для OAuth2 (отримання токена з заголовка Authorization: Bearer <token>) ---
 # `tokenUrl` вказує на ендпоінт, де клієнт може отримати токен (для документації Swagger).
@@ -38,12 +38,13 @@ oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.app.API_V1_STR}/auth/l
 # --- Залежність для отримання поточного активного користувача ---
 async def get_current_user(
     token: str = Depends(oauth2_scheme),
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_async_session)
 ) -> UserSchema: # Повертає Pydantic схему користувача, а не ORM модель
     """
     Отримує та валідує JWT токен, повертає дані користувача.
     Викликає UnauthorizedException, якщо токен невалідний або користувач не знайдений/неактивний.
     """
+    from backend.app.src.services.auth.user_service import UserService # Локальний імпорт для розриву циклу
     credentials_exception = UnauthorizedException(detail="Не вдалося валідувати облікові дані")
     try:
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -124,7 +125,7 @@ async def get_current_superuser(
 # async def get_current_group_admin(
 #     group_id: uuid.UUID, # З параметра шляху
 #     current_user: UserSchema = Depends(get_current_active_user),
-#     db: AsyncSession = Depends(get_db_session)
+#     db: AsyncSession = Depends(get_async_session)
 # ) -> UserSchema:
 #     # Потрібно перевірити членство користувача в групі group_id та його роль.
 #     # Це вимагає доступу до GroupMembershipModel та UserService/GroupService.
@@ -138,7 +139,7 @@ async def get_current_superuser(
 # --- Залежність для опціонального поточного користувача ---
 async def get_optional_current_user(
     token: Optional[str] = Depends(oauth2_scheme) if settings.app.ENVIRONMENT != "testing" else None, # У тестах токен може бути відсутнім
-    db: AsyncSession = Depends(get_db_session)
+    db: AsyncSession = Depends(get_async_session)
 ) -> Optional[UserSchema]:
     """
     Намагається отримати поточного користувача, якщо токен надано.

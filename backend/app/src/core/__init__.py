@@ -40,7 +40,7 @@ from backend.app.src.core.exceptions import (
 )
 from backend.app.src.core.dependencies import (
     get_current_user,
-    get_current_active_user,
+    # get_current_active_user, # Видалено, функціонал в get_current_user
     get_current_superuser,
     get_optional_current_user,
     oauth2_scheme, # OAuth2PasswordBearer схема для FastAPI
@@ -123,7 +123,8 @@ __all__ = [
     "ResourceAlreadyExistsException", "ResourceNotFoundException",
 
     # dependencies.py
-    "get_current_user", "get_current_active_user", "get_current_superuser",
+    "get_current_user", # "get_current_active_user", # Видалено
+    "get_current_superuser",
     "get_optional_current_user", "oauth2_scheme",
     # "get_api_key",
 

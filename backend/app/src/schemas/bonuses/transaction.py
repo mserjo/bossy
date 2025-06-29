@@ -7,24 +7,17 @@
 """
 
 from pydantic import Field
-from typing import Optional, List, Any, ForwardRef, Dict # Додано Dict
+from typing import Optional, List, Any, Dict # Забрано ForwardRef
 import uuid
 from datetime import datetime
 from decimal import Decimal # Використовуємо Decimal
 
 from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
-# Потрібно буде імпортувати схеми для зв'язків:
-# from backend.app.src.schemas.bonuses.account import AccountSchema # Або AccountSimpleSchema
-# from backend.app.src.schemas.auth.user import UserPublicSchema (для related_user)
-
-from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from backend.app.src.schemas.bonuses.account import AccountSchema
     from backend.app.src.schemas.auth.user import UserPublicSchema
-
-# AccountSchema = ForwardRef('backend.app.src.schemas.bonuses.account.AccountSchema') # Перенесено
-# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
 
 # --- Схема для відображення інформації про транзакцію (для читання) ---
 class TransactionSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at

@@ -11,7 +11,7 @@ from typing import Optional, List, Any
 import uuid
 from datetime import datetime
 
-from backend.app.src.schemas.base import BaseMainSchema, BaseSchema, AuditDatesSchema
+from backend.app.src.schemas.base import BaseMainSchema, BaseSchema, AuditDatesSchema, IdentifiedSchema
 # Потрібно буде імпортувати схеми для зв'язків, коли вони будуть готові, наприклад:
 # from backend.app.src.schemas.groups.membership import GroupMembershipSchema
 # from backend.app.src.schemas.bonuses.account import AccountSchema
@@ -19,7 +19,7 @@ from backend.app.src.schemas.base import BaseMainSchema, BaseSchema, AuditDatesS
 from backend.app.src.schemas.dictionaries.status import StatusSchema
 from backend.app.src.schemas.groups.membership import GroupMembershipSchema
 from backend.app.src.schemas.bonuses.account import AccountSchema
-from backend.app.src.schemas.tasks.task import TaskSimpleSchema # Для created_tasks
+# from backend.app.src.schemas.tasks.task import TaskSimpleSchema # Для created_tasks
 from backend.app.src.schemas.gamification.achievement import AchievementSchema # Для achievements_earned
 from backend.app.src.schemas.gamification.user_level import UserLevelSchema # Для achieved_user_levels
 
@@ -73,7 +73,7 @@ class UserSchema(BaseMainSchema):
     accounts: List[AccountSchema] = Field(default_factory=list, description="Рахунки користувача в групах")
 
     # Приклади інших зв'язків (можуть бути не всі потрібні для кожної відповіді)
-    # created_tasks: List[TaskSimpleSchema] = Field(default_factory=list, description="Завдання, створені користувачем")
+    # created_tasks: List['TaskSimpleSchema'] = Field(default_factory=list, description="Завдання, створені користувачем") # Закоментовано, оскільки TaskSimpleSchema не готова
     # achievements_earned: List[AchievementSchema] = Field(default_factory=list, description="Отримані бейджі/досягнення")
     # achieved_user_levels: List[UserLevelSchema] = Field(default_factory=list, description="Досягнуті рівні")
 
@@ -99,6 +99,8 @@ class UserPublicSchema(IdentifiedSchema): # Тільки id + публічні �
     description: Optional[str] = Field(None, description="Опис/біографія користувача (публічне, якщо заповнене та дозволено)")
     current_avatar_url: Optional[str] = Field(None, description="URL поточного аватара користувача (публічний, якщо є та дозволено)")
     # TODO: Сервісний шар повинен заповнювати ці поля з урахуванням налаштувань приватності.
+
+UserPublicSchema.model_rebuild()
 
 # --- Схема для створення нового користувача (наприклад, адміном або при реєстрації) ---
 class UserCreateSchema(BaseSchema):

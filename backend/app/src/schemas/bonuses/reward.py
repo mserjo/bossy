@@ -7,27 +7,18 @@
 """
 
 from pydantic import Field, HttpUrl
-from typing import Optional, List, ForwardRef
+from typing import Optional, List # Забрано ForwardRef
 import uuid
 from datetime import datetime
 from decimal import Decimal # Використовуємо Decimal
 
 from backend.app.src.schemas.base import BaseMainSchema, BaseSchema
-# Потрібно буде імпортувати схеми для зв'язків:
-# from backend.app.src.schemas.groups.group import GroupSimpleSchema (group_id вже є)
-# from backend.app.src.schemas.dictionaries.status import StatusSchema (state_id вже є)
-# from backend.app.src.schemas.files.file import FileSchema (або URL іконки)
-# from backend.app.src.schemas.dictionaries.bonus_type import BonusTypeSchema
-
-from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from backend.app.src.schemas.dictionaries.bonus_type import BonusTypeSchema
     from backend.app.src.schemas.dictionaries.status import StatusSchema
     from backend.app.src.schemas.files.file import FileSchema
-
-# BonusTypeSchema = ForwardRef('backend.app.src.schemas.dictionaries.bonus_type.BonusTypeSchema') # Перенесено
-# FileSchema = ForwardRef('backend.app.src.schemas.files.file.FileSchema') # Або просто URL
 
 # --- Схема для відображення інформації про нагороду (для читання) ---
 class RewardSchema(BaseMainSchema):
@@ -50,9 +41,9 @@ class RewardSchema(BaseMainSchema):
 
     # --- Розгорнуті зв'язки (приклад) ---
     # group: Optional[GroupSimpleSchema] = Field(None, description="Група, якій належить нагорода") # `group_id` вже є
-    state: Optional['StatusSchema'] = Field(None, description="Статус нагороди") # Рядкове посилання
-    icon: Optional['FileSchema'] = Field(None, description="Файл іконки нагороди") # Або `icon_url`, Рядкове посилання
-    bonus_type: Optional['BonusTypeSchema'] = Field(None, description="Тип бонусу, в якому вказана вартість") # Рядкове посилання
+    state: Optional['StatusSchema'] = Field(None, description="Статус нагороди")
+    icon: Optional['FileSchema'] = Field(None, description="Файл іконки нагороди") # Або `icon_url`
+    bonus_type: Optional['BonusTypeSchema'] = Field(None, description="Тип бонусу, в якому вказана вартість")
 
     # Статистика покупок (обчислювані поля, додаються сервісом)
     total_purchased_count: Optional[int] = Field(None, description="Загальна кількість куплених екземплярів цієї нагороди")

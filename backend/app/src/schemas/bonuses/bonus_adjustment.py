@@ -6,28 +6,19 @@
 адміністратором та для відображення інформації про такі коригування.
 """
 
-from pydantic import Field
-from typing import Optional, List, ForwardRef
+from pydantic import Field, field_validator
+from typing import Optional, List # Забрано ForwardRef
 import uuid
 from datetime import datetime
 from decimal import Decimal # Використовуємо Decimal
 
 from backend.app.src.schemas.base import BaseSchema, AuditDatesSchema
-# Потрібно буде імпортувати схеми для зв'язків:
-# from backend.app.src.schemas.bonuses.account import AccountSchema
-# from backend.app.src.schemas.auth.user import UserPublicSchema
-# from backend.app.src.schemas.bonuses.transaction import TransactionSchema
-
-from typing import TYPE_CHECKING # Додано TYPE_CHECKING
+from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
     from backend.app.src.schemas.bonuses.account import AccountSchema
     from backend.app.src.schemas.auth.user import UserPublicSchema
     from backend.app.src.schemas.bonuses.transaction import TransactionSchema
-
-# AccountSchema = ForwardRef('backend.app.src.schemas.bonuses.account.AccountSchema') # Перенесено
-# UserPublicSchema = ForwardRef('backend.app.src.schemas.auth.user.UserPublicSchema') # Перенесено
-# TransactionSchema = ForwardRef('backend.app.src.schemas.bonuses.transaction.TransactionSchema') # Перенесено
 
 # --- Схема для відображення інформації про ручне коригування бонусів (для читання) ---
 class BonusAdjustmentSchema(AuditDatesSchema): # Успадковує id, created_at, updated_at
@@ -41,9 +32,9 @@ class BonusAdjustmentSchema(AuditDatesSchema): # Успадковує id, create
     transaction_id: Optional[uuid.UUID] = Field(None, description="ID створеної транзакції, що відображає це коригування")
 
     # --- Розгорнуті зв'язки (приклад) ---
-    account: Optional['AccountSchema'] = Field(None, description="Рахунок, до якого застосовано коригування") # Рядкове посилання
-    admin: Optional['UserPublicSchema'] = Field(None, description="Адміністратор, який виконав коригування") # Рядкове посилання
-    transaction: Optional['TransactionSchema'] = Field(None, description="Пов'язана транзакція, що відображає коригування") # Рядкове посилання
+    account: Optional['AccountSchema'] = Field(None, description="Рахунок, до якого застосовано коригування")
+    admin: Optional['UserPublicSchema'] = Field(None, description="Адміністратор, який виконав коригування")
+    transaction: Optional['TransactionSchema'] = Field(None, description="Пов'язана транзакція, що відображає коригування")
 
 
 # --- Схема для створення нового ручного коригування бонусів ---
@@ -60,7 +51,8 @@ class BonusAdjustmentCreateSchema(BaseSchema):
     # після успішного створення відповідної транзакції.
 
     # Валідатор, щоб сума не була нульовою
-    @Field('amount')
+    @field_validator('amount')
+    @classmethod
     def amount_must_not_be_zero(cls, value: Decimal) -> Decimal:
         if value == Decimal('0'):
             raise ValueError("Сума коригування не може бути нульовою.")

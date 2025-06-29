@@ -6,7 +6,7 @@
 Нагороди належать до певної групи та налаштовуються адміністратором групи.
 """
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Integer, Numeric, \
     CheckConstraint  # type: ignore
@@ -17,6 +17,12 @@ import uuid # Для роботи з UUID
 # Використовуємо BaseMainModel, оскільки нагорода має назву, опис, статус (доступна/недоступна),
 # і належить до групи.
 from backend.app.src.models.base import BaseMainModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.files.file import FileModel
+    from backend.app.src.models.dictionaries.bonus_type import BonusTypeModel
+    # GroupModel, StatusModel вже є в BaseMainModel
+
 
 class RewardModel(BaseMainModel):
     """
@@ -78,7 +84,7 @@ class RewardModel(BaseMainModel):
     # group: Mapped["GroupModel"] - успадковано з BaseMainModel
 
     # TODO: Узгодити back_populates з FileModel
-    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="reward_icon_for")
+    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="reward_icon_for", lazy="selectin")
 
     # Зв'язок з BonusTypeModel через bonus_type_code
     # TODO: Узгодити back_populates="rewards_costed_in_this_type" з BonusTypeModel
@@ -86,7 +92,8 @@ class RewardModel(BaseMainModel):
         "BonusTypeModel",
         primaryjoin="foreign(RewardModel.bonus_type_code) == remote(BonusTypeModel.code)",
         uselist=False, # Одна нагорода має один тип валюти для вартості
-        back_populates="rewards_costed_in_this_type"
+        back_populates="rewards_costed_in_this_type",
+        lazy="selectin"
     )
 
     # state: Mapped[Optional["StatusModel"]] - успадковано з BaseMainModel

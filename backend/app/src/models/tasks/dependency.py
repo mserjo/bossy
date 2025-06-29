@@ -6,13 +6,17 @@
 не може бути розпочате або завершене, доки не завершене інше (передумова).
 Це реалізує зв'язок "багато-до-багатьох" між завданнями.
 """
-
+from typing import TYPE_CHECKING
 from sqlalchemy import Column, ForeignKey, String, UniqueConstraint # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
-from sqlalchemy.orm import relationship, Mapped  # type: ignore
+from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore # Додано mapped_column
 import uuid # Для роботи з UUID
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.tasks.task import TaskModel
+
 
 class TaskDependencyModel(BaseModel):
     """
@@ -51,12 +55,14 @@ class TaskDependencyModel(BaseModel):
     # --- Зв'язки (Relationships) ---
     dependent_task: Mapped["TaskModel"] = relationship(
         foreign_keys=[dependent_task_id],
-        back_populates="prerequisite_links"
+        back_populates="prerequisite_links",
+        lazy="selectin"
     )
 
     prerequisite_task: Mapped["TaskModel"] = relationship(
         foreign_keys=[prerequisite_task_id],
-        back_populates="dependent_tasks"
+        back_populates="dependent_tasks",
+        lazy="selectin"
     )
 
     # Обмеження унікальності: одна й та сама пара залежності не повинна існувати двічі.

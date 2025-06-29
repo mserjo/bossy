@@ -298,7 +298,7 @@ class UserModel(BaseMainModel):
     # Потрібно в StatusModel додати `users_with_this_state: Mapped[List["UserModel"]] = relationship(back_populates="state")`
 
     # Зв'язок з типом користувача
-    user_type: Mapped[Optional["UserTypeModel"]] = relationship("UserTypeModel", back_populates="users", foreign_keys=[user_type_id])
+    user_type: Mapped[Optional["UserTypeModel"]] = relationship("UserTypeModel", back_populates="users", foreign_keys=[user_type_id], lazy="selectin")
 
     # Зв'язок з транзакціями, де цей користувач є "пов'язаним" (наприклад, для подяки)
     related_transactions: Mapped[List["TransactionModel"]] = relationship(

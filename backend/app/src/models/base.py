@@ -9,11 +9,16 @@
 
 import uuid  # Для генерації унікальних ідентифікаторів
 from datetime import datetime  # Для роботи з датами та часом
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import Column, DateTime, ForeignKey, String, Text, func, Boolean, Integer # Додано Integer для version
 from sqlalchemy.dialects.postgresql import UUID  # Специфічний для PostgreSQL тип UUID
-from sqlalchemy.orm import declarative_base, declared_attr, relationship, Mapped, mapped_column # type: ignore # Додано Mapped, mapped_column для SQLAlchemy 2.0 стилю
+from sqlalchemy.orm import declarative_base, declared_attr, relationship, Mapped, mapped_column # Додано Mapped, mapped_column для SQLAlchemy 2.0 стилю
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel  # Для тайп-хінтінгу
+    from backend.app.src.models.dictionaries.status import StatusModel # Для тайп-хінтінгу
+    from backend.app.src.models.groups.group import GroupModel # Для тайп-хінтінгу
 
 # Створення базового класу для декларативного визначення моделей
 # Усі моделі SQLAlchemy успадковуватимуться від цього класу.
@@ -54,14 +59,11 @@ class BaseModel(Base): # type: ignore
     # Сервіси будуть відповідати за заповнення created_by_user_id/updated_by_user_id.
     # Зв'язки тут можуть бути для зручності отримання об'єкта користувача.
 
-    # created_by: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[created_by_user_id])
-    # updated_by: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[updated_by_user_id])
-    # TODO: Додати type hints для UserModel, коли він буде імпортований або через ForwardRef,
-    #       але це може створити циклічні залежності на рівні імпорту файлів.
-    #       Краще залишити ці зв'язки для визначення в конкретних моделях, якщо вони там потрібні,
-    #       або використовувати їх без back_populates, якщо вони лише для читання звідси.
-    #       Або ж, якщо UserModel матиме загальний `audited_records` зв'язок.
-    #       Поки що закоментовано, щоб уникнути проблем з імпортами.
+    created_by: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[created_by_user_id], lazy="selectin") # type: ignore
+    updated_by: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[updated_by_user_id], lazy="selectin") # type: ignore
+    # TODO: Потрібно буде перевірити та узгодити `back_populates` для created_by/updated_by,
+    #       якщо UserModel матиме відповідні зворотні зв'язки (наприклад, `audited_records_created`
+    #       або щось подібне). Наразі залишено `lazy="selectin"` для ефективності.
 
     def __repr__(self) -> str:
         """
@@ -104,7 +106,8 @@ class BaseMainModel(BaseModel):
     # Використовуємо рядкові посилання на моделі для уникнення циклічних імпортів на рівні файлів.
     # SQLAlchemy зможе їх розпізнати, якщо всі моделі успадковують від одного Base.
     @declared_attr
-    def state(cls) -> Mapped[Optional["StatusModel"]]:
+    def state(cls) -> Mapped[Optional["StatusModel"]]: # type: ignore
+        # Використовуємо cls.state_id для прив'язки до конкретного поля моделі-нащадка
         return relationship("StatusModel", foreign_keys=[cls.state_id], lazy="selectin") # type: ignore
 
     # Зв'язок з групою
@@ -115,7 +118,8 @@ class BaseMainModel(BaseModel):
     # Поки що без `back_populates` або з загальною назвою, яку треба буде узгодити.
     # `foreign_keys` вказується явно, щоб SQLAlchemy точно знав, яке поле використовувати.
     @declared_attr
-    def group(cls) -> Mapped[Optional["GroupModel"]]:
+    def group(cls) -> Mapped[Optional["GroupModel"]]: # type: ignore
+        # Використовуємо cls.group_id для прив'язки до конкретного поля моделі-нащадка
         return relationship("GroupModel", foreign_keys=[cls.group_id], lazy="selectin") # type: ignore
     # TODO: Узгодити `back_populates` для `group` з `GroupModel`, коли там будуть визначені
     #       зворотні зв'язки до різних типів сутностей, що належать групі.
@@ -179,12 +183,10 @@ class BaseMainModel(BaseModel):
 # Перехід на SQLAlchemy 2.0 стиль з `Mapped` та `mapped_column` зроблено.
 # Це покращує типізацію та інтеграцію з Mypy.
 #
-# Зв'язки `created_by` та `updated_by` в `BaseModel` закоментовані,
-# оскільки їх реалізація з `back_populates` може бути складною для базового класу,
-# який не знає про всі моделі, що його успадковують.
 # Поля `created_by_user_id` та `updated_by_user_id` залишені як `ForeignKey`.
+# Зв'язки `created_by` та `updated_by` в `BaseModel` розкоментовані та використовують `TYPE_CHECKING`.
 # Отримання об'єктів користувачів за цими ID може бути реалізовано на сервісному рівні
-# або в конкретних моделях, якщо це часто потрібно.
+# або в конкретних моделях, якщо це часто потрібно. Узгодження `back_populates` залишається актуальним.
 #
 # Логіка генерації `__tablename__` трохи покращена, але все ще може потребувати
 # ручного перевизначення для деяких моделей.

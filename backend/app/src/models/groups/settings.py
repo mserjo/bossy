@@ -6,7 +6,7 @@
 Ці налаштування керують поведінкою та функціоналом в межах конкретної групи.
 """
 from decimal import Decimal
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TYPE_CHECKING
 
 from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, Integer, Numeric, Time # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
@@ -16,6 +16,11 @@ import uuid # Для роботи з UUID
 from backend.app.src.models.base import BaseModel # Успадковуємо від BaseModel, оскільки це налаштування, а не основна сутність з ім'ям/описом.
 # Хоча, якщо налаштування мають версії або потребують аудиту як `BaseMainModel`, можна переглянути.
 # Поки що `BaseModel` (id, created_at, updated_at) виглядає достатнім.
+
+if TYPE_CHECKING:
+    from backend.app.src.models.groups.group import GroupModel
+    from backend.app.src.models.dictionaries.bonus_type import BonusTypeModel
+
 
 class GroupSettingsModel(BaseModel):
     """
@@ -113,9 +118,9 @@ class GroupSettingsModel(BaseModel):
     custom_settings: Mapped[Optional[Dict[str, Any]]] = mapped_column(JSONB, nullable=True) # SQLAlchemy 2.0 style for JSONB
 
     # --- Зв'язки (Relationships) ---
-    group: Mapped["GroupModel"] = relationship(back_populates="settings") # Використовуємо рядкове посилання
+    group: Mapped["GroupModel"] = relationship(back_populates="settings", lazy="selectin") # Використовуємо рядкове посилання
 
-    selected_bonus_type: Mapped[Optional["BonusTypeModel"]] = relationship(foreign_keys=[bonus_type_id], back_populates="group_settings_using_this_type")
+    selected_bonus_type: Mapped[Optional["BonusTypeModel"]] = relationship(foreign_keys=[bonus_type_id], back_populates="group_settings_using_this_type", lazy="selectin")
 
     def __repr__(self) -> str:
         """

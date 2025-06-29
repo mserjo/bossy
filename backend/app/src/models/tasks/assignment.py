@@ -5,7 +5,7 @@
 Ця модель представляє призначення завдання (`TaskModel`) конкретному користувачеві (`UserModel`)
 або команді (`TeamModel`). Вона фіксує, хто є виконавцем завдання.
 """
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import Column, ForeignKey, DateTime, Text, UniqueConstraint, Index, text  # type: ignore # Додано Index, text
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
@@ -14,6 +14,13 @@ import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.tasks.task import TaskModel
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.teams.team import TeamModel
+    from backend.app.src.models.dictionaries.status import StatusModel
+
 
 class TaskAssignmentModel(BaseModel):
     """
@@ -58,14 +65,14 @@ class TaskAssignmentModel(BaseModel):
 
 
     # --- Зв'язки (Relationships) ---
-    task: Mapped["TaskModel"] = relationship(back_populates="assignments")
+    task: Mapped["TaskModel"] = relationship(back_populates="assignments", lazy="selectin")
     # TODO: Узгодити back_populates="task_assignments" з UserModel
-    user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[user_id], back_populates="task_assignments")
+    user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[user_id], back_populates="task_assignments", lazy="selectin")
     # TODO: Узгодити back_populates="task_assignments" з TeamModel
-    team: Mapped[Optional["TeamModel"]] = relationship(foreign_keys=[team_id], back_populates="task_assignments") # Припускаючи, що в TeamModel є tasks_assigned, а не task_assignments
+    team: Mapped[Optional["TeamModel"]] = relationship(foreign_keys=[team_id], back_populates="task_assignments", lazy="selectin") # Припускаючи, що в TeamModel є tasks_assigned, а не task_assignments
     # TODO: Узгодити back_populates="made_task_assignments" з UserModel
-    assigner: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[assigned_by_user_id], back_populates="made_task_assignments")
-    status: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[status_id], back_populates="task_assignments_with_this_status")
+    assigner: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[assigned_by_user_id], back_populates="made_task_assignments", lazy="selectin")
+    status: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[status_id], back_populates="task_assignments_with_this_status", lazy="selectin")
 
     # Обмеження унікальності:
     # Одне завдання не може бути призначене одному й тому ж користувачеві двічі.

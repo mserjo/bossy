@@ -5,15 +5,18 @@
 Це може включати системні логи, метрики продуктивності, записи про помилки тощо.
 Ці дані допомагають відстежувати стан системи, діагностувати проблеми та аналізувати її роботу.
 """
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import Column, String, Text, DateTime, JSON, Integer, Float, ForeignKey # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, INET # type: ignore
 import uuid # Для роботи з UUID
 
-from sqlalchemy.orm import Mapped, relationship
+from sqlalchemy.orm import Mapped, relationship, mapped_column # type: ignore # Додано mapped_column
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel, оскільки це записи логів/метрик
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel
 
 # TODO: Розділити на декілька моделей, якщо потрібно:
 # - SystemLogModel: для текстових логів додатку.
@@ -83,7 +86,7 @@ class SystemEventLogModel(BaseModel):
     # `created_at` (якщо використовується як timestamp) вже має індекс з BaseModel.
 
     # Зв'язок з користувачем
-    user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[user_id], back_populates="system_event_logs")
+    user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[user_id], back_populates="system_event_logs", lazy="selectin")
 
     def __repr__(self) -> str:
         """

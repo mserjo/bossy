@@ -4,7 +4,7 @@
 Цей модуль визначає модель SQLAlchemy `GroupInvitationModel` для зберігання запрошень
 користувачів до груп. Запрошення можуть бути у вигляді унікального посилання або QR-коду.
 """
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import Column, String, DateTime, ForeignKey, Boolean, Integer # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
@@ -13,6 +13,13 @@ import uuid # Для роботи з UUID
 from datetime import datetime, timedelta # Для роботи з датами та часом
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.groups.group import GroupModel
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.dictionaries.user_role import UserRoleModel
+    from backend.app.src.models.dictionaries.status import StatusModel
+
 
 class GroupInvitationModel(BaseModel):
     """
@@ -65,15 +72,15 @@ class GroupInvitationModel(BaseModel):
     status_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("statuses.id", name="fk_group_invitations_status_id", ondelete="SET NULL"), nullable=True, index=True)
 
     # --- Зв'язки (Relationships) ---
-    group: Mapped["GroupModel"] = relationship(back_populates="invitations")
+    group: Mapped["GroupModel"] = relationship(back_populates="invitations", lazy="selectin")
 
     # TODO: Узгодити back_populates з UserModel
-    creator: Mapped["UserModel"] = relationship(foreign_keys=[user_id_creator], back_populates="created_group_invitations")
-    invited_user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[user_id_invited], back_populates="received_group_invitations")
+    creator: Mapped["UserModel"] = relationship(foreign_keys=[user_id_creator], back_populates="created_group_invitations", lazy="selectin")
+    invited_user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[user_id_invited], back_populates="received_group_invitations", lazy="selectin")
 
-    role_to_assign: Mapped["UserRoleModel"] = relationship(foreign_keys=[role_to_assign_id], back_populates="group_invitations_assigning_this_role")
+    role_to_assign: Mapped["UserRoleModel"] = relationship(foreign_keys=[role_to_assign_id], back_populates="group_invitations_assigning_this_role", lazy="selectin")
 
-    status: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[status_id], back_populates="group_invitations_with_this_status")
+    status: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[status_id], back_populates="group_invitations_with_this_status", lazy="selectin")
 
 
     def __repr__(self) -> str:

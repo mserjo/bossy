@@ -5,7 +5,7 @@
 в межах групи. Команди можуть використовуватися для виконання спільних завдань
 або участі у змаганнях.
 """
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 
 from sqlalchemy import Column, String, Text, ForeignKey, Integer, CheckConstraint, UniqueConstraint  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
@@ -15,6 +15,16 @@ import uuid # Для роботи з UUID
 # Використовуємо BaseMainModel, оскільки команда має назву, опис, статус (активна/неактивна),
 # і належить до групи.
 from backend.app.src.models.base import BaseMainModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.teams.membership import TeamMembershipModel
+    from backend.app.src.models.tasks.task import TaskModel
+    from backend.app.src.models.files.file import FileModel
+    from backend.app.src.models.tasks.assignment import TaskAssignmentModel
+    from backend.app.src.models.tasks.completion import TaskCompletionModel
+    # GroupModel та StatusModel вже є в BaseMainModel
+
 
 class TeamModel(BaseMainModel):
     """
@@ -62,18 +72,22 @@ class TeamModel(BaseMainModel):
     # group: Mapped["GroupModel"] - успадковано з BaseMainModel
 
     # TODO: Узгодити back_populates="led_teams" з UserModel
-    leader: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[leader_user_id], back_populates="led_teams")
+    leader: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[leader_user_id], back_populates="led_teams", lazy="selectin")
 
-    memberships: Mapped[List["TeamMembershipModel"]] = relationship(back_populates="team", cascade="all, delete-orphan")
+    memberships: Mapped[List["TeamMembershipModel"]] = relationship(back_populates="team", cascade="all, delete-orphan", lazy="select")
 
     # Зв'язок з TaskModel.team_id
     # TODO: Узгодити back_populates="team" в TaskModel з назвою тут (tasks_assigned)
-    tasks_assigned: Mapped[List["TaskModel"]] = relationship(back_populates="team")
+    tasks_assigned: Mapped[List["TaskModel"]] = relationship(back_populates="team", lazy="select")
 
     # state: Mapped[Optional["StatusModel"]] - успадковано з BaseMainModel
 
     # TODO: Узгодити back_populates з FileModel
-    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="team_icon_for")
+    icon_file: Mapped[Optional["FileModel"]] = relationship(foreign_keys=[icon_file_id], back_populates="team_icon_for", lazy="selectin")
+
+    # Зв'язки з TaskAssignmentModel та TaskCompletionModel
+    task_assignments: Mapped[List["TaskAssignmentModel"]] = relationship(back_populates="team", cascade="all, delete-orphan", lazy="select")
+    task_completions: Mapped[List["TaskCompletionModel"]] = relationship(back_populates="team", cascade="all, delete-orphan", lazy="select")
 
     __table_args__ = (
         CheckConstraint('group_id IS NOT NULL', name='ck_team_group_id_not_null'),

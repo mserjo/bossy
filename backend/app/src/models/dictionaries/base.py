@@ -30,14 +30,15 @@ class BaseDictModel(BaseMainModel):
     # Це поле повинно бути унікальним в межах одного довідника.
     # index=True: Створює індекс для цього поля для пришвидшення пошуку.
     # nullable=False: Поле не може бути порожнім.
-    # TODO: Додати обмеження унікальності (unique=True) для поля `code` на рівні бази даних.
-    # Це потрібно робити в конкретних моделях-наслідниках, оскільки унікальність
-    # має бути в межах таблиці конкретного довідника, а не глобально.
-    # Або розглянути композитний індекс/обмеження, якщо `code` має бути унікальним
-    # в поєднанні з іншим полем (наприклад, `group_id`, якщо довідники специфічні для груп).
-    # Для загальних довідників `unique=True` є доцільним.
-    # code: Column[str] = Column(String(100), nullable=False, index=True) # Старий стиль
-    code: Mapped[str] = mapped_column(String(100), nullable=False, index=True) # Новий стиль SQLAlchemy 2.0
+    # Примітка: Обмеження унікальності (UniqueConstraint) для поля `code`
+    # слід додавати в конкретних моделях-наслідниках через атрибут `__table_args__`.
+    # Наприклад:
+    # class MySpecificDictModel(BaseDictModel):
+    #     __tablename__ = "my_specific_dicts"
+    #     __table_args__ = (UniqueConstraint('code', name='uq_my_specific_dict_code'),)
+    #
+    # Це забезпечить унікальність коду в межах конкретної таблиці довідника.
+    code: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
 
     # TODO: Подумати над тим, чи потрібне поле `group_id` для всіх довідників.
     # Деякі довідники можуть бути глобальними (наприклад, системні статуси, ролі),

@@ -6,7 +6,7 @@
 адміністратору групи. Адміністратор може на основі пропозиції створити
 реальне завдання/подію та, за бажанням, нарахувати бонуси за вдалу пропозицію.
 """
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, TYPE_CHECKING
 
 from sqlalchemy import Column, ForeignKey, DateTime, Text, String, Boolean  # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
@@ -19,6 +19,13 @@ from datetime import datetime # Для роботи з датами та час�
 # Однак, пропозиція сама по собі може не мати всіх атрибутів BaseMainModel.
 # Спробуємо з BaseModel і додамо потрібні поля.
 from backend.app.src.models.base import BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.groups.group import GroupModel
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.dictionaries.status import StatusModel
+    from backend.app.src.models.tasks.task import TaskModel
+
 
 class TaskProposalModel(BaseModel):
     """
@@ -73,14 +80,14 @@ class TaskProposalModel(BaseModel):
 
     # --- Зв'язки (Relationships) ---
     # TODO: Узгодити back_populates з GroupModel
-    group: Mapped["GroupModel"] = relationship(foreign_keys=[group_id], back_populates="task_proposals")
+    group: Mapped["GroupModel"] = relationship(foreign_keys=[group_id], back_populates="task_proposals", lazy="selectin")
     # TODO: Узгодити back_populates="task_proposals_made" з UserModel
-    proposer: Mapped["UserModel"] = relationship(foreign_keys=[proposed_by_user_id], back_populates="task_proposals_made")
-    status: Mapped["StatusModel"] = relationship(foreign_keys=[status_id], back_populates="task_proposals_with_this_status")
+    proposer: Mapped["UserModel"] = relationship(foreign_keys=[proposed_by_user_id], back_populates="task_proposals_made", lazy="selectin")
+    status: Mapped["StatusModel"] = relationship(foreign_keys=[status_id], back_populates="task_proposals_with_this_status", lazy="selectin")
     # TODO: Узгодити back_populates="task_proposals_reviewed" з UserModel
-    reviewer: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[reviewed_by_user_id], back_populates="task_proposals_reviewed")
+    reviewer: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[reviewed_by_user_id], back_populates="task_proposals_reviewed", lazy="selectin")
     # TODO: Узгодити back_populates="source_proposal" з TaskModel
-    created_task: Mapped[Optional["TaskModel"]] = relationship(foreign_keys=[created_task_id], back_populates="source_proposal")
+    created_task: Mapped[Optional["TaskModel"]] = relationship(foreign_keys=[created_task_id], back_populates="source_proposal", lazy="selectin")
 
     def __repr__(self) -> str:
         """

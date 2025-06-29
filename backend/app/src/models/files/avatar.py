@@ -5,13 +5,18 @@
 про аватари користувачів. Аватар - це специфічний тип файлу (`FileModel`),
 пов'язаний з користувачем (`UserModel`).
 """
-
+from typing import TYPE_CHECKING
 from sqlalchemy import Column, ForeignKey, Boolean, Index, text # type: ignore # Замінено UniqueConstraint на Index
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
 from sqlalchemy.orm import relationship, Mapped, mapped_column  # type: ignore # Додано mapped_column
 import uuid # Для роботи з UUID
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.files.file import FileModel
+
 
 class AvatarModel(BaseModel):
     """
@@ -48,10 +53,10 @@ class AvatarModel(BaseModel):
 
     # --- Зв'язки (Relationships) ---
     # TODO: Узгодити back_populates="avatars" з UserModel
-    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="avatars")
+    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="avatars", lazy="selectin")
 
     # TODO: Узгодити back_populates="avatar_entry" з FileModel
-    file: Mapped["FileModel"] = relationship(foreign_keys=[file_id], back_populates="avatar_entry")
+    file: Mapped["FileModel"] = relationship(foreign_keys=[file_id], back_populates="avatar_entry", lazy="selectin")
 
     # Обмеження унікальності:
     # Для кожного user_id може бути лише один аватар з is_current = True.

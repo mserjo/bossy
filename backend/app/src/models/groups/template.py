@@ -5,7 +5,7 @@
 Шаблони груп дозволяють супер-адміністраторам створювати передвизначені конфігурації груп
 (з налаштуваннями, типами завдань, нагородами тощо) для швидкого розгортання нових схожих груп.
 """
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 
 from sqlalchemy import Column, String, Text, DateTime, Boolean, ForeignKey, JSON, Integer, \
     UniqueConstraint  # type: ignore
@@ -16,6 +16,12 @@ import uuid # Для роботи з UUID
 # Використовуємо BaseMainModel, оскільки шаблон має назву, опис, і потенційно статус (активний/неактивний шаблон).
 # group_id для шаблона буде NULL.
 from backend.app.src.models.base import BaseMainModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.auth.user import UserModel
+    # from backend.app.src.models.dictionaries.status import StatusModel # Вже є в BaseMainModel
+    from backend.app.src.models.groups.group import GroupModel
+
 
 class GroupTemplateModel(BaseMainModel):
     """
@@ -67,7 +73,7 @@ class GroupTemplateModel(BaseMainModel):
 
     # --- Зв'язки (Relationships) ---
     # TODO: Узгодити back_populates="created_group_templates" з UserModel
-    creator: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[created_by_user_id], back_populates="created_group_templates")
+    creator: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[created_by_user_id], back_populates="created_group_templates", lazy="selectin")
 
     # Зв'язок зі статусом (успадкований з BaseMainModel)
     # state: Mapped[Optional["StatusModel"]] = relationship(foreign_keys="GroupTemplateModel.state_id") # Вже є в BaseMainModel

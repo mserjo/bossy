@@ -7,7 +7,7 @@
 статус перевірки та підтвердження виконання.
 """
 from decimal import Decimal
-from typing import Optional, List, Dict, Any
+from typing import Optional, List, Dict, Any, TYPE_CHECKING
 
 from sqlalchemy import Column, ForeignKey, DateTime, Text, UniqueConstraint, Numeric, LargeBinary # type: ignore
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
@@ -16,6 +16,13 @@ import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.tasks.task import TaskModel
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.teams.team import TeamModel
+    from backend.app.src.models.dictionaries.status import StatusModel
+
 
 class TaskCompletionModel(BaseModel):
     """
@@ -93,14 +100,14 @@ class TaskCompletionModel(BaseModel):
 
 
     # --- Зв'язки (Relationships) ---
-    task: Mapped["TaskModel"] = relationship(back_populates="completions")
+    task: Mapped["TaskModel"] = relationship(back_populates="completions", lazy="selectin")
     # TODO: Узгодити back_populates="task_completions" з UserModel
-    user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[user_id], back_populates="task_completions")
+    user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[user_id], back_populates="task_completions", lazy="selectin")
     # TODO: Узгодити back_populates="task_completions" з TeamModel
-    team: Mapped[Optional["TeamModel"]] = relationship(foreign_keys=[team_id], back_populates="task_completions") # Припускаючи, що в TeamModel є task_completions
-    status: Mapped["StatusModel"] = relationship(foreign_keys=[status_id], back_populates="task_completions_with_this_status")
+    team: Mapped[Optional["TeamModel"]] = relationship(foreign_keys=[team_id], back_populates="task_completions", lazy="selectin") # Припускаючи, що в TeamModel є task_completions
+    status: Mapped["StatusModel"] = relationship(foreign_keys=[status_id], back_populates="task_completions_with_this_status", lazy="selectin")
     # TODO: Узгодити back_populates="reviewed_task_completions" з UserModel
-    reviewer: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[reviewed_by_user_id], back_populates="reviewed_task_completions")
+    reviewer: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[reviewed_by_user_id], back_populates="reviewed_task_completions", lazy="selectin")
 
     # Обмеження унікальності:
     # Зазвичай, один користувач може мати один "активний" запис про виконання для одного завдання.

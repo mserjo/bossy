@@ -9,13 +9,18 @@
 (id, name, description, code, state_id, group_id, created_at, updated_at, deleted_at, is_deleted, notes)
 та функціональність.
 """
-
+from typing import TYPE_CHECKING
 from sqlalchemy import UniqueConstraint # type: ignore # Для визначення обмежень унікальності
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped # type: ignore # Додано Mapped
 
 # from sqlalchemy.orm import relationship # type: ignore # Для визначення зв'язків (якщо потрібно)
 
 from backend.app.src.models.dictionaries.base import BaseDictModel # Імпорт базової моделі для довідників
+
+if TYPE_CHECKING:
+    from backend.app.src.models.groups.membership import GroupMembershipModel
+    from backend.app.src.models.groups.invitation import GroupInvitationModel
+    # from backend.app.src.models.auth.user import UserModel # Якщо буде зв'язок users_with_this_as_default_role
 
 # TODO: Визначити, чи потрібні специфічні поля для моделі UserRoleModel, окрім успадкованих.
 # Наприклад, рівень доступу (числовий), або список дозволів (якщо не реалізовано окремою системою дозволів).

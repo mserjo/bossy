@@ -5,7 +5,7 @@
 Ця модель дозволяє користувачам залишати відгуки та ставити рейтинги
 на завдання або події в групі. Ця можливість налаштовується адміністратором групи.
 """
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import Column, ForeignKey, DateTime, Text, Integer, UniqueConstraint # type: ignore
 from sqlalchemy.dialects.postgresql import UUID # type: ignore
@@ -14,6 +14,12 @@ import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.tasks.task import TaskModel
+    from backend.app.src.models.auth.user import UserModel
+    # from backend.app.src.models.dictionaries.status import StatusModel # Якщо буде модерація
+
 
 class TaskReviewModel(BaseModel):
     """
@@ -54,10 +60,10 @@ class TaskReviewModel(BaseModel):
     # status_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), ForeignKey("statuses.id", ondelete="SET NULL"), nullable=True, index=True) # Якщо буде модерація
 
     # --- Зв'язки (Relationships) ---
-    task: Mapped["TaskModel"] = relationship(back_populates="reviews")
+    task: Mapped["TaskModel"] = relationship(back_populates="reviews", lazy="selectin")
     # TODO: Узгодити back_populates="task_reviews_left" з UserModel
-    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="task_reviews_left")
-    # status: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[status_id], back_populates="task_reviews_with_this_status") # Якщо буде модерація
+    user: Mapped["UserModel"] = relationship(foreign_keys=[user_id], back_populates="task_reviews_left", lazy="selectin")
+    # status: Mapped[Optional["StatusModel"]] = relationship(foreign_keys=[status_id], back_populates="task_reviews_with_this_status", lazy="selectin") # Якщо буде модерація
 
     # Обмеження унікальності: один користувач може залишити лише один відгук на одне завдання.
     __table_args__ = (

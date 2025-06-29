@@ -9,12 +9,18 @@
 from sqlalchemy import Column, ForeignKey, Numeric, Text, String, DateTime, Index  # type: ignore # Для mapped_column
 from sqlalchemy.dialects.postgresql import UUID, JSONB # type: ignore
 from sqlalchemy.orm import relationship, Mapped, mapped_column # type: ignore
-from typing import Optional, Dict, Any, List # Додано List
+from typing import Optional, Dict, Any, List, TYPE_CHECKING # Додано List
 import uuid # Для роботи з UUID
 from datetime import datetime # Для роботи з датами та часом
 from decimal import Decimal # Для Numeric полів
 
 from backend.app.src.models.base import BaseModel # Використовуємо BaseModel
+
+if TYPE_CHECKING:
+    from backend.app.src.models.bonuses.account import AccountModel
+    from backend.app.src.models.auth.user import UserModel
+    from backend.app.src.models.bonuses.bonus_adjustment import BonusAdjustmentModel
+
 
 class TransactionModel(BaseModel):
     """
@@ -41,14 +47,14 @@ class TransactionModel(BaseModel):
     balance_after_transaction: Mapped[Optional[Decimal]] = mapped_column(Numeric(12, 2), nullable=True)
 
     # --- Зв'язки (Relationships) ---
-    account: Mapped["AccountModel"] = relationship(back_populates="transactions")
+    account: Mapped["AccountModel"] = relationship(back_populates="transactions", lazy="selectin")
     # TODO: Узгодити back_populates="related_transactions" з UserModel
-    related_user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[related_user_id], back_populates="related_transactions")
+    related_user: Mapped[Optional["UserModel"]] = relationship(foreign_keys=[related_user_id], back_populates="related_transactions", lazy="selectin")
 
     # Зв'язок з BonusAdjustmentModel (якщо транзакція створена через коригування)
     # Потрібно додати `bonus_adjustment = relationship(back_populates="transaction")` в BonusAdjustmentModel
     # І тут:
-    source_adjustment: Mapped[Optional["BonusAdjustmentModel"]] = relationship(back_populates="transaction")
+    source_adjustment: Mapped[Optional["BonusAdjustmentModel"]] = relationship(back_populates="transaction", lazy="selectin")
 
     __table_args__ = (
         Index('ix_transactions_source_entity', 'source_entity_type', 'source_entity_id'),

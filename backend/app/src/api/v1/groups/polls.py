@@ -55,8 +55,8 @@ async def check_poll_permissions(
     summary="Створити нове опитування в групі (адміністратор групи)"
 )
 async def create_group_poll_endpoint(
-    group_id: int = Path(..., description="ID групи"),
     poll_in: PollCreateSchema,
+    group_id: int = Path(..., description="ID групи"),
     group_with_admin_rights: dict = Depends(group_admin_permission),
     db_session: DBSession = Depends()
 ):

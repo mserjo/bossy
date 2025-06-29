@@ -36,8 +36,8 @@ router = APIRouter()
     summary="Створити нове завдання/подію в групі (адміністратор групи)"
 )
 async def create_task_in_group(
-    group_id: int = Path(..., description="ID групи, в якій створюється завдання"),
     task_in: TaskCreateSchema,
+    group_id: int = Path(..., description="ID групи, в якій створюється завдання"),
     group_with_admin_rights: dict = Depends(group_admin_permission), # Перевірка, що користувач є адміном цієї групи
     db_session: DBSession = Depends()
 ):
@@ -167,9 +167,9 @@ async def get_task_details(
     summary="Оновити інформацію про завдання/подію (адміністратор групи)"
 )
 async def update_existing_task(
+    task_in: TaskUpdateSchema,
     group_id: int = Path(..., description="ID групи"),
     task_id: int = Path(..., description="ID завдання/події для оновлення"),
-    task_in: TaskUpdateSchema,
     group_with_admin_rights: dict = Depends(group_admin_permission),
     db_session: DBSession = Depends()
 ):

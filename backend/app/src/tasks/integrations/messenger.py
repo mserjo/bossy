@@ -7,6 +7,7 @@
 from backend.app.src.config.logging import get_logger
 # TODO: Імпортувати екземпляр Celery app
 # from backend.app.src.workers import celery_app as app # Приклад
+from typing import Optional, Dict, Any # Додано для Optional, Dict, Any
 # TODO: Імпортувати сервіси для взаємодії з логікою бота або командами
 # from backend.app.src.services.bot.command_handler_service import CommandHandlerService
 # from backend.app.src.services.integrations.messenger_service_factory import MessengerServiceFactory # Для відправки відповідей
@@ -18,11 +19,11 @@ logger = get_logger(__name__)
 def process_incoming_messenger_message_task(
     provider_name: str, # Наприклад, 'telegram', 'slack'
     user_messenger_id: str, # ID користувача в месенджері (chat_id, user_id в Slack)
+    full_payload: Dict[str, Any], # Повний payload від месенджера
     text_message: Optional[str] = None,
     # command: Optional[str] = None, # Якщо це команда
     # callback_query_data: Optional[str] = None, # Для Telegram inline кнопок
-    # event_payload: Optional[Dict[str, Any]] = None # Повний payload від месенджера
-    full_payload: Dict[str, Any] # Повний payload від месенджера
+    # event_payload: Optional[Dict[str, Any]] = None # Повний payload від месенджера (схоже на full_payload)
 ):
     """
     Асинхронне завдання для обробки вхідного повідомлення або команди від месенджера.

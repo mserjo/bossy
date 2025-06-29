@@ -119,8 +119,8 @@ async def get_user_transactions_in_group_by_admin(
     summary="Ручне нарахування/списання бонусів (адміністратор групи)"
 )
 async def manual_bonus_adjustment(
-    group_id: int = Path(..., description="ID групи, в якій проводиться операція"),
     adjustment_data: ManualTransactionCreateSchema,
+    group_id: int = Path(..., description="ID групи, в якій проводиться операція"),
     group_with_admin_rights: dict = Depends(group_admin_permission),
     db_session: DBSession = Depends()
 ):
@@ -173,8 +173,8 @@ async def manual_bonus_adjustment(
     summary="Надіслати 'подяку' (бонуси) іншому учаснику групи"
 )
 async def send_thank_you_bonus(
-    group_id: int = Path(..., description="ID групи, в якій відбувається подяка"),
     thank_you_data: ThankYouBonusCreateSchema,
+    group_id: int = Path(..., description="ID групи, в якій відбувається подяка"),
     access_check: dict = Depends(group_member_permission), # Відправник має бути членом групи
     db_session: DBSession = Depends()
 ):

@@ -34,8 +34,8 @@ router = APIRouter()
     summary="Створити нову нагороду в групі (адміністратор групи)"
 )
 async def create_reward_in_group(
-    group_id: int = Path(..., description="ID групи, в якій створюється нагорода"),
     reward_in: RewardCreateSchema,
+    group_id: int = Path(..., description="ID групи, в якій створюється нагорода"),
     group_with_admin_rights: dict = Depends(group_admin_permission),
     db_session: DBSession = Depends()
 ):
@@ -123,9 +123,9 @@ async def get_reward_details(
     summary="Оновити нагороду (адміністратор групи)"
 )
 async def update_existing_reward(
+    reward_in: RewardUpdateSchema,
     group_id: int = Path(..., description="ID групи"),
     reward_id: int = Path(..., description="ID нагороди для оновлення"),
-    reward_in: RewardUpdateSchema,
     group_with_admin_rights: dict = Depends(group_admin_permission),
     db_session: DBSession = Depends()
 ):

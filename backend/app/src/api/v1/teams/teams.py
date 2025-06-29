@@ -35,8 +35,8 @@ router = APIRouter()
     summary="Створити нову команду в групі (адміністратор групи)"
 )
 async def create_team_in_group(
-    group_id: int = Path(..., description="ID групи, в якій створюється команда"),
     team_in: TeamCreateSchema,
+    group_id: int = Path(..., description="ID групи, в якій створюється команда"),
     group_with_admin_rights: dict = Depends(group_admin_permission),
     db_session: DBSession = Depends()
 ):
@@ -152,9 +152,9 @@ async def get_team_details(
     summary="Оновити інформацію про команду (адміністратор групи)"
 )
 async def update_existing_team(
+    team_in: TeamUpdateSchema,
     group_id: int = Path(..., description="ID групи"),
     team_id: int = Path(..., description="ID команди для оновлення"),
-    team_in: TeamUpdateSchema,
     group_with_admin_rights: dict = Depends(group_admin_permission), # Перевірка, що користувач адмін групи
     db_session: DBSession = Depends()
 ):
